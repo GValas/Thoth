@@ -85,7 +85,8 @@ heston_vol: !heston_volatility
   long_vol: 25      # sqrt(theta) in percent
   kappa: 2          # mean-reversion speed
   vol_of_vol: 0.5   # xi
-  rho: -0.7         # spot / variance correlation
+  # rho (spot/variance correlation) is read from the global correlation matrix:
+  # the variance factor is the pseudo-underlying "eq_var" (see correl below).
   calendar: calendar
 calendar: !simple_weighted_calendar
   non_working_days_weight: 1
@@ -94,6 +95,8 @@ eur: !currency
 eur_rate: !yield_curve
   dates: [2000-01-01, 2010-01-01]
   values: [5, 5]
+# the Heston spot/variance correlation rho = -0.7 lives here: "eq" against its
+# variance pseudo-underlying "eq_var".
 correl: !correlation_matrix
-  underlyings: [eq]
-  matrix: [1]
+  underlyings: [eq, eq_var]
+  matrix: [1, -0.7, -0.7, 1]

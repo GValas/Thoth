@@ -80,8 +80,10 @@ Black-Scholes (delta 0.66, gamma 0.012, vega 0.37, rho 0.50, theta −0.026).
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).
 
-**Stochastic volatility (Heston)** — `heston_volatility` (`v0`/`kappa`/`theta`/
-`xi`/`rho`, vols in percent) is priced consistently by all three engines: MCL via
+**Stochastic volatility (Heston)** — `heston_volatility` (`init_vol`/`long_vol`/
+`kappa`/`vol_of_vol`, vols in percent; the spot/variance correlation ρ lives in
+the global `correlation_matrix` as the underlying against its variance
+pseudo-underlying `<name>_var`) is priced consistently by all three engines: MCL via
 the Andersen QE variance scheme, ANA via the characteristic function (Carr–Madan /
 Little-Heston-Trap), and PDE via a 2-D `(S,v)` Douglas-ADI grid (European and
 American). The three agree to ~0.3% across moneyness, and the degenerate

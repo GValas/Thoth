@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "pricer.hpp"
+#include "heston_volatility.hpp"
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
 
@@ -561,5 +562,23 @@ void Pricer::InitPricing()
           s++ )
     {
         ( *s )->SetToday( _today );
+
+        //! Heston: the spot/variance correlation rho lives in the global
+        //! correlation matrix (variance keyed "<underlying>_var"), not on the
+        //! heston_volatility object. Resolve it onto the vol so every engine can
+        //! read hv->GetRho() unchanged.
+        if ( ( *s )->GetVolatility()->IsStochastic() )
+        {
+            HestonVolatility* hv = dynamic_cast<HestonVolatility*>( ( *s )->GetVolatility() );
+            if ( hv )
+            {
+                if ( !_correlation )
+                {
+                    ERR( "book pricing '" + _name + "': Heston underlying '" + ( *s )->GetName() +
+                         "' needs a correlation matrix for its spot/variance correlation" );
+                }
+                hv->SetRho( _correlation->GetValue( ( *s )->GetName(), ( *s )->GetName() + "_var" ) );
+            }
+        }
     }
 }

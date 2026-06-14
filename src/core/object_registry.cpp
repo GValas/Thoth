@@ -291,7 +291,6 @@ map<string, ObjectManager::Factory> MakeRegistry()
         H->SetTheta( pow( m.cfg().GetDouble( n + ".long_vol" ) / 100.0, 2 ) );
         H->SetKappa( m.cfg().GetDouble( n + ".kappa" ) );
         H->SetXi( m.cfg().GetDouble( n + ".vol_of_vol" ) );
-        H->SetRho( m.cfg().GetDouble( n + ".rho" ) );
         ConfigureVolatilityCommon( m, H, n );
         return H;
     };
