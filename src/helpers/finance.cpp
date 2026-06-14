@@ -1,4 +1,6 @@
 #include "finance.hpp"
+#include <complex>
+#include <gsl/gsl_integration.h>
 
 //! vanilla price
 double payoff_vanilla( const double spot,
@@ -208,4 +210,93 @@ double BS_Call_ImplicitVol( const double Forward,
     } while ( abs( vol_error ) > IMPLICIT_VOL_MAX_ERROR && ++i < IMPLICIT_VOL_MAX_ITERATIONS );
 
     return vol;
+}
+//! ----------------------------------------------------------------------
+//! Heston European pricing via the characteristic function
+//! ----------------------------------------------------------------------
+namespace
+{
+using cdouble = std::complex<double>;
+
+struct HestonParams
+{
+    double F, K, T, v0, kappa, theta, xi, rho;
+    int j; //!< 1 or 2 (the two Heston probabilities P1, P2)
+};
+
+//! integrand of P_j : Re( e^{-i phi ln K} f_j(phi) / (i phi) ), forward measure
+//! (x = ln F, no drift term — the forward carries the drift).
+double heston_integrand( double phi, void* params )
+{
+    const HestonParams& h = *static_cast<HestonParams*>( params );
+    const cdouble I( 0.0, 1.0 );
+
+    const double uj = ( h.j == 1 ) ? 0.5 : -0.5;
+    const double bj = ( h.j == 1 ) ? ( h.kappa - h.rho * h.xi ) : h.kappa;
+    const double a = h.kappa * h.theta;
+    const double xi2 = h.xi * h.xi;
+
+    const cdouble rxi = h.rho * h.xi * I * phi;
+    const cdouble d = std::sqrt( ( rxi - bj ) * ( rxi - bj ) - xi2 * ( 2.0 * uj * I * phi - phi * phi ) );
+    const cdouble g = ( bj - rxi - d ) / ( bj - rxi + d ); //!< little-Heston-trap
+    const cdouble edt = std::exp( -d * h.T );
+
+    const cdouble C = ( a / xi2 ) * ( ( bj - rxi - d ) * h.T - 2.0 * std::log( ( 1.0 - g * edt ) / ( 1.0 - g ) ) );
+    const cdouble D = ( bj - rxi - d ) / xi2 * ( ( 1.0 - edt ) / ( 1.0 - g * edt ) );
+    const cdouble f = std::exp( C + D * h.v0 + I * phi * std::log( h.F ) );
+
+    return std::real( std::exp( -I * phi * std::log( h.K ) ) * f / ( I * phi ) );
+}
+
+//! P_j = 1/2 + 1/pi * integral_0^inf integrand dphi
+double heston_probability( HestonParams h, int j )
+{
+    h.j = j;
+    gsl_integration_workspace* w = gsl_integration_workspace_alloc( 1000 );
+    gsl_function fn;
+    fn.function = &heston_integrand;
+    fn.params = &h;
+    double result = 0;
+    double err = 0;
+    //! semi-infinite integral from a small epsilon (integrand is regular at 0)
+    gsl_integration_qagiu( &fn, 1e-8, 1e-8, 1e-8, 1000, w, &result, &err );
+    gsl_integration_workspace_free( w );
+    return 0.5 + result / M_PI;
+}
+} // namespace
+
+double Heston_Call_Price( const double Forward,
+                          const double Strike,
+                          const double TimeToMaturity,
+                          const double DiscountFactor,
+                          const double V0,
+                          const double Kappa,
+                          const double Theta,
+                          const double Xi,
+                          const double Rho )
+{
+    //! degenerate (no vol-of-vol / zero maturity) : flat-vol Black-Scholes
+    if ( Xi <= 1e-10 || TimeToMaturity <= 0 || Forward <= 0 || Strike <= 0 )
+    {
+        return BS_Call_Price( Forward, Strike, TimeToMaturity, sqrt( max( V0, 0.0 ) ), DiscountFactor );
+    }
+    HestonParams h{ Forward, Strike, TimeToMaturity, V0, Kappa, Theta, Xi, Rho, 1 };
+    double P1 = heston_probability( h, 1 );
+    double P2 = heston_probability( h, 2 );
+    return DiscountFactor * ( Forward * P1 - Strike * P2 );
+}
+
+double Heston_Put_Price( const double Forward,
+                         const double Strike,
+                         const double TimeToMaturity,
+                         const double DiscountFactor,
+                         const double V0,
+                         const double Kappa,
+                         const double Theta,
+                         const double Xi,
+                         const double Rho )
+{
+    //! put/call parity
+    double c = Heston_Call_Price( Forward, Strike, TimeToMaturity, DiscountFactor, V0, Kappa, Theta, Xi, Rho );
+    return c - DiscountFactor * ( Forward - Strike );
 }

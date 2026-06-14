@@ -232,6 +232,57 @@ TEST_CASE( "Heston MCL negative-rho skew enriches the OTM put" )
     CHECK( heston > BsPut( 100, 80, 0.0, 0.20, T1 ) + 0.2 ); //!< clearly richer than flat-vol
 }
 
+// --- Heston (ANA) : the characteristic-function price agrees with the MCL QE
+// diffusion (the two engines, same model) within Monte-Carlo error.
+TEST_CASE( "Heston ANA characteristic function agrees with MCL" )
+{
+    auto cfg = []( const std::string& method, const std::string& mcl )
+    {
+        std::ostringstream o;
+        o << "root: p\n"
+          << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "c: !pricer_configuration {method: " << method << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
+          << "m: !mcl_configuration {max_time_step: 3, min_time_step: -1, paths: " << mcl
+          << ", vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+          << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
+          << "h: !heston_volatility {spot: 100, init_vol: 20, long_vol: 20, kappa: 2,"
+          << " vol_of_vol: 0.5, rho: -0.7, calendar: cal}\n"
+          << "bk: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 80,"
+          << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n";
+        return o.str();
+    };
+    double ana = Premium( Price( cfg( "ana", "1" ) ) );
+    auto mr = Price( cfg( "mcl", "300000" ) );
+    CHECK( std::abs( ana - Premium( mr ) ) <= 6.0 * Trust( mr ) + 0.02 );
+}
+
+// --- Heston (ANA) : degenerate vol-of-vol collapses to Black-Scholes (closed form).
+TEST_CASE( "Heston ANA degenerate limit matches Black-Scholes" )
+{
+    std::ostringstream o;
+    o << "root: p\n"
+      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "c: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
+      << "h: !heston_volatility {spot: 100, init_vol: 30, long_vol: 30, kappa: 5,"
+      << " vol_of_vol: 0.0001, rho: 0, calendar: cal}\n"
+      << "bk: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    CHECK( Premium( Price( o.str() ) ) == doctest::Approx( BsCall( 100, 100, 0.08, 0.30, T1 ) ).epsilon( 0.01 ) );
+}
+
 // --- historical volatility : EWMA of log returns of a price series -> a positive
 // annualised vol (exercises historical_volatility_computation).
 TEST_CASE( "historical volatility computation" )

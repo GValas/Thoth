@@ -63,6 +63,30 @@ double BS_Volga( const double Forward,
                  const double Volatility,
                  const double DiscountFactor );
 
+//! Heston European call/put via the characteristic function (forward measure,
+//! "Little Heston Trap" branch-stable form, GSL adaptive integration). Forward
+//! F already carries the carry/quanto drift; df discounts in the payoff currency.
+//! v0/theta are variances, xi the vol-of-vol, rho the spot/variance correlation.
+double Heston_Call_Price( const double Forward,
+                          const double Strike,
+                          const double TimeToMaturity,
+                          const double DiscountFactor,
+                          const double V0,
+                          const double Kappa,
+                          const double Theta,
+                          const double Xi,
+                          const double Rho );
+
+double Heston_Put_Price( const double Forward,
+                         const double Strike,
+                         const double TimeToMaturity,
+                         const double DiscountFactor,
+                         const double V0,
+                         const double Kappa,
+                         const double Theta,
+                         const double Xi,
+                         const double Rho );
+
 // implicit vol
 double BS_Call_ImplicitVol( const double Forward,
                             const double Strike,
