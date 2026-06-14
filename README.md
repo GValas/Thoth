@@ -303,9 +303,10 @@ matrices are flat number lists. Output YAML is emitted with fields in
 alphabetical order (stable, diff-friendly).
 
 `samples/` holds runnable books: `simple_call.yaml` (the 1y ATM call above,
-Black-Scholes ~15.71) and `matrix.yaml` — a `!sequence` running the full
-pricer/product matrix (vanilla european/american, quanto, continuous/discrete
-barriers, variance swap, across PDE / MCL / ANA) in one process.
+Black-Scholes ~15.71), `heston_call.yaml` (a Heston call priced by all three
+engines) and `matrix.yaml` — a `!sequence` running the full pricer/product matrix
+(vanilla european/american, quanto, continuous/discrete barriers, variance swap,
+across PDE / MCL / ANA) in one process.
 
 ---
 
@@ -322,6 +323,7 @@ CMakeLists.txt   build
 format.sh        clang-format wrapper (--check for CI)
 run_batch.sh     batch convenience wrapper
 run_matrix.sh    post the full pricer/product matrix to a server (samples/matrix.yaml)
+run_heston.sh    post the Heston sample to a server (ANA/PDE/MCL premiums + Greeks)
 run_serve.sh     start the HTTP pricing server (Docker)
 run_simple_call.sh    post a config to a running server
 run_clients.sh   fire N parallel clients on one input (queue test)
