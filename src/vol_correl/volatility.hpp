@@ -1,0 +1,46 @@
+#pragma once
+#include "market_data.hpp"
+#include "node_collector.hpp"
+
+class Volatility : public MarketData
+{
+
+  private:
+    double _non_working_days_weight;
+
+  protected:
+    double GetDayWeight();
+
+    //! additive parallel shift (in vol units) applied on top of the quoted vol;
+    //! used by the bump-and-revalue vega. Zero in normal pricing.
+    double _vol_shift = 0.0;
+
+  public:
+    // setter
+    void SetNonWorkingDaysWeight( double Weight );
+
+    //! set the parallel vol shift (vega bump); 0 restores the quoted surface
+    void SetVolShift( double Shift ) { _vol_shift = Shift; }
+
+    //
+    bool _is_local;
+
+    // local & implicit vols
+    virtual double GetImplicitVol( const double Strike,
+                                   const date& MaturityDate ) = 0;
+
+    double GetLocalVolatility( const double Strike,
+                               const date& MaturityDate,
+                               const double Spot,
+                               const double RiskFreeRate,
+                               const double ContinuousDividend );
+
+    //! mcl node
+    virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
+
+    //! constructor & destructor
+    Volatility( const string& ObjectName,
+                const string& ObjectKind );
+
+    ~Volatility() override;
+};

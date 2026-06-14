@@ -1,0 +1,139 @@
+#pragma once
+#include "thoth.hpp"
+#include <yaml-cpp/yaml.h>
+
+inline constexpr char OBJECT_SEPARATOR[] = ".";
+
+class YamlConfig
+{
+
+  private:
+    //! config tree (YAML) + file paths
+    YAML::Node _root;
+    string input_cfg_file;
+    string output_cfg_file;
+    bool _write_file = true; //!< file mode writes output on destruction; string mode does not
+
+    void SplitPath( const string& Path,
+                    string& ObjectName,
+                    string& AttributeName );
+
+    //! navigate a dotted path; throws if any segment is missing
+    YAML::Node LookUp( const string& Path ) const;
+
+    //! create/replace the node addressed by a dotted path and return it
+    YAML::Node PathNode( const string& Path );
+
+    //! shared list getter: validate the sequence, convert each element via conv,
+    //! and report a single typed error message on any failure
+    template <class T, class Conv>
+    vector<T> GetList( const string& Path, const char* TypeName, Conv conv )
+    {
+        try
+        {
+            YAML::Node s = LookUp( Path );
+            if ( !s.IsSequence() )
+                throw std::runtime_error( "not a list" );
+            vector<T> v;
+            v.reserve( s.size() );
+            for ( size_t i = 0; i < s.size(); i++ )
+                v.push_back( conv( s[i] ) );
+            return v;
+        }
+        catch ( ... )
+        {
+            ERR( "parsing error : " + Path + " must be a " + TypeName );
+        }
+    }
+
+    bool IsPath( const string& Path );
+
+  public:
+    //! get methods
+    int GetInteger( const string& Path );
+    int GetInteger( const string& Path,
+                    const int ElseValue );
+    double GetDouble( const string& Path );
+    double GetDouble( const string& Path,
+                      const double ElseValue );
+    date GetDate( const string& Path );
+    date GetDate( const string& Path,
+                  const date& ElseValue );
+    string GetString( const string& Path );
+    string GetString( const string& Path,
+                      const string& ElseValue );
+    bool GetBoolean( const string& Path );
+    bool GetBoolean( const string& Path,
+                     const bool ElseValue );
+
+    vector<bool> GetBooleanList( const string& Path );
+    vector<string> GetStringList( const string& Path );
+    vector<double> GetDoubleList( const string& Path );
+    gsl_vector* GetGslVector( const string& Path );
+    vector<int> GetIntegerList( const string& Path );
+    vector<date> GetDateList( const string& Path );
+
+    //! set methods
+    void SetDouble( const string& Path,
+                    const double Value );
+    void SetDoubleList( const string& Path,
+                        const double* Value,
+                        size_t size );
+    void SetDoubleList( const string& Path,
+                        const vector<double>& Value );
+    void SetDate( const string& Path,
+                  const date& Value );
+    void SetDateList( const string& Path,
+                      const vector<date>& Value );
+    void SetGslMatrix( const string& Path,
+                       const gsl_matrix* Value );
+    void SetGslVector( const string& Path,
+                       const gsl_vector* Value );
+    void SetString( const string& Path,
+                    const string& Value );
+    void SetStringList( const string& Path,
+                        const vector<string>& Value );
+    void SetBoolean( const string& Path,
+                     const bool Value );
+    void SetBooleanList( const string& Path,
+                         const vector<bool> Value );
+
+    //! object existence
+    bool IsString( const string& Path );
+    bool IsDouble( const string& Path );
+    bool IsBoolean( const string& Path );
+    bool IsInteger( const string& Path );
+    bool IsStringList( const string& Path );
+    bool IsDoubleList( const string& Path );
+    bool IsBooleanList( const string& Path );
+    bool IsIntegerList( const string& Path );
+
+    //! local YAML tag of the node at Path, without the leading '!' (e.g. "equity"
+    //! for `!equity`); "" if the node is missing or carries no local tag. Objects
+    //! declare their kind through this tag.
+    string GetTag( const string& Path );
+
+    //! remove path
+    void Remove( const string& Path );
+
+    //! objects byt kind
+    vector<string> GetObjectsByKind( const string& kind );
+
+    //! tag to disambiguate the in-memory (string) constructor
+    struct from_string_t
+    {
+    };
+
+    //! emit the current config tree (with system_information) as a YAML string
+    string Dump();
+
+    //! write the config tree to the output file (file mode); reports I/O errors
+    void WriteFile();
+
+    //! constructor & destructor
+    YamlConfig( const string& InputCfgFile,
+                const string& OutputCfgFile ); //!< file in / file out
+    YamlConfig( from_string_t,
+                const string& YamlContent ); //!< in-memory YAML (HTTP)
+    ~YamlConfig();
+};

@@ -1,0 +1,16 @@
+---
+# Safe, behavior-preserving modernizations only (C++23 target).
+# No ownership/smart-pointer or architecture changes.
+Checks: >
+  -*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+  modernize-use-equals-default,
+  modernize-use-default-member-init,
+  modernize-use-bool-literals,
+  modernize-redundant-void-arg,
+  modernize-loop-convert
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: none

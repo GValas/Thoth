@@ -1,0 +1,149 @@
+#include "thoth.hpp"
+#include "historical_correlation_computation.hpp"
+
+HistoricalCorrelationComputation::HistoricalCorrelationComputation( const string& ObjectName,
+                                                                    YamlConfig& YamlConfig ) : Task( ObjectName, YamlConfig, KIND_HISTORICAL_CORRELATION_COMPUTATION )
+{
+    _correlation = nullptr;
+}
+
+HistoricalCorrelationComputation::~HistoricalCorrelationComputation() = default;
+
+//! setter
+void HistoricalCorrelationComputation::SetCorrelation( Correlation* Correlation )
+{
+    _correlation = Correlation;
+}
+
+//! setter
+void HistoricalCorrelationComputation::SetHalfLife( double HalfLife )
+{
+    _half_life = HalfLife;
+}
+
+//! setter
+void HistoricalCorrelationComputation::SetTimeStep( int TimeStep )
+{
+    _time_step = TimeStep;
+}
+
+//! setter
+void HistoricalCorrelationComputation::SetRangeSize( int RangeSize )
+{
+    _range_size = RangeSize;
+}
+
+//! setter
+void HistoricalCorrelationComputation::SetHistoricalSpotsFixingList( const vector<SimpleFixingData*>& HistoricalSpotsFixingList )
+{
+    _historical_spots_fixing_list = HistoricalSpotsFixingList;
+}
+
+//!
+void HistoricalCorrelationComputation::Execute()
+{
+
+    clock_t t0 = clock();
+
+    //! dimensions
+    size_t histos_size = _historical_spots_fixing_list.size();
+
+    //! constraints
+    if ( _range_size + _time_step > _historical_spots_fixing_list[0]->GetValueList()->size )
+    {
+        ERR( "range_size + time_step must be smaller than size of records" );
+    }
+
+    //! log returns vectors
+    vector<gsl_vector*> log_return_list;
+    for ( size_t i = 0; i < histos_size; i++ )
+    {
+        gsl_vector* v = gsl_vector_alloc( _range_size );
+        for ( size_t j = 0; j < _range_size; j++ )
+        {
+            gsl_vector* w = _historical_spots_fixing_list[i]->GetValueList();
+            double x = log( gsl_vector_get( w, w->size - _range_size + j ) /
+                            gsl_vector_get( w, w->size - _range_size + j - _time_step ) );
+            gsl_vector_set( v, j, x );
+        }
+        log_return_list.push_back( v );
+    }
+
+    //! weights
+    gsl_vector* weights = gsl_vector_alloc( _range_size );
+    double r = exp( -log( 2. ) / _half_life );
+    double w = 1;
+    for ( size_t i = 0; i < _range_size; i++ )
+    {
+        gsl_vector_set( weights, _range_size - i - 1, w );
+        w *= r;
+    }
+
+    //! compute weighted means, variances
+    gsl_vector* weighted_means = gsl_vector_alloc( histos_size );
+    gsl_vector* weighted_variances = gsl_vector_alloc( histos_size );
+    for ( size_t i = 0; i < histos_size; i++ )
+    {
+        gsl_vector* v = log_return_list[i];
+        double wm = gsl_stats_wmean( gsl_vector_ptr( weights, 0 ), 1,
+                                     gsl_vector_ptr( v, 0 ), 1,
+                                     _range_size );
+        double wv = gsl_stats_wvariance_m( gsl_vector_ptr( weights, 0 ), 1,
+                                           gsl_vector_ptr( v, 0 ), 1,
+                                           _range_size, wm );
+        gsl_vector_set( weighted_means, i, wm );
+        gsl_vector_set( weighted_variances, i, wv );
+    }
+
+    //! weighted covariances
+    _historical_matrix = gsl_matrix_alloc( histos_size, histos_size );
+    for ( size_t i = 0; i < histos_size; i++ )
+    {
+        for ( size_t j = i + 1; j < histos_size; j++ )
+        {
+            double c = ext_gsl_stats_wcorrelation_m_v( gsl_vector_ptr( weights, 0 ), 1,
+                                                       gsl_vector_ptr( log_return_list[i], 0 ), 1,
+                                                       gsl_vector_ptr( log_return_list[j], 0 ), 1,
+                                                       _range_size,
+                                                       gsl_vector_get( weighted_means, i ),
+                                                       gsl_vector_get( weighted_means, j ),
+                                                       gsl_vector_get( weighted_variances, i ),
+                                                       gsl_vector_get( weighted_variances, j ) );
+            gsl_matrix_set( _historical_matrix, i, j, c );
+            gsl_matrix_set( _historical_matrix, j, i, c );
+        }
+        gsl_matrix_set( _historical_matrix, i, i, 1 );
+    }
+
+    // ext_gsl_matrix_log( historical_matrix );
+
+    //! free memory
+    for ( size_t i = 0; i < histos_size; i++ )
+    {
+        gsl_vector_free( log_return_list[i] );
+    }
+    gsl_vector_free( weights );
+    gsl_vector_free( weighted_means );
+    gsl_vector_free( weighted_variances );
+
+    _exec_time = ExecTime( t0 );
+}
+
+//!
+void HistoricalCorrelationComputation::WriteResults()
+{
+
+    //! common
+    Task::WriteResults();
+
+    vector<string> underlying_list;
+    vector<SimpleFixingData*>::iterator s;
+    for ( s = _historical_spots_fixing_list.begin();
+          s != _historical_spots_fixing_list.end();
+          s++ )
+    {
+        underlying_list.push_back( ( *s )->GetUnderlying() );
+    }
+    _cfg->SetStringList( _correlation->GetName() + ".underlyings", underlying_list );
+    _cfg->SetGslMatrix( _correlation->GetName() + ".matrix", _historical_matrix );
+}

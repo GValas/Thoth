@@ -1,0 +1,93 @@
+#pragma once
+#include "object_collector.hpp"
+#include "yaml_config.hpp"
+#include "task.hpp"
+
+#include <functional>
+#include <map>
+
+//! ROOT_NODE is defined in Constants.hpp (inline constexpr)
+
+//! Builds the object graph from the parsed YAML.
+//!
+//! The manager is deliberately type-agnostic: it knows nothing about the
+//! concrete object classes. Each kind tag maps to a factory in a single table
+//! (object_registry.cpp) — adding a new object type means adding one entry
+//! there and a new class, with no change here. Factories create their product,
+//! register it in the collector and configure it (resolving referenced objects
+//! through Get<T>).
+class ObjectManager
+{
+  public:
+    //! a kind tag's factory: create + register + configure, returned as Object*
+    using Factory = std::function<Object*( ObjectManager&, const string& )>;
+
+    //! lifecycle
+    void ReadObjects( const string& ExecName ); //!< resolve the exec (root) task
+    void ExecuteTask();                         //!< run it
+    void WriteResults();                        //!< export results into the config tree
+    void WriteOutputFile();                     //!< flush the config tree to the output file
+
+    //! result config emitted as a YAML string (in-memory / HTTP mode)
+    string ResultYaml();
+
+    //! constructors
+    ObjectManager( const string& InputFile, const string& OutputFile );
+    ObjectManager( YamlConfig::from_string_t,
+                   const string& YamlContent ); //!< build from an in-memory YAML request
+    ~ObjectManager();
+
+    //! --- services used by the registry factories ---
+
+    //! config tree (field access)
+    YamlConfig& cfg() { return *_c; }
+
+    //! object store (factories Add/Own their product here)
+    ObjectCollector& collector() { return _collector; }
+
+    //! get-or-build the object named ObjectName, viewed as the (base) type T.
+    //! Returns the cached object if already built, else dispatches on its kind
+    //! tag to the registry factory. Errors if it is missing or not a T.
+    template <class T>
+    T* Get( const string& ObjectName )
+    {
+        CheckObject( ObjectName );
+        if ( T* cached = _collector.Get<T>( ObjectName ) )
+        {
+            return cached;
+        }
+        T* built = dynamic_cast<T*>( Build( ObjectName ) );
+        if ( !built )
+        {
+            ERR( "object '" + ObjectName + "' has an unexpected type for this reference" );
+        }
+        return built;
+    }
+
+    //! map a list of names through Get<T>
+    template <class T>
+    vector<T*> GetList( const vector<string>& ObjectNameList )
+    {
+        vector<T*> result;
+        result.reserve( ObjectNameList.size() );
+        for ( const auto& name : ObjectNameList )
+        {
+            result.push_back( Get<T>( name ) );
+        }
+        return result;
+    }
+
+  private:
+    std::unique_ptr<YamlConfig> _c;
+    Task* _exec_node = nullptr;
+    string _exec_name;
+    ObjectCollector _collector;
+
+    //! an object exists iff it carries a kind tag (e.g. `name: !equity { ... }`)
+    bool IsObject( const string& Path );
+    void CheckObject( const string& ObjectName );
+
+    //! dispatch ObjectName's kind tag to its factory. Defined in
+    //! object_registry.cpp, the single translation unit aware of every type.
+    Object* Build( const string& ObjectName );
+};

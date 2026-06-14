@@ -1,0 +1,7 @@
+# Build artifacts and VCS — keep the build context small
+build/
+.git/
+.github/
+.devcontainer/
+*.md
+thoth

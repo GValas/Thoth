@@ -1,0 +1,54 @@
+{
+  // CMake Tools tente de configurer le projet à l'ouverture et, faute de kit
+  // (toolchain) sélectionné, affiche la notification « Scan for kits… ».
+  // On désactive la configuration auto : le build passe par make/CMake en CLI.
+  "cmake.configureOnOpen": false,
+  "cmake.showOptionsMovedNotification": false,
+
+  // Each Thoth object declares its kind via a local YAML tag (name: !equity {...}).
+  // Declare them so the YAML linter (redhat.vscode-yaml) stops reporting
+  // "Unresolved tag: !...". All kinds are mappings.
+  "yaml.customTags": [
+    "!pricer mapping",
+    "!pricer_configuration mapping",
+    "!mcl_configuration mapping",
+    "!pde_configuration mapping",
+    "!book mapping",
+    "!vanilla mapping",
+    "!barrier mapping",
+    "!variance_swap mapping",
+    "!equity mapping",
+    "!composite mapping",
+    "!basket mapping",
+    "!currency mapping",
+    "!forex mapping",
+    "!yield_curve mapping",
+    "!repo_curve mapping",
+    "!continuous_dividends_curve mapping",
+    "!bs_volatility mapping",
+    "!sabr_volatility mapping",
+    "!correlation_matrix mapping",
+    "!historical_volatility_computation mapping",
+    "!historical_correlation_computation mapping",
+    "!sequence mapping",
+    "!simple_fixing_data mapping",
+    "!simple_weighted_calendar mapping"
+  ],
+
+  // Color local YAML tags (e.g. !pricer, !vanilla) in red. Under the
+  // active redhat.vscode-yaml grammar, a node tag like "!pricer" is scoped
+  // storage.type.tag-handle.yaml. NB: entity.name.tag.yaml is the mapping-KEY
+  // scope, so do not use it here or the fields turn red instead of the tags.
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": [
+          "storage.type.tag-handle.yaml"
+        ],
+        "settings": {
+          "foreground": "#ff84b3", 
+        }
+      }
+    ]
+  }
+}

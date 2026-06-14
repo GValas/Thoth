@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "inputs": [
+    {
+      // Asked once at launch; type the pricing config you want to debug.
+      "id": "inputYaml",
+      "type": "promptString",
+      "description": "Pricing input YAML (path relative to the project root)",
+      "default": "samples/simple_call.yaml"
+    }
+  ],
+  "configurations": [
+    {
+      // Step through a single pricing run: thoth -batch <input> <output>.
+      // Set breakpoints in the engine (e.g. PricerPDE::PriceContract,
+      // PricerMCL::Tree_Run_, SabrVolatility::GetImplicitVol) then press F5.
+      "name": "Debug thoth -batch",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-debug/thoth",
+      "args": ["-batch", "${input:inputYaml}", "/tmp/thoth-debug.out.yaml"],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "cmake: build debug",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      // Debug the HTTP server; then drive it from another terminal with
+      // ./run_simple_call.sh (or ./run_clients.sh). Breakpoints hit on each request.
+      "name": "Debug thoth -server 8080",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-debug/thoth",
+      "args": ["-server", "8080"],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "cmake: build debug",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

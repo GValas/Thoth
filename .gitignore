@@ -1,0 +1,15 @@
+# Build artifacts
+/build/
+/build-debug/
+/thoth
+
+# Generated output
+*.o
+log.txt
+*.out.yaml
+
+# Claude local settings
+.claude/
+
+# todo list file
+TODO.md

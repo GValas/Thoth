@@ -1,0 +1,29 @@
+{
+  "name": "Thoth C++ (g++ / make)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.makefile-tools",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        // Le terminal "Claude Code" (.vscode/tasks.json) s'ouvre dans le Panel.
+        // On place le Panel à droite pour le sortir de la zone basse.
+        "workbench.panel.defaultLocation": "right"
+      }
+    }
+  },
+  "postCreateCommand": "g++ --version && cmake --version && git --version && claude --version",
+  "remoteUser": "vscode"
+}
