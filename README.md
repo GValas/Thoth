@@ -179,7 +179,7 @@ aggregate the results:
 ./build/thoth -server 8092 &
 ./build/thoth -cluster 8090 http://localhost:8091 http://localhost:8092
 # or the wrapper (launches N local slaves + master, posts a book, cleans up):
-./run_cluster.sh samples/quanto_call.yaml 2
+./run_cluster.sh samples/simple_call.yaml 2
 ```
 
 The master splits `paths` evenly and gives each slave a distinct `seed`, which
