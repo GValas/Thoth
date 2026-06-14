@@ -182,6 +182,56 @@ TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
     CHECK( std::abs( p - BsCall( 100, 100, 0.05, 0.30, T1 ) ) <= 0.3 );
 }
 
+// --- Heston (MCL) : in the degenerate limit (vol-of-vol -> 0, v0 = theta) the
+// stochastic-vol diffusion collapses to constant-vol GBM, so it matches BS.
+TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
+{
+    std::ostringstream o;
+    o << "root: p\n"
+      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
+      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
+      << "h: !heston_volatility {spot: 100, init_vol: 30, long_vol: 30, kappa: 5,"
+      << " vol_of_vol: 0.0001, rho: 0, calendar: cal}\n"
+      << "bk: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    auto mr = Price( o.str() );
+    CHECK( std::abs( Premium( mr ) - BsCall( 100, 100, 0.08, 0.30, T1 ) ) <= 6.0 * Trust( mr ) + 0.05 );
+}
+
+// --- Heston (MCL) : a negative spot/vol correlation fattens the left wing, so an
+// OTM put is richer than the flat-vol Black-Scholes put at the same ATM level.
+TEST_CASE( "Heston MCL negative-rho skew enriches the OTM put" )
+{
+    std::ostringstream o;
+    o << "root: p\n"
+      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "m: !mcl_configuration {max_time_step: 5, min_time_step: -1, paths: 200000,"
+      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
+      << "h: !heston_volatility {spot: 100, init_vol: 20, long_vol: 20, kappa: 2,"
+      << " vol_of_vol: 0.5, rho: -0.7, calendar: cal}\n"
+      << "bk: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 80,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n";
+    double heston = Premium( Price( o.str() ) );
+    CHECK( heston > BsPut( 100, 80, 0.0, 0.20, T1 ) + 0.2 ); //!< clearly richer than flat-vol
+}
+
 // --- historical volatility : EWMA of log returns of a price series -> a positive
 // annualised vol (exercises historical_volatility_computation).
 TEST_CASE( "historical volatility computation" )

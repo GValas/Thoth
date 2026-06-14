@@ -325,6 +325,14 @@ void PricerMCL::CreateBrownianNodes_()
         node_name = ( *u )->GetName() + "#brownian";
         BrownianNode* B = _collector.NewBrownianNode( node_name );
         B->SetNoiseNode( N );
+
+        //! stochastic vol (Heston) underlyings need a second, independent noise
+        //! for the variance process (pseudo-random; Sobol stays on the spot noise)
+        if ( ( *u )->GetVolatility()->IsStochastic() )
+        {
+            NoiseNode* VN = _collector.NewNode<NoiseNode>( ( *u )->GetName() + "#vol_white_noise" );
+            VN->SetRandomGenerator( _gsl_r );
+        }
     }
 }
 

@@ -15,6 +15,7 @@ inline constexpr char KIND_EQUITY[] = "equity";
 inline constexpr char KIND_COMPOSITE[] = "composite";
 inline constexpr char KIND_BASKET[] = "basket";
 inline constexpr char KIND_FOREX[] = "forex";
+inline constexpr char KIND_HESTON_VOLATILITY[] = "heston_volatility";
 inline constexpr char KIND_HISTORICAL_CORRELATION_COMPUTATION[] = "historical_correlation_computation";
 inline constexpr char KIND_HISTORICAL_VOLATILITY_COMPUTATION[] = "historical_volatility_computation";
 inline constexpr char KIND_MCL_CONFIGURATION[] = "mcl_configuration";

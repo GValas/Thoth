@@ -27,6 +27,7 @@
     "!continuous_dividends_curve mapping",
     "!bs_volatility mapping",
     "!sabr_volatility mapping",
+    "!heston_volatility mapping",
     "!correlation_matrix mapping",
     "!historical_volatility_computation mapping",
     "!historical_correlation_computation mapping",

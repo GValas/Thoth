@@ -38,6 +38,7 @@
 #include "continuous_dividends_curve.hpp"
 #include "bs_volatility.hpp"
 #include "sabr_volatility.hpp"
+#include "heston_volatility.hpp"
 #include "correlation.hpp"
 #include "simple_fixing_data.hpp"
 
@@ -279,6 +280,20 @@ map<string, ObjectManager::Factory> MakeRegistry()
         B->SetVolatility( m.cfg().GetDouble( n + ".volatility" ) );
         ConfigureVolatilityCommon( m, B, n );
         return B;
+    };
+
+    r[KIND_HESTON_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*
+    {
+        HestonVolatility* H = m.collector().Add( std::make_unique<HestonVolatility>( n ) );
+        H->SetSpot( m.cfg().GetDouble( n + ".spot" ) );
+        //! vols quoted in percent (like every vol) -> variances
+        H->SetV0( pow( m.cfg().GetDouble( n + ".init_vol" ) / 100.0, 2 ) );
+        H->SetTheta( pow( m.cfg().GetDouble( n + ".long_vol" ) / 100.0, 2 ) );
+        H->SetKappa( m.cfg().GetDouble( n + ".kappa" ) );
+        H->SetXi( m.cfg().GetDouble( n + ".vol_of_vol" ) );
+        H->SetRho( m.cfg().GetDouble( n + ".rho" ) );
+        ConfigureVolatilityCommon( m, H, n );
+        return H;
     };
 
     r[KIND_SABR_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*

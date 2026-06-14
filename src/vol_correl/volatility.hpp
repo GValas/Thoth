@@ -25,6 +25,11 @@ class Volatility : public MarketData
     //
     bool _is_local;
 
+    //! true for a genuine stochastic-volatility model (Heston): the MCL engine
+    //! builds a dedicated variance + spot diffusion instead of the constant-vol
+    //! SpotDiffusionNode. Deterministic vols (bs / sabr) return false.
+    virtual bool IsStochastic() const { return false; }
+
     // local & implicit vols
     virtual double GetImplicitVol( const double Strike,
                                    const date& MaturityDate ) = 0;
