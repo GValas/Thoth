@@ -11,7 +11,7 @@ usable as a batch tool or as an HTTP service.
 **Pricers** (selected per book via `method`)
 - **Monte-Carlo (`mcl`)** — correlated geometric Brownian motion via a Cholesky
   factorisation of the correlation matrix; exact log-Euler step for constant
-  volatility (no discretisation bias). With `use_sobol: yes` the increments are
+  volatility (no discretisation bias). With `use_sobol: true` the increments are
   drawn from a **Sobol** low-discrepancy sequence laid out by a **Brownian
   bridge** (the coarsest, most important path structure gets the lowest Sobol
   dimensions, the rest pseudo-random) — far faster convergence on smooth payoffs
@@ -30,22 +30,37 @@ usable as a batch tool or as an HTTP service.
 Long runs show a `│███░░░│` progress bar with the running price/trust. On a
 terminal it redraws in place as a single updating line; when stdout is not a TTY
 (output redirected, or captured via `docker logs`) it falls back to one bar line
-every 10% so logs stay readable instead of piling up the redraw frames.
+every 10% so logs stay readable instead of piling up the redraw frames. A pricer
+can attach a `debug_configuration` with `generate_nodes_graph: true` to dump the
+Monte-Carlo node graph as a Graphviz `.dot` file for inspection.
 
 **Greeks** — list any of `delta`, `gamma`, `vega`, `rho`, `theta` in a pricer's
-`indicators` (alongside `premium`) and they are computed by bump-and-revalue,
-uniformly across all three engines. delta/vega/rho use small central bumps;
-gamma uses a wider spot bump (its second difference is otherwise swamped by the
-PDE grid's per-spot re-centering); theta rolls the valuation date one day. For
-Monte-Carlo the random sequence is reset each scenario, so the bumps share
-common random numbers and stay stable. Units: delta `dP/dS`, gamma `d²P/dS²`,
-vega per vol point, rho per 1% parallel rate move, theta per calendar day. On a
-1y ATM call all three engines agree with Black-Scholes (delta 0.66, gamma 0.012,
-vega 0.37, rho 0.50, theta −0.026).
+`indicators` (alongside `premium`). All three engines use bump-and-revalue with
+the same bump sizes (delta/vega/rho small central bumps; gamma a wider spot bump,
+since its second difference is otherwise swamped by the PDE grid's per-spot
+re-centering; theta rolls the valuation date one day), but each engine computes
+them the cheapest way for its structure:
+- **PDE / ANA** bump and reprice **per contract**, inside the single contract
+  loop, so one progress bar covers price + Greeks and the per-contract Greeks are
+  also reported (not just the book total).
+- **MCL** builds the base tree and every spot/vol/rate bump sub-tree into **one**
+  node graph that shares the (expensive) Brownian/noise nodes, and prices them in
+  a **single path sweep** — so delta/gamma/vega/rho cost one simulation, not one
+  per bump. theta is a separate one-day reprice. Sharing the path nodes is exact
+  common-random-numbers, so the Greeks match the old reset-per-scenario values
+  bit-for-bit. Books with American contracts or non-trivial (basket/composite)
+  underlyings fall back to book-level bump-and-revalue.
+
+Units: delta `dP/dS`, gamma `d²P/dS²`, vega per vol point, rho per 1% parallel
+rate move, theta per calendar day. On a 1y ATM call all three engines agree with
+Black-Scholes (delta 0.66, gamma 0.012, vega 0.37, rho 0.50, theta −0.026).
 
 **Instruments**
 - `vanilla` — call / put, **european** or **american**, absolute or
-  relative strike.
+  relative strike. **Quanto** (a foreign-currency asset paid in the book
+  currency) is supported by all three engines — the drift correction
+  `F *= exp(-ρ·σ_S·σ_X·t)` lives in the MCL node graph, ANA's quanto forward and
+  the PDE carry, and the three agree (American quanto via PDE / MCL).
 - `barrier` — knock-out / digital payoffs, **continuous or
   discrete monitoring** (`monitoring_period_days`); PDE, MCL and (continuous-only)
   closed-form.
@@ -99,8 +114,10 @@ lean runtime image) are provided.
 ### Tests
 
 A doctest suite (`tests/`) covers European/American vanillas, barriers,
-dividends, multi-asset consistency, engine-vs-engine agreement, determinism and
-config parsing. It is built alongside the binary:
+dividends, multi-asset consistency, engine-vs-engine agreement (incl. quanto),
+variance swaps, baskets, composites, the SABR surface, Sobol QMC, the `!sequence`
+task, the historical vol/correlation analytics, determinism and config parsing
+(~71% line coverage). It is built alongside the binary:
 
 ```bash
 cmake --build build -j           # builds thoth + thoth_tests
@@ -153,7 +170,7 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 # or the wrapper, which writes the result next to the input as
 # samples/<input>.out.yaml (these *.out.yaml files are gitignored):
-./run_simple_call.sh samples/quanto_call.yaml        # -> samples/quanto_call.out.yaml
+./run_simple_call.sh samples/simple_call.yaml        # -> samples/simple_call.out.yaml
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
@@ -273,11 +290,14 @@ my_calendar: !simple_weighted_calendar
 ```
 
 Conventions: volatilities and curve values are in **percent** (`30` -> 0.30,
-`8` -> 0.08); booleans use `yes` / `no`; vectors/matrices are flat number lists.
+`8` -> 0.08); booleans use `true` / `false` (yes/no still parse); vectors and
+matrices are flat number lists. Output YAML is emitted with fields in
+alphabetical order (stable, diff-friendly).
 
 `samples/` holds runnable books: `simple_call.yaml` (the 1y ATM call above,
-Black-Scholes ~15.71), `quanto_call.yaml` (a quanto call with an FX rate) and
-`random_book.yaml` (100 random options on 3 correlated underlyings).
+Black-Scholes ~15.71) and `matrix.yaml` — a `!sequence` running the full
+pricer/product matrix (vanilla european/american, quanto, continuous/discrete
+barriers, variance swap, across PDE / MCL / ANA) in one process.
 
 ---
 
