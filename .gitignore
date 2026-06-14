@@ -13,3 +13,6 @@ log.txt
 
 # todo list file
 TODO.md
+# coverage build (gcov)
+build-cov/
+*.gcov
