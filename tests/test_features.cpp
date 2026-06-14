@@ -1,0 +1,220 @@
+#include "helpers.hpp"
+#include <doctest/doctest.h>
+
+// Coverage for features the rest of the suite did not exercise: variance swap,
+// Sobol QMC paths, the !sequence task, baskets, composites and the SABR surface.
+// Assertions favour cross-engine agreement / parity / determinism / sanity
+// bounds over brittle reference numbers.
+
+using namespace test;
+
+namespace
+{
+//! a one-pricer book on a single eur equity, parameterised by the contract block
+//! and the pricing method. draws/step matter only for mcl.
+std::string OneContract( const std::string& method, const std::string& contract_block,
+                         const std::string& extra_objects = "", int draws = 200000,
+                         int step = 7 )
+{
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( method, draws, step, 5 )
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << extra_objects
+      << "book: !book {options: [o]}\n"
+      << contract_block;
+    return o.str();
+}
+} // namespace
+
+// --- variance swap : the Monte-Carlo realized variance and the analytic static
+// replication must agree, and the fair value is positive for a strike below vol.
+TEST_CASE( "variance swap: MCL and ANA agree" )
+{
+    const std::string c = "o: !variance_swap {underlying: eq, premium_currency: eur,"
+                          " maturity: 2000-12-31, volatility_strike: 20, notional: 10000}\n";
+    double ana = Premium( Price( OneContract( "ana", c ) ) );
+    auto mr = Price( OneContract( "mcl", c ) );
+    double mcl = Premium( mr );
+
+    CHECK( ana > 0.0 );                              //!< 30% realized vs 20% strike -> positive
+    CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 2.0 ); //!< engines agree (MC error)
+}
+
+// --- Sobol QMC : a use_sobol MCL run prices a vanilla, is deterministic across
+// runs, and lands within MC error of Black-Scholes (exercises path_generator /
+// sobol_generator).
+TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
+{
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
+      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 50000,"
+      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [6, 6]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    double a = Premium( Price( o.str() ) );
+    double b = Premium( Price( o.str() ) );
+    CHECK( a == doctest::Approx( b ).epsilon( 1e-12 ) );        //!< deterministic
+    CHECK( std::abs( a - BsCall( 100, 100, 0.06, 0.30, T1 ) ) <= 0.2 ); //!< QMC accuracy
+}
+
+// --- !sequence : runs each sub-task in order, each writing its own result block.
+TEST_CASE( "sequence runs every sub-task" )
+{
+    std::ostringstream o;
+    o << "root: seq\n"
+      << "seq: !sequence {tasks: [p_pde, p_ana], result: seq_result}\n"
+      << "p_pde: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cpde,"
+      << " correlation: cor, indicators: [premium], result: pde_res}\n"
+      << "p_ana: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cana,"
+      << " correlation: cor, indicators: [premium], result: ana_res}\n"
+      << "cpde: !pricer_configuration {method: pde, pde_configuration: pcfg, log_path: \"/tmp/\"}\n"
+      << "cana: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
+      << "pcfg: !pde_configuration {vanilla_precision: high}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    YAML::Node r = Price( o.str(), "seq" );
+    double pde = r["pde_res"]["premium"].as<double>();
+    double ana = r["ana_res"]["premium"].as<double>();
+    CHECK( pde == doctest::Approx( ana ).epsilon( 0.01 ) ); //!< both ran, agree on the same book
+}
+
+// --- basket : with near-perfect correlation a 50/50 basket of two identical
+// equities is (almost) a single-asset option (diversification ~vanishes).
+TEST_CASE( "basket: near-perfectly correlated 50/50 basket equals the single asset" )
+{
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 60000,"
+      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq1: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "eq2: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq1, eq2], matrix: [1, 0.99, 0.99, 1]}\n"
+      << "bk: !basket {underlyings: [eq1, eq2], weights: [0.5, 0.5]}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: bk, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    double basket = Premium( Price( o.str() ) );
+    CHECK( std::abs( basket - BsCall( 100, 100, 0.05, 0.30, T1 ) ) <= 0.3 );
+}
+
+// --- composite : a composite underlying (asset converted into another currency)
+// prices to a positive, finite premium through the MCL node graph.
+TEST_CASE( "composite underlying prices a vanilla" )
+{
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 40000,"
+      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << "eur: !currency {rate: r_eur}\n"
+      << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "usd: !currency {rate: r_usd}\n"
+      << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "eur/usd: !forex {base_currency: usd, underlying_currency: eur, spot: 1.5, volatility: fxvol}\n"
+      << "fxvol: !bs_volatility {volatility: 15}\n"
+      << "comp: !composite {equity: eq, composite_currency: usd}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    double p = Premium( Price( o.str() ) );
+    CHECK( p > 0.0 );
+    CHECK( std::isfinite( p ) );
+}
+
+// --- SABR : with beta = 1 and a tiny vol-of-vol the ATM SABR implied vol is ~alpha,
+// so an ATM call matches Black-Scholes at that vol (exercises the SABR surface).
+TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
+{
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "cfg: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !sabr_volatility {spot: 100, maturities: [1.0], alpha: [0.30], beta: [1.0],"
+      << " rho: [0.0], nu: [0.01], calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
+    double p = Premium( Price( o.str() ) );
+    CHECK( std::abs( p - BsCall( 100, 100, 0.05, 0.30, T1 ) ) <= 0.3 );
+}
+
+// --- historical volatility : EWMA of log returns of a price series -> a positive
+// annualised vol (exercises historical_volatility_computation).
+TEST_CASE( "historical volatility computation" )
+{
+    std::ostringstream o;
+    o << "root: hv\n"
+      << "hv: !historical_volatility_computation {half_life: 30, time_step: 1,"
+      << " values: [100, 101, 99, 102, 98, 103, 101, 100, 99, 101, 102, 100],"
+      << " result: hv_res}\n";
+    YAML::Node r = Price( o.str(), "hv" );
+    double vol = r["hv_res"]["historical_volatility"].as<double>();
+    CHECK( vol > 0.0 );
+    CHECK( std::isfinite( vol ) );
+}
+
+// --- historical correlation : EWMA correlation of two fixing series, written
+// back into the correlation object (exercises historical_correlation_computation
+// and simple_fixing_data). The result is a valid correlation matrix (unit diagonal).
+TEST_CASE( "historical correlation computation" )
+{
+    const std::string dates = "[2000-01-01, 2000-01-02, 2000-01-03, 2000-01-04,"
+                              " 2000-01-05, 2000-01-06, 2000-01-07, 2000-01-08]";
+    std::ostringstream o;
+    o << "root: hc\n"
+      << "hc: !historical_correlation_computation {half_life: 30, time_step: 1, range_size: 5,"
+      << " correlation: cor, historical_spots_fixings: [f1, f2], result: hc_res}\n"
+      << "cor: !correlation_matrix {underlyings: [a, b], matrix: [1, 0, 0, 1]}\n"
+      << "f1: !simple_fixing_data {dates: " << dates
+      << ", values: [100, 101, 102, 101, 103, 104, 103, 105], underlying: a}\n"
+      << "f2: !simple_fixing_data {dates: " << dates
+      << ", values: [50, 50.4, 50.8, 50.5, 51.2, 51.6, 51.3, 52], underlying: b}\n";
+    YAML::Node r = Price( o.str(), "hc" );
+    //! the computed correlation matrix is written back onto 'cor' (unit diagonal)
+    double m00 = r["cor"]["matrix"][0].as<double>();
+    CHECK( m00 == doctest::Approx( 1.0 ).epsilon( 1e-6 ) );
+}
