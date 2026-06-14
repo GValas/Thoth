@@ -76,8 +76,16 @@ Black-Scholes (delta 0.66, gamma 0.012, vega 0.37, rho 0.50, theta −0.026).
 **Market data**
 - `yield_curve`, `repo_curve`, `continuous_dividends_curve`,
   `correlation_matrix`.
-- Volatilities: `bs_volatility` (flat Black-Scholes vol) and `sabr_volatility`
-  (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`).
+- Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
+  (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
+  and `heston_volatility` (genuine stochastic vol — see below).
+
+**Stochastic volatility (Heston)** — `heston_volatility` (`v0`/`kappa`/`theta`/
+`xi`/`rho`, vols in percent) is priced consistently by all three engines: MCL via
+the Andersen QE variance scheme, ANA via the characteristic function (Carr–Madan /
+Little-Heston-Trap), and PDE via a 2-D `(S,v)` Douglas-ADI grid (European and
+American). The three agree to ~0.3% across moneyness, and the degenerate
+(vol-of-vol → 0) limit reproduces Black-Scholes.
 
 **Analytics objects**
 - `pricer`, `historical_volatility_computation`,
