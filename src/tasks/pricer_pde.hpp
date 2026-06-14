@@ -127,6 +127,12 @@ class PricerPDE : public Pricer
     //! price one contract (vanilla, knock-out, or knock-in via in/out parity)
     void PriceContract( Contract* );
 
+    //! Heston stochastic vol : a 2-D (S, v) Douglas-ADI finite-difference solve
+    //! (cross term explicit, S- and v-sweeps implicit). European + American.
+    //! Only plain vanillas on a mono Heston underlying are routed here.
+    bool UnderlyingIsHeston_( Contract* Ctr );
+    GridResult SolveHestonGrid( Contract* Ctr );
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
   protected:

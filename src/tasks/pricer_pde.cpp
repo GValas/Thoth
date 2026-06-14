@@ -2,6 +2,7 @@
 #include "pricer_pde.hpp"
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
+#include "heston_volatility.hpp"
 
 PricerPDE::PricerPDE( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
@@ -53,6 +54,16 @@ void PricerPDE::PriceContract_( Contract* Ctr )
 //! price one contract: vanilla, knock-out, or knock-in (= vanilla - knock-out)
 void PricerPDE::PriceContract( Contract* Ctr )
 {
+
+    //! Heston stochastic vol vanilla : 2-D (S, v) ADI grid
+    if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston_( Ctr ) )
+    {
+        GridResult r = SolveHestonGrid( Ctr );
+        Ctr->SetPremium( r.premium );
+        Ctr->SetDelta( r.delta );
+        Ctr->SetGamma( r.gamma );
+        return;
+    }
 
     //! plain vanilla : single full-domain solve
     if ( !Ctr->PDE_IsBarrier() )
@@ -478,4 +489,261 @@ inline double PricerPDE::T_0( int i, int j )
 inline double PricerPDE::T_1( int i, int j )
 {
     return I( i, j ) - k * theta * L( i, j );
+}
+//! ----------------------------------------------------------------------
+//! Heston 2-D (S, v) finite-difference pricer (Douglas ADI)
+//! ----------------------------------------------------------------------
+
+//! true iff the contract's underlying is a mono with a stochastic-vol (Heston)
+bool PricerPDE::UnderlyingIsHeston_( Contract* Ctr )
+{
+    SingleSet s = Ctr->GetUnderlying()->GetSingleSet();
+    if ( s.size() != 1 )
+    {
+        return false;
+    }
+    return ( *s.begin() )->GetVolatility()->IsStochastic();
+}
+
+namespace
+{
+//! solve a tridiagonal system (sub a[1..n-1], diag d[0..n-1], super c[0..n-2])
+//! in place using the Thomas algorithm; rhs/solution in x.
+void Thomas( vector<double>& a, vector<double>& d, vector<double>& c, vector<double>& x )
+{
+    const int n = (int)d.size();
+    for ( int i = 1; i < n; i++ )
+    {
+        double w = a[i] / d[i - 1];
+        d[i] -= w * c[i - 1];
+        x[i] -= w * x[i - 1];
+    }
+    x[n - 1] /= d[n - 1];
+    for ( int i = n - 2; i >= 0; i-- )
+    {
+        x[i] = ( x[i] - c[i] * x[i + 1] ) / d[i];
+    }
+}
+} // namespace
+
+//! Douglas ADI for the Heston PDE
+//!   V_t + 0.5 v S^2 V_SS + rho xi v S V_Sv + 0.5 xi^2 v V_vv
+//!        + b S V_S + kappa(theta - v) V_v - r_d V = 0
+//! with b the carry (from the forward) and r_d the premium-currency discount.
+//! Cross term explicit; S- and v-sweeps implicit (theta = 1/2). European or,
+//! if requested, American by intrinsic projection after each step.
+PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
+{
+    Single* single = *Ctr->GetUnderlying()->GetSingleSet().begin();
+    HestonVolatility* hv = dynamic_cast<HestonVolatility*>( single->GetVolatility() );
+
+    const date mat = Ctr->GetMaturityDate();
+    const double T = YearFraction( _today, mat );
+    const double S0 = single->GetSpot();
+    const double F = Ctr->GetUnderlying()->GetForward( mat, Ctr->GetPremiumCurrency() );
+    const double rd = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( mat );
+    const double b = ( T > 0 ) ? log( F / S0 ) / T : 0.0;
+    const double v0 = hv->GetV0();
+    const double kap = hv->GetKappa();
+    const double th = hv->GetTheta();
+    const double xi = hv->GetXi();
+    const double rho = hv->GetRho();
+    const bool american = Ctr->PDE_IsAmerican();
+
+    //! grid extents
+    const double vmax = std::max( 1.0, 6.0 * std::max( v0, th ) );
+    const double smax = std::max( 3.0 * S0, S0 * exp( 5.0 * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
+    const int NS = 120;
+    const int Nv = 60;
+    const int Nt = 120;
+    const double dS = smax / NS;
+    const double dv = vmax / Nv;
+    const double dt = T / Nt;
+    const double q = 0.5; //!< ADI implicitness (Crank-Nicolson directional)
+
+    auto S = [&]( int i ) { return i * dS; };
+    auto V = [&]( int i ) { return i * dv; };
+    auto IX = [&]( int i, int j ) { return i * ( Nv + 1 ) + j; };
+
+    vector<double> U( ( NS + 1 ) * ( Nv + 1 ), 0.0 );
+
+    //! terminal payoff
+    for ( int i = 0; i <= NS; i++ )
+    {
+        double payoff = Ctr->PDE_EvalFlow( S( i ) );
+        for ( int j = 0; j <= Nv; j++ )
+        {
+            U[IX( i, j )] = payoff;
+        }
+    }
+    const double intrinsic0 = Ctr->PDE_EvalFlow( 0.0 ); //!< payoff at S=0 (0 call, K put)
+
+    //! per-step operator applications and tridiagonal coefficients
+    auto A1 = [&]( int i, int j, const vector<double>& g ) //!< S-direction (+ half discount)
+    {
+        double si = S( i ), vj = V( j );
+        double vss = ( g[IX( i + 1, j )] - 2 * g[IX( i, j )] + g[IX( i - 1, j )] ) / ( dS * dS );
+        double vs = ( g[IX( i + 1, j )] - g[IX( i - 1, j )] ) / ( 2 * dS );
+        return 0.5 * vj * si * si * vss + b * si * vs - 0.5 * rd * g[IX( i, j )];
+    };
+    auto A2 = [&]( int i, int j, const vector<double>& g ) //!< v-direction (+ half discount)
+    {
+        double vj = V( j );
+        if ( j == 0 ) //!< v=0 : no diffusion, forward (upwind) drift kappa*theta>0
+        {
+            double vv = ( g[IX( i, 1 )] - g[IX( i, 0 )] ) / dv;
+            return kap * th * vv - 0.5 * rd * g[IX( i, 0 )];
+        }
+        double vvv = ( g[IX( i, j + 1 )] - 2 * g[IX( i, j )] + g[IX( i, j - 1 )] ) / ( dv * dv );
+        double vv = ( g[IX( i, j + 1 )] - g[IX( i, j - 1 )] ) / ( 2 * dv );
+        return 0.5 * xi * xi * vj * vvv + kap * ( th - vj ) * vv - 0.5 * rd * g[IX( i, j )];
+    };
+    auto A0 = [&]( int i, int j, const vector<double>& g ) //!< cross term (explicit)
+    {
+        if ( j == 0 )
+        {
+            return 0.0;
+        }
+        double vsv = ( g[IX( i + 1, j + 1 )] - g[IX( i + 1, j - 1 )] - g[IX( i - 1, j + 1 )] + g[IX( i - 1, j - 1 )] ) /
+                     ( 4 * dS * dv );
+        return rho * xi * V( j ) * S( i ) * vsv;
+    };
+
+    auto fill_boundaries = [&]( vector<double>& g, double tau )
+    {
+        for ( int j = 0; j <= Nv; j++ )
+        {
+            g[IX( 0, j )] = intrinsic0 * exp( -rd * tau );             //!< S=0 (Dirichlet)
+            g[IX( NS, j )] = 2 * g[IX( NS - 1, j )] - g[IX( NS - 2, j )]; //!< S=Smax (linear)
+        }
+        for ( int i = 0; i <= NS; i++ )
+        {
+            g[IX( i, Nv )] = g[IX( i, Nv - 1 )]; //!< v=Vmax (Neumann)
+        }
+    };
+
+    vector<double> Y0 = U, Y1 = U;
+    for ( int n = 1; n <= Nt; n++ )
+    {
+        const double tau = n * dt;
+        fill_boundaries( U, ( n - 1 ) * dt );
+
+        //! explicit full-operator step Y0 = U + dt*(A0+A1+A2)U
+        for ( int i = 1; i < NS; i++ )
+        {
+            for ( int j = 0; j < Nv; j++ )
+            {
+                Y0[IX( i, j )] = U[IX( i, j )] + dt * ( A0( i, j, U ) + A1( i, j, U ) + A2( i, j, U ) );
+            }
+        }
+
+        //! implicit S-sweep : (I - q dt A1) Y1 = Y0 - q dt A1 U, for each j
+        for ( int j = 0; j < Nv; j++ )
+        {
+            int m = NS - 1; //!< unknowns i = 1..NS-1
+            vector<double> a( m ), d( m ), c( m ), x( m );
+            double vj = V( j );
+            for ( int i = 1; i < NS; i++ )
+            {
+                double si = S( i );
+                double diff = 0.5 * vj * si * si / ( dS * dS );
+                double drift = b * si / ( 2 * dS );
+                double lo = diff - drift, up = diff + drift, di = -2 * diff - 0.5 * rd;
+                int idx = i - 1;
+                a[idx] = -q * dt * lo;
+                d[idx] = 1 - q * dt * di;
+                c[idx] = -q * dt * up;
+                x[idx] = Y0[IX( i, j )] - q * dt * A1( i, j, U );
+                if ( i == 1 )
+                {
+                    x[idx] -= a[idx] * U[IX( 0, j )]; //!< known S=0 boundary
+                    a[idx] = 0;
+                }
+                if ( i == NS - 1 )
+                {
+                    x[idx] -= c[idx] * U[IX( NS, j )]; //!< lagged S=Smax boundary
+                    c[idx] = 0;
+                }
+            }
+            Thomas( a, d, c, x );
+            for ( int i = 1; i < NS; i++ )
+            {
+                Y1[IX( i, j )] = x[i - 1];
+            }
+        }
+
+        //! implicit v-sweep : (I - q dt A2) U = Y1 - q dt A2 U, for each i
+        for ( int i = 1; i < NS; i++ )
+        {
+            int m = Nv; //!< unknowns j = 0..Nv-1
+            vector<double> a( m ), d( m ), c( m ), x( m );
+            for ( int j = 0; j < Nv; j++ )
+            {
+                double vj = V( j );
+                double lo, di, up;
+                if ( j == 0 )
+                {
+                    lo = 0;
+                    up = kap * th / dv;
+                    di = -kap * th / dv - 0.5 * rd;
+                }
+                else
+                {
+                    double diff = 0.5 * xi * xi * vj / ( dv * dv );
+                    double drift = kap * ( th - vj ) / ( 2 * dv );
+                    lo = diff - drift;
+                    up = diff + drift;
+                    di = -2 * diff - 0.5 * rd;
+                }
+                a[j] = -q * dt * lo;
+                d[j] = 1 - q * dt * di;
+                c[j] = -q * dt * up;
+                x[j] = Y1[IX( i, j )] - q * dt * A2( i, j, U );
+                if ( j == Nv - 1 )
+                {
+                    x[j] -= c[j] * U[IX( i, Nv )]; //!< lagged v=Vmax boundary
+                    c[j] = 0;
+                }
+            }
+            a[0] = 0;
+            Thomas( a, d, c, x );
+            for ( int j = 0; j < Nv; j++ )
+            {
+                U[IX( i, j )] = x[j];
+            }
+        }
+
+        fill_boundaries( U, tau );
+
+        //! American : early-exercise projection
+        if ( american )
+        {
+            for ( int i = 0; i <= NS; i++ )
+            {
+                double ev = Ctr->PDE_EvalFlow( S( i ) );
+                for ( int j = 0; j <= Nv; j++ )
+                {
+                    U[IX( i, j )] = std::max( U[IX( i, j )], ev );
+                }
+            }
+        }
+    }
+
+    //! interpolate the price at (S0, v0): bilinear on the grid
+    int i0 = std::min( NS - 1, std::max( 0, (int)( S0 / dS ) ) );
+    int j0 = std::min( Nv - 1, std::max( 0, (int)( v0 / dv ) ) );
+    double ws = ( S0 - S( i0 ) ) / dS, wv = ( v0 - V( j0 ) ) / dv;
+    auto at = [&]( int i, int j ) { return U[IX( i, j )]; };
+    double price = ( 1 - ws ) * ( 1 - wv ) * at( i0, j0 ) + ws * ( 1 - wv ) * at( i0 + 1, j0 ) +
+                   ( 1 - ws ) * wv * at( i0, j0 + 1 ) + ws * wv * at( i0 + 1, j0 + 1 );
+
+    //! delta / gamma by finite differences in S at v0 (central, one grid step)
+    auto price_at = [&]( int i ) {
+        return ( 1 - wv ) * at( i, j0 ) + wv * at( i, j0 + 1 );
+    };
+    GridResult res;
+    res.premium = price;
+    res.delta = ( price_at( i0 + 1 ) - price_at( i0 - 1 < 0 ? 0 : i0 - 1 ) ) / ( 2 * dS );
+    res.gamma = ( price_at( i0 + 1 ) - 2 * price_at( i0 ) + price_at( i0 - 1 < 0 ? 0 : i0 - 1 ) ) / ( dS * dS );
+    return res;
 }

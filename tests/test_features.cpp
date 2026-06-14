@@ -283,6 +283,46 @@ TEST_CASE( "Heston ANA degenerate limit matches Black-Scholes" )
     CHECK( Premium( Price( o.str() ) ) == doctest::Approx( BsCall( 100, 100, 0.08, 0.30, T1 ) ).epsilon( 0.01 ) );
 }
 
+// --- Heston (PDE) : the 2-D (S,v) ADI grid matches the ANA characteristic
+// function across moneyness, and American >= European.
+TEST_CASE( "Heston PDE 2-D ADI matches ANA and supports American" )
+{
+    auto cfg = []( const std::string& method, double strike, const std::string& type,
+                   const std::string& exercise )
+    {
+        std::ostringstream o;
+        o << "root: p\n"
+          << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "c: !pricer_configuration {method: " << method << ", pde_configuration: pc, log_path: \"/tmp/\"}\n"
+          << "pc: !pde_configuration {vanilla_precision: high}\n"
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+          << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
+          << "h: !heston_volatility {spot: 100, init_vol: 25, long_vol: 25, kappa: 2,"
+          << " vol_of_vol: 0.5, rho: -0.7, calendar: cal}\n"
+          << "bk: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
+          << ", exercise: " << exercise << "}\n";
+        return o.str();
+    };
+    for ( double K : { 80.0, 100.0, 120.0 } )
+    {
+        CAPTURE( K );
+        std::string type = ( K < 100 ) ? "put" : "call";
+        double ana = Premium( Price( cfg( "ana", K, type, "european" ) ) );
+        double pde = Premium( Price( cfg( "pde", K, type, "european" ) ) );
+        CHECK( std::abs( ana - pde ) <= 0.05 ); //!< 2-D ADI vs closed form
+    }
+    //! American put carries an early-exercise premium over European
+    double eu = Premium( Price( cfg( "pde", 80, "put", "european" ) ) );
+    double am = Premium( Price( cfg( "pde", 80, "put", "american" ) ) );
+    CHECK( am >= eu - 1e-6 );
+}
+
 // --- historical volatility : EWMA of log returns of a price series -> a positive
 // annualised vol (exercises historical_volatility_computation).
 TEST_CASE( "historical volatility computation" )
