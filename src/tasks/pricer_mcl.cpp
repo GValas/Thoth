@@ -125,8 +125,8 @@ void PricerMCL::BuildGreekScenarios_()
         _scenario_roots.emplace_back( Tag, root );
     };
 
-    //! delta / gamma : per-underlying relative spot bump (small for delta, wider
-    //! for gamma); rates and vols are unbumped (shared with the base tree)
+    //! delta (one-sided, reuses the base price) / gamma (central, needs both
+    //! sides). rates and vols are unbumped (shared with the base tree).
     for ( Single* s : singles )
     {
         const double spot = s->GetSpot();
@@ -134,7 +134,6 @@ void PricerMCL::BuildGreekScenarios_()
         {
             const double h = GREEK_SPOT_BUMP * spot;
             build( "@D+:" + s->GetName(), false, false, [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
-            build( "@D-:" + s->GetName(), false, false, [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
         }
         if ( _request_gamma )
         {
@@ -144,18 +143,16 @@ void PricerMCL::BuildGreekScenarios_()
         }
     }
 
-    //! vega : parallel vol bump on every underlying
+    //! vega : one-sided parallel vol bump on every underlying
     if ( _request_vega )
     {
         build( "@V+", false, true, [&] { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
-        build( "@V-", false, true, [&] { ApplyVolShift_( -GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
     }
 
-    //! rho : parallel rate bump on every currency's curve
+    //! rho : one-sided parallel rate bump on every currency's curve
     if ( _request_rho )
     {
         build( "@R+", true, false, [&] { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
-        build( "@R-", true, false, [&] { ApplyRateShift_( -GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
     }
 }
 //! single-tree Greeks: delta/gamma/vega/rho come from the bump sub-trees priced
@@ -180,14 +177,12 @@ void PricerMCL::ComputeGreeks_()
         for ( Single* s : _single_set )
         {
             const double spot = s->GetSpot();
-            if ( _request_delta )
+            if ( _request_delta ) //!< one-sided forward difference, reuses p0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
-                delta += ( _scenario_premium.at( "@D+:" + s->GetName() ) -
-                           _scenario_premium.at( "@D-:" + s->GetName() ) ) /
-                         ( 2 * h );
+                delta += ( _scenario_premium.at( "@D+:" + s->GetName() ) - p0 ) / h;
             }
-            if ( _request_gamma )
+            if ( _request_gamma ) //!< central second difference (needs both sides)
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
                 gamma += ( _scenario_premium.at( "@G+:" + s->GetName() ) - 2 * p0 +
@@ -199,16 +194,14 @@ void PricerMCL::ComputeGreeks_()
         _gamma = gamma;
     }
 
-    //! vega / rho : per 1 vol point / per 1% rate move (matches Pricer conventions)
+    //! vega / rho : one-sided, per 1 vol point / per 1% rate move
     if ( _request_vega )
     {
-        _vega = ( _scenario_premium.at( "@V+" ) - _scenario_premium.at( "@V-" ) ) /
-                ( 2 * GREEK_VOL_BUMP ) * 0.01;
+        _vega = ( _scenario_premium.at( "@V+" ) - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
     if ( _request_rho )
     {
-        _rho = ( _scenario_premium.at( "@R+" ) - _scenario_premium.at( "@R-" ) ) /
-               ( 2 * GREEK_RATE_BUMP ) * 0.01;
+        _rho = ( _scenario_premium.at( "@R+" ) - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
     //! theta : roll today one calendar day forward and reprice (base-only tree;

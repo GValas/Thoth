@@ -172,17 +172,14 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         {
             const double spot = s->GetSpot();
 
-            if ( _request_delta )
+            if ( _request_delta ) //!< one-sided forward difference, reuses p0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceContract_( Ctr );
                 const double pu = Ctr->GetPremium();
-                s->SetSpot( spot - h );
-                PriceContract_( Ctr );
-                const double pd = Ctr->GetPremium();
                 s->SetSpot( spot ); //!< restore
-                delta += ( pu - pd ) / ( 2 * h );
+                delta += ( pu - p0 ) / h;
             }
 
             if ( _request_gamma )
@@ -200,7 +197,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         }
     }
 
-    //! vega : parallel vol bump on the contract's underlyings, per 1 vol point
+    //! vega : one-sided parallel vol bump on the contract's underlyings, per vol point
     double vega = 0;
     if ( _request_vega )
     {
@@ -213,19 +210,13 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         const double pu = Ctr->GetPremium();
         for ( Single* s : singles )
         {
-            s->GetVolatility()->SetVolShift( -GREEK_VOL_BUMP );
-        }
-        PriceContract_( Ctr );
-        const double pd = Ctr->GetPremium();
-        for ( Single* s : singles )
-        {
             s->GetVolatility()->SetVolShift( 0 ); //!< restore
         }
-        vega = ( pu - pd ) / ( 2 * GREEK_VOL_BUMP ) * 0.01;
+        vega = ( pu - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
 
-    //! rho : parallel rate bump on every currency the contract touches (premium
-    //! currency + the underlyings' currencies, each shifted once), per 1% move
+    //! rho : one-sided parallel rate bump on every currency the contract touches
+    //! (premium currency + the underlyings' currencies, each shifted once), per 1%
     double rho = 0;
     if ( _request_rho )
     {
@@ -239,15 +230,9 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         const double pu = Ctr->GetPremium();
         for ( Currency* c : ccys )
         {
-            c->GetRate()->SetCurveShift( -GREEK_RATE_BUMP );
-        }
-        PriceContract_( Ctr );
-        const double pd = Ctr->GetPremium();
-        for ( Currency* c : ccys )
-        {
             c->GetRate()->SetCurveShift( 0 ); //!< restore
         }
-        rho = ( pu - pd ) / ( 2 * GREEK_RATE_BUMP ) * 0.01;
+        rho = ( pu - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
     //! theta : roll one calendar day forward (spot held), per-day decay. The PDE
@@ -300,17 +285,14 @@ void Pricer::ComputeGreeks_()
         {
             const double spot = s->GetSpot();
 
-            if ( _request_delta )
+            if ( _request_delta ) //!< one-sided forward difference, reuses p0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceBook_();
                 const double pu = _book->GetPremium();
-                s->SetSpot( spot - h );
-                PriceBook_();
-                const double pd = _book->GetPremium();
                 s->SetSpot( spot ); //!< restore
-                delta += ( pu - pd ) / ( 2 * h );
+                delta += ( pu - p0 ) / h;
             }
 
             if ( _request_gamma )
@@ -330,34 +312,26 @@ void Pricer::ComputeGreeks_()
         _gamma = gamma;
     }
 
-    //! vega : parallel vol bump, reported per 1 vol point (0.01 of vol)
+    //! vega : one-sided parallel vol bump, reported per 1 vol point (0.01 of vol)
     if ( _request_vega )
     {
         ApplyVolShift_( GREEK_VOL_BUMP );
         PriceBook_();
         const double pu = _book->GetPremium();
 
-        ApplyVolShift_( -GREEK_VOL_BUMP );
-        PriceBook_();
-        const double pd = _book->GetPremium();
-
         ApplyVolShift_( 0 ); //!< restore
-        _vega = ( pu - pd ) / ( 2 * GREEK_VOL_BUMP ) * 0.01;
+        _vega = ( pu - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
 
-    //! rho : parallel rate bump, reported per 1% (0.01) rate move
+    //! rho : one-sided parallel rate bump, reported per 1% (0.01) rate move
     if ( _request_rho )
     {
         ApplyRateShift_( GREEK_RATE_BUMP );
         PriceBook_();
         const double pu = _book->GetPremium();
 
-        ApplyRateShift_( -GREEK_RATE_BUMP );
-        PriceBook_();
-        const double pd = _book->GetPremium();
-
         ApplyRateShift_( 0 ); //!< restore
-        _rho = ( pu - pd ) / ( 2 * GREEK_RATE_BUMP ) * 0.01;
+        _rho = ( pu - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
     //! theta : roll today forward one calendar day (spot held), per-day decay

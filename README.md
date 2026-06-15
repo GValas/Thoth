@@ -35,11 +35,12 @@ can attach a `debug_configuration` with `generate_nodes_graph: true` to dump the
 Monte-Carlo node graph as a Graphviz `.dot` file for inspection.
 
 **Greeks** — list any of `delta`, `gamma`, `vega`, `rho`, `theta` in a pricer's
-`indicators` (alongside `premium`). All three engines use bump-and-revalue with
-the same bump sizes (delta/vega/rho small central bumps; gamma a wider spot bump,
-since its second difference is otherwise swamped by the PDE grid's per-spot
-re-centering; theta rolls the valuation date one day), but each engine computes
-them the cheapest way for its structure:
+`indicators` (alongside `premium`). All three engines use bump-and-revalue. The
+first-order Greeks (delta, vega, rho, theta) use a **one-sided** difference that
+reuses the base price (`(P(x+ε) − P₀)/ε`), so each costs one extra valuation;
+gamma uses a **central** second difference (a wider spot bump, since the second
+difference is otherwise swamped by the PDE grid's per-spot re-centering). Each
+engine then computes them the cheapest way for its structure:
 - **PDE / ANA** bump and reprice **per contract**, inside the single contract
   loop, so one progress bar covers price + Greeks and the per-contract Greeks are
   also reported (not just the book total).
@@ -52,8 +53,9 @@ them the cheapest way for its structure:
   underlyings fall back to book-level bump-and-revalue.
 
 Units: delta `dP/dS`, gamma `d²P/dS²`, vega per vol point, rho per 1% parallel
-rate move, theta per calendar day. On a 1y ATM call all three engines agree with
-Black-Scholes (delta 0.66, gamma 0.012, vega 0.37, rho 0.50, theta −0.026).
+rate move, theta per calendar day. On a 1y ATM call the three engines agree and
+sit close to Black-Scholes (delta ≈0.67, gamma ≈0.012, vega ≈0.37, rho ≈0.50,
+theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·ε).
 
 **Instruments**
 - `vanilla` — call / put, **european** or **american**, absolute or
