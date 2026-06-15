@@ -267,10 +267,25 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
 void Pricer::ComputeGreeks_()
 {
     //! every PriceBook_ below is an inner bump revaluation: silence the engine's
-    //! progress bar so it shows only for the base price (restored on the way out).
+    //! per-sweep progress bar and status logs (restored on the way out). One
+    //! "GRK" bar replaces them, advancing once per bump so the whole Greek job
+    //! shows as a single line instead of N repeated re-price blocks.
     _quiet_pricing = true;
 
     const double p0 = _premium;
+
+    //! count the bump scenarios up front to size the Greek progress bar:
+    //! delta = 1 / underlying, gamma = 2 / underlying, vega/rho/theta = 1 each,
+    //! plus one final restore re-price.
+    const long ns = (long)_single_set.size();
+    long greek_total = 1; //!< final restore
+    if ( _request_delta ) greek_total += ns;
+    if ( _request_gamma ) greek_total += 2 * ns;
+    if ( _request_vega ) greek_total += 1;
+    if ( _request_rho ) greek_total += 1;
+    if ( _request_theta ) greek_total += 1;
+    ProgressBar greek_bar( "GRK", greek_total );
+    long greek_done = 0;
 
     //! delta / gamma : per-underlying relative spot bump (summed over underlyings),
     //! with a small bump for delta and a wider one for gamma (see GREEK_*_BUMP).
@@ -290,6 +305,7 @@ void Pricer::ComputeGreeks_()
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceBook_();
+                greek_bar.Update( ++greek_done );
                 const double pu = _book->GetPremium();
                 s->SetSpot( spot ); //!< restore
                 delta += ( pu - p0 ) / h;
@@ -300,9 +316,11 @@ void Pricer::ComputeGreeks_()
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceBook_();
+                greek_bar.Update( ++greek_done );
                 const double pu = _book->GetPremium();
                 s->SetSpot( spot - h );
                 PriceBook_();
+                greek_bar.Update( ++greek_done );
                 const double pd = _book->GetPremium();
                 s->SetSpot( spot ); //!< restore
                 gamma += ( pu - 2 * p0 + pd ) / ( h * h );
@@ -317,6 +335,7 @@ void Pricer::ComputeGreeks_()
     {
         ApplyVolShift_( GREEK_VOL_BUMP );
         PriceBook_();
+        greek_bar.Update( ++greek_done );
         const double pu = _book->GetPremium();
 
         ApplyVolShift_( 0 ); //!< restore
@@ -328,6 +347,7 @@ void Pricer::ComputeGreeks_()
     {
         ApplyRateShift_( GREEK_RATE_BUMP );
         PriceBook_();
+        greek_bar.Update( ++greek_done );
         const double pu = _book->GetPremium();
 
         ApplyRateShift_( 0 ); //!< restore
@@ -340,6 +360,7 @@ void Pricer::ComputeGreeks_()
         const date base_today = _today;
         _today = base_today + days( 1 );
         PriceBook_();
+        greek_bar.Update( ++greek_done );
         const double p1 = _book->GetPremium();
         _today = base_today; //!< restore
         _theta = p1 - p0;
@@ -347,6 +368,8 @@ void Pricer::ComputeGreeks_()
 
     //! restore the book to the base scenario so the premium output is unbumped
     PriceBook_();
+    greek_bar.Update( ++greek_done );
+    greek_bar.Done();
     _premium = _book->GetPremium();
 
     _quiet_pricing = false;

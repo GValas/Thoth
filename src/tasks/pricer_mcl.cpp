@@ -445,26 +445,31 @@ void PricerMCL::Tree_Init_()
         LOG( "MCL", "node graph written to " + path );
     }
 
-    //! status
+    //! status (only on the visible base build; the bump-and-revalue Greek
+    //! re-prices set _quiet_pricing, and would otherwise repeat these lines once
+    //! per bump)
+    if ( !_quiet_pricing )
     {
-        std::ostringstream oss;
-        oss << _collector.GetNodeNumber() << " created nodes";
-        LOG( "MCL", oss.str() );
-    }
-    {
-        std::ostringstream oss;
-        oss << "diffusion dates = " << _diffusion_dates.size() << ", "
-            << "contracts = " << _book->GetOptionList().size() << ", "
-            << "underlings = " << _single_set.size() << ", "
-            << "currencies = " << _currency_set.size();
-        LOG( "MCL", oss.str() );
-    }
-    {
-        std::ostringstream oss;
-        oss << "drawings = " << _configuration->_mcl->_paths << ", "
-            << "max time step = " << _configuration->_mcl->_max_time_step << ", "
-            << "vol time step = " << _configuration->_mcl->_vol_time_step;
-        LOG( "MCL", oss.str() );
+        {
+            std::ostringstream oss;
+            oss << _collector.GetNodeNumber() << " created nodes";
+            LOG( "MCL", oss.str() );
+        }
+        {
+            std::ostringstream oss;
+            oss << "diffusion dates = " << _diffusion_dates.size() << ", "
+                << "contracts = " << _book->GetOptionList().size() << ", "
+                << "underlings = " << _single_set.size() << ", "
+                << "currencies = " << _currency_set.size();
+            LOG( "MCL", oss.str() );
+        }
+        {
+            std::ostringstream oss;
+            oss << "drawings = " << _configuration->_mcl->_paths << ", "
+                << "max time step = " << _configuration->_mcl->_max_time_step << ", "
+                << "vol time step = " << _configuration->_mcl->_vol_time_step;
+            LOG( "MCL", oss.str() );
+        }
     }
 }
 
