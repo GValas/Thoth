@@ -48,6 +48,11 @@ inline double Trust( const YAML::Node& r, const std::string& opt = "" )
     return opt.empty() ? r["res"]["premium_trust"].as<double>()
                        : r["res"][opt + "_premium_trust"].as<double>();
 }
+//! a single Greek (delta/gamma/vega/rho/theta) from the "res" result block
+inline double Greek( const YAML::Node& r, const std::string& name )
+{
+    return r["res"][name].as<double>();
+}
 
 //! Black-Scholes (no dividend), maturity in years
 inline double NormCdf( double x ) { return 0.5 * std::erfc( -x / std::sqrt( 2.0 ) ); }

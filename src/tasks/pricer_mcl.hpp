@@ -32,7 +32,7 @@ class PricerMCL : public Pricer
     bool _suppress_scenarios = false;    //!< force a base-only tree (theta reprice / fallback)
     vector<std::pair<string, MonteCarloNode*>> _scenario_roots;
     map<string, double> _scenario_premium;
-    bool CanSingleTreeGreeks_() const; //!< true iff no American contract and every underlying is Mono
+    bool CanSingleTreeGreeks_() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)
     void BuildGreekScenarios_();       //!< build the delta/gamma/vega/rho bump sub-trees
 
     //! tree
@@ -50,9 +50,34 @@ class PricerMCL : public Pricer
     void SetupAmericanRecording();
     void LogRecordings();
 
-    //! American pricing via Longstaff-Schwartz on the recorded paths
+    //! American pricing via Longstaff-Schwartz on the recorded paths.
+    //!
+    //! Single-tree Greeks for American options: the exercise policy is fit ONCE
+    //! on the base paths (FitAmericanPolicy) and then applied as a FROZEN rule to
+    //! the base paths and to every bumped scenario's recorded paths
+    //! (ApplyAmericanPolicy). Freezing the boundary across bumps is both cheaper
+    //! (no re-regression per bump) and lower-variance/smoother (the envelope
+    //! theorem makes a first-order boundary error contribute only at second order).
+    struct AmericanPolicy
+    {
+        double s0 = 0;          //!< base-path initial spot (moneyness normaliser m = S/s0)
+        vector<double> tau;     //!< year fractions of the recorded exercise grid
+        vector<double> b0;      //!< continuation regression constant per exercise date
+        vector<double> b1;      //!< continuation regression slope (m) per exercise date
+        vector<double> b2;      //!< continuation regression curvature (m^2) per exercise date
+        vector<bool> has_fit;   //!< true where a continuation fit exists (enough ITM points)
+    };
     void PriceAmerican();
-    double PriceAmericanLSM( Contract* Contract, double& Trust );
+    AmericanPolicy FitAmericanPolicy( Contract* Contract,
+                                      const gsl_matrix* Paths,
+                                      const vector<double>& Tau,
+                                      double Rate );
+    double ApplyAmericanPolicy( Contract* Contract,
+                                const gsl_matrix* Paths,
+                                const vector<double>& Tau,
+                                double Rate,
+                                const AmericanPolicy& Policy,
+                                double& Trust );
 
   protected:
     void PreCheck_() override; //!< require an mcl_configuration and a correlation

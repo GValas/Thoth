@@ -81,16 +81,14 @@ void PricerMCL::PriceBook_()
 }
 
 //! single-tree Greeks need to isolate one contract's spot bump within a shared
-//! path; that requires a plain (Mono) underlying and no American early exercise
-//! (the LSM regression is a separate post-pass). Otherwise fall back to bumps.
+//! path; that requires a plain (Mono) underlying. American early exercise IS
+//! supported: each scenario records its own bumped spot path and PriceAmerican
+//! re-prices it under the frozen LSM policy (see PriceAmerican). Non-Mono books
+//! (basket / composite) still fall back to bump-and-revalue.
 bool PricerMCL::CanSingleTreeGreeks_() const
 {
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( c->PDE_IsAmerican() )
-        {
-            return false;
-        }
         if ( !dynamic_cast<Mono*>( c->GetUnderlying() ) )
         {
             return false;
@@ -507,13 +505,28 @@ void PricerMCL::SetupAmericanRecording()
             continue;
         }
         string udl = c->GetUnderlying()->GetName();
+        vector<size_t> grid = _collector.DiffusionIndicesUpTo( c->GetMaturityDate() );
+
+        //! base spot path : feeds the LSM policy fit and the base premium
         MonteCarloNode* spot = _collector.GetNode( udl + "#spot" );
         if ( !spot )
         {
             continue;
         }
-        vector<size_t> grid = _collector.DiffusionIndicesUpTo( c->GetMaturityDate() );
         _collector.StartRecording( spot, grid, n );
+
+        //! single-tree Greeks: also record each bump scenario's spot path so the
+        //! frozen exercise policy can be applied to the bumped paths (the spot
+        //! diffusion node is always duplicated per scenario, so every bump — spot,
+        //! vol and rate — exposes its own correctly-bumped path here)
+        for ( auto& tagged : _scenario_roots )
+        {
+            if ( MonteCarloNode* sb = _collector.GetNode( udl + "#spot" + tagged.first ) )
+            {
+                _collector.StartRecording( sb, grid, n );
+            }
+        }
+
         std::ostringstream oss;
         oss << "recording " << grid.size() << " exercise dates on '"
             << udl << "' for American contract '" << c->GetName() << "'";
@@ -554,7 +567,11 @@ void PricerMCL::LogRecordings()
     }
 }
 
-//! price every American contract by Longstaff-Schwartz, then re-aggregate the book
+//! price every American contract by Longstaff-Schwartz, then re-aggregate the
+//! book. Single-tree Greeks: the exercise policy is fit ONCE per contract on its
+//! base paths and then applied (frozen) to the base paths AND to every bumped
+//! scenario's recorded paths, replacing that contract's European contribution in
+//! _scenario_premium so ComputeGreeks_ finite-differences the American values.
 void PricerMCL::PriceAmerican()
 {
     if ( !_collector.IsRecording() )
@@ -562,69 +579,121 @@ void PricerMCL::PriceAmerican()
         return;
     }
 
-    //! override each American contract's premium with its LSM value
+    //! fx factor that converts a contract premium into the book currency
+    auto fx_of = [&]( Contract* c ) -> double
+    {
+        if ( _currency == c->GetPremiumCurrency() )
+        {
+            return 1.0;
+        }
+        return _correlation->GetFxSpot( _currency->GetName(),
+                                        c->GetPremiumCurrency()->GetName() );
+    };
+
     for ( Contract* c : _book->GetOptionList() )
     {
         if ( !c->PDE_IsAmerican() )
         {
             continue;
         }
+
+        string udl = c->GetUnderlying()->GetName();
+        const gsl_matrix* S0 = _collector.RecordedPaths( udl + "#spot" );
+        vector<double> tau = _collector.RecordedTau( udl + "#spot" );
+        double r = c->GetPremiumCurrency()->GetRate()->GetCurveValue( c->GetMaturityDate() );
+
+        //! fit the exercise policy once on the base paths
+        AmericanPolicy policy = FitAmericanPolicy( c, S0, tau, r );
+
+        //! base premium = apply the frozen policy to the base paths
         double trust = 0;
-        double premium = PriceAmericanLSM( c, trust );
+        double premium = ApplyAmericanPolicy( c, S0, tau, r, policy, trust );
         c->SetPremium( premium );
         c->SetPremiumTrust( trust );
         std::ostringstream oss;
-        oss << "american '" << c->GetName() << "' (LSM) premium = " << premium;
+        oss << "american '" << c->GetName() << "' (LSM, frozen boundary) premium = " << premium;
         LOG( "MCL", oss.str() );
+
+        //! re-price each Greek scenario for this contract under the frozen policy,
+        //! swapping the contract's European contribution for its American value in
+        //! the (book-currency) scenario premium
+        const double fx = fx_of( c );
+        for ( auto& tagged : _scenario_roots )
+        {
+            const string& tag = tagged.first;
+            auto it = _scenario_premium.find( tag );
+            if ( it == _scenario_premium.end() )
+            {
+                continue;
+            }
+
+            //! European contribution of this contract under the bump (to remove)
+            MonteCarloNode* euro_node = _collector.GetNode( c->GetName() + tag );
+            double euro_c = euro_node ? euro_node->GetIndicatorValue( 0 ) : 0;
+
+            //! bumped paths (spot/vol/rate). The rho scenario also discounts (and
+            //! drifts, already in the path) at the bumped rate
+            const gsl_matrix* Sb = _collector.RecordedPaths( udl + "#spot" + tag );
+            vector<double> taub = _collector.RecordedTau( udl + "#spot" + tag );
+            if ( !Sb )
+            {
+                Sb = S0;
+                taub = tau;
+            }
+            double rb = ( tag == "@R+" ) ? r + GREEK_RATE_BUMP : r;
+
+            double tb = 0;
+            double amer_c = ApplyAmericanPolicy( c, Sb, taub, rb, policy, tb );
+
+            it->second += ( amer_c - euro_c ) * fx;
+        }
     }
 
-    //! re-aggregate the book premium from the (now possibly American) contracts
+    //! re-aggregate the base book premium from the (now American) contracts
     double book_premium = 0;
     for ( Contract* c : _book->GetOptionList() )
     {
-        double fx = 1;
-        if ( _currency != c->GetPremiumCurrency() )
-        {
-            fx = _correlation->GetFxSpot( _currency->GetName(),
-                                          c->GetPremiumCurrency()->GetName() );
-        }
-        book_premium += c->GetPremium() * fx;
+        book_premium += c->GetPremium() * fx_of( c );
     }
     _book->SetPremium( book_premium );
 }
 
-//! Longstaff-Schwartz on the recorded spot paths of the contract's underlying.
-//! Backward induction over the exercise grid; at each date the continuation
-//! value of the in-the-money paths is regressed on { 1, m, m^2 } (m = S/S0),
-//! and a path exercises when its intrinsic value beats the estimated
-//! continuation. Intrinsic uses the contract's own payoff (PDE_EvalFlow).
-double PricerMCL::PriceAmericanLSM( Contract* Contract, double& Trust )
+//! Fit a Longstaff-Schwartz exercise policy on the recorded base paths. Backward
+//! induction over the exercise grid; at each interior date the continuation value
+//! of the in-the-money paths is regressed on { 1, m, m^2 } (m = S/S0) and the
+//! per-date coefficients are stored. The fitted continuation also drives the
+//! cashflow roll-back so earlier dates regress against the realised policy value.
+PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
+                                                       const gsl_matrix* Paths,
+                                                       const vector<double>& Tau,
+                                                       double Rate )
 {
-    Trust = 0;
-    string udl = Contract->GetUnderlying()->GetName();
-    const gsl_matrix* S = _collector.RecordedPaths( udl + "#spot" );
-    vector<double> tau = _collector.RecordedTau( udl + "#spot" );
-    if ( !S || S->size2 < 2 )
+    AmericanPolicy pol;
+    if ( !Paths || Paths->size2 < 2 )
     {
-        return 0;
+        return pol;
     }
 
-    size_t N = S->size1; //!< paths
-    size_t M = S->size2; //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
-    double r = Contract->GetPremiumCurrency()->GetRate()->GetCurveValue( Contract->GetMaturityDate() );
-    double s0 = gsl_matrix_get( S, 0, 0 ); //!< initial spot (constant across paths)
+    size_t N = Paths->size1; //!< paths
+    size_t M = Paths->size2; //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
+    pol.s0 = gsl_matrix_get( Paths, 0, 0 ); //!< initial spot (constant across base paths)
+    pol.tau = Tau;
+    pol.b0.assign( M, 0.0 );
+    pol.b1.assign( M, 0.0 );
+    pol.b2.assign( M, 0.0 );
+    pol.has_fit.assign( M, false );
 
     //! cashflow per path, expressed as value at the current backward time step
     vector<double> cf( N );
     for ( size_t p = 0; p < N; p++ )
     {
-        cf[p] = Contract->PDE_EvalFlow( gsl_matrix_get( S, p, M - 1 ) ); //!< at maturity
+        cf[p] = Contract->PDE_EvalFlow( gsl_matrix_get( Paths, p, M - 1 ) ); //!< at maturity
     }
 
     //! backward induction over the interior exercise dates
     for ( int t = (int)M - 2; t >= 1; t-- )
     {
-        double df = exp( -r * ( tau[t + 1] - tau[t] ) );
+        double df = exp( -Rate * ( Tau[t + 1] - Tau[t] ) );
         for ( size_t p = 0; p < N; p++ )
         {
             cf[p] *= df; //!< discount future cashflow to this date
@@ -634,7 +703,7 @@ double PricerMCL::PriceAmericanLSM( Contract* Contract, double& Trust )
         vector<size_t> itm;
         for ( size_t p = 0; p < N; p++ )
         {
-            if ( Contract->PDE_EvalFlow( gsl_matrix_get( S, p, t ) ) > 0 )
+            if ( Contract->PDE_EvalFlow( gsl_matrix_get( Paths, p, t ) ) > 0 )
             {
                 itm.push_back( p );
             }
@@ -650,7 +719,7 @@ double PricerMCL::PriceAmericanLSM( Contract* Contract, double& Trust )
         gsl_vector* y = gsl_vector_alloc( ni );
         for ( size_t k = 0; k < ni; k++ )
         {
-            double m = gsl_matrix_get( S, itm[k], t ) / s0;
+            double m = gsl_matrix_get( Paths, itm[k], t ) / pol.s0;
             gsl_matrix_set( X, k, 0, 1.0 );
             gsl_matrix_set( X, k, 1, m );
             gsl_matrix_set( X, k, 2, m * m );
@@ -661,16 +730,17 @@ double PricerMCL::PriceAmericanLSM( Contract* Contract, double& Trust )
         double chisq = 0;
         gsl_multifit_linear_workspace* w = gsl_multifit_linear_alloc( ni, 3 );
         gsl_multifit_linear( X, y, beta, cov, &chisq, w );
-        double b0 = gsl_vector_get( beta, 0 );
-        double b1 = gsl_vector_get( beta, 1 );
-        double b2 = gsl_vector_get( beta, 2 );
+        pol.b0[t] = gsl_vector_get( beta, 0 );
+        pol.b1[t] = gsl_vector_get( beta, 1 );
+        pol.b2[t] = gsl_vector_get( beta, 2 );
+        pol.has_fit[t] = true;
 
-        //! exercise where intrinsic beats the estimated continuation
+        //! roll the cashflow back through the fitted exercise decision
         for ( size_t p : itm )
         {
-            double s = gsl_matrix_get( S, p, t );
-            double m = s / s0;
-            double continuation = b0 + b1 * m + b2 * m * m;
+            double s = gsl_matrix_get( Paths, p, t );
+            double m = s / pol.s0;
+            double continuation = pol.b0[t] + pol.b1[t] * m + pol.b2[t] * m * m;
             double intrinsic = Contract->PDE_EvalFlow( s );
             if ( intrinsic >= continuation )
             {
@@ -685,21 +755,69 @@ double PricerMCL::PriceAmericanLSM( Contract* Contract, double& Trust )
         gsl_matrix_free( cov );
     }
 
-    //! discount from the first exercise date to today, then average
-    double df0 = exp( -r * ( tau[1] - tau[0] ) );
+    return pol;
+}
+
+//! Apply a fitted (frozen) exercise policy to a set of paths: walk each path
+//! forward and exercise at the first interior date whose intrinsic beats the
+//! frozen continuation estimate, otherwise take the maturity payoff. Returns the
+//! discounted MC mean (vs immediate exercise at the path-set's initial spot).
+//! Rate is the scenario's discount rate (bumped for rho); the moneyness is always
+//! normalised by the policy's base s0 so the frozen boundary stays comparable.
+double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
+                                       const gsl_matrix* Paths,
+                                       const vector<double>& Tau,
+                                       double Rate,
+                                       const AmericanPolicy& Policy,
+                                       double& Trust )
+{
+    Trust = 0;
+    if ( !Paths || Paths->size2 < 2 )
+    {
+        return 0;
+    }
+
+    size_t N = Paths->size1; //!< paths
+    size_t M = Paths->size2; //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
     double sum = 0;
     double sum2 = 0;
     for ( size_t p = 0; p < N; p++ )
     {
-        double v = cf[p] * df0;
-        sum += v;
-        sum2 += v * v;
-    }
-    double continuation0 = sum / N;
-    Trust = sqrt( ( sum2 / N - continuation0 * continuation0 ) / ( N - 1 ) );
+        double value = 0; //!< discounted-to-today cashflow of this path
+        for ( size_t t = 1; t < M; t++ )
+        {
+            double s = gsl_matrix_get( Paths, p, t );
+            double intrinsic = Contract->PDE_EvalFlow( s );
 
-    //! American value = max( continuation today, immediate exercise at S0 )
-    return std::max( continuation0, Contract->PDE_EvalFlow( s0 ) );
+            if ( t == M - 1 ) //!< maturity : forced exercise (take the payoff)
+            {
+                value = intrinsic * exp( -Rate * ( Tau[t] - Tau[0] ) );
+                break;
+            }
+
+            //! interior date : exercise when intrinsic beats the frozen continuation
+            if ( intrinsic > 0 && Policy.has_fit[t] )
+            {
+                double m = s / Policy.s0;
+                double continuation = Policy.b0[t] + Policy.b1[t] * m + Policy.b2[t] * m * m;
+                if ( intrinsic >= continuation )
+                {
+                    value = intrinsic * exp( -Rate * ( Tau[t] - Tau[0] ) );
+                    break;
+                }
+            }
+        }
+        sum += value;
+        sum2 += value * value;
+    }
+
+    double mean = sum / N;
+    Trust = sqrt( ( sum2 / N - mean * mean ) / ( N - 1 ) );
+
+    //! American value = max( continuation today, immediate exercise at the
+    //! path-set's initial spot ) — for bumped paths this is the bumped spot
+    double s0_set = gsl_matrix_get( Paths, 0, 0 );
+    return std::max( mean, Contract->PDE_EvalFlow( s0_set ) );
 }
 
 void PricerMCL::Tree_Read_()
