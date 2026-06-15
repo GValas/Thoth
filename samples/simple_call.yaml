@@ -11,20 +11,27 @@ simple_call_pricing: !pricer
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: simple_call_result
+  debug_configuration: debug
 
 config: !pricer_configuration
-  method: pde
+  method: mcl
   mcl_configuration: mcl_config
   pde_configuration: pde_config
   log_path: "/tmp/"
 
+# node-graph dump: a debug switch on its own object, referenced by the pricer
+# above (debug_configuration: debug) — NOT a field of mcl_configuration.
+debug: !debug_configuration
+  generate_nodes_graph: true
+
 mcl_config: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 100000
+  paths: 10000000
   vol_time_step: 0.01
   use_sobol: true
   use_milstein: true
+  generate_nodes_graph: true
 
 pde_config: !pde_configuration
   vanilla_precision: high
