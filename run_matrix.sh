@@ -73,6 +73,11 @@ cells = [
     ("vanilla us compo",   "mcl", "p_compo_am_mcl"),
     ("rainbow best-of",    "mcl", "p_rb_best_mcl"),
     ("rainbow worst-of",   "mcl", "p_rb_worst_mcl"),
+    ("heston",             "pde", "p_heston_pde"),
+    ("heston",             "mcl", "p_heston_mcl"),
+    ("heston",             "ana", "p_heston_ana"),
+    ("bates",              "ana", "p_bates_ana"),
+    ("bates",              "mcl", "p_bates_mcl"),
     ("variance swap",      "mcl", "p_vswap_mcl"),
     ("variance swap",      "ana", "p_vswap_ana"),
 ]
