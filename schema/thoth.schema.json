@@ -50,6 +50,7 @@
         { "$ref": "#/$defs/variance_swap" },
         { "$ref": "#/$defs/equity" },
         { "$ref": "#/$defs/basket" },
+        { "$ref": "#/$defs/rainbow" },
         { "$ref": "#/$defs/composite" },
         { "$ref": "#/$defs/forex" },
         { "$ref": "#/$defs/currency" },
@@ -209,6 +210,18 @@
       "properties": {
         "underlyings": { "$ref": "#/$defs/refList" },
         "weights": { "$ref": "#/$defs/numberList" }
+      }
+    },
+
+    "rainbow": {
+      "type": "object",
+      "title": "!rainbow",
+      "description": "Best-of / worst-of (rainbow) basket: spot is the max (best-of) or min (worst-of) of the members' rebased performances. MCL-only.",
+      "additionalProperties": false,
+      "required": ["underlyings", "type"],
+      "properties": {
+        "underlyings": { "$ref": "#/$defs/refList" },
+        "type": { "enum": ["best_of", "worst_of"] }
       }
     },
 

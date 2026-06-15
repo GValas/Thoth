@@ -28,6 +28,7 @@
 #include "equity.hpp"
 #include "mono.hpp"
 #include "absolute_basket.hpp"
+#include "rainbow.hpp"
 #include "composite.hpp"
 #include "forex.hpp"
 
@@ -50,8 +51,10 @@ void ConfigureContractCommon( ObjectManager& m, Contract* c, const string& n )
     c->SetUnderlying( *m.Get<Underlying>( m.cfg().GetString( n + ".underlying" ) ) );
     c->SetPremiumCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".premium_currency" ) ) );
 
-    //! force underlying currency for a basket
-    if ( c->GetUnderlying()->GetKind() == KIND_BASKET )
+    //! force underlying currency for a basket / rainbow (its rebased spot is
+    //! dimensionless and settled in the premium currency)
+    if ( c->GetUnderlying()->GetKind() == KIND_BASKET ||
+         c->GetUnderlying()->GetKind() == KIND_RAINBOW )
     {
         c->GetUnderlying()->SetCurrency( *c->GetPremiumCurrency() );
     }
@@ -216,6 +219,14 @@ map<string, ObjectManager::Factory> MakeRegistry()
         B->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
         B->SetWeightList( m.cfg().GetGslVector( n + ".weights" ) );
         return B;
+    };
+
+    r[KIND_RAINBOW] = []( ObjectManager& m, const string& n ) -> Object*
+    {
+        Rainbow* R = m.collector().Add( std::make_unique<Rainbow>( n ) );
+        R->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
+        R->SetType( ParseRainbowType( m.cfg().GetString( n + ".type" ) ) );
+        return R;
     };
 
     r[KIND_COMPOSITE] = []( ObjectManager& m, const string& n ) -> Object*

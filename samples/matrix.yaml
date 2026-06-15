@@ -15,6 +15,7 @@ root: matrix
 #   barrier discrete               pde   mcl
 #   vanilla eu compo (EUR->USD)    pde   mcl   ana
 #   vanilla us compo (american)    pde   mcl
+#   rainbow best-of / worst-of     mcl         (max/min of 2 assets; MCL-only)
 #   variance swap                  mcl   ana
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
@@ -47,6 +48,8 @@ matrix: !sequence
     - p_compo_ana
     - p_compo_am_pde
     - p_compo_am_mcl
+    - p_rb_best_mcl
+    - p_rb_worst_mcl
     - p_vswap_mcl
     - p_vswap_ana
 
@@ -234,6 +237,27 @@ p_compo_am_mcl: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: p_compo_am_mcl_result
 
+# rainbow best-of / worst-of call on two equities (eq + eq2, correl 0.5). The
+# payoff is on the max / min of the rebased performances, so it is MCL-only (no
+# single-lognormal forward/vol for ANA/PDE). Rainbow spot is rebased to 100, so
+# strike 100 is at-the-money; best-of >= worst-of.
+p_rb_best_mcl: !pricer
+  today: 2000-01-01
+  book: book_rb_best
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_rb
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_rb_best_mcl_result
+p_rb_worst_mcl: !pricer
+  today: 2000-01-01
+  book: book_rb_worst
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_rb
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_rb_worst_mcl_result
+
 # variance swap
 p_vswap_mcl: !pricer
   today: 2000-01-01
@@ -294,6 +318,10 @@ book_compo: !book
   options: [c_compo]
 book_compo_am: !book
   options: [c_compo_am]
+book_rb_best: !book
+  options: [c_rb_best]
+book_rb_worst: !book
+  options: [c_rb_worst]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -374,6 +402,22 @@ c_compo_am: !vanilla
   type: put
   exercise: american
 
+# rainbow best-of / worst-of calls (ATM at the rebased spot of 100)
+c_rb_best: !vanilla
+  underlying: rb_best
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+c_rb_worst: !vanilla
+  underlying: rb_worst
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+
 # --- shared market data ----------------------------------------------------
 eq: !equity
   spot: 100
@@ -383,6 +427,17 @@ eq: !equity
 comp: !composite
   equity: eq
   composite_currency: usd
+# second equity + rainbow (best-of / worst-of) underlyings on (eq, eq2)
+eq2: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+rb_best: !rainbow
+  underlyings: [eq, eq2]
+  type: best_of
+rb_worst: !rainbow
+  underlyings: [eq, eq2]
+  type: worst_of
 vol: !bs_volatility
   volatility: 30
   calendar: calendar
@@ -396,6 +451,10 @@ eur_rate: !yield_curve
 correl: !correlation_matrix
   underlyings: [eq]
   matrix: [1]
+# two-asset correlation for the rainbow (eq, eq2) at 0.5
+correl_rb: !correlation_matrix
+  underlyings: [eq, eq2]
+  matrix: [1, 0.5, 0.5, 1]
 
 # USD leg + FX for the quanto cases (r_usd = 5%, eur/usd vol 15%, corr 0.5)
 usd: !currency

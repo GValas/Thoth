@@ -71,6 +71,8 @@ cells = [
     ("vanilla eu compo",   "ana", "p_compo_ana"),
     ("vanilla us compo",   "pde", "p_compo_am_pde"),
     ("vanilla us compo",   "mcl", "p_compo_am_mcl"),
+    ("rainbow best-of",    "mcl", "p_rb_best_mcl"),
+    ("rainbow worst-of",   "mcl", "p_rb_worst_mcl"),
     ("variance swap",      "mcl", "p_vswap_mcl"),
     ("variance swap",      "ana", "p_vswap_ana"),
 ]

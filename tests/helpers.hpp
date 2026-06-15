@@ -83,6 +83,24 @@ inline double QuantoBsCall( double S, double K, double r_for, double r_dom,
     return std::exp( -r_dom * T ) * ( F * NormCdf( d1 ) - K * NormCdf( d2 ) );
 }
 
+//! E[max(A,B)] / E[min(A,B)] for two lognormals with forwards FA, FB, annual
+//! vols sigA, sigB and correlation rho over horizon T. Margrabe/exchange-option
+//! identity: max(A,B) = B + (A-B)^+, so E[max] uses only univariate normals (no
+//! bivariate CDF needed). E[min] = FA + FB - E[max]. These give an exact oracle
+//! for a strike-0 best-of / worst-of forward.
+inline double ExpMaxLN( double FA, double FB, double sigA, double sigB, double rho, double T )
+{
+    double s = std::sqrt( ( sigA * sigA + sigB * sigB - 2 * rho * sigA * sigB ) * T );
+    if ( s < 1e-12 )
+        return std::max( FA, FB );
+    double d = ( std::log( FA / FB ) + 0.5 * s * s ) / s;
+    return FA * NormCdf( d ) + FB * NormCdf( s - d ); //!< = FA N(d) + FB N(-(d-s))
+}
+inline double ExpMinLN( double FA, double FB, double sigA, double sigB, double rho, double T )
+{
+    return FA + FB - ExpMaxLN( FA, FB, sigA, sigB, rho, T );
+}
+
 //! the sample configs below price from today=2000-01-01 to 2000-12-31 -> T = 1y
 constexpr double T1 = 1.0;
 

@@ -17,6 +17,7 @@
 #include "noise_node.hpp"
 #include "product_node.hpp"
 #include "quanto_adjustment_node.hpp"
+#include "rainbow_node.hpp"
 #include "spot_diffusion_node.hpp"
 #include "vanilla_flow_node.hpp"
 #include "variance_swap_flow_node.hpp"

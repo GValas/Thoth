@@ -33,6 +33,13 @@ enum class BarrierMonitoring
     Discrete
 };
 
+//! rainbow (best-of / worst-of) basket flavour
+enum class RainbowType
+{
+    BestOf,
+    WorstOf
+};
+
 //! ---- parsing (config string -> enum), failing loudly on an unknown value ----
 //! (throws std::runtime_error, the same type ERR throws, so callers/tests see no
 //! difference; kept here to avoid a circular include on Tools_Misc/Thoth)
@@ -77,6 +84,15 @@ inline BarrierMonitoring ParseBarrierMonitoring( const std::string& s )
         return BarrierMonitoring::Discrete;
     throw std::runtime_error( "unknown barrier monitoring '" + s +
                               "' (expected 'continuous_monitoring' or 'discrete_monitoring')" );
+}
+
+inline RainbowType ParseRainbowType( const std::string& s )
+{
+    if ( s == RAINBOW_TYPE_BEST_OF )
+        return RainbowType::BestOf;
+    if ( s == RAINBOW_TYPE_WORST_OF )
+        return RainbowType::WorstOf;
+    throw std::runtime_error( "unknown rainbow type '" + s + "' (expected 'best_of' or 'worst_of')" );
 }
 
 //! ---- convenience predicates ----

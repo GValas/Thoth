@@ -22,3 +22,5 @@ inline constexpr char BARRIER_TYPE_DOWN_AND_OUT[] = "down&out";
 inline constexpr char BARRIER_TYPE_DOWN_AND_IN[] = "down&in";
 inline constexpr char BARRIER_MONITORING_CONTINUOUS[] = "continuous_monitoring";
 inline constexpr char BARRIER_MONITORING_DISCRETE[] = "discrete_monitoring";
+inline constexpr char RAINBOW_TYPE_BEST_OF[] = "best_of";
+inline constexpr char RAINBOW_TYPE_WORST_OF[] = "worst_of";
