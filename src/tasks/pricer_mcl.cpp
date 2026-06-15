@@ -480,7 +480,13 @@ void PricerMCL::Tree_Run_()
 
     //! iterations
     int n = _configuration->_mcl->_paths;
-    ProgressBar bar( "MCL", n, !_quiet_pricing );
+
+    //! the bar spans the whole job: the path sweep plus the American LSM fit
+    //! (one backward step per exercise date, per American contract). For a plain
+    //! European book the LSM part is 0, so the bar is just the sweep.
+    const long lsm_steps = AmericanLsmSteps_();
+    _progress_bar = std::make_unique<ProgressBar>( "MCL", (long)n + lsm_steps, !_quiet_pricing );
+
     for ( int i = 0; i < n; i++ )
     {
         //! bail out promptly if the request was cancelled (client disconnected)
@@ -499,15 +505,49 @@ void PricerMCL::Tree_Run_()
         _collector.RecordPath();
 
         //! live progress (price/trust computed only when the bar redraws)
-        bar.Update( i + 1, [&]()
-                    { return "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
-                             ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ); } );
+        _progress_bar->Update( i + 1, [&]()
+                               { return "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
+                                        ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ); } );
     }
-    bar.Done( "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
-              ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ) );
+    _progress_step = n; //!< the LSM fit continues the bar from here
 
     //! report the recorded American underlying paths (martingale sanity)
     LogRecordings();
+
+    //! European books finish here; American books keep the bar open and finalise
+    //! it in PriceAmerican once the LSM premium is known.
+    if ( lsm_steps == 0 )
+    {
+        _progress_bar->Done( "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
+                             ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ) );
+        _progress_bar.reset();
+    }
+}
+
+//! total backward-induction steps the LSM fit will run across all American
+//! contracts (one per interior exercise date) — used to size the progress bar so
+//! the American post-pass is embedded in the same bar as the path sweep.
+long PricerMCL::AmericanLsmSteps_() const
+{
+    if ( !_collector.IsRecording() )
+    {
+        return 0;
+    }
+    long steps = 0;
+    for ( Contract* c : _book->GetOptionList() )
+    {
+        if ( !c->PDE_IsAmerican() )
+        {
+            continue;
+        }
+        //! FitAmericanPolicy iterates t = M-2 .. 1  ->  M-2 steps (M = grid size)
+        long m = (long)_collector.DiffusionIndicesUpTo( c->GetMaturityDate() ).size();
+        if ( m > 2 )
+        {
+            steps += m - 2;
+        }
+    }
+    return steps;
 }
 
 //! name of the diffusion node carrying a contract's exercise value. Asking the
@@ -683,6 +723,14 @@ void PricerMCL::PriceAmerican()
         book_premium += c->GetPremium() * fx_of( c );
     }
     _book->SetPremium( book_premium );
+
+    //! finalise the shared bar now that the American premium is known (the sweep
+    //! left it open). Shows the American book premium, not the European readback.
+    if ( _progress_bar )
+    {
+        _progress_bar->Done( "price = " + ToString( book_premium ) );
+        _progress_bar.reset();
+    }
 }
 
 //! Fit a Longstaff-Schwartz exercise policy on the recorded base paths. Backward
@@ -720,6 +768,13 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
     //! backward induction over the interior exercise dates
     for ( int t = (int)M - 2; t >= 1; t-- )
     {
+        //! advance the shared progress bar: the LSM fit continues the same bar
+        //! the path sweep started, so the whole American job fills one bar
+        if ( _progress_bar )
+        {
+            _progress_bar->Update( ++_progress_step );
+        }
+
         double df = exp( -Rate * ( Tau[t + 1] - Tau[t] ) );
         for ( size_t p = 0; p < N; p++ )
         {
