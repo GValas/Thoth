@@ -22,6 +22,8 @@ void NodeCollector::Reset()
     _date_index_list.clear();
     _records.clear();
     _scenario_suffix.clear();
+    _scenario_bumps_rate = false;
+    _scenario_bumps_vol = false;
 }
 
 //! push back

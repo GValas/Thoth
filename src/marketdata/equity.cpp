@@ -106,13 +106,17 @@ MonteCarloNode* Equity::GetNode( NodeCollector& NC )
 
 MonteCarloNode* Equity::GetDriftNode( NodeCollector& NC )
 {
-
-    return NC.GetOrCreate<DriftNode>(
-        _name + "#drift",
-        [&]( DriftNode* D )
-        {
-            D->SetDomesticRateNode( Asset::_currency->GetRateNode( NC ) );
-            D->SetDividendRateNode( ( _continuous_dividends ) ? _continuous_dividends->GetNode( NC ) : nullptr );
-            D->SetRepoRateNode( ( _repo ) ? _repo->GetNode( NC ) : nullptr );
-        } );
+    auto init = [&]( DriftNode* D )
+    {
+        D->SetDomesticRateNode( Asset::_currency->GetRateNode( NC ) );
+        D->SetDividendRateNode( ( _continuous_dividends ) ? _continuous_dividends->GetNode( NC ) : nullptr );
+        D->SetRepoRateNode( ( _repo ) ? _repo->GetNode( NC ) : nullptr );
+    };
+    //! the drift depends on the rate (and div/repo, never bumped), so it is
+    //! mutualised with the base tree unless the scenario bumps rates (rho)
+    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    {
+        return NC.GetOrCreateShared<DriftNode>( _name + "#drift", init );
+    }
+    return NC.GetOrCreate<DriftNode>( _name + "#drift", init );
 }

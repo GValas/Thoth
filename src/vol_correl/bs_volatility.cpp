@@ -25,7 +25,11 @@ double BsVolatility::GetImplicitVol( const double /*Strike*/,
 MonteCarloNode* BsVolatility::GetNode( NodeCollector& NC )
 {
     //! the Monte-Carlo diffusion reads the vol here, so the vega shift must apply
-    return NC.GetOrCreate<ConstantNode>( _name,
-                                         [&]( ConstantNode* C )
-                                         { C->SetConstantValue( _volatility + _vol_shift ); } );
+    auto init = [&]( ConstantNode* C ) { C->SetConstantValue( _volatility + _vol_shift ); };
+    //! mutualise with the base tree unless the current Greek scenario bumps vols
+    if ( NC.HasScenario() && !NC.ScenarioBumpsVol() )
+    {
+        return NC.GetOrCreateShared<ConstantNode>( _name, init );
+    }
+    return NC.GetOrCreate<ConstantNode>( _name, init );
 }

@@ -156,10 +156,11 @@ MonteCarloNode* Book::GetNode( NodeCollector& NC )
         {
             for ( Contract* c : _option_list )
             {
+                //! FX conversion to the book currency is applied at aggregation
+                //! (AggregateContract, PDE/ANA); the MCL book sums premiums in the
+                //! contract currency (BookNode defaults the FX factor to 1, so no
+                //! per-contract "#fx" node is created).
                 B->PushContractNode( c->GetNode( NC ) );
-                ConstantNode* C = NC.NewNode<ConstantNode>( c->GetName() + "#fx" );
-                C->SetConstantValue( 1 );
-                B->PushForexNode( C );
             }
         } );
 }

@@ -109,48 +109,53 @@ void PricerMCL::BuildGreekScenarios_()
     //! iterator, and each spot bump is relative to the unbumped spot
     const vector<Single*> singles( _single_set.begin(), _single_set.end() );
 
-    auto build = [&]( const string& Tag, const std::function<void()>& Mutate,
-                      const std::function<void()>& Restore )
+    //! BumpsRate/BumpsVol tell the market-data leaves which nodes to mutualise
+    //! with the base tree (rate/vol/drift are shared unless this scenario bumps
+    //! them), so only the genuinely bumped sub-tree is duplicated.
+    auto build = [&]( const string& Tag, bool BumpsRate, bool BumpsVol,
+                      const std::function<void()>& Mutate, const std::function<void()>& Restore )
     {
         Mutate();
         _collector.SetScenarioSuffix( Tag );
+        _collector.SetScenarioBumps( BumpsRate, BumpsVol );
         MonteCarloNode* root = _book->GetNode( _collector );
+        _collector.SetScenarioBumps( false, false );
         _collector.SetScenarioSuffix( "" );
         Restore();
         _scenario_roots.emplace_back( Tag, root );
     };
 
     //! delta / gamma : per-underlying relative spot bump (small for delta, wider
-    //! for gamma), matching the bump-and-revalue conventions in Pricer
+    //! for gamma); rates and vols are unbumped (shared with the base tree)
     for ( Single* s : singles )
     {
         const double spot = s->GetSpot();
         if ( _request_delta )
         {
             const double h = GREEK_SPOT_BUMP * spot;
-            build( "@D+:" + s->GetName(), [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
-            build( "@D-:" + s->GetName(), [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@D+:" + s->GetName(), false, false, [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@D-:" + s->GetName(), false, false, [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
         }
         if ( _request_gamma )
         {
             const double h = GREEK_GAMMA_BUMP * spot;
-            build( "@G+:" + s->GetName(), [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
-            build( "@G-:" + s->GetName(), [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@G+:" + s->GetName(), false, false, [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@G-:" + s->GetName(), false, false, [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
         }
     }
 
     //! vega : parallel vol bump on every underlying
     if ( _request_vega )
     {
-        build( "@V+", [&] { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
-        build( "@V-", [&] { ApplyVolShift_( -GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
+        build( "@V+", false, true, [&] { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
+        build( "@V-", false, true, [&] { ApplyVolShift_( -GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
     }
 
     //! rho : parallel rate bump on every currency's curve
     if ( _request_rho )
     {
-        build( "@R+", [&] { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
-        build( "@R-", [&] { ApplyRateShift_( -GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
+        build( "@R+", true, false, [&] { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
+        build( "@R-", true, false, [&] { ApplyRateShift_( -GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
     }
 }
 //! single-tree Greeks: delta/gamma/vega/rho come from the bump sub-trees priced

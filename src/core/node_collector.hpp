@@ -16,6 +16,8 @@ class NodeCollector
     map<string, BrownianNode*> _brownian_node_map;          //!< non-owning view
 
     string _scenario_suffix; //!< appended to node names while building a Greek bump
+    bool _scenario_bumps_rate = false; //!< scenario bumps rates (rho)
+    bool _scenario_bumps_vol = false;  //!< scenario bumps vols (vega)
 
     //! (node,index)
     vector<MonteCarloNode*> _node_list;
@@ -66,12 +68,41 @@ class NodeCollector
         return node;
     }
 
+    //! like GetOrCreate but IGNORES the scenario suffix: the node is built/looked
+    //! up under its bare name, so it is shared with the base tree. Used for the
+    //! market-data leaves (rate / vol / drift) a Greek scenario does not bump, so
+    //! they are mutualised instead of duplicated per scenario.
+    template <class T, class Init>
+    MonteCarloNode* GetOrCreateShared( const string& Name, Init init )
+    {
+        if ( MonteCarloNode* existing = GetNode( Name ) )
+        {
+            return existing;
+        }
+        string saved = _scenario_suffix;
+        _scenario_suffix.clear(); //!< build under the bare name
+        T* node = NewNode<T>( Name );
+        _scenario_suffix = saved;
+        init( node );
+        return node;
+    }
+
     //! Greek-scenario tagging: while a suffix is set, every node built through
     //! NewNode/GetOrCreate is named "<base><suffix>", so the bumped sub-tree is
     //! distinct from the base tree but reuses the shared Brownian/noise nodes
     //! (which are looked up by their bare name via GetNode). Empty = base tree.
+    //! The bump flags let the market-data leaves stay shared (GetOrCreateShared)
+    //! unless the scenario actually bumps them (vega -> vol, rho -> rate).
     void SetScenarioSuffix( const string& Suffix ) { _scenario_suffix = Suffix; }
     const string& GetScenarioSuffix() const { return _scenario_suffix; }
+    void SetScenarioBumps( bool Rate, bool Vol )
+    {
+        _scenario_bumps_rate = Rate;
+        _scenario_bumps_vol = Vol;
+    }
+    bool HasScenario() const { return !_scenario_suffix.empty(); }
+    bool ScenarioBumpsRate() const { return _scenario_bumps_rate; }
+    bool ScenarioBumpsVol() const { return _scenario_bumps_vol; }
 
     //! getter
     size_t GetDateIndex( const date& AsOfDate );

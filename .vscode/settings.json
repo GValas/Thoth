@@ -11,6 +11,7 @@
   "yaml.customTags": [
     "!pricer mapping",
     "!pricer_configuration mapping",
+    "!debug_configuration mapping",
     "!mcl_configuration mapping",
     "!pde_configuration mapping",
     "!book mapping",

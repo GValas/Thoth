@@ -17,8 +17,12 @@ void BookNode::ComputeValue( size_t DateIndex )
           i < _contract_node_list.size();
           i++ )
     {
-        x += _contract_node_list[i]->GetValue( DateIndex ) *
-             _forex_node_list[i]->GetValue( DateIndex );
+        //! FX factor to the book currency: 1 when no forex node is attached
+        //! (same-currency book — the common case, no node created)
+        double fx = ( i < _forex_node_list.size() && _forex_node_list[i] )
+                        ? _forex_node_list[i]->GetValue( DateIndex )
+                        : 1.0;
+        x += _contract_node_list[i]->GetValue( DateIndex ) * fx;
     }
     _value_list[DateIndex] = x;
 }
@@ -53,7 +57,10 @@ void BookNode::GetDateDependencies( size_t DateIndex,
     {
         NodeList.push_back( _contract_node_list[i] );
         DateList.push_back( DateIndex );
-        NodeList.push_back( _forex_node_list[i] );
-        DateList.push_back( DateIndex );
+        if ( i < _forex_node_list.size() && _forex_node_list[i] )
+        {
+            NodeList.push_back( _forex_node_list[i] );
+            DateList.push_back( DateIndex );
+        }
     }
 }

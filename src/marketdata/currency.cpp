@@ -35,7 +35,11 @@ MonteCarloNode* Currency::GetDiscFactorNode( NodeCollector& /*NC*/ )
 
 MonteCarloNode* Currency::GetRateNode( NodeCollector& NC )
 {
-    return NC.GetOrCreate<ConstantNode>( _name + "#rate",
-                                         [&]( ConstantNode* C )
-                                         { C->SetConstantValue( _rate->GetCurveValue( _today ) ); } );
+    auto init = [&]( ConstantNode* C ) { C->SetConstantValue( _rate->GetCurveValue( _today ) ); };
+    //! mutualise with the base tree unless the current Greek scenario bumps rates
+    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    {
+        return NC.GetOrCreateShared<ConstantNode>( _name + "#rate", init );
+    }
+    return NC.GetOrCreate<ConstantNode>( _name + "#rate", init );
 }
