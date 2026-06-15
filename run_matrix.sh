@@ -85,7 +85,7 @@ greeks = ["delta", "gamma", "vega", "rho", "theta"]
 def field(block, name):
     m = re.search(rf'\b{name}: ([\-0-9.eE]+)', block)
     return float(m.group(1)) if m else None
-hdr = f"    {'case':20s}{'method':>7s}{'premium':>13s}{'trust':>10s}"
+hdr = f"    {'case':20s}{'method':>7s}{'time(s)':>10s}{'premium':>13s}{'trust':>10s}"
 hdr += "".join(f"{g:>11s}" for g in greeks)
 print(hdr)
 print("    " + "-" * (len(hdr) - 4))
@@ -94,10 +94,11 @@ for product, method, obj in cells:
     blk = m.group(1) if m else ""
     p = field(blk, "premium")
     if p is None:
-        print(f"    {product:20s}{method:>7s}{'(missing)':>13s}")
+        print(f"    {product:20s}{method:>7s}{'(missing)':>23s}")
         continue
+    secs = field(blk, "exec_time")
     t = field(blk, "premium_trust")
-    row = f"    {product:20s}{method:>7s}{p:13.5f}{(t or 0):10.4f}"
+    row = f"    {product:20s}{method:>7s}{(secs or 0):10.3f}{p:13.5f}{(t or 0):10.4f}"
     for g in greeks:
         v = field(blk, g)
         row += f"{v:11.5f}" if v is not None else f"{'-':>11s}"
