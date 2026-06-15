@@ -13,7 +13,8 @@ root: matrix
 #   vanilla american put (quanto)  pde   mcl
 #   barrier continuous             pde   mcl   ana
 #   barrier discrete               pde   mcl
-#   composite (EUR asset, USD)     pde   mcl   ana
+#   vanilla eu compo (EUR->USD)    pde   mcl   ana
+#   vanilla us compo (american)    pde   mcl
 #   variance swap                  mcl   ana
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
@@ -44,6 +45,8 @@ matrix: !sequence
     - p_compo_pde
     - p_compo_mcl
     - p_compo_ana
+    - p_compo_am_pde
+    - p_compo_am_mcl
     - p_vswap_mcl
     - p_vswap_ana
 
@@ -211,6 +214,26 @@ p_compo_ana: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: p_compo_ana_result
 
+# american composite put (early exercise on the USD value S*FX). PDE projects the
+# early exercise on the composite grid; MCL records the composite spot path and
+# runs Longstaff-Schwartz on it (ANA has no American closed form).
+p_compo_am_pde: !pricer
+  today: 2000-01-01
+  book: book_compo_am
+  currency: usd
+  configuration: cfg_pde
+  correlation: correl_q
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_compo_am_pde_result
+p_compo_am_mcl: !pricer
+  today: 2000-01-01
+  book: book_compo_am
+  currency: usd
+  configuration: cfg_mcl
+  correlation: correl_q
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_compo_am_mcl_result
+
 # variance swap
 p_vswap_mcl: !pricer
   today: 2000-01-01
@@ -269,6 +292,8 @@ book_van_am_q: !book
   options: [c_van_am_q]
 book_compo: !book
   options: [c_compo]
+book_compo_am: !book
+  options: [c_compo_am]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -340,6 +365,14 @@ c_compo: !vanilla
   maturity: 2000-12-31
   type: call
   exercise: european
+# american composite put (so early exercise carries value), same ATM strike
+c_compo_am: !vanilla
+  underlying: comp
+  premium_currency: usd
+  strike: 150
+  maturity: 2000-12-31
+  type: put
+  exercise: american
 
 # --- shared market data ----------------------------------------------------
 eq: !equity

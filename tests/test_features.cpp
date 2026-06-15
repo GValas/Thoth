@@ -192,6 +192,53 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
     CHECK( std::abs( p_ana - p_mcl ) <= 6.0 * Trust( mcl ) + 5e-2 );
 }
 
+// --- American composite : early exercise on the USD value S*FX. The composite
+// spot is a derived (non-diffusion) node, so its full path is only available once
+// recording forces it to be scheduled at every exercise date; the LSM then prices
+// above the European value and close to the PDE American oracle.
+TEST_CASE( "American composite put exceeds European and matches the PDE oracle" )
+{
+    auto cfg = []( const std::string& method, const std::string& exercise )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "cfg: !pricer_configuration {method: " << method
+          << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
+          << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
+          << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << "pd: !pde_configuration {vanilla_precision: high}\n"
+          << "eur: !currency {rate: r_eur}\n"
+          << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "usd: !currency {rate: r_usd}\n"
+          << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur, spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 15}\n"
+          << "comp: !composite {equity: eq, composite_currency: usd}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
+          << "book: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
+          << " maturity: 2000-12-31, type: put, exercise: " << exercise << "}\n";
+        return o.str();
+    };
+
+    const double eu_mcl = Premium( Price( cfg( "mcl", "european" ) ) );
+    auto am = Price( cfg( "mcl", "american" ) );
+    const double am_mcl = Premium( am );
+    const double am_pde = Premium( Price( cfg( "pde", "american" ) ) );
+    CAPTURE( eu_mcl );
+    CAPTURE( am_mcl );
+    CAPTURE( am_pde );
+
+    CHECK( am_mcl > eu_mcl );                            //!< early-exercise premium captured
+    CHECK( am_mcl <= am_pde + 6.0 * Trust( am ) + 5e-2 ); //!< LSM is a (biased-low) lower bound
+    CHECK( am_mcl >= am_pde * 0.95 );                   //!< within ~5% of the oracle
+}
+
 // --- regression : a non-Mono underlying (composite) priced with MCL Greeks goes
 // through bump-and-revalue, which re-enters PriceBook_ (and ComputeCholeskyMatrix)
 // several times. The cholesky working lists must be rebuilt each call, else they

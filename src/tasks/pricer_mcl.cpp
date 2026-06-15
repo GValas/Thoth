@@ -415,6 +415,12 @@ void PricerMCL::Tree_Init_()
         }
     }
 
+    //! American contracts : register their spot-path recordings BEFORE the sort,
+    //! so SortNodes schedules each recorded node (and its dependencies) at every
+    //! exercise date — essential for derived spots (composite / basket) that the
+    //! flow only references at maturity.
+    SetupAmericanRecording();
+
     //! sort nodes
     _collector.SortNodes( roots );
 
@@ -425,9 +431,6 @@ void PricerMCL::Tree_Init_()
         _collector.ExportGraph( path );
         LOG( "MCL", "node graph written to " + path );
     }
-
-    //! American contracts : record their underlying spot paths (opt-in)
-    SetupAmericanRecording();
 
     //! status
     {
@@ -494,6 +497,16 @@ void PricerMCL::Tree_Run_()
     LogRecordings();
 }
 
+//! name of the diffusion node carrying a contract's exercise value. Asking the
+//! underlying for its node works for every kind (Mono -> "<name>#spot",
+//! composite -> "<eq>_compo_<ccy>#spot", basket -> its own node), unlike the
+//! "<underlying-name>#spot" convention which only holds for Mono.
+string PricerMCL::AmericanSpotName_( Contract* Contract )
+{
+    MonteCarloNode* spot = Contract->GetUnderlying()->GetNode( _collector );
+    return spot ? spot->GetName() : "";
+}
+
 //! register the underlying spot of every American contract for path recording
 void PricerMCL::SetupAmericanRecording()
 {
@@ -504,15 +517,16 @@ void PricerMCL::SetupAmericanRecording()
         {
             continue;
         }
-        string udl = c->GetUnderlying()->GetName();
-        vector<size_t> grid = _collector.DiffusionIndicesUpTo( c->GetMaturityDate() );
-
-        //! base spot path : feeds the LSM policy fit and the base premium
-        MonteCarloNode* spot = _collector.GetNode( udl + "#spot" );
+        //! the exercise-value node (handles composite / basket, not just Mono)
+        MonteCarloNode* spot = c->GetUnderlying()->GetNode( _collector );
         if ( !spot )
         {
             continue;
         }
+        const string spot_name = spot->GetName();
+        vector<size_t> grid = _collector.DiffusionIndicesUpTo( c->GetMaturityDate() );
+
+        //! base spot path : feeds the LSM policy fit and the base premium
         _collector.StartRecording( spot, grid, n );
 
         //! single-tree Greeks: also record each bump scenario's spot path so the
@@ -521,7 +535,7 @@ void PricerMCL::SetupAmericanRecording()
         //! vol and rate — exposes its own correctly-bumped path here)
         for ( auto& tagged : _scenario_roots )
         {
-            if ( MonteCarloNode* sb = _collector.GetNode( udl + "#spot" + tagged.first ) )
+            if ( MonteCarloNode* sb = _collector.GetNode( spot_name + tagged.first ) )
             {
                 _collector.StartRecording( sb, grid, n );
             }
@@ -529,7 +543,7 @@ void PricerMCL::SetupAmericanRecording()
 
         std::ostringstream oss;
         oss << "recording " << grid.size() << " exercise dates on '"
-            << udl << "' for American contract '" << c->GetName() << "'";
+            << spot_name << "' for American contract '" << c->GetName() << "'";
         LOG( "MCL", oss.str() );
     }
 }
@@ -547,8 +561,8 @@ void PricerMCL::LogRecordings()
         {
             continue;
         }
-        string udl = c->GetUnderlying()->GetName();
-        const gsl_matrix* paths = _collector.RecordedPaths( udl + "#spot" );
+        const string spot_name = AmericanSpotName_( c );
+        const gsl_matrix* paths = _collector.RecordedPaths( spot_name );
         if ( !paths || paths->size2 == 0 )
         {
             continue;
@@ -561,7 +575,7 @@ void PricerMCL::LogRecordings()
         }
         mean /= paths->size1;
         std::ostringstream oss;
-        oss << "recorded '" << udl << "' paths : E[S_T] = " << mean
+        oss << "recorded '" << spot_name << "' paths : E[S_T] = " << mean
             << " (" << paths->size1 << " x " << paths->size2 << ")";
         LOG( "MCL", oss.str() );
     }
@@ -597,9 +611,9 @@ void PricerMCL::PriceAmerican()
             continue;
         }
 
-        string udl = c->GetUnderlying()->GetName();
-        const gsl_matrix* S0 = _collector.RecordedPaths( udl + "#spot" );
-        vector<double> tau = _collector.RecordedTau( udl + "#spot" );
+        const string spot_name = AmericanSpotName_( c );
+        const gsl_matrix* S0 = _collector.RecordedPaths( spot_name );
+        vector<double> tau = _collector.RecordedTau( spot_name );
         double r = c->GetPremiumCurrency()->GetRate()->GetCurveValue( c->GetMaturityDate() );
 
         //! fit the exercise policy once on the base paths
@@ -633,8 +647,8 @@ void PricerMCL::PriceAmerican()
 
             //! bumped paths (spot/vol/rate). The rho scenario also discounts (and
             //! drifts, already in the path) at the bumped rate
-            const gsl_matrix* Sb = _collector.RecordedPaths( udl + "#spot" + tag );
-            vector<double> taub = _collector.RecordedTau( udl + "#spot" + tag );
+            const gsl_matrix* Sb = _collector.RecordedPaths( spot_name + tag );
+            vector<double> taub = _collector.RecordedTau( spot_name + tag );
             if ( !Sb )
             {
                 Sb = S0;

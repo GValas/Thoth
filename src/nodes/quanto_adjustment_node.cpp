@@ -15,16 +15,24 @@ QuantoAdjustmentNode::~QuantoAdjustmentNode() = default;
 
 void QuantoAdjustmentNode::ComputeValue( size_t DateIndex )
 {
-    if ( DateIndex > 0 )
+    double s = _udl_spot_node->GetValue( DateIndex );
+
+    //! today (dt = 0): the quanto drift adjustment over a zero horizon is 1, so
+    //! the value is just the spot. Leaving index 0 unset (the old behaviour) left
+    //! it at 0, which is invisible to European pricing — only the maturity flow is
+    //! read — but corrupts the recorded American (LSM) path at t = 0.
+    if ( DateIndex == 0 )
     {
-        double c = _udl_fx_correl_node->GetValue( DateIndex );
-        double v = _udl_vol_node->GetValue( DateIndex );
-        double w = _fx_vol_node->GetValue( DateIndex );
-        double s = _udl_spot_node->GetValue( DateIndex );
-        double dt = _t_list[DateIndex];
-        double q = exp( -v * w * c * dt );
-        _value_list[DateIndex] = s * q;
+        _value_list[DateIndex] = s;
+        return;
     }
+
+    double c = _udl_fx_correl_node->GetValue( DateIndex );
+    double v = _udl_vol_node->GetValue( DateIndex );
+    double w = _fx_vol_node->GetValue( DateIndex );
+    double dt = _t_list[DateIndex];
+    double q = exp( -v * w * c * dt );
+    _value_list[DateIndex] = s * q;
 }
 
 void QuantoAdjustmentNode::SetUdlVolNode( MonteCarloNode* N )

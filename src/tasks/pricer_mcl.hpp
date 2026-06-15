@@ -49,6 +49,11 @@ class PricerMCL : public Pricer
     //! American path recording (opt-in : only when American contracts exist)
     void SetupAmericanRecording();
     void LogRecordings();
+    //! the diffusion node carrying the contract's exercise value. Resolved from
+    //! the underlying itself (not the "<name>#spot" convention) so it also works
+    //! for composite / basket, whose spot node is named differently from the
+    //! underlying. Empty if the node has not been built.
+    string AmericanSpotName_( Contract* Contract );
 
     //! American pricing via Longstaff-Schwartz on the recorded paths.
     //!

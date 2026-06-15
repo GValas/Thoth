@@ -264,6 +264,19 @@ void NodeCollector::SortNodes( const vector<MonteCarloNode*>& Roots )
     {
         node_stack.push( node( r, 0 ) );
     }
+
+    //! recorded nodes (American LSM): force each recorded node — and hence its
+    //! dependencies — to be evaluated at every recorded date. A diffusion spot is
+    //! already scheduled at all dates via its self-dependency, but a derived spot
+    //! (composite / basket) is otherwise only pulled in where the contract flow
+    //! references it (maturity), leaving the interior path columns uncomputed.
+    for ( const auto& rec : _records )
+    {
+        for ( size_t idx : rec.date_index )
+        {
+            node_stack.push( node( rec.node, idx ) );
+        }
+    }
     while ( !node_stack.empty() )
     {
         node n = node_stack.top();
