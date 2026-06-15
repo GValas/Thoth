@@ -48,58 +48,36 @@ echo
 echo "==> Matrix results (premium / trust / Greeks):"
 python3 - "$OUTPUT" <<'PY'
 import re, sys
+# The script only CROSS-REFERENCES the data: every pricer result block is
+# discovered from the output, the row name is the entity name itself (its
+# trailing method token split into the 'method' column), and rows are sorted
+# alphabetically. Nothing about the products is hard-coded here — the full
+# product names live in matrix.yaml as the pricer entity names.
 txt = open(sys.argv[1]).read()
-# (product, method, result-object) — mono/multi underlying; sorted alphabetically
-cells = [
-    ("barrier mono continuous", "ana", "p_barr_cont_ana"),
-    ("barrier mono continuous", "mcl", "p_barr_cont_mcl"),
-    ("barrier mono continuous", "pde", "p_barr_cont_pde"),
-    ("barrier mono discrete",   "mcl", "p_barr_disc_mcl"),
-    ("barrier mono discrete",   "pde", "p_barr_disc_pde"),
-    ("vanilla mono am put",     "mcl", "p_van_am_mcl"),
-    ("vanilla mono am put",     "pde", "p_van_am_pde"),
-    ("vanilla mono am put qto", "mcl", "p_van_am_q_mcl"),
-    ("vanilla mono am put qto", "pde", "p_van_am_q_pde"),
-    ("vanilla mono eu",         "ana", "p_van_eu_ana"),
-    ("vanilla mono eu",         "mcl", "p_van_eu_mcl"),
-    ("vanilla mono eu",         "pde", "p_van_eu_pde"),
-    ("vanilla mono eu bates",   "ana", "p_bates_ana"),
-    ("vanilla mono eu bates",   "mcl", "p_bates_mcl"),
-    ("vanilla mono eu compo",   "ana", "p_compo_ana"),
-    ("vanilla mono eu compo",   "mcl", "p_compo_mcl"),
-    ("vanilla mono eu compo",   "pde", "p_compo_pde"),
-    ("vanilla mono eu heston",  "ana", "p_heston_ana"),
-    ("vanilla mono eu heston",  "mcl", "p_heston_mcl"),
-    ("vanilla mono eu heston",  "pde", "p_heston_pde"),
-    ("vanilla mono eu quanto",  "ana", "p_van_eu_q_ana"),
-    ("vanilla mono eu quanto",  "mcl", "p_van_eu_q_mcl"),
-    ("vanilla mono eu quanto",  "pde", "p_van_eu_q_pde"),
-    ("vanilla mono us compo",   "mcl", "p_compo_am_mcl"),
-    ("vanilla mono us compo",   "pde", "p_compo_am_pde"),
-    ("vanilla multi eu basket", "ana", "p_basket_ana"),
-    ("vanilla multi eu basket", "mcl", "p_basket_mcl"),
-    ("vanilla multi eu basket", "pde", "p_basket_pde"),
-    ("vanilla multi eu best-of","mcl", "p_rb_best_mcl"),
-    ("vanilla multi eu worst-of","mcl", "p_rb_worst_mcl"),
-    ("variance swap mono", "ana", "p_vswap_ana"),
-    ("variance swap mono", "mcl", "p_vswap_mcl"),
-]
+METHODS = {"ana", "mcl", "pde"}
 greeks = ["delta", "gamma", "vega", "rho", "theta"]
 def field(block, name):
     m = re.search(rf'\b{name}: ([\-0-9.eE]+)', block)
     return float(m.group(1)) if m else None
-hdr = f"    {'case':27s}{'method':>7s}{'time(s)':>10s}{'premium':>13s}{'trust':>10s}"
+
+rows = []
+for m in re.finditer(r'^(\w+)_result:\n((?: .*\n)+)', txt, re.M):
+    name, blk = m.group(1), m.group(2)
+    if field(blk, "premium") is None:
+        continue                       # skip the sequence / system_information blocks
+    parts = name.split("_")
+    if parts[-1] not in METHODS:
+        continue                       # only (product, method) pricer results
+    rows.append((" ".join(parts[:-1]), parts[-1], blk))  # (product, method, block)
+rows.sort(key=lambda r: (r[0], r[1]))
+
+hdr = f"    {'product':27s}{'method':>7s}{'time(s)':>10s}{'premium':>13s}{'trust':>10s}"
 hdr += "".join(f"{g:>11s}" for g in greeks)
 print(hdr)
 print("    " + "-" * (len(hdr) - 4))
-for product, method, obj in cells:
-    m = re.search(rf'^{obj}_result:\n((?: .*\n)+)', txt, re.M)
-    blk = m.group(1) if m else ""
-    p = field(blk, "premium")
-    if p is None:
-        print(f"    {product:27s}{method:>7s}{'(missing)':>23s}")
-        continue
+for product, method, blk in rows:
     secs = field(blk, "exec_time")
+    p = field(blk, "premium")
     t = field(blk, "premium_trust")
     row = f"    {product:27s}{method:>7s}{(secs or 0):10.3f}{p:13.5f}{(t or 0):10.4f}"
     for g in greeks:
