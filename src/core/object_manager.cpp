@@ -61,11 +61,14 @@ void ObjectManager::ExecuteTask()
     //! executing root
     if ( _exec_node )
     {
+        //! total wall-clock time for the whole task (real elapsed, not CPU time)
+        const double t0 = WallClockSeconds();
         _exec_node->Execute();
 
         //! system_information
         _c->SetString( "system_information.last_exec_name", _exec_node->GetName() );
         _c->SetString( "system_information.last_exec_kind", _exec_node->GetKind() );
+        _c->SetDouble( "system_information.exec_time", ExecTime( t0 ) );
     }
 
     //! no task to execute
