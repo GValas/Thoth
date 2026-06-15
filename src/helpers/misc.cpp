@@ -1,4 +1,5 @@
 #include "misc.hpp"
+#include <chrono>
 #include <unistd.h>
 
 time_t ref_time;
@@ -165,17 +166,24 @@ void CheckDateList( const vector<date>& DateList )
     }
 }
 
-//!
-string ExecTimeLog( clock_t T )
+//! monotonic wall-clock seconds (real elapsed time, robust to multi-threading)
+double WallClockSeconds()
 {
-    double x = (double)( clock() - T ) / CLOCKS_PER_SEC;
+    using namespace std::chrono;
+    return duration<double>( steady_clock::now().time_since_epoch() ).count();
+}
+
+//!
+string ExecTimeLog( double StartSeconds )
+{
+    double x = WallClockSeconds() - StartSeconds;
     return "exec_time = " + ToString( x ) + " sec";
 }
 
 //!
-double ExecTime( clock_t T )
+double ExecTime( double StartSeconds )
 {
-    return (double)( clock() - T ) / CLOCKS_PER_SEC;
+    return WallClockSeconds() - StartSeconds;
 }
 
 //! resident set size from /proc/self/status (Linux); "" if unavailable

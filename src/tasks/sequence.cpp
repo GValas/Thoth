@@ -20,7 +20,7 @@ void Sequence::SetTaskList( const vector<Task*>& Tasks, const vector<string>& Na
 //! their own numbers before the next task re-prices the shared state.
 void Sequence::Execute()
 {
-    clock_t t0 = clock();
+    double t0 = WallClockSeconds();
     for ( size_t i = 0; i < _tasks.size(); i++ )
     {
         LOG( "SEQ", "task " + ToString( i + 1 ) + "/" + ToString( _tasks.size() ) + " : " + _task_names[i],

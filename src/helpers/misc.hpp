@@ -31,8 +31,11 @@ void LOG( const string& Context,
 inline constexpr char LOG_COLOR_CYAN[] = "\033[36m";
 
 void CheckDateList( const vector<date>& DateList );
-string ExecTimeLog( clock_t T );
-double ExecTime( clock_t T );
+//! monotonic wall-clock time in seconds (steady_clock); use as the start stamp
+//! for ExecTime / ExecTimeLog so timings are real elapsed time, not CPU time.
+double WallClockSeconds();
+string ExecTimeLog( double StartSeconds );
+double ExecTime( double StartSeconds );
 
 //! ACT/365 year fraction between two dates (the single day-count convention)
 inline double YearFraction( const date& From, const date& To )

@@ -43,7 +43,7 @@ void HistoricalCorrelationComputation::SetHistoricalSpotsFixingList( const vecto
 void HistoricalCorrelationComputation::Execute()
 {
 
-    clock_t t0 = clock();
+    double t0 = WallClockSeconds();
 
     //! dimensions
     size_t histos_size = _historical_spots_fixing_list.size();

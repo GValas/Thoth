@@ -66,7 +66,7 @@ void Pricer::Execute()
     //! validate the book / configuration once for the chosen engine
     PreCheck_();
 
-    clock_t t0 = clock();
+    double t0 = WallClockSeconds();
 
     //! base scenario : price the whole book at the quoted market. For the
     //! per-contract engines (PDE, ANA) PriceBook_ already folds in each

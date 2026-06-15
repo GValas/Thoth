@@ -417,19 +417,19 @@ int RunBatch( const string& InputFile,
 
     try
     {
-        clock_t t0 = clock();
+        double t0 = WallClockSeconds();
         ObjectManager ObjManager( InputFile, OutputFile );
         LOG( "CFG", "config read, exec_time = " + ExecTimeLog( t0 ) );
 
-        t0 = clock();
+        t0 = WallClockSeconds();
         ObjManager.ReadObjects( ExecName );
         LOG( "INI", "objects created, " + ExecTimeLog( t0 ) );
 
-        t0 = clock();
+        t0 = WallClockSeconds();
         ObjManager.ExecuteTask();
         LOG( "EXE", "executed objects, " + ExecTimeLog( t0 ) );
 
-        t0 = clock();
+        t0 = WallClockSeconds();
         ObjManager.WriteResults();
         ObjManager.WriteOutputFile(); //!< explicit flush (instead of in ~YamlConfig)
         LOG( "OUT", "written outputs, " + ExecTimeLog( t0 ) );

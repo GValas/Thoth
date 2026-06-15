@@ -12,7 +12,7 @@ HistoricalVolatilityComputation::~HistoricalVolatilityComputation() = default;
 //!
 void HistoricalVolatilityComputation::Execute()
 {
-    clock_t t0 = clock();
+    double t0 = WallClockSeconds();
 
     // log returns & weights
     size_t data_size = _value_list.size();
