@@ -13,6 +13,7 @@ root: matrix
 #   vanilla am put                    mcl   pde
 #   vanilla am put (quanto)           mcl   pde
 #   vanilla eu                        ana   mcl   pde
+#   vanilla eu basket (50/50 wgt avg) ana   mcl   pde
 #   vanilla eu bates (heston+jumps)   ana   mcl   (ANA jump CF / MCL compound Poisson)
 #   vanilla eu compo (EUR->USD)       ana   mcl   pde
 #   vanilla eu heston (stoch vol)     ana   mcl   pde
@@ -46,6 +47,9 @@ matrix: !sequence
     - p_van_eu_ana
     - p_van_eu_mcl
     - p_van_eu_pde
+    - p_basket_ana
+    - p_basket_mcl
+    - p_basket_pde
     - p_bates_ana
     - p_bates_mcl
     - p_compo_ana
@@ -267,6 +271,34 @@ p_rb_worst_mcl: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: p_rb_worst_mcl_result
 
+# weighted-average basket call: 50/50 on (eq, eq2), correl 0.5. All three engines
+# price it: MCL exact (sum-product node), ANA/PDE via moment-matching to an
+# equivalent lognormal. Basket spot = 100*(0.5+0.5) = 100, so strike 100 is ATM.
+p_basket_ana: !pricer
+  today: 2000-01-01
+  book: book_basket
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl_rb
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_basket_ana_result
+p_basket_mcl: !pricer
+  today: 2000-01-01
+  book: book_basket
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_rb
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_basket_mcl_result
+p_basket_pde: !pricer
+  today: 2000-01-01
+  book: book_basket
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl_rb
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_basket_pde_result
+
 # heston stochastic-vol ATM call (rho = -0.7 via the eq_h_var pseudo-underlying).
 # All three engines agree: ANA char-function, PDE 2-D ADI, MCL Andersen QE.
 p_heston_pde: !pricer
@@ -382,6 +414,8 @@ book_heston: !book
   options: [c_heston]
 book_bates: !book
   options: [c_bates]
+book_basket: !book
+  options: [c_basket]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -493,6 +527,13 @@ c_bates: !vanilla
   maturity: 2000-12-31
   type: call
   exercise: european
+c_basket: !vanilla
+  underlying: bskt
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: european
 
 # --- shared market data ----------------------------------------------------
 eq: !equity
@@ -514,6 +555,10 @@ rb_best: !rainbow
 rb_worst: !rainbow
   underlyings: [eq, eq2]
   type: worst_of
+# weighted-average basket on (eq, eq2)
+bskt: !basket
+  underlyings: [eq, eq2]
+  weights: [0.5, 0.5]
 # heston / bates stochastic-vol underlyings (rho carried by the *_var pseudo-udl)
 eq_h: !equity
   spot: 100

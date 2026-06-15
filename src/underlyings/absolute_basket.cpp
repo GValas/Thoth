@@ -27,6 +27,10 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
 {
 
+    //! a strike <= 0 is the "representative vol" query (e.g. the PDE grid setup):
+    //! invert at the ATM basket forward instead, since a strike-0 call has no vega
+    double k = ( Strike > 0 ) ? Strike : GetForward( MaturityDate, _currency );
+
     // mkt data
     size_t n = _underlying_list.size();
     gsl_vector* fwds = gsl_vector_alloc( n );
@@ -38,7 +42,7 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
     {
         Underlying* u = _underlying_list[i];
         gsl_vector_set( fwds, i, u->GetForward( MaturityDate, _currency ) / u->GetSpot() * _weight_list->data[i] );
-        gsl_vector_set( vols, i, u->GetImplicitVol( Strike, MaturityDate ) * sqrt( dt ) );
+        gsl_vector_set( vols, i, u->GetImplicitVol( k, MaturityDate ) * sqrt( dt ) );
         udl_list.push_back( u->GetName() );
     }
 
@@ -61,11 +65,11 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
     double Mu, Var, D;
     M3_to_SLN( M1, M2, M3, Mu, Var, D );
     double df = _currency->GetRate()->GetDiscountFactor( MaturityDate );
-    double premium = 100 * SLN_Call_Price( M1, Strike / 100, df, Mu, Var, D );
+    double premium = 100 * SLN_Call_Price( M1, k / 100, df, Mu, Var, D );
 
     //! price -> vol
     double fwd = GetForward( MaturityDate, _currency );
-    double vol = BS_Call_ImplicitVol( fwd, Strike, dt, premium, df );
+    double vol = BS_Call_ImplicitVol( fwd, k, dt, premium, df );
 
     //! free memory
     gsl_vector_free( fwds );
