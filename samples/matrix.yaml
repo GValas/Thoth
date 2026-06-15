@@ -13,6 +13,7 @@ root: matrix
 #   vanilla american put (quanto)  pde   mcl
 #   barrier continuous             pde   mcl   ana
 #   barrier discrete               pde   mcl
+#   composite (EUR asset, USD)     pde   mcl   ana
 #   variance swap                  mcl   ana
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
@@ -40,6 +41,9 @@ matrix: !sequence
     - p_barr_cont_ana
     - p_barr_disc_pde
     - p_barr_disc_mcl
+    - p_compo_pde
+    - p_compo_mcl
+    - p_compo_ana
     - p_vswap_mcl
     - p_vswap_ana
 
@@ -178,6 +182,35 @@ p_barr_disc_mcl: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: p_barr_disc_mcl_result
 
+# composite vanilla (EUR asset, payoff settled in USD at the prevailing FX). The
+# USD value S*FX is lognormal, so all three engines agree: ANA uses the composite
+# forward/vol closed form, MCL builds spot*FX in the node graph, PDE diffuses the
+# composite as a plain USD asset.
+p_compo_pde: !pricer
+  today: 2000-01-01
+  book: book_compo
+  currency: usd
+  configuration: cfg_pde
+  correlation: correl_q
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_compo_pde_result
+p_compo_mcl: !pricer
+  today: 2000-01-01
+  book: book_compo
+  currency: usd
+  configuration: cfg_mcl
+  correlation: correl_q
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_compo_mcl_result
+p_compo_ana: !pricer
+  today: 2000-01-01
+  book: book_compo
+  currency: usd
+  configuration: cfg_ana
+  correlation: correl_q
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: p_compo_ana_result
+
 # variance swap
 p_vswap_mcl: !pricer
   today: 2000-01-01
@@ -234,6 +267,8 @@ book_van_eu_q: !book
   options: [c_van_eu_q]
 book_van_am_q: !book
   options: [c_van_am_q]
+book_compo: !book
+  options: [c_compo]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -296,11 +331,25 @@ c_van_am_q: !vanilla
   type: put
   exercise: american
 
+# composite call: EUR equity converted to USD at maturity FX. Composite spot =
+# 100 * 1.5 = 150, so strike 150 is at-the-money.
+c_compo: !vanilla
+  underlying: comp
+  premium_currency: usd
+  strike: 150
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+
 # --- shared market data ----------------------------------------------------
 eq: !equity
   spot: 100
   volatility: vol
   currency: eur
+# composite view of eq: the EUR asset settled in USD (uses eur/usd + correl_q)
+comp: !composite
+  equity: eq
+  composite_currency: usd
 vol: !bs_volatility
   volatility: 30
   calendar: calendar

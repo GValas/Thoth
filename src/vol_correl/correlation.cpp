@@ -288,6 +288,13 @@ double Correlation::GetCholeskyValue( const string& u1,
 void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
 {
 
+    //! rebuilt from scratch on every call: bump-and-revalue Greeks (and any other
+    //! re-pricing) call this repeatedly, so the lists must be cleared or they
+    //! accumulate duplicate rows and the extracted matrix is no longer SDP
+    _cholesky_underlying_list.clear();
+    _cholesky_forex_list.clear();
+    _cholesky_single_list.clear();
+
     // cholesky attributes
     for ( const string& s : SingleNameList )
     {

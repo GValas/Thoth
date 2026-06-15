@@ -129,16 +129,82 @@ TEST_CASE( "basket: near-perfectly correlated 50/50 basket equals the single ass
     CHECK( std::abs( basket - BsCall( 100, 100, 0.05, 0.30, T1 ) ) <= 0.3 );
 }
 
-// --- composite : a composite underlying (asset converted into another currency)
-// prices to a positive, finite premium through the MCL node graph.
-TEST_CASE( "composite underlying prices a vanilla" )
+// --- composite : an asset quoted in EUR but settled in USD at the prevailing
+// FX. The USD value S*FX is lognormal, so the composite is a plain BS asset in
+// USD with composite spot = S0*FX0, forward = spot*exp(r_usd*T) and composite
+// vol^2 = vol_S^2 + vol_FX^2 + 2*rho*vol_S*vol_FX. The three engines must agree
+// with each other and with that closed form.
+TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
+{
+    const double S = 100, fx = 1.5, vol_s = 0.30, vol_fx = 0.15, rho = 0.5;
+    const double r_usd = 0.05, K = 150;
+
+    // closed-form composite Black-Scholes reference (lognormal USD value)
+    const double s_comp = S * fx;
+    const double v_comp = std::sqrt( vol_s * vol_s + vol_fx * vol_fx +
+                                     2 * rho * vol_s * vol_fx );
+    const double ref = BsCall( s_comp, K, r_usd, v_comp, T1 );
+
+    auto cfg = []( const std::string& method )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "cfg: !pricer_configuration {method: " << method
+          << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
+          << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
+          << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << "pd: !pde_configuration {vanilla_precision: high}\n"
+          << "eur: !currency {rate: r_eur}\n"
+          << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "usd: !currency {rate: r_usd}\n"
+          << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur, spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 15}\n"
+          << "comp: !composite {equity: eq, composite_currency: usd}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
+          << "book: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
+          << " maturity: 2000-12-31, type: call, exercise: european}\n";
+        return o.str();
+    };
+
+    auto ana = Price( cfg( "ana" ) );
+    auto mcl = Price( cfg( "mcl" ) );
+    auto pde = Price( cfg( "pde" ) );
+    const double p_ana = Premium( ana ), p_mcl = Premium( mcl ), p_pde = Premium( pde );
+    CAPTURE( ref );
+    CAPTURE( p_ana );
+    CAPTURE( p_mcl );
+    CAPTURE( p_pde );
+
+    // each engine matches the closed form (ANA exact; PDE grid; MCL within noise)
+    CHECK( std::abs( p_ana - ref ) <= 1e-2 );
+    CHECK( std::abs( p_pde - ref ) <= 0.1 );
+    CHECK( std::abs( p_mcl - ref ) <= 6.0 * Trust( mcl ) + 5e-2 );
+
+    // and the engines agree with each other
+    CHECK( std::abs( p_ana - p_pde ) <= 0.1 );
+    CHECK( std::abs( p_ana - p_mcl ) <= 6.0 * Trust( mcl ) + 5e-2 );
+}
+
+// --- regression : a non-Mono underlying (composite) priced with MCL Greeks goes
+// through bump-and-revalue, which re-enters PriceBook_ (and ComputeCholeskyMatrix)
+// several times. The cholesky working lists must be rebuilt each call, else they
+// accumulate duplicate rows and the correlation is reported "not SDP". A few
+// thousand paths suffice: this guards against the throw, not a numeric value.
+TEST_CASE( "composite MCL Greeks do not corrupt the correlation Cholesky" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
       << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
-      << " correlation: cor, indicators: [premium], result: res}\n"
+      << " correlation: cor, indicators: [premium, delta, vega, rho, theta], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
-      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 40000,"
+      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 8000,"
       << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
       << "eur: !currency {rate: r_eur}\n"
       << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
@@ -153,10 +219,11 @@ TEST_CASE( "composite underlying prices a vanilla" )
       << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
       << "book: !book {options: [o]}\n"
       << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
-      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
-    double p = Premium( Price( o.str() ) );
-    CHECK( p > 0.0 );
-    CHECK( std::isfinite( p ) );
+      << " maturity: 2000-12-31, type: call, exercise: european}\n";
+    auto r = Price( o.str() );                 //!< must not throw "cor is not SDP"
+    CHECK( std::isfinite( Premium( r ) ) );
+    CHECK( std::isfinite( Greek( r, "delta" ) ) );
+    CHECK( Greek( r, "vega" ) > 0.0 );         //!< composite vega is positive
 }
 
 // --- SABR : with beta = 1 and a tiny vol-of-vol the ATM SABR implied vol is ~alpha,

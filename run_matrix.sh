@@ -66,6 +66,9 @@ cells = [
     ("barrier continuous", "ana", "p_barr_cont_ana"),
     ("barrier discrete",   "pde", "p_barr_disc_pde"),
     ("barrier discrete",   "mcl", "p_barr_disc_mcl"),
+    ("composite eur->usd", "pde", "p_compo_pde"),
+    ("composite eur->usd", "mcl", "p_compo_mcl"),
+    ("composite eur->usd", "ana", "p_compo_ana"),
     ("variance swap",      "mcl", "p_vswap_mcl"),
     ("variance swap",      "ana", "p_vswap_ana"),
 ]
