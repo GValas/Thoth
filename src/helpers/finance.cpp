@@ -221,7 +221,8 @@ using cdouble = std::complex<double>;
 struct HestonParams
 {
     double F, K, T, v0, kappa, theta, xi, rho;
-    int j; //!< 1 or 2 (the two Heston probabilities P1, P2)
+    double lambda, muJ, sigmaJ; //!< Bates lognormal jumps (lambda = 0 -> pure Heston)
+    int j;                      //!< 1 or 2 (the two Heston probabilities P1, P2)
 };
 
 //! integrand of P_j : Re( e^{-i phi ln K} f_j(phi) / (i phi) ), forward measure
@@ -243,7 +244,19 @@ double heston_integrand( double phi, void* params )
 
     const cdouble C = ( a / xi2 ) * ( ( bj - rxi - d ) * h.T - 2.0 * std::log( ( 1.0 - g * edt ) / ( 1.0 - g ) ) );
     const cdouble D = ( bj - rxi - d ) / xi2 * ( ( 1.0 - edt ) / ( 1.0 - g * edt ) );
-    const cdouble f = std::exp( C + D * h.v0 + I * phi * std::log( h.F ) );
+    cdouble f = std::exp( C + D * h.v0 + I * phi * std::log( h.F ) );
+
+    //! Bates : multiply by the closed-form jump characteristic function. The two
+    //! probabilities are the CF under different measures, encoded here by the
+    //! argument shift u = phi (P2) vs phi - i (P1); the compensator (-i u kbar)
+    //! makes the jump factor martingale-neutral, so it equals 1 at u = -i.
+    if ( h.lambda > 0 )
+    {
+        const cdouble u = ( h.j == 1 ) ? ( phi - I ) : cdouble( phi );
+        const double kbar = exp( h.muJ + 0.5 * h.sigmaJ * h.sigmaJ ) - 1.0;
+        const cdouble psi = std::exp( I * u * h.muJ - 0.5 * u * u * h.sigmaJ * h.sigmaJ ) - 1.0 - I * u * kbar;
+        f *= std::exp( h.T * h.lambda * psi );
+    }
 
     return std::real( std::exp( -I * phi * std::log( h.K ) ) * f / ( I * phi ) );
 }
@@ -273,14 +286,20 @@ double Heston_Call_Price( const double Forward,
                           const double Kappa,
                           const double Theta,
                           const double Xi,
-                          const double Rho )
+                          const double Rho,
+                          const double JumpIntensity,
+                          const double JumpMean,
+                          const double JumpVol )
 {
-    //! degenerate (no vol-of-vol / zero maturity) : flat-vol Black-Scholes
+    //! degenerate (no vol-of-vol / zero maturity) : flat-vol Black-Scholes. The
+    //! characteristic-function integrand divides by xi^2, so Xi must stay > 0;
+    //! the Bates jumps require the CF, hence xi > 0 too.
     if ( Xi <= 1e-10 || TimeToMaturity <= 0 || Forward <= 0 || Strike <= 0 )
     {
         return BS_Call_Price( Forward, Strike, TimeToMaturity, sqrt( max( V0, 0.0 ) ), DiscountFactor );
     }
-    HestonParams h{ Forward, Strike, TimeToMaturity, V0, Kappa, Theta, Xi, Rho, 1 };
+    HestonParams h{ Forward, Strike, TimeToMaturity, V0, Kappa, Theta, Xi, Rho,
+                    JumpIntensity, JumpMean, JumpVol, 1 };
     double P1 = heston_probability( h, 1 );
     double P2 = heston_probability( h, 2 );
     return DiscountFactor * ( Forward * P1 - Strike * P2 );
@@ -294,9 +313,13 @@ double Heston_Put_Price( const double Forward,
                          const double Kappa,
                          const double Theta,
                          const double Xi,
-                         const double Rho )
+                         const double Rho,
+                         const double JumpIntensity,
+                         const double JumpMean,
+                         const double JumpVol )
 {
     //! put/call parity
-    double c = Heston_Call_Price( Forward, Strike, TimeToMaturity, DiscountFactor, V0, Kappa, Theta, Xi, Rho );
+    double c = Heston_Call_Price( Forward, Strike, TimeToMaturity, DiscountFactor,
+                                  V0, Kappa, Theta, Xi, Rho, JumpIntensity, JumpMean, JumpVol );
     return c - DiscountFactor * ( Forward - Strike );
 }

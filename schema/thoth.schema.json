@@ -308,7 +308,7 @@
     "heston_volatility": {
       "type": "object",
       "title": "!heston_volatility",
-      "description": "Heston stochastic volatility. The spot/vol correlation (rho) is set via the !correlation_matrix, not here.",
+      "description": "Heston stochastic volatility (optionally Bates, via the jump_* fields). The spot/vol correlation (rho) is set via the !correlation_matrix, not here.",
       "additionalProperties": false,
       "required": ["spot", "init_vol", "long_vol", "kappa", "vol_of_vol"],
       "properties": {
@@ -317,6 +317,9 @@
         "long_vol": { "type": "number", "description": "Long-run vol in percent (-> theta)." },
         "kappa": { "type": "number", "description": "Mean-reversion speed." },
         "vol_of_vol": { "type": "number", "description": "Vol of variance (xi)." },
+        "jump_intensity": { "type": "number", "description": "Bates: jump frequency per year (lambda). 0 = pure Heston." },
+        "jump_mean": { "type": "number", "description": "Bates: mean of the log jump size (mu)." },
+        "jump_vol": { "type": "number", "description": "Bates: vol of the log jump size (sigma)." },
         "calendar": { "$ref": "#/$defs/ref" }
       }
     },

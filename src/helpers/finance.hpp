@@ -67,6 +67,9 @@ double BS_Volga( const double Forward,
 //! "Little Heston Trap" branch-stable form, GSL adaptive integration). Forward
 //! F already carries the carry/quanto drift; df discounts in the payoff currency.
 //! v0/theta are variances, xi the vol-of-vol, rho the spot/variance correlation.
+//! The optional lognormal-jump parameters (intensity lambda, log-jump mean mu and
+//! vol sigma) turn this into the Bates model: the characteristic function gets an
+//! extra closed-form jump factor. All zero -> pure Heston. Requires Xi > 0.
 double Heston_Call_Price( const double Forward,
                           const double Strike,
                           const double TimeToMaturity,
@@ -75,7 +78,10 @@ double Heston_Call_Price( const double Forward,
                           const double Kappa,
                           const double Theta,
                           const double Xi,
-                          const double Rho );
+                          const double Rho,
+                          const double JumpIntensity = 0,
+                          const double JumpMean = 0,
+                          const double JumpVol = 0 );
 
 double Heston_Put_Price( const double Forward,
                          const double Strike,
@@ -85,7 +91,10 @@ double Heston_Put_Price( const double Forward,
                          const double Kappa,
                          const double Theta,
                          const double Xi,
-                         const double Rho );
+                         const double Rho,
+                         const double JumpIntensity = 0,
+                         const double JumpMean = 0,
+                         const double JumpVol = 0 );
 
 // implicit vol
 double BS_Call_ImplicitVol( const double Forward,

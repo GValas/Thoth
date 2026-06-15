@@ -302,6 +302,11 @@ map<string, ObjectManager::Factory> MakeRegistry()
         H->SetTheta( pow( m.cfg().GetDouble( n + ".long_vol" ) / 100.0, 2 ) );
         H->SetKappa( m.cfg().GetDouble( n + ".kappa" ) );
         H->SetXi( m.cfg().GetDouble( n + ".vol_of_vol" ) );
+        //! optional Bates jumps (absent -> 0 -> pure Heston). jump_mean / jump_vol
+        //! are in log-return space; jump_intensity is the yearly jump frequency.
+        H->SetJumpIntensity( m.cfg().GetDouble( n + ".jump_intensity", 0 ) );
+        H->SetJumpMean( m.cfg().GetDouble( n + ".jump_mean", 0 ) );
+        H->SetJumpVol( m.cfg().GetDouble( n + ".jump_vol", 0 ) );
         ConfigureVolatilityCommon( m, H, n );
         return H;
     };

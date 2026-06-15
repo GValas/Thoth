@@ -75,6 +75,11 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
                 S->SetVarianceNode( var );
                 S->SetDriftNode( GetDriftNode( NC ) );
                 S->SetNoiseNode( NC.GetNode( _name + "#white_noise" ) );
+                //! Bates : wire the jump source if this Heston vol carries jumps
+                if ( h->HasJumps() )
+                {
+                    S->SetJumpNode( NC.GetNode( _name + "#jump_noise" ) );
+                }
                 S->SetSpot( _spot );
             } );
     }

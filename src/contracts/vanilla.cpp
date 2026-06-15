@@ -120,8 +120,10 @@ void Vanilla::ANA_EvalPrice()
     if ( HestonVolatility* h = HestonOf( _underlying ) )
     {
         _premium = ( _type == OptionType::Call )
-                       ? Heston_Call_Price( f, k, t, df, h->GetV0(), h->GetKappa(), h->GetTheta(), h->GetXi(), h->GetRho() )
-                       : Heston_Put_Price( f, k, t, df, h->GetV0(), h->GetKappa(), h->GetTheta(), h->GetXi(), h->GetRho() );
+                       ? Heston_Call_Price( f, k, t, df, h->GetV0(), h->GetKappa(), h->GetTheta(), h->GetXi(), h->GetRho(),
+                                            h->GetJumpIntensity(), h->GetJumpMean(), h->GetJumpVol() )
+                       : Heston_Put_Price( f, k, t, df, h->GetV0(), h->GetKappa(), h->GetTheta(), h->GetXi(), h->GetRho(),
+                                           h->GetJumpIntensity(), h->GetJumpMean(), h->GetJumpVol() );
         _delta = _gamma = _vega_bs = _volga_bs = 0;
         return;
     }

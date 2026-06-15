@@ -61,6 +61,13 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
         step = ( b - 0.5 * vp ) * dt + sqrt( vp * dt ) * z;
     }
 
+    //! Bates : add the compound-Poisson jump increment (compensator + realised
+    //! jumps) for this step (no-op when there is no jump node)
+    if ( _jump_node )
+    {
+        step += _jump_node->GetValue( DateIndex );
+    }
+
     _value_list[DateIndex] = _value_list[DateIndex - 1] * exp( step );
 }
 
@@ -78,6 +85,11 @@ void HestonSpotNode::GetDateDependencies( size_t DateIndex,
         DateList.push_back( DateIndex );
         NodeList.push_back( _noise_node );
         DateList.push_back( DateIndex );
+        if ( _jump_node )
+        {
+            NodeList.push_back( _jump_node );
+            DateList.push_back( DateIndex );
+        }
         NodeList.push_back( this );
         DateList.push_back( DateIndex - 1 );
     }

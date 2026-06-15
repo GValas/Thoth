@@ -17,6 +17,7 @@ class HestonSpotNode : public MonteCarloNode
     MonteCarloNode* _variance_node = nullptr;
     MonteCarloNode* _drift_node = nullptr;
     MonteCarloNode* _noise_node = nullptr;
+    MonteCarloNode* _jump_node = nullptr; //!< optional Bates jump increment (null = pure Heston)
 
   public:
     bool IsConstant( size_t DateIndex ) override;
@@ -29,6 +30,7 @@ class HestonSpotNode : public MonteCarloNode
     void SetVarianceNode( MonteCarloNode* N ) { _variance_node = N; }
     void SetDriftNode( MonteCarloNode* N ) { _drift_node = N; }
     void SetNoiseNode( MonteCarloNode* N ) { _noise_node = N; }
+    void SetJumpNode( MonteCarloNode* N ) { _jump_node = N; }
     void SetSpot( double Spot );
 
     HestonSpotNode( const string& Name );

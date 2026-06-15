@@ -11,6 +11,7 @@
 #include "drift_node.hpp"
 #include "heston_variance_node.hpp"
 #include "heston_spot_node.hpp"
+#include "jump_node.hpp"
 #include "absolute_basket_node.hpp"
 #include "local_volatility_node.hpp"
 #include "monte_carlo_node.hpp"

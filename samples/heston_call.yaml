@@ -10,7 +10,7 @@ root: heston
 
 heston: !sequence
   result: heston_result
-  tasks: [heston_ana, heston_pde, heston_mcl]
+  tasks: [heston_ana, heston_pde, heston_mcl, bates_ana, bates_mcl]
 
 heston_ana: !pricer
   today: 2000-01-01
@@ -38,6 +38,27 @@ heston_mcl: !pricer
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: heston_mcl_result
+
+# Bates = Heston + lognormal jumps (crash-like: negative jump mean). Priced by
+# ANA (closed-form jump factor on the characteristic function) and MCL (a
+# compound-Poisson jump on the QE spot); they agree, and the jumps lift the
+# premium above pure Heston. PDE is not supported for Bates (it needs a PIDE).
+bates_ana: !pricer
+  today: 2000-01-01
+  book: book_bates
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl_bates
+  indicators: [premium]
+  result: bates_ana_result
+bates_mcl: !pricer
+  today: 2000-01-01
+  book: book_bates
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_bates
+  indicators: [premium]
+  result: bates_mcl_result
 
 # --- configurations --------------------------------------------------------
 cfg_ana: !pricer_configuration
@@ -73,6 +94,17 @@ heston_call: !vanilla
   nominal: 1
   type: call
   exercise: european
+book_bates: !book
+  options: [bates_call]
+bates_call: !vanilla
+  underlying: eq_bates
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
 
 # --- market data -----------------------------------------------------------
 eq: !equity
@@ -99,4 +131,24 @@ eur_rate: !yield_curve
 # variance pseudo-underlying "eq_var".
 correl: !correlation_matrix
   underlyings: [eq, eq_var]
+  matrix: [1, -0.7, -0.7, 1]
+
+# Bates underlying: same Heston dynamics plus lognormal jumps (0.5/yr, mean -10%,
+# vol 15% in log-return space).
+eq_bates: !equity
+  spot: 100
+  volatility: heston_vol_bates
+  currency: eur
+heston_vol_bates: !heston_volatility
+  spot: 100
+  init_vol: 25
+  long_vol: 25
+  kappa: 2
+  vol_of_vol: 0.5
+  jump_intensity: 0.5
+  jump_mean: -0.10
+  jump_vol: 0.15
+  calendar: calendar
+correl_bates: !correlation_matrix
+  underlyings: [eq_bates, eq_bates_var]
   matrix: [1, -0.7, -0.7, 1]

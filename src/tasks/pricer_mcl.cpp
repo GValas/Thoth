@@ -1,6 +1,7 @@
 #include "thoth.hpp"
 #include "pricer_mcl.hpp"
 #include "cancellation.hpp"
+#include "heston_volatility.hpp"
 #include "mono.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
@@ -328,6 +329,18 @@ void PricerMCL::CreateBrownianNodes_()
         {
             NoiseNode* VN = _collector.NewNode<NoiseNode>( ( *u )->GetName() + "#vol_white_noise" );
             VN->SetRandomGenerator( _gsl_r );
+
+            //! Bates : an independent compound-Poisson jump source (only created
+            //! when the Heston vol carries jumps; pure Heston has no jump node)
+            if ( auto* h = dynamic_cast<HestonVolatility*>( ( *u )->GetVolatility() ) )
+            {
+                if ( h->HasJumps() )
+                {
+                    JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + "#jump_noise" );
+                    JN->SetRandomGenerator( _gsl_r );
+                    JN->SetJumpParameters( h->GetJumpIntensity(), h->GetJumpMean(), h->GetJumpVol() );
+                }
+            }
         }
     }
 }

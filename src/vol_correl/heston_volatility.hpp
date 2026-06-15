@@ -19,6 +19,12 @@ class HestonVolatility : public Volatility
     double _xi = 0;    //!< vol-of-vol
     double _rho = 0;   //!< spot/variance correlation in (-1, 1)
 
+    //! optional Bates jumps (all zero -> pure Heston). Lognormal jump sizes:
+    //! intensity lambda (per year), log-jump mean mu and vol sigma.
+    double _jump_intensity = 0;
+    double _jump_mean = 0;
+    double _jump_vol = 0;
+
   public:
     //! setters
     void SetSpot( double Spot ) { _spot = Spot; }
@@ -27,6 +33,9 @@ class HestonVolatility : public Volatility
     void SetTheta( double Theta ) { _theta = Theta; }
     void SetXi( double Xi ) { _xi = Xi; }
     void SetRho( double Rho ) { _rho = Rho; }
+    void SetJumpIntensity( double Lambda ) { _jump_intensity = Lambda; }
+    void SetJumpMean( double Mu ) { _jump_mean = Mu; }
+    void SetJumpVol( double Sigma ) { _jump_vol = Sigma; }
 
     //! getters (used by the MCL nodes and the ANA/PDE Heston pricers). The vega
     //! bump (_vol_shift) raises the whole vol level, so it shifts the variance
@@ -37,6 +46,10 @@ class HestonVolatility : public Volatility
     double GetTheta() const { return Shifted( _theta ); }
     double GetXi() const { return _xi; }
     double GetRho() const { return _rho; }
+    double GetJumpIntensity() const { return _jump_intensity; }
+    double GetJumpMean() const { return _jump_mean; }
+    double GetJumpVol() const { return _jump_vol; }
+    bool HasJumps() const { return _jump_intensity > 0; }
 
     bool IsStochastic() const override { return true; }
 
