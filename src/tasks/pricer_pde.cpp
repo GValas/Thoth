@@ -289,13 +289,13 @@ void PricerPDE::ApplyDiscreteBarrier( gsl_vector* U )
 PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 {
 
-    // vectors & matrices allocations
-    gsl_vector* diag_u = gsl_vector_calloc( J );     // up diag
-    gsl_vector* diag_m = gsl_vector_calloc( J + 1 ); // mid diag
-    gsl_vector* diag_d = gsl_vector_calloc( J );     // down diag
-    gsl_vector* D_1 = gsl_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
-    gsl_vector* U_0 = gsl_vector_calloc( J + 1 );
-    gsl_vector* U_1 = gsl_vector_calloc( J + 1 );
+    // vectors & matrices allocations (RAII: freed on every exit, incl. ERR throw)
+    GslVector diag_u = gsl_vector_calloc( J );     // up diag
+    GslVector diag_m = gsl_vector_calloc( J + 1 ); // mid diag
+    GslVector diag_d = gsl_vector_calloc( J );     // down diag
+    GslVector D_1 = gsl_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
+    GslVector U_0 = gsl_vector_calloc( J + 1 );
+    GslVector U_1 = gsl_vector_calloc( J + 1 );
     // gsl_matrix * V        = gsl_matrix_calloc(J+1, N+1);
 
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
@@ -395,16 +395,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
                        ( X_0 * X_0 * GREEK_SPOT_SHIFT * GREEK_SPOT_SHIFT );
     }
 
-    // free memory
-    // gsl_matrix_free(V);
-    gsl_vector_free( diag_u );
-    gsl_vector_free( diag_m );
-    gsl_vector_free( diag_d );
-    gsl_vector_free( D_1 );
-    gsl_vector_free( U_0 );
-    gsl_vector_free( U_1 );
-
-    return result;
+    return result; //!< GslVector members above free themselves at scope exit
 }
 
 inline double PricerPDE::Phi( double x )

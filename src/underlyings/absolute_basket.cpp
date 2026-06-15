@@ -31,10 +31,10 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
     //! invert at the ATM basket forward instead, since a strike-0 call has no vega
     double k = ( Strike > 0 ) ? Strike : GetForward( MaturityDate, _currency );
 
-    // mkt data
+    // mkt data (RAII: freed even if a callee below throws via ERR)
     size_t n = _underlying_list.size();
-    gsl_vector* fwds = gsl_vector_alloc( n );
-    gsl_vector* vols = gsl_vector_alloc( n );
+    GslVector fwds = gsl_vector_alloc( n );
+    GslVector vols = gsl_vector_alloc( n );
     vector<string> udl_list;
     vector<Forex*> fx_list;
     double dt = YearFraction( _today, MaturityDate );
@@ -58,7 +58,7 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
     //! moment matching
     double M1, M2, M3, M4;
-    gsl_matrix* correls = _correlation->ExtractMatrix( udl_list, fx_list );
+    GslMatrix correls = _correlation->ExtractMatrix( udl_list, fx_list );
     LN_to_M4( fwds, vols, correls, M1, M2, M3, M4 );
 
     //! shifted log normal formula
@@ -70,11 +70,6 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
     //! price -> vol
     double fwd = GetForward( MaturityDate, _currency );
     double vol = BS_Call_ImplicitVol( fwd, k, dt, premium, df );
-
-    //! free memory
-    gsl_vector_free( fwds );
-    gsl_vector_free( vols );
-    gsl_matrix_free( correls );
 
     return vol;
 }

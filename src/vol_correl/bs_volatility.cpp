@@ -25,7 +25,10 @@ double BsVolatility::GetImplicitVol( const double /*Strike*/,
 MonteCarloNode* BsVolatility::GetNode( NodeCollector& NC )
 {
     //! the Monte-Carlo diffusion reads the vol here, so the vega shift must apply
-    auto init = [&]( ConstantNode* C ) { C->SetConstantValue( _volatility + _vol_shift ); };
+    //! — and the calendar day-weight too, so MCL matches the ANA/PDE vol (which
+    //! use GetImplicitVol = (vol + shift) * GetDayWeight()). No-op when weight = 1.
+    auto init = [&]( ConstantNode* C )
+    { C->SetConstantValue( ( _volatility + _vol_shift ) * GetDayWeight() ); };
     //! mutualise with the base tree unless the current Greek scenario bumps vols
     if ( NC.HasScenario() && !NC.ScenarioBumpsVol() )
     {

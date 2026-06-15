@@ -130,10 +130,14 @@ void M3_to_SLN( const double M1,
 
     if ( E2 <= 0 )
     {
-        ERR( "??????" );
+        ERR( "M3_to_SLN: non-positive variance (E2 <= 0); check the basket "
+             "forward/vol/correlation inputs" );
     }
 
-    if ( E3 == 0 )
+    //! near-symmetric (third central moment ~ 0): the shifted-lognormal shift
+    //! degenerates, so fall back to the plain lognormal match and avoid the
+    //! 1/E3 division below. Tolerance is relative to the variance scale.
+    if ( fabs( E3 ) < 1e-10 * E2 * sqrt( E2 ) )
     {
         M2_to_LN( M1, M2, Mu, Var );
         D = 0;
@@ -211,9 +215,9 @@ void ext_gsl_matrix_shift_to_epsilon( gsl_matrix* m, double eps )
 void ext_gsl_matrix_to_near_positive( gsl_matrix* m, double& eps )
 {
 
-    //!
+    //! RAII scratch copy (freed on every exit path)
     size_t n = m->size1;
-    gsl_matrix* A = gsl_matrix_alloc( n, n );
+    GslMatrix A = gsl_matrix_alloc( n, n );
     gsl_matrix_memcpy( A, m );
 
     //!
@@ -249,7 +253,6 @@ void ext_gsl_matrix_to_near_positive( gsl_matrix* m, double& eps )
     {
         ext_gsl_matrix_shift_to_epsilon( m, eps_max );
     }
-    gsl_matrix_free( A );
 }
 
 //! test if matrix is symmetric
@@ -343,9 +346,11 @@ double InterpolateWithSpline( gsl_vector* x_serie,
                               double x_point )
 {
 
-    // allocations
+    // allocations. Natural (non-periodic) cubic spline: the data (e.g. a PDE
+    // price profile) is not periodic, so cspline_periodic — which assumes
+    // y[0] == y[n-1] — would be the wrong boundary condition.
     gsl_interp_accel* acc = gsl_interp_accel_alloc();
-    const gsl_interp_type* t = gsl_interp_cspline_periodic;
+    const gsl_interp_type* t = gsl_interp_cspline;
     gsl_spline* spline = gsl_spline_alloc( t, x_serie->size );
     gsl_spline_init( spline, gsl_vector_ptr( x_serie, 0 ), gsl_vector_ptr( y_serie, 0 ), x_serie->size );
 

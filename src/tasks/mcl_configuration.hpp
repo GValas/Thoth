@@ -10,7 +10,7 @@ class MclConfiguration : public Object
     int _max_time_step;
     int _min_time_step;
     int _paths;
-    int _vol_time_step;
+    double _vol_time_step; //!< variance sub-step (year fraction, e.g. 0.01) — a double
     string _node_file;
     bool _use_sobol;
     bool _use_milstein;

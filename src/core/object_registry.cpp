@@ -428,11 +428,22 @@ map<string, ObjectManager::Factory> MakeRegistry()
         M->_max_time_step = m.cfg().GetInteger( n + ".max_time_step" );
         M->_min_time_step = m.cfg().GetInteger( n + ".min_time_step" );
         M->_paths = m.cfg().GetInteger( n + ".paths" );
-        M->_vol_time_step = m.cfg().GetInteger( n + ".vol_time_step" );
+        //! year-fraction sub-step, so it is a double (0.01, not 0)
+        M->_vol_time_step = m.cfg().GetDouble( n + ".vol_time_step" );
         M->_node_file = m.cfg().GetString( n + ".node_file", MCL_NODE_PATH );
         M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
         M->_use_milstein = m.cfg().GetBoolean( n + ".use_milstein", MC_USE_MILSTEIN );
         M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
+        //! guard against degenerate grids: paths <= 0 -> NaN premium, and
+        //! max_time_step <= 0 -> a zero-day diffusion step that never advances
+        if ( M->_paths <= 0 )
+        {
+            ERR( "mcl_configuration '" + n + "': paths must be > 0" );
+        }
+        if ( M->_max_time_step <= 0 )
+        {
+            ERR( "mcl_configuration '" + n + "': max_time_step must be > 0 (days)" );
+        }
         return M;
     };
 

@@ -34,6 +34,30 @@ std::string OneContract( const std::string& method, const std::string& contract_
 }
 } // namespace
 
+// --- calendar day-weight consistency : with a non-unit non_working_days_weight,
+// the vol is scaled by GetDayWeight() in ANA/PDE; the MCL diffusion must apply the
+// same scaling. Before the fix, MCL ignored the day-weight and diverged. A vanilla
+// priced ANA vs MCL under weight=2 must agree (both use the weighted vol).
+TEST_CASE( "calendar day-weight: MCL matches ANA under a non-unit weight" )
+{
+    const std::string c = "o: !vanilla {underlying: eq, premium_currency: eur,"
+                          " strike: 100, maturity: 2000-12-31, type: call, exercise: european}\n";
+    // override the default weight-1 calendar with weight 2 (dayweight = sqrt(9/7))
+    auto with_weight = []( std::string cfg )
+    {
+        const std::string from = "non_working_days_weight: 1";
+        const std::string to = "non_working_days_weight: 2";
+        cfg.replace( cfg.find( from ), from.size(), to );
+        return cfg;
+    };
+    double ana = Premium( Price( with_weight( OneContract( "ana", c ) ) ) );
+    auto mr = Price( with_weight( OneContract( "mcl", c ) ) );
+    double mcl = Premium( mr );
+    CAPTURE( ana );
+    CAPTURE( mcl );
+    CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 5e-2 );
+}
+
 // --- variance swap : the Monte-Carlo realized variance and the analytic static
 // replication must agree, and the fair value is positive for a strike below vol.
 TEST_CASE( "variance swap: MCL and ANA agree" )

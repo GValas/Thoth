@@ -54,11 +54,11 @@ void HistoricalCorrelationComputation::Execute()
         ERR( "range_size + time_step must be smaller than size of records" );
     }
 
-    //! log returns vectors
-    vector<gsl_vector*> log_return_list;
+    //! log returns vectors (RAII: freed on every exit, including ERR throw)
+    vector<GslVector> log_return_list;
     for ( size_t i = 0; i < histos_size; i++ )
     {
-        gsl_vector* v = gsl_vector_alloc( _range_size );
+        GslVector v = gsl_vector_alloc( _range_size );
         for ( size_t j = 0; j < _range_size; j++ )
         {
             gsl_vector* w = _historical_spots_fixing_list[i]->GetValueList();
@@ -66,11 +66,11 @@ void HistoricalCorrelationComputation::Execute()
                             gsl_vector_get( w, w->size - _range_size + j - _time_step ) );
             gsl_vector_set( v, j, x );
         }
-        log_return_list.push_back( v );
+        log_return_list.push_back( std::move( v ) );
     }
 
     //! weights
-    gsl_vector* weights = gsl_vector_alloc( _range_size );
+    GslVector weights = gsl_vector_alloc( _range_size );
     double r = exp( -log( 2. ) / _half_life );
     double w = 1;
     for ( size_t i = 0; i < _range_size; i++ )
@@ -80,8 +80,8 @@ void HistoricalCorrelationComputation::Execute()
     }
 
     //! compute weighted means, variances
-    gsl_vector* weighted_means = gsl_vector_alloc( histos_size );
-    gsl_vector* weighted_variances = gsl_vector_alloc( histos_size );
+    GslVector weighted_means = gsl_vector_alloc( histos_size );
+    GslVector weighted_variances = gsl_vector_alloc( histos_size );
     for ( size_t i = 0; i < histos_size; i++ )
     {
         gsl_vector* v = log_return_list[i];
@@ -117,15 +117,7 @@ void HistoricalCorrelationComputation::Execute()
 
     // ext_gsl_matrix_log( historical_matrix );
 
-    //! free memory
-    for ( size_t i = 0; i < histos_size; i++ )
-    {
-        gsl_vector_free( log_return_list[i] );
-    }
-    gsl_vector_free( weights );
-    gsl_vector_free( weighted_means );
-    gsl_vector_free( weighted_variances );
-
+    //! (GSL scratch vectors above are RAII-owned and free themselves)
     _exec_time = ExecTime( t0 );
 }
 
