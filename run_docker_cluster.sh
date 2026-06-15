@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# run_docker_cluster.sh - Build the Thoth image and run a Dockerised cluster.
+# run_docker_cluster.sh - Build the Thoth image and run a cluster of containers.
 #
-# Builds the production image (Dockerfile), creates a private Docker network,
-# launches N slave containers (ordinary `thoth -server`) on inner ports, and a
-# master (`thoth -cluster`) that splits an MCL pricing's paths across them. Only
-# the master is published to the host (on --port); the slaves stay on the
-# network. Ctrl-C tears the whole cluster (containers + network) down.
+# Builds the production image (Dockerfile), then brings up a small cluster the
+# way docker-compose would: ONE container per slave plus one for the master, all
+# on a private Docker network so they reach each other by container name.
+#   * N slaves : `thoth-cluster-slave-1 .. -N`, each a `thoth -server 8080`
+#                container. They are reachable only on the cluster network
+#                (their 8080 is NOT published to the host).
+#   * 1 master : `thoth-cluster-master`, a `thoth -cluster 8080 http://...:8080`
+#                container in the foreground that splits an MCL pricing's paths
+#                across the slaves. Only the master's 8080 is published, on --port.
+# Ctrl-C (or the master exiting) tears the whole cluster down: master, every
+# slave container, and the network are removed on exit.
 #
 # Usage:
 #     ./run_docker_cluster.sh --port 8888 --slaves 10
@@ -39,78 +45,60 @@ if ! [[ "$SLAVES" =~ ^[0-9]+$ ]] || (( SLAVES < 1 )); then
     echo "error: --slaves must be a positive integer" >&2; exit 1
 fi
 
-NET="thoth-cluster-net"
-MASTER="thoth-master"
-SLAVE_PREFIX="thoth-slave"
-SLAVE_PORT_BASE=8090 #!< slave i listens on SLAVE_PORT_BASE + i (inner, not published)
+NETWORK="thoth-cluster-net"      #!< private network; slaves resolve by container name
+MASTER="thoth-cluster-master"
+SLAVE_PREFIX="thoth-cluster-slave"
+INNER_PORT=8080                  #!< every container listens on 8080 inside its own namespace
 
-# Tear everything we created down on any exit (success, error, Ctrl-C).
-cleanup() {
-    echo "==> Tearing down cluster ..."
+# Remove the master, all slave containers, and the network. Idempotent: used both
+# to clear any stale run before starting and (via the trap) to tear down on exit.
+cluster_down() {
     docker rm -f "$MASTER" >/dev/null 2>&1 || true
     for (( i = 1; i <= SLAVES; i++ )); do
-        docker rm -f "${SLAVE_PREFIX}-${i}" >/dev/null 2>&1 || true
+        docker rm -f "${SLAVE_PREFIX}-$i" >/dev/null 2>&1 || true
     done
-    docker network rm "$NET" >/dev/null 2>&1 || true
+    docker network rm "$NETWORK" >/dev/null 2>&1 || true
 }
-trap cleanup EXIT INT TERM
 
 thoth_build_image
 
-# Fresh network (remove a stale one from a previous aborted run).
-docker network rm "$NET" >/dev/null 2>&1 || true
-docker network create "$NET" >/dev/null
-echo "==> Network '$NET' created"
+# Clean slate, then create the network the whole cluster shares.
+cluster_down
+trap cluster_down EXIT INT TERM
+docker network create "$NETWORK" >/dev/null
 
-# --- launch the slaves (inner ports, network-only) -------------------------
-SLAVE_URLS=()
+# Start one detached container per slave; collect their in-network URLs.
+urls=()
 for (( i = 1; i <= SLAVES; i++ )); do
-    sport=$(( SLAVE_PORT_BASE + i ))
-    name="${SLAVE_PREFIX}-${i}"
-    docker rm -f "$name" >/dev/null 2>&1 || true
-    echo "==> starting slave $i ($name) on inner port $sport"
-    docker run -d --network "$NET" --name "$name" "$THOTH_IMAGE" -server "$sport" >/dev/null
-    SLAVE_URLS+=( "http://${name}:${sport}" )
+    name="${SLAVE_PREFIX}-$i"
+    echo "==> starting slave container $name (inner $INNER_PORT)"
+    docker run -d --name "$name" --network "$NETWORK" "$THOTH_IMAGE" \
+        -server "$INNER_PORT" >/dev/null
+    urls+=( "http://$name:$INNER_PORT" )
 done
 
-# Wait until each slave's port accepts connections (bash /dev/tcp inside the
-# container — the runtime image has no curl, but it has bash).
-wait_slave() {
-    local name="$1" port="$2"
-    for _ in $(seq 1 150); do
-        if docker exec "$name" bash -c "exec 3<>/dev/tcp/127.0.0.1/${port}" 2>/dev/null; then
-            return 0
+# Wait until each slave accepts connections. The runtime image has no curl but
+# has bash, so probe its own listening socket from inside the container.
+for (( i = 1; i <= SLAVES; i++ )); do
+    name="${SLAVE_PREFIX}-$i"
+    ready=0
+    for (( t = 0; t < 300; t++ )); do
+        if docker exec "$name" bash -c "exec 3<>/dev/tcp/127.0.0.1/$INNER_PORT" 2>/dev/null; then
+            ready=1; break
         fi
         sleep 0.2
     done
-    echo "error: slave $name did not become ready on port $port" >&2
-    return 1
-}
-for (( i = 1; i <= SLAVES; i++ )); do
-    wait_slave "${SLAVE_PREFIX}-${i}" "$(( SLAVE_PORT_BASE + i ))"
+    if (( ! ready )); then
+        echo "error: slave container $name did not become ready" >&2
+        docker logs "$name" >&2 || true
+        exit 1
+    fi
 done
-echo "==> all $SLAVES slave(s) ready"
+echo "==> all $SLAVES slave container(s) ready"
 
-# --- launch the master (published on the host port) ------------------------
-docker rm -f "$MASTER" >/dev/null 2>&1 || true
-echo "==> starting master ($MASTER) on host port $PORT over $SLAVES slave(s)"
-docker run -d --network "$NET" --name "$MASTER" -p "${PORT}:8080" \
-    "$THOTH_IMAGE" -cluster 8080 "${SLAVE_URLS[@]}" >/dev/null
-
-# Wait for the master's HTTP endpoint (published, so curl from the host).
-for _ in $(seq 1 150); do
-    if curl -sf "http://localhost:${PORT}/health" >/dev/null 2>&1; then break; fi
-    sleep 0.2
-done
-
-cat <<EOF
-==> Cluster up:  master http://localhost:${PORT}  +  ${SLAVES} slave(s)
-    price a book through the master, e.g.:
-      curl -X POST -H "Content-Type: application/x-yaml" \\
-           --data-binary @samples/heston_call.yaml http://localhost:${PORT}/price
-    (Ctrl-C to stop the cluster)
-EOF
-
-# Stay in the foreground streaming the master log; Ctrl-C triggers cleanup.
-# (no `exec`: keep bash as the parent so the EXIT/INT trap tears the cluster down)
-docker logs -f "$MASTER" || true
+echo "==> Cluster on http://localhost:$PORT  ($SLAVES slave container(s))  (Ctrl-C to stop)"
+# Master in the foreground so it owns this console (live -t progress bar) and so
+# Ctrl-C reaches it; on exit the trap removes every container and the network.
+# --rm here removes the master itself; slaves are removed by cluster_down.
+docker run --rm -t --name "$MASTER" --network "$NETWORK" -p "$PORT:$INNER_PORT" \
+    "$THOTH_IMAGE" -cluster "$INNER_PORT" "${urls[@]}"
