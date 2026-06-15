@@ -49,46 +49,46 @@ echo "==> Matrix results (premium / trust / Greeks):"
 python3 - "$OUTPUT" <<'PY'
 import re, sys
 txt = open(sys.argv[1]).read()
-# (product, method, result-object) — sorted alphabetically by product, then method
+# (product, method, result-object) — mono/multi underlying; sorted alphabetically
 cells = [
-    ("barrier continuous", "ana", "p_barr_cont_ana"),
-    ("barrier continuous", "mcl", "p_barr_cont_mcl"),
-    ("barrier continuous", "pde", "p_barr_cont_pde"),
-    ("barrier discrete",   "mcl", "p_barr_disc_mcl"),
-    ("barrier discrete",   "pde", "p_barr_disc_pde"),
-    ("vanilla am put",     "mcl", "p_van_am_mcl"),
-    ("vanilla am put",     "pde", "p_van_am_pde"),
-    ("vanilla am put qto", "mcl", "p_van_am_q_mcl"),
-    ("vanilla am put qto", "pde", "p_van_am_q_pde"),
-    ("vanilla eu",         "ana", "p_van_eu_ana"),
-    ("vanilla eu",         "mcl", "p_van_eu_mcl"),
-    ("vanilla eu",         "pde", "p_van_eu_pde"),
-    ("vanilla eu basket",  "ana", "p_basket_ana"),
-    ("vanilla eu basket",  "mcl", "p_basket_mcl"),
-    ("vanilla eu basket",  "pde", "p_basket_pde"),
-    ("vanilla eu bates",   "ana", "p_bates_ana"),
-    ("vanilla eu bates",   "mcl", "p_bates_mcl"),
-    ("vanilla eu best-of", "mcl", "p_rb_best_mcl"),
-    ("vanilla eu compo",   "ana", "p_compo_ana"),
-    ("vanilla eu compo",   "mcl", "p_compo_mcl"),
-    ("vanilla eu compo",   "pde", "p_compo_pde"),
-    ("vanilla eu heston",  "ana", "p_heston_ana"),
-    ("vanilla eu heston",  "mcl", "p_heston_mcl"),
-    ("vanilla eu heston",  "pde", "p_heston_pde"),
-    ("vanilla eu quanto",  "ana", "p_van_eu_q_ana"),
-    ("vanilla eu quanto",  "mcl", "p_van_eu_q_mcl"),
-    ("vanilla eu quanto",  "pde", "p_van_eu_q_pde"),
-    ("vanilla eu worst-of","mcl", "p_rb_worst_mcl"),
-    ("vanilla us compo",   "mcl", "p_compo_am_mcl"),
-    ("vanilla us compo",   "pde", "p_compo_am_pde"),
-    ("variance swap",      "ana", "p_vswap_ana"),
-    ("variance swap",      "mcl", "p_vswap_mcl"),
+    ("barrier mono continuous", "ana", "p_barr_cont_ana"),
+    ("barrier mono continuous", "mcl", "p_barr_cont_mcl"),
+    ("barrier mono continuous", "pde", "p_barr_cont_pde"),
+    ("barrier mono discrete",   "mcl", "p_barr_disc_mcl"),
+    ("barrier mono discrete",   "pde", "p_barr_disc_pde"),
+    ("vanilla mono am put",     "mcl", "p_van_am_mcl"),
+    ("vanilla mono am put",     "pde", "p_van_am_pde"),
+    ("vanilla mono am put qto", "mcl", "p_van_am_q_mcl"),
+    ("vanilla mono am put qto", "pde", "p_van_am_q_pde"),
+    ("vanilla mono eu",         "ana", "p_van_eu_ana"),
+    ("vanilla mono eu",         "mcl", "p_van_eu_mcl"),
+    ("vanilla mono eu",         "pde", "p_van_eu_pde"),
+    ("vanilla mono eu bates",   "ana", "p_bates_ana"),
+    ("vanilla mono eu bates",   "mcl", "p_bates_mcl"),
+    ("vanilla mono eu compo",   "ana", "p_compo_ana"),
+    ("vanilla mono eu compo",   "mcl", "p_compo_mcl"),
+    ("vanilla mono eu compo",   "pde", "p_compo_pde"),
+    ("vanilla mono eu heston",  "ana", "p_heston_ana"),
+    ("vanilla mono eu heston",  "mcl", "p_heston_mcl"),
+    ("vanilla mono eu heston",  "pde", "p_heston_pde"),
+    ("vanilla mono eu quanto",  "ana", "p_van_eu_q_ana"),
+    ("vanilla mono eu quanto",  "mcl", "p_van_eu_q_mcl"),
+    ("vanilla mono eu quanto",  "pde", "p_van_eu_q_pde"),
+    ("vanilla mono us compo",   "mcl", "p_compo_am_mcl"),
+    ("vanilla mono us compo",   "pde", "p_compo_am_pde"),
+    ("vanilla multi eu basket", "ana", "p_basket_ana"),
+    ("vanilla multi eu basket", "mcl", "p_basket_mcl"),
+    ("vanilla multi eu basket", "pde", "p_basket_pde"),
+    ("vanilla multi eu best-of","mcl", "p_rb_best_mcl"),
+    ("vanilla multi eu worst-of","mcl", "p_rb_worst_mcl"),
+    ("variance swap mono", "ana", "p_vswap_ana"),
+    ("variance swap mono", "mcl", "p_vswap_mcl"),
 ]
 greeks = ["delta", "gamma", "vega", "rho", "theta"]
 def field(block, name):
     m = re.search(rf'\b{name}: ([\-0-9.eE]+)', block)
     return float(m.group(1)) if m else None
-hdr = f"    {'case':20s}{'method':>7s}{'time(s)':>10s}{'premium':>13s}{'trust':>10s}"
+hdr = f"    {'case':27s}{'method':>7s}{'time(s)':>10s}{'premium':>13s}{'trust':>10s}"
 hdr += "".join(f"{g:>11s}" for g in greeks)
 print(hdr)
 print("    " + "-" * (len(hdr) - 4))
@@ -97,11 +97,11 @@ for product, method, obj in cells:
     blk = m.group(1) if m else ""
     p = field(blk, "premium")
     if p is None:
-        print(f"    {product:20s}{method:>7s}{'(missing)':>23s}")
+        print(f"    {product:27s}{method:>7s}{'(missing)':>23s}")
         continue
     secs = field(blk, "exec_time")
     t = field(blk, "premium_trust")
-    row = f"    {product:20s}{method:>7s}{(secs or 0):10.3f}{p:13.5f}{(t or 0):10.4f}"
+    row = f"    {product:27s}{method:>7s}{(secs or 0):10.3f}{p:13.5f}{(t or 0):10.4f}"
     for g in greeks:
         v = field(blk, g)
         row += f"{v:11.5f}" if v is not None else f"{'-':>11s}"

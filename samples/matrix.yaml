@@ -6,21 +6,21 @@ root: matrix
 # as a table. All cases share the same 1y, spot-100, flat-30%-vol, flat-8%-rate
 # market so the numbers are directly comparable across engines.
 #
-#   product (sorted alphabetically)   method(s)
-#   barrier continuous                ana   mcl   pde
-#   barrier discrete                  mcl   pde
-#   vanilla am put                    mcl   pde
-#   vanilla am put (quanto)           mcl   pde
-#   vanilla eu                        ana   mcl   pde
-#   vanilla eu basket (50/50 wgt avg) ana   mcl   pde
-#   vanilla eu bates (heston+jumps)   ana   mcl   (ANA jump CF / MCL compound Poisson)
-#   vanilla eu best-of                mcl         (max of 2 assets; MCL-only)
-#   vanilla eu compo (EUR->USD)       ana   mcl   pde
-#   vanilla eu heston (stoch vol)     ana   mcl   pde
-#   vanilla eu quanto                 ana   mcl   pde
-#   vanilla eu worst-of               mcl         (min of 2 assets; MCL-only)
-#   vanilla us compo (american)       mcl   pde
-#   variance swap                     ana   mcl
+#   product (mono/multi underlying; sorted alphabetically)  method(s)
+#   barrier mono continuous           ana   mcl   pde
+#   barrier mono discrete             mcl   pde
+#   vanilla mono am put               mcl   pde
+#   vanilla mono am put qto           mcl   pde
+#   vanilla mono eu                   ana   mcl   pde
+#   vanilla mono eu bates (hes+jumps) ana   mcl   (ANA jump CF / MCL compound Poisson)
+#   vanilla mono eu compo (EUR->USD)  ana   mcl   pde
+#   vanilla mono eu heston (stoch vol)ana   mcl   pde
+#   vanilla mono eu quanto            ana   mcl   pde
+#   vanilla mono us compo (american)  mcl   pde
+#   vanilla multi eu basket (50/50)   ana   mcl   pde
+#   vanilla multi eu best-of          mcl         (max of 2 assets; MCL-only)
+#   vanilla multi eu worst-of         mcl         (min of 2 assets; MCL-only)
+#   variance swap mono                ana   mcl
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
@@ -31,39 +31,39 @@ root: matrix
 
 matrix: !sequence
   result: matrix_result
-  #! sorted alphabetically by product, then by method (ana, mcl, pde)
+  #! sorted alphabetically by product label (mono before multi), then by method
   tasks:
-    - p_barr_cont_ana
+    - p_barr_cont_ana    # barrier mono continuous
     - p_barr_cont_mcl
     - p_barr_cont_pde
-    - p_barr_disc_mcl
+    - p_barr_disc_mcl    # barrier mono discrete
     - p_barr_disc_pde
-    - p_van_am_mcl
+    - p_van_am_mcl       # vanilla mono am put
     - p_van_am_pde
-    - p_van_am_q_mcl
+    - p_van_am_q_mcl     # vanilla mono am put qto
     - p_van_am_q_pde
-    - p_van_eu_ana
+    - p_van_eu_ana       # vanilla mono eu
     - p_van_eu_mcl
     - p_van_eu_pde
-    - p_basket_ana
-    - p_basket_mcl
-    - p_basket_pde
-    - p_bates_ana
+    - p_bates_ana        # vanilla mono eu bates
     - p_bates_mcl
-    - p_rb_best_mcl
-    - p_compo_ana
+    - p_compo_ana        # vanilla mono eu compo
     - p_compo_mcl
     - p_compo_pde
-    - p_heston_ana
+    - p_heston_ana       # vanilla mono eu heston
     - p_heston_mcl
     - p_heston_pde
-    - p_van_eu_q_ana
+    - p_van_eu_q_ana     # vanilla mono eu quanto
     - p_van_eu_q_mcl
     - p_van_eu_q_pde
-    - p_rb_worst_mcl
-    - p_compo_am_mcl
+    - p_compo_am_mcl     # vanilla mono us compo
     - p_compo_am_pde
-    - p_vswap_ana
+    - p_basket_ana       # vanilla multi eu basket
+    - p_basket_mcl
+    - p_basket_pde
+    - p_rb_best_mcl      # vanilla multi eu best-of
+    - p_rb_worst_mcl     # vanilla multi eu worst-of
+    - p_vswap_ana        # variance swap mono
     - p_vswap_mcl
 
 # --- pricers (one per matrix cell) -----------------------------------------
