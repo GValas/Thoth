@@ -5,6 +5,27 @@
   "cmake.configureOnOpen": false,
   "cmake.showOptionsMovedNotification": false,
 
+  // JSON Schema for the Thoth YAML config: inline validation + autocomplete in
+  // redhat.vscode-yaml. Scoped to the maintained INPUT samples only (not the
+  // generated *.out.yaml results). To validate a new config, add it here or put
+  // a modeline at the top of the file:
+  //   # yaml-language-server: $schema=./schema/thoth.schema.json
+  // NB: JSON Schema cannot key on a YAML tag, so each tagged object is checked
+  // against anyOf the kind definitions; a typo'd field matches none and is
+  // flagged, while the three structurally identical curves match several.
+  "yaml.schemas": {
+    "./schema/thoth.schema.json": [
+      "samples/simple_call.yaml",
+      "samples/matrix.yaml",
+      "samples/heston_call.yaml"
+    ]
+  },
+  // Turn on the editor guidance the schema drives (these are the defaults, set
+  // explicitly so a user-level override does not silently disable them).
+  "yaml.validate": true,
+  "yaml.hover": true,
+  "yaml.completion": true,
+
   // Each Thoth object declares its kind via a local YAML tag (name: !equity {...}).
   // Declare them so the YAML linter (redhat.vscode-yaml) stops reporting
   // "Unresolved tag: !...". All kinds are mappings.

@@ -1,0 +1,9 @@
+{
+  // Recommended extensions for working on Thoth. VS Code prompts to install
+  // these when the workspace is opened.
+  "recommendations": [
+    // YAML language server: powers the schema-driven validation, hover docs and
+    // autocomplete for the Thoth config files (see yaml.schemas in settings.json).
+    "redhat.vscode-yaml"
+  ]
+}

@@ -1,0 +1,432 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/GValas/Thoth/schema/thoth.schema.json",
+  "title": "Thoth pricing configuration",
+  "description": "A Thoth config is a flat map of named objects. Each object declares its kind through a local YAML tag (e.g. `eq: !equity { ... }`) and references other objects by their name. The special `root` key names the task to execute.\n\nNOTE: JSON Schema cannot branch on a YAML tag, so every tagged object is validated against `anyOf` the kind definitions below. A correct object matches its kind; a typo'd field matches none and is flagged. Structurally identical kinds (the three curves) legitimately match several branches.",
+  "type": "object",
+  "required": ["root"],
+  "properties": {
+    "root": {
+      "type": "string",
+      "description": "Name of the task object to execute (a !pricer, !sequence, or one of the historical computations)."
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/$defs/object"
+  },
+
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "description": "Name of another object defined in this config."
+    },
+    "refList": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of names of other objects defined in this config."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Calendar date, YYYY-MM-DD."
+    },
+    "dateList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/date" }
+    },
+    "numberList": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+
+    "object": {
+      "anyOf": [
+        { "$ref": "#/$defs/pricer" },
+        { "$ref": "#/$defs/sequence" },
+        { "$ref": "#/$defs/historical_volatility_computation" },
+        { "$ref": "#/$defs/historical_correlation_computation" },
+        { "$ref": "#/$defs/vanilla" },
+        { "$ref": "#/$defs/barrier" },
+        { "$ref": "#/$defs/variance_swap" },
+        { "$ref": "#/$defs/equity" },
+        { "$ref": "#/$defs/basket" },
+        { "$ref": "#/$defs/composite" },
+        { "$ref": "#/$defs/forex" },
+        { "$ref": "#/$defs/currency" },
+        { "$ref": "#/$defs/yield_curve" },
+        { "$ref": "#/$defs/repo_curve" },
+        { "$ref": "#/$defs/continuous_dividends_curve" },
+        { "$ref": "#/$defs/bs_volatility" },
+        { "$ref": "#/$defs/heston_volatility" },
+        { "$ref": "#/$defs/sabr_volatility" },
+        { "$ref": "#/$defs/correlation_matrix" },
+        { "$ref": "#/$defs/simple_weighted_calendar" },
+        { "$ref": "#/$defs/pricer_configuration" },
+        { "$ref": "#/$defs/mcl_configuration" },
+        { "$ref": "#/$defs/pde_configuration" },
+        { "$ref": "#/$defs/debug_configuration" },
+        { "$ref": "#/$defs/book" },
+        { "$ref": "#/$defs/simple_fixing_data" }
+      ]
+    },
+
+    "pricer": {
+      "type": "object",
+      "title": "!pricer",
+      "description": "Price a book of contracts with one engine and report the requested indicators.",
+      "additionalProperties": false,
+      "required": ["today", "book", "currency", "configuration", "indicators", "result"],
+      "properties": {
+        "today": { "$ref": "#/$defs/date", "description": "Valuation date." },
+        "book": { "$ref": "#/$defs/ref", "description": "Name of the !book to price." },
+        "currency": { "$ref": "#/$defs/ref", "description": "Reporting (book) currency." },
+        "configuration": { "$ref": "#/$defs/ref", "description": "Name of the !pricer_configuration (selects the engine)." },
+        "correlation": { "$ref": "#/$defs/ref", "description": "Name of the !correlation_matrix (required for MCL / multi-asset)." },
+        "debug_configuration": { "$ref": "#/$defs/ref", "description": "Optional !debug_configuration (e.g. node-graph dump)." },
+        "indicators": {
+          "type": "array",
+          "description": "Outputs to compute.",
+          "items": { "enum": ["premium", "delta", "gamma", "vega", "rho", "theta"] }
+        },
+        "result": { "type": "string", "description": "Name of the result block written back into the output." }
+      }
+    },
+
+    "sequence": {
+      "type": "object",
+      "title": "!sequence",
+      "description": "Run several tasks one after another in a single process.",
+      "additionalProperties": false,
+      "required": ["tasks"],
+      "properties": {
+        "tasks": { "$ref": "#/$defs/refList", "description": "Names of the tasks to run, in order." },
+        "result": { "type": "string", "description": "Optional aggregate result block name." }
+      }
+    },
+
+    "historical_volatility_computation": {
+      "type": "object",
+      "title": "!historical_volatility_computation",
+      "additionalProperties": false,
+      "required": ["half_life", "time_step", "values", "result"],
+      "properties": {
+        "half_life": { "type": "number", "description": "EWMA half-life." },
+        "time_step": { "type": "integer", "description": "Sampling step." },
+        "values": { "$ref": "#/$defs/numberList", "description": "Historical spot series." },
+        "result": { "type": "string" }
+      }
+    },
+
+    "historical_correlation_computation": {
+      "type": "object",
+      "title": "!historical_correlation_computation",
+      "additionalProperties": false,
+      "required": ["half_life", "time_step", "range_size", "correlation", "historical_spots_fixings", "result"],
+      "properties": {
+        "half_life": { "type": "number" },
+        "time_step": { "type": "integer" },
+        "range_size": { "type": "integer" },
+        "correlation": { "$ref": "#/$defs/ref" },
+        "historical_spots_fixings": { "$ref": "#/$defs/refList", "description": "Names of !simple_fixing_data objects." },
+        "result": { "type": "string" }
+      }
+    },
+
+    "vanilla": {
+      "type": "object",
+      "title": "!vanilla",
+      "description": "European or American call/put.",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "strike", "maturity", "type", "exercise"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "strike": { "type": "number" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "type": { "enum": ["call", "put"] },
+        "exercise": { "enum": ["european", "american"] },
+        "nominal": { "type": "number", "description": "Accepted but currently unused (defaults apply)." },
+        "is_absolute_strike": { "type": "boolean", "description": "Accepted but currently unused." }
+      }
+    },
+
+    "barrier": {
+      "type": "object",
+      "title": "!barrier",
+      "description": "Single-barrier knock-in/knock-out option.",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "strike", "maturity", "type", "barrier_type", "barrier_monitoring_type"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "strike": { "type": "number" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "type": { "enum": ["call", "put"] },
+        "barrier_type": { "enum": ["up&out", "up&in", "down&out", "down&in"] },
+        "barrier_monitoring_type": { "enum": ["continuous_monitoring", "discrete_monitoring"] },
+        "monitoring_period_days": { "type": "integer", "description": "Step in days for discrete monitoring." },
+        "barrier_up_level": { "type": "number" },
+        "barrier_down_level": { "type": "number" },
+        "nominal": { "type": "number", "description": "Accepted but currently unused." },
+        "is_absolute_strike": { "type": "boolean", "description": "Accepted but currently unused." }
+      }
+    },
+
+    "variance_swap": {
+      "type": "object",
+      "title": "!variance_swap",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "maturity", "volatility_strike"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "volatility_strike": { "type": "number", "description": "Vol strike in percent." },
+        "notional": { "type": "number" }
+      }
+    },
+
+    "equity": {
+      "type": "object",
+      "title": "!equity",
+      "additionalProperties": false,
+      "required": ["spot", "volatility", "currency"],
+      "properties": {
+        "spot": { "type": "number" },
+        "volatility": { "$ref": "#/$defs/ref", "description": "Name of a volatility object (bs / sabr / heston)." },
+        "currency": { "$ref": "#/$defs/ref" },
+        "continuous_dividends": { "$ref": "#/$defs/ref" },
+        "repo": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "basket": {
+      "type": "object",
+      "title": "!basket",
+      "description": "Weighted (absolute) basket of underlyings.",
+      "additionalProperties": false,
+      "required": ["underlyings", "weights"],
+      "properties": {
+        "underlyings": { "$ref": "#/$defs/refList" },
+        "weights": { "$ref": "#/$defs/numberList" }
+      }
+    },
+
+    "composite": {
+      "type": "object",
+      "title": "!composite",
+      "description": "Equity payoff converted into another currency (composite/compo).",
+      "additionalProperties": false,
+      "required": ["equity", "composite_currency"],
+      "properties": {
+        "equity": { "$ref": "#/$defs/ref" },
+        "composite_currency": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "forex": {
+      "type": "object",
+      "title": "!forex",
+      "additionalProperties": false,
+      "required": ["base_currency", "underlying_currency"],
+      "properties": {
+        "base_currency": { "$ref": "#/$defs/ref" },
+        "underlying_currency": { "$ref": "#/$defs/ref" },
+        "volatility": { "$ref": "#/$defs/ref" },
+        "spot": { "type": "number" }
+      }
+    },
+
+    "currency": {
+      "type": "object",
+      "title": "!currency",
+      "additionalProperties": false,
+      "required": ["rate"],
+      "properties": {
+        "rate": { "$ref": "#/$defs/ref", "description": "Name of the !yield_curve." }
+      }
+    },
+
+    "yield_curve": {
+      "type": "object",
+      "title": "!yield_curve",
+      "additionalProperties": false,
+      "required": ["dates", "values"],
+      "properties": {
+        "dates": { "$ref": "#/$defs/dateList" },
+        "values": { "$ref": "#/$defs/numberList", "description": "Rates in percent at each date." }
+      }
+    },
+
+    "repo_curve": {
+      "type": "object",
+      "title": "!repo_curve",
+      "additionalProperties": false,
+      "required": ["dates", "values"],
+      "properties": {
+        "dates": { "$ref": "#/$defs/dateList" },
+        "values": { "$ref": "#/$defs/numberList" }
+      }
+    },
+
+    "continuous_dividends_curve": {
+      "type": "object",
+      "title": "!continuous_dividends_curve",
+      "additionalProperties": false,
+      "required": ["dates", "values"],
+      "properties": {
+        "dates": { "$ref": "#/$defs/dateList" },
+        "values": { "$ref": "#/$defs/numberList" }
+      }
+    },
+
+    "bs_volatility": {
+      "type": "object",
+      "title": "!bs_volatility",
+      "description": "Flat Black-Scholes volatility.",
+      "additionalProperties": false,
+      "required": ["volatility"],
+      "properties": {
+        "volatility": { "type": "number", "description": "Volatility in percent." },
+        "calendar": { "$ref": "#/$defs/ref", "description": "Optional !simple_weighted_calendar." }
+      }
+    },
+
+    "heston_volatility": {
+      "type": "object",
+      "title": "!heston_volatility",
+      "description": "Heston stochastic volatility. The spot/vol correlation (rho) is set via the !correlation_matrix, not here.",
+      "additionalProperties": false,
+      "required": ["spot", "init_vol", "long_vol", "kappa", "vol_of_vol"],
+      "properties": {
+        "spot": { "type": "number" },
+        "init_vol": { "type": "number", "description": "Initial vol in percent (-> v0)." },
+        "long_vol": { "type": "number", "description": "Long-run vol in percent (-> theta)." },
+        "kappa": { "type": "number", "description": "Mean-reversion speed." },
+        "vol_of_vol": { "type": "number", "description": "Vol of variance (xi)." },
+        "calendar": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "sabr_volatility": {
+      "type": "object",
+      "title": "!sabr_volatility",
+      "additionalProperties": false,
+      "required": ["spot", "maturities", "alpha", "beta", "rho", "nu"],
+      "properties": {
+        "spot": { "type": "number" },
+        "maturities": { "$ref": "#/$defs/numberList", "description": "Pillar maturities (years)." },
+        "alpha": { "$ref": "#/$defs/numberList" },
+        "beta": { "$ref": "#/$defs/numberList" },
+        "rho": { "$ref": "#/$defs/numberList" },
+        "nu": { "$ref": "#/$defs/numberList" },
+        "calendar": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "correlation_matrix": {
+      "type": "object",
+      "title": "!correlation_matrix",
+      "description": "Correlation between underlyings (and optionally forexs). Provide exactly one of `matrix` (full, row-major) or `symmetric_matrix` (lower triangle).",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["matrix"] },
+        { "required": ["symmetric_matrix"] }
+      ],
+      "properties": {
+        "matrix": { "$ref": "#/$defs/numberList", "description": "Full row-major correlation matrix." },
+        "symmetric_matrix": { "$ref": "#/$defs/numberList", "description": "Lower-triangle correlation entries." },
+        "underlyings": { "$ref": "#/$defs/refList" },
+        "forexs": { "$ref": "#/$defs/refList" }
+      }
+    },
+
+    "simple_weighted_calendar": {
+      "type": "object",
+      "title": "!simple_weighted_calendar",
+      "description": "Day-weighting calendar referenced by a volatility's `calendar` field.",
+      "additionalProperties": false,
+      "required": ["non_working_days_weight"],
+      "properties": {
+        "non_working_days_weight": { "type": "number", "description": "Weight of non-working days (0..1)." }
+      }
+    },
+
+    "pricer_configuration": {
+      "type": "object",
+      "title": "!pricer_configuration",
+      "description": "Engine selection plus references to the engine-specific configurations.",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "method": { "enum": ["mcl", "pde", "ana"], "description": "Pricing engine." },
+        "mcl_configuration": { "$ref": "#/$defs/ref" },
+        "pde_configuration": { "$ref": "#/$defs/ref" },
+        "log_path": { "type": "string", "description": "Directory for logs / node-graph dumps (must exist)." }
+      }
+    },
+
+    "mcl_configuration": {
+      "type": "object",
+      "title": "!mcl_configuration",
+      "description": "Monte-Carlo engine settings.",
+      "additionalProperties": false,
+      "required": ["max_time_step", "min_time_step", "paths", "vol_time_step"],
+      "properties": {
+        "max_time_step": { "type": "integer", "description": "Max diffusion step in days." },
+        "min_time_step": { "type": "integer", "description": "Min step in days (-1 = unconstrained)." },
+        "paths": { "type": "integer", "description": "Number of simulated paths." },
+        "vol_time_step": { "type": "number", "description": "Variance sub-step." },
+        "node_file": { "type": "string" },
+        "use_sobol": { "type": "boolean", "description": "Sobol + Brownian-bridge quasi-random paths." },
+        "use_milstein": { "type": "boolean", "description": "Milstein diffusion scheme." },
+        "seed": { "type": "integer" },
+        "generate_nodes_graph": { "type": "boolean", "description": "Deprecated here and ignored; use a !debug_configuration referenced by the pricer's debug_configuration field instead." }
+      }
+    },
+
+    "pde_configuration": {
+      "type": "object",
+      "title": "!pde_configuration",
+      "description": "Finite-difference (PDE) engine settings.",
+      "additionalProperties": false,
+      "properties": {
+        "vanilla_precision": { "enum": ["low", "medium", "high"], "description": "Grid preset (default high)." },
+        "custom_n_s": { "type": "integer", "description": "Override spatial nodes." },
+        "custom_n_t": { "type": "integer", "description": "Override time steps." },
+        "custom_sigma_factor": { "type": "number", "description": "Override grid width in sigmas." }
+      }
+    },
+
+    "debug_configuration": {
+      "type": "object",
+      "title": "!debug_configuration",
+      "additionalProperties": false,
+      "properties": {
+        "generate_nodes_graph": { "type": "boolean", "description": "Dump the Monte-Carlo node graph as Graphviz .dot into log_path." }
+      }
+    },
+
+    "book": {
+      "type": "object",
+      "title": "!book",
+      "additionalProperties": false,
+      "required": ["options"],
+      "properties": {
+        "options": { "$ref": "#/$defs/refList", "description": "Names of the contracts in the book." }
+      }
+    },
+
+    "simple_fixing_data": {
+      "type": "object",
+      "title": "!simple_fixing_data",
+      "additionalProperties": false,
+      "required": ["dates", "values", "underlying"],
+      "properties": {
+        "dates": { "$ref": "#/$defs/dateList" },
+        "values": { "$ref": "#/$defs/numberList" },
+        "underlying": { "type": "string" }
+      }
+    }
+  }
+}
