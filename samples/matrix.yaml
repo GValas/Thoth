@@ -6,18 +6,19 @@ root: matrix
 # as a table. All cases share the same 1y, spot-100, flat-30%-vol, flat-8%-rate
 # market so the numbers are directly comparable across engines.
 #
-#   product                       method(s)
-#   vanilla european (non-quanto)  pde   mcl   ana
-#   vanilla european (quanto)      pde   mcl   ana
-#   vanilla american put           pde   mcl
-#   vanilla american put (quanto)  pde   mcl
-#   barrier continuous             pde   mcl   ana
-#   barrier discrete               pde   mcl
-#   vanilla eu compo (EUR->USD)    pde   mcl   ana
-#   vanilla us compo (american)    pde   mcl
-#   rainbow best-of / worst-of     mcl         (max/min of 2 assets; MCL-only)
-#   heston (stochastic vol)        pde   mcl   ana
-#   bates (heston + jumps)         mcl   ana   (ANA jump CF / MCL compound Poisson)
+#   product (sorted alphabetically)   method(s)
+#   barrier continuous                ana   mcl   pde
+#   barrier discrete                  mcl   pde
+#   rainbow best-of / worst-of        mcl         (max/min of 2 assets; MCL-only)
+#   vanilla am put                    mcl   pde
+#   vanilla am put (quanto)           mcl   pde
+#   vanilla eu                        ana   mcl   pde
+#   vanilla eu bates (heston+jumps)   ana   mcl   (ANA jump CF / MCL compound Poisson)
+#   vanilla eu compo (EUR->USD)       ana   mcl   pde
+#   vanilla eu heston (stoch vol)     ana   mcl   pde
+#   vanilla eu quanto                 ana   mcl   pde
+#   vanilla us compo (american)       mcl   pde
+#   variance swap                     ana   mcl
 #   variance swap                  mcl   ana
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
@@ -29,36 +30,37 @@ root: matrix
 
 matrix: !sequence
   result: matrix_result
+  #! sorted alphabetically by product, then by method (ana, mcl, pde)
   tasks:
-    - p_van_eu_pde
-    - p_van_eu_mcl
-    - p_van_eu_ana
-    - p_van_eu_q_pde
-    - p_van_eu_q_mcl
-    - p_van_eu_q_ana
-    - p_van_am_pde
-    - p_van_am_mcl
-    - p_van_am_q_pde
-    - p_van_am_q_mcl
-    - p_barr_cont_pde
-    - p_barr_cont_mcl
     - p_barr_cont_ana
-    - p_barr_disc_pde
+    - p_barr_cont_mcl
+    - p_barr_cont_pde
     - p_barr_disc_mcl
-    - p_compo_pde
-    - p_compo_mcl
-    - p_compo_ana
-    - p_compo_am_pde
-    - p_compo_am_mcl
+    - p_barr_disc_pde
     - p_rb_best_mcl
     - p_rb_worst_mcl
-    - p_heston_pde
-    - p_heston_mcl
-    - p_heston_ana
+    - p_van_am_mcl
+    - p_van_am_pde
+    - p_van_am_q_mcl
+    - p_van_am_q_pde
+    - p_van_eu_ana
+    - p_van_eu_mcl
+    - p_van_eu_pde
     - p_bates_ana
     - p_bates_mcl
-    - p_vswap_mcl
+    - p_compo_ana
+    - p_compo_mcl
+    - p_compo_pde
+    - p_heston_ana
+    - p_heston_mcl
+    - p_heston_pde
+    - p_van_eu_q_ana
+    - p_van_eu_q_mcl
+    - p_van_eu_q_pde
+    - p_compo_am_mcl
+    - p_compo_am_pde
     - p_vswap_ana
+    - p_vswap_mcl
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
