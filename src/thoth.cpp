@@ -111,6 +111,12 @@ int RunHttpServer( int Port )
 {
     httplib::Server server;
 
+    //! pricing is serialised by price_mutex below, so a slave only ever handles
+    //! one price at a time; cap the worker pool small (default is ~one thread per
+    //! core) so a many-slave cluster on one box does not spawn hundreds of idle
+    //! threads at startup (which made high slave counts fail to come up in time).
+    server.new_task_queue = [] { return new httplib::ThreadPool( 4 ); };
+
     //! pricing is not re-entrant (global GSL state) -> serialise requests
     static std::mutex price_mutex;
 
@@ -343,6 +349,9 @@ int RunClusterMaster( int Port,
                       const vector<string>& Slaves )
 {
     httplib::Server server;
+    //! one cluster pricing at a time; the slave fan-out uses its own std::threads
+    //! (below), so a small server pool is enough.
+    server.new_task_queue = [] { return new httplib::ThreadPool( 4 ); };
     static std::mutex price_mutex; //!< one cluster pricing at a time
 
     server.Get( "/health", []( const httplib::Request&, httplib::Response& res )

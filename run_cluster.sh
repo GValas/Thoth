@@ -60,10 +60,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# wait until a server answers GET /health (or give up after ~10s)
+# wait until a server answers GET /health (or give up after ~30s). The window is
+# generous because a many-slave cluster on one machine starts all servers at once.
 wait_health() {
     local url="$1"
-    for _ in $(seq 1 50); do
+    for _ in $(seq 1 150); do
         if curl -sf "$url/health" >/dev/null 2>&1; then
             return 0
         fi
