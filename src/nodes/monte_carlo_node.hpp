@@ -12,6 +12,11 @@ struct NodeNameLess
 };
 using node_set = set<node, NodeNameLess>;
 
+//! Base class for every Monte-Carlo node. Holds one value per diffusion date
+//! (_value_list) and the precomputed schedule year-fractions; ComputeValue fills a
+//! date's value from the node's children, GetDateDependencies declares those
+//! children (so the collector can topologically sort the graph), and indicator
+//! nodes (the book and contracts) also accumulate premium/trust statistics.
 class MonteCarloNode
 {
   protected:

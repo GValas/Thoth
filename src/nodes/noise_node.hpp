@@ -2,6 +2,9 @@
 #include "monte_carlo_node.hpp"
 #include "rng.hpp"
 
+//! Independent standard-normal innovation for one factor per step. Draws from its
+//! own RNG, or — when a quasi-noise buffer is set — reads the (Sobol +
+//! Brownian-bridge) normalized increments produced by the PathGenerator.
 class NoiseNode : public MonteCarloNode
 {
 

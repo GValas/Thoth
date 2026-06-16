@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Book level: the sum of its contract nodes' premiums, each converted to the book
+//! currency by an optional forex node (factor 1 for a same-currency book). An
+//! indicator node — the book premium/trust is reported.
 class BookNode : public MonteCarloNode
 {
 

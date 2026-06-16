@@ -11,7 +11,7 @@ CompositeVolNode::~CompositeVolNode() = default;
 
 void CompositeVolNode::ComputeValue( size_t DateIndex )
 {
-    // v�(SX) = v�(X) + v�(S) + 2.rho(S,X).v(S).v(X)
+    //! v^2(SX) = v^2(S) + v^2(X) + 2 rho(S,X) v(S) v(X)
     double rho_sx = _rho_SX_node->GetValue( DateIndex );
     double vol_s = _vol_S_node->GetValue( DateIndex );
     double vol_x = _vol_X_node->GetValue( DateIndex );

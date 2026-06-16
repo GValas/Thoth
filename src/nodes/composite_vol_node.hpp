@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Composite (quanto) volatility of S*FX: sqrt(v_S^2 + v_X^2 + 2 rho(S,X) v_S v_X),
+//! combined from the underlying vol, the FX vol and their correlation.
 class CompositeVolNode : public MonteCarloNode
 {
 

@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Product of its child node values raised to per-child powers, prod_i child_i^p_i
+//! (e.g. spot * FX for a composite; integer / simple powers are special-cased).
 class ProductNode : public MonteCarloNode
 {
   private:

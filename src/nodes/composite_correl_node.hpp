@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Correlation between a composite underlying S*FX and another factor, assembled
+//! from the underlying/FX sub-correlations and the underlying, FX and composite
+//! vols. Feeds the Cholesky combine that correlates a multi-asset composite book.
 class CompositeCorrelNode : public MonteCarloNode
 {
 

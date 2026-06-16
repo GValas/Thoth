@@ -3,6 +3,10 @@
 
 class LocalVolatilityNode;
 
+//! Spot diffusion: the log-Euler GBM step S_i = S_{i-1} exp((r - v^2/2) dt + v dW),
+//! exact for a constant vol. For a local-vol surface v is read per step from a
+//! LocalVolatilityNode and a log-space Milstein correction is added (EnableMilstein);
+//! the correction vanishes for constant vol.
 class SpotDiffusionNode : public MonteCarloNode
 {
   private:

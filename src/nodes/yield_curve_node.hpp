@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Placeholder yield-curve node: rates are currently wired as ConstantNodes (a flat
+//! rate over the simulation), so this node is unused and its ComputeValue throws.
 class YieldCurveNode : public MonteCarloNode
 {
 

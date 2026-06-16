@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! One priced contract: discounts each payoff (flow) node from its flow date back
+//! to the evaluation date with the contract's rate curve and sums them. An
+//! indicator node — the per-contract premium/trust is reported.
 class ContractNode : public MonteCarloNode
 {
   private:

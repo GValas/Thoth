@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Risk-neutral carry rate r_dom - r_for - repo - dividend (each leg optional) —
+//! the log-drift the spot diffusion grows at.
 class DriftNode : public MonteCarloNode
 {
 

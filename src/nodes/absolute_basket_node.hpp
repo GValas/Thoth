@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Absolute basket level: the weighted sum sum_i w_i * S_i of its component spot
+//! nodes (no rebasing), used as the underlying of a basket option.
 class AbsoluteBasketNode : public MonteCarloNode
 {
 

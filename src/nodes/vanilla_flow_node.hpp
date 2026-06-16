@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Vanilla payoff at the maturity (flow) date — max(phi*(S_T - K), 0) for the
+//! option type (phi = +1 call / -1 put); zero on every other date.
 class VanillaFlowNode : public MonteCarloNode
 {
 

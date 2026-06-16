@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Local (Dupire) volatility along the path: looks up sigma_loc(S_{i-1}, t_i) on a
+//! precomputed per-date log-spot grid by clamped linear interpolation. Built from a
+//! SABR (or other) implied surface — see Single::BuildLocalVolNode.
 class LocalVolatilityNode : public MonteCarloNode
 {
 

@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Barrier option payoff for one path: at the flow date it pays the vanilla payoff
+//! only if the contract is "alive" — knock-in and the barrier was touched on a
+//! monitored date, or knock-out and never touched (up- or down-barrier per _is_up).
 class BarrierFlowNode : public MonteCarloNode
 {
 

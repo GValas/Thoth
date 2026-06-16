@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! A node whose value is the same constant on every date (a rate, a vol, an FX spot
+//! or a Cholesky coefficient). IsConstant() is true, so the scheduler evaluates it
+//! once instead of per path.
 class ConstantNode : public MonteCarloNode
 {
 

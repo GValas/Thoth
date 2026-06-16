@@ -1,6 +1,8 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Cumulative Brownian path: W_i = W_{i-1} + sqrt(dt_i) * noise_i, accumulated from
+//! a standard-normal noise node over the diffusion dates.
 class BrownianNode : public MonteCarloNode
 {
 

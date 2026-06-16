@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Quanto adjustment: multiplies the diffused spot by exp(-rho(S,FX) sigma_S
+//! sigma_FX t), the change-of-measure drift correction applied to an asset whose
+//! payoff is settled in a foreign currency.
 class QuantoAdjustmentNode : public MonteCarloNode
 {
 

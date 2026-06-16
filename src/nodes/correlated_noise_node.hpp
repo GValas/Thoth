@@ -1,6 +1,9 @@
 #pragma once
 #include "monte_carlo_node.hpp"
 
+//! Correlated Gaussian increment for one factor: sum_i noise_i * L_i, the dot
+//! product of the independent noise nodes with a row of the correlation matrix's
+//! Cholesky factor (supplied as constant Cholesky nodes).
 class CorrelatedNoiseNode : public MonteCarloNode
 {
 
