@@ -98,7 +98,13 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
             //! Flat surface (bs): one constant-vol node.
             if ( _volatility->_is_local )
             {
-                S->SetLocalVolNode( BuildLocalVolNode( NC, S ) );
+                LocalVolatilityNode* lv = BuildLocalVolNode( NC, S );
+                S->SetLocalVolNode( lv );
+                //! refine the local-vol diffusion with the Milstein step when asked
+                if ( NC.UseMilstein() )
+                {
+                    S->EnableMilstein( lv );
+                }
             }
             else
             {
@@ -119,9 +125,9 @@ static constexpr double LOCAL_VOL_GRID_SIGMA_FACTOR = 8.0;
 //! log-spot grid points per diffusion date (odd -> a node sits on the spot)
 static constexpr int LOCAL_VOL_GRID_POINTS = 201;
 
-MonteCarloNode* Single::BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode )
+LocalVolatilityNode* Single::BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode )
 {
-    return NC.GetOrCreate<LocalVolatilityNode>(
+    return static_cast<LocalVolatilityNode*>( NC.GetOrCreate<LocalVolatilityNode>(
         _name + "#localvol",
         [&]( LocalVolatilityNode* L )
         {
@@ -160,5 +166,5 @@ MonteCarloNode* Single::BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* Sp
                 L->PushOffset( offset );
                 L->PushVolVector( vol );
             }
-        } );
+        } ) );
 }

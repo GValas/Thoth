@@ -49,6 +49,34 @@ void LocalVolatilityNode::ComputeValue( size_t DateIndex )
     }
 }
 
+//! central-difference d(sigma)/d(log spot) on the grid at the previous step's
+//! spot, clamped so the i-1 / i+1 neighbours stay in range
+double LocalVolatilityNode::LogSpotDerivative( size_t DateIndex )
+{
+    const la_vector* v = _vol_vector_list[DateIndex];
+    const double ln_step = _ln_step_list[DateIndex];
+    const long offset = _offset_list[DateIndex];
+
+    const size_t prev = ( DateIndex > 0 ) ? DateIndex - 1 : 0;
+    const double s = _spot_node->GetValue( prev );
+
+    const size_t last = v->size - 1;
+    if ( last < 2 )
+    {
+        return 0.0; //!< degenerate grid (e.g. today)
+    }
+    long i = (long)( log( s ) / ln_step - (double)offset ); //!< nearest lower index
+    if ( i < 1 )
+    {
+        i = 1;
+    }
+    if ( i > (long)last - 1 )
+    {
+        i = (long)last - 1;
+    }
+    return ( la_vector_get( v, i + 1 ) - la_vector_get( v, i - 1 ) ) / ( 2.0 * ln_step );
+}
+
 void LocalVolatilityNode::SetSpotNode( MonteCarloNode* SpotNode )
 {
     _spot_node = SpotNode;

@@ -25,7 +25,20 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
         double r = _drift_node->GetValue( DateIndex );
         double v = _local_vol_node->GetValue( DateIndex );
         double dt = _dt_list[DateIndex];
-        _value_list[DateIndex] = s0 * exp( ( r - v * v / 2 ) * dt + v * dw );
+
+        //! log-Euler step for d(lnS) = (r - v^2/2) dt + v dW (exact for constant v).
+        double expo = ( r - v * v / 2 ) * dt + v * dw;
+
+        //! log-space Milstein correction for a state-dependent (local) vol:
+        //! + 1/2 v (dv/dlnS) (dW^2 - dt). Vanishes when v is constant, so this only
+        //! refines the local-vol diffusion; it is enabled only there.
+        if ( _milstein_lv )
+        {
+            double dv_dlns = _milstein_lv->LogSpotDerivative( DateIndex );
+            expo += 0.5 * v * dv_dlns * ( dw * dw - dt );
+        }
+
+        _value_list[DateIndex] = s0 * exp( expo );
     }
     //! spot
     else if ( DateIndex == 0 )
@@ -42,6 +55,11 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
 void SpotDiffusionNode::SetLocalVolNode( MonteCarloNode* N )
 {
     _local_vol_node = N;
+}
+
+void SpotDiffusionNode::EnableMilstein( LocalVolatilityNode* Lv )
+{
+    _milstein_lv = Lv;
 }
 
 void SpotDiffusionNode::SetDriftNode( MonteCarloNode* N )

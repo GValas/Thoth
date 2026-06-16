@@ -21,6 +21,10 @@ class LocalVolatilityNode : public MonteCarloNode
                               vector<MonteCarloNode*>& NodeList,
                               vector<size_t>& DateList ) override;
 
+    //! d(local vol)/d(log spot) at the spot of the previous step, by central
+    //! difference on the grid — the state-derivative the Milstein step needs
+    double LogSpotDerivative( size_t DateIndex );
+
     void SetSpotNode( MonteCarloNode* SpotNode );
     void PushLnStep( double LnStep );
     void PushOffset( long Offset );

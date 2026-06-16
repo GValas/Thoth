@@ -425,6 +425,7 @@ void PricerMCL::Tree_Init()
     //! node collector
     InitDates();
     _collector.SetDiffusionDates( _diffusion_dates );
+    _collector.SetUseMilstein( _configuration->_mcl->_use_milstein );
 
     //! node tree
     CreateBrownianNodes();

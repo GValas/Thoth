@@ -11,7 +11,11 @@ usable as a batch tool or as an HTTP service.
 **Pricers** (selected per book via `method`)
 - **Monte-Carlo (`mcl`)** — correlated geometric Brownian motion via a Cholesky
   factorisation of the correlation matrix; exact log-Euler step for constant
-  volatility (no discretisation bias). With `use_sobol: true` the increments are
+  volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`,
+  single-asset) it diffuses the **Dupire** local vol sampled onto per-date log-spot
+  grids, with a log-space **Milstein** step (`use_milstein: true`) to cut the
+  state-dependent discretisation bias (a no-op for constant vol). With
+  `use_sobol: true` the increments are
   drawn from a **Sobol** low-discrepancy sequence laid out by a **Brownian
   bridge** (the coarsest, most important path structure gets the lowest Sobol
   dimensions, the rest pseudo-random) — far faster convergence on smooth payoffs
@@ -324,7 +328,7 @@ my_mcl: !mcl_configuration
   paths: 50000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
   vol_time_step: 0.01
   use_sobol: true
-  use_milstein: true
+  use_milstein: true    # Milstein step for the local-vol diffusion (no-op for constant vol)
 my_pde: !pde_configuration
   vanilla_precision: high
 

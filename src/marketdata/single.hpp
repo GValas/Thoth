@@ -32,7 +32,7 @@ class Single : public Asset
     //! build a LocalVolatilityNode that samples the Dupire local-vol surface onto
     //! a per-diffusion-date log-spot grid (used for a local-vol surface like SABR);
     //! SpotNode is the spot path the surface is read along
-    MonteCarloNode* BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode );
+    LocalVolatilityNode* BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode );
 
     //! constructor & destructor
     Single( const string& ObjectName,

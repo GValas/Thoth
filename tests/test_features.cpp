@@ -372,6 +372,28 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
     }
 }
 
+// --- Milstein no-op for constant vol : the log-space Milstein correction is
+// 1/2 v (dv/dlnS)(dW^2-dt); with a flat bs_volatility dv/dlnS = 0, so the step is
+// identical to the log-Euler step. A bs-vol MCL price must be bit-identical with
+// use_milstein on vs off (same paths, zero correction) — proving the Milstein step
+// only ever refines the local-vol diffusion and never perturbs constant-vol books.
+TEST_CASE( "Milstein is a no-op for constant volatility (MCL unchanged)" )
+{
+    const std::string c = "o: !vanilla {underlying: eq, premium_currency: eur,"
+                          " strike: 100, maturity: 2000-12-31, type: call, exercise: european}\n";
+    auto without = []( std::string y )
+    {
+        const std::string from = "use_milstein: true";
+        y.replace( y.find( from ), from.size(), "use_milstein: false" );
+        return y;
+    };
+    double on = Premium( Price( OneContract( "mcl", c ) ) );
+    double off = Premium( Price( without( OneContract( "mcl", c ) ) ) );
+    CAPTURE( on );
+    CAPTURE( off );
+    CHECK( on == doctest::Approx( off ).epsilon( 1e-9 ) );
+}
+
 // --- Heston (MCL) : in the degenerate limit (vol-of-vol -> 0, v0 = theta) the
 // stochastic-vol diffusion collapses to constant-vol GBM, so it matches BS.
 TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
