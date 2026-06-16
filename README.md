@@ -376,7 +376,9 @@ alphabetical order (stable, diff-friendly).
 Black-Scholes ~15.71, with the node-graph debug switch enabled),
 `heston_call.yaml` (a Heston call priced by all three engines),
 `bates_call.yaml` (a Bates — Heston + jumps — call priced by MCL, dumping its
-node DAG to Graphviz), `gpu_call.yaml` (a call priced by the GPU `mcl_gpu`
+node DAG to Graphviz), `sabr_call.yaml` (a realistic SABR equity surface priced
+by ANA and by the Dupire local-vol MCL — the two agree, repricing the smile,
+including a skewed OTM put), `gpu_call.yaml` (a call priced by the GPU `mcl_gpu`
 engine, falling back to CPU off a GPU) and `matrix.yaml` — a `!sequence` running
 the full pricer/product matrix (vanilla european/american, quanto,
 continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one process.
