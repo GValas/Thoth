@@ -3,6 +3,9 @@
 #include "object.hpp"
 #include "pde_configuration.hpp"
 
+//! A pricer's configuration: the chosen method ("pde" / "mcl" / "ana"), a log path,
+//! and a reference to the engine-parameter object(s) (mcl_configuration /
+//! pde_configuration) the method needs.
 class PricerConfiguration : public Object
 {
   private:

@@ -1,6 +1,8 @@
 #pragma once
 #include "volatility.hpp"
 
+//! A flat Black-Scholes volatility (one number, strike- and maturity-independent),
+//! scaled by the calendar day-weight. Exact in every engine.
 class BsVolatility : public Volatility
 {
 

@@ -2,6 +2,8 @@
 #include "currency.hpp"
 #include "object.hpp"
 
+//! An asset priced in a currency: the base of Single (a tradable spot) carrying the
+//! pricing currency and propagating the valuation date down to it.
 class Asset : public Object
 {
 

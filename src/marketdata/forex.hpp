@@ -3,6 +3,8 @@
 #include "single.hpp"
 #include "volatility.hpp"
 
+//! An FX pair (underlying currency vs base currency): the spot rate and its (flat)
+//! volatility, used for quanto / composite FX conversion in the node graph.
 class Forex : public Single
 {
 

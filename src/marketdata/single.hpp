@@ -2,6 +2,9 @@
 #include "asset.hpp"
 #include "volatility.hpp"
 
+//! A single tradable name (base of Equity / Forex): an Asset with a spot and a
+//! volatility surface. Provides the implied / Dupire local vol and builds the MCL
+//! spot-diffusion node (constant-vol, or a local-vol grid for a SABR surface).
 class Single : public Asset
 {
 

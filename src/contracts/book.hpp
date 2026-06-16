@@ -2,6 +2,9 @@
 #include "contract.hpp"
 #include "object.hpp"
 
+//! A book: the list of contracts priced together, holding the aggregated premium
+//! and Greeks (in the book currency) and exposing the union of fixing / exercise
+//! dates and the single-name / currency sets the engines need.
 class Book : public Object
 {
     //

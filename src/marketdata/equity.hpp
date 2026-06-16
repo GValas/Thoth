@@ -4,6 +4,9 @@
 #include "repo_curve.hpp"
 #include "single.hpp"
 
+//! A single equity underlying: spot + volatility in its currency, with optional repo
+//! and continuous-dividend curves. Provides the forward, the implied and Dupire
+//! local vol, and builds the MCL spot-diffusion / drift nodes.
 class Equity : public Single
 {
   private:

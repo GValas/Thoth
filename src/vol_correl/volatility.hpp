@@ -2,6 +2,9 @@
 #include "market_data.hpp"
 #include "node_collector.hpp"
 
+//! Abstract volatility surface: returns the implied vol at a (strike, forward,
+//! maturity) and the Dupire local vol derived from it; concrete kinds are
+//! bs_volatility (flat), sabr_volatility (Hagan) and heston_volatility.
 class Volatility : public MarketData
 {
 

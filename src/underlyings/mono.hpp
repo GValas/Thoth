@@ -1,6 +1,8 @@
 #pragma once
 #include "underlying.hpp"
 
+//! A single-asset underlying wrapping one Single (equity): delegates the forward,
+//! vol and node graph to it.
 class Mono : public Underlying
 {
 

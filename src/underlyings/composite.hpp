@@ -1,6 +1,9 @@
 #pragma once
 #include "underlying.hpp"
 
+//! A composite (quanto) underlying: an asset quoted in one currency but settled in
+//! another at the prevailing FX (S*FX). Combines the underlying with the FX leg and
+//! a quanto drift correction in the node graph.
 class Composite : public Underlying
 {
 

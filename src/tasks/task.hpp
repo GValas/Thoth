@@ -2,6 +2,8 @@
 #include "object.hpp"
 #include "yaml_config.hpp"
 
+//! Abstract executable unit (a pricer or a sequence): Execute() does the work and
+//! WriteResults() writes its result block back into the YAML config.
 class Task : public Object
 {
 

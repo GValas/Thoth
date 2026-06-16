@@ -2,6 +2,9 @@
 #include "forex.hpp"
 #include "object.hpp"
 
+//! The correlation matrix over the book's underlyings and FX pairs: validated
+//! positive-definite at load, it serves correlation entries to the analytic
+//! engines and the Cholesky factor (cached) that correlates the MC noise factors.
 class Correlation : public Object
 {
 

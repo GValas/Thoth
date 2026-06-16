@@ -4,6 +4,9 @@
 
 inline constexpr char OBJECT_SEPARATOR[] = ".";
 
+//! The YAML configuration tree: parses the input book, resolves dotted object
+//! paths with typed getters (scalars / lists, with clear error messages), and
+//! writes each task's result block back out (to a file or an in-memory string).
 class YamlConfig
 {
 

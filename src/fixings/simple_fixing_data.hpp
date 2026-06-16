@@ -1,6 +1,7 @@
 #pragma once
 #include "object.hpp"
 
+//! A simple time series of past fixings (dates + values) for one underlying.
 class SimpleFixingData : public Object
 {
 

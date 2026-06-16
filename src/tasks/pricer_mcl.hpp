@@ -6,6 +6,10 @@
 class PathGenerator; //!< Sobol + Brownian-bridge per-path Gaussian generator
 class ProgressBar;   //!< shared between the path sweep and the American LSM pass
 
+//! The Monte-Carlo engine: builds the diffusion-date schedule and node graph, draws
+//! paths (pseudo-random or Sobol + Brownian bridge), prices the book (with shared
+//! single-tree Greeks), and runs the Longstaff-Schwartz post-pass for American
+//! exercise (the "AMC" leg).
 class PricerMCL : public Pricer
 {
 

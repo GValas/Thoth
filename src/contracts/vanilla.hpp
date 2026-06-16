@@ -1,6 +1,8 @@
 #pragma once
 #include "contract.hpp"
 
+//! A vanilla option: european or american call/put on one underlying. Priced by
+//! ANA (european closed form), PDE (incl. american), MCL and the GPU GBM kernel.
 class Vanilla : public Contract
 {
 

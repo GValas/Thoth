@@ -1,6 +1,8 @@
 #pragma once
 #include "basket.hpp"
 
+//! A weighted-average basket sum_i w_i * S_i of its components, diffused as the
+//! weighted sum of the per-component spot paths.
 class AbsoluteBasket : public Basket
 {
 

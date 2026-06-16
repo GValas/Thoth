@@ -1,6 +1,9 @@
 #pragma once
 #include "contract.hpp"
 
+//! A barrier option: knock-in / knock-out, up / down, continuous or discrete
+//! monitoring. Priced by PDE and MCL, and (continuous only) by the closed form;
+//! knock-in is obtained from knock-out by in/out parity (vanilla = in + out).
 class Barrier : public Contract
 {
   public:

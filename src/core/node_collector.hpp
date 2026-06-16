@@ -2,6 +2,10 @@
 
 #include "nodes.hpp"
 
+//! Owns and wires the Monte-Carlo node graph: builds/looks up nodes by name
+//! (GetOrCreate, with per-Greek-scenario suffixing), holds the diffusion-date
+//! schedule, topologically sorts the DAG (SortNodes) and evaluates it per path
+//! (PriceNodes), and records per-path values for the American (Longstaff-Schwartz) pass.
 class NodeCollector
 {
 

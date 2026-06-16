@@ -1,6 +1,8 @@
 #pragma once
 #include "yield_curve.hpp"
 
+//! A currency and its discount (yield) curve: provides discount factors / rates and
+//! the MCL rate / discount-factor nodes.
 class Currency : public Object
 {
   private:

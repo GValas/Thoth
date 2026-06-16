@@ -1,6 +1,8 @@
 #pragma once
 #include "underlying.hpp"
 
+//! Abstract multi-asset basket of underlyings (base of AbsoluteBasket): holds the
+//! component list and aggregates their single-name / currency sets.
 class Basket : public Underlying
 {
 

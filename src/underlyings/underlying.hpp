@@ -2,6 +2,9 @@
 #include "asset.hpp"
 #include "correlation.hpp"
 
+//! Abstract diffusable underlying of a contract (mono / composite / basket /
+//! rainbow): exposes the forward, implied vol and its single-name & currency sets,
+//! and builds the MCL spot / vol / correlation nodes.
 class Underlying : public Asset
 {
 

@@ -2,6 +2,9 @@
 #include "market_data.hpp"
 #include "node_collector.hpp"
 
+//! A term-structure curve of (date, value) pillars read as a continuously-compounded
+//! rate by linear interpolation between pillars (flat beyond the ends), plus an
+//! additive shift for the rho bump. Base of yield / repo / dividend curves.
 class Curve : public MarketData
 {
   private:
