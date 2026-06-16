@@ -87,11 +87,11 @@ class PricerMCL : public Pricer
     };
     void PriceAmerican();
     AmericanPolicy FitAmericanPolicy( Contract* Contract,
-                                      const gsl_matrix* Paths,
+                                      const la_matrix* Paths,
                                       const vector<double>& Tau,
                                       double Rate );
     double ApplyAmericanPolicy( Contract* Contract,
-                                const gsl_matrix* Paths,
+                                const la_matrix* Paths,
                                 const vector<double>& Tau,
                                 double Rate,
                                 const AmericanPolicy& Policy,

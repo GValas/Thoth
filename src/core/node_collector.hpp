@@ -148,7 +148,7 @@ class NodeCollector
                          size_t NbDraws );
     void RecordPath(); //!< call once per draw, after PriceNodes
     bool IsRecording() const { return !_records.empty(); }
-    const gsl_matrix* RecordedPaths( const string& NodeName ) const;
+    const la_matrix* RecordedPaths( const string& NodeName ) const;
     vector<double> RecordedTau( const string& NodeName ) const;
     vector<size_t> DiffusionIndicesUpTo( const date& Maturity ) const;
 

@@ -12,12 +12,12 @@ class SimpleFixingData : public Object
   public:
     //! setter
     void SetDateList( const vector<date>& DateList );
-    void SetValueList( gsl_vector* ValueList );
+    void SetValueList( la_vector* ValueList );
     void SetUnderlying( const string& Underlying );
 
     //! getter
     const vector<date> GetDateList();
-    gsl_vector* GetValueList();
+    la_vector* GetValueList();
     string GetUnderlying();
 
     //! constructor, destructor

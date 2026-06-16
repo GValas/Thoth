@@ -16,7 +16,7 @@ class Curve : public MarketData
   public:
     //! setter
     void SetDateList( const vector<date>& DateList );
-    void SetValueList( gsl_vector* ValueList );
+    void SetValueList( la_vector* ValueList );
 
     //! set the parallel shift (rho bump, in decimal rate); 0 restores the curve
     void SetCurveShift( double Shift ) { _curve_shift = Shift; }

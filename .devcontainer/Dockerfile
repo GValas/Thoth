@@ -1,8 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 # Build toolchain + Thoth dependencies
-#   GSL            : libgsl-dev
-#   Boost          : libboost-all-dev (only date_time is linked; header-only at runtime)
+#   Boost          : libboost-all-dev (date_time linked; Boost.Math header-only)
 #   YAML           : libyaml-cpp-dev          (config format)
 #   HTTP server    : libcpp-httplib-dev       (HTTP pricing service)
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
@@ -14,7 +13,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         pkg-config \
         gdb \
         git \
-        libgsl-dev \
         libboost-all-dev \
         libyaml-cpp-dev \
         libcpp-httplib-dev \

@@ -20,21 +20,21 @@ void HistoricalVolatilityComputation::Execute()
     size_t return_size = data_size - _time_step;
     double w = 1;
     double r = ( _half_life == 0 ) ? 1 : exp( -M_LN2 / _half_life );
-    GslVector log_returns = gsl_vector_alloc( return_size );
-    GslVector weights = gsl_vector_alloc( return_size );
+    GslVector log_returns = la_vector_alloc( return_size );
+    GslVector weights = la_vector_alloc( return_size );
     for ( size_t i = 0; i < return_size; i++ )
     {
         // log return
         double x = log( _value_list[i + _time_step] / _value_list[i] );
-        gsl_vector_set( log_returns, i, x );
+        la_vector_set( log_returns, i, x );
 
         // weight
-        gsl_vector_set( weights, return_size - i - 1, w );
+        la_vector_set( weights, return_size - i - 1, w );
         w *= r;
     }
 
     //! weighted variance
-    _vol = WeightedSd( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( log_returns, 0 ), return_size ) * sqrt( NB_OF_BUSINESS_DAYS_A_YEAR / _time_step ) * 100;
+    _vol = WeightedSd( la_vector_ptr( weights, 0 ), la_vector_ptr( log_returns, 0 ), return_size ) * sqrt( NB_OF_BUSINESS_DAYS_A_YEAR / _time_step ) * 100;
 
     _exec_time = ExecTime( t0 );
 }

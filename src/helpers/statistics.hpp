@@ -6,7 +6,7 @@
 //! Weighted descriptive statistics — part of the migration off GSL.
 //!
 //! These operate on plain contiguous double arrays (the callers still hold the
-//! data in gsl_vector for now, passing gsl_vector_ptr). Conventions match the
+//! data in la_vector for now, passing la_vector_ptr). Conventions match the
 //! gsl_stats_w* routines they replace: the weighted variance is the unbiased
 //! estimator with the V1/(V1^2 - V2) bias factor (V1 = sum w, V2 = sum w^2).
 //! ----------------------------------------------------------------------

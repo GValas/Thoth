@@ -7,9 +7,9 @@ const size_t NEAR_POSITIVE_MATRIX_MAX_ITER = 24;
 const double NEAR_POSITIVE_MATRIX_MIN_EPS = 1e-6;
 
 // moment matching
-void LN_to_M4( gsl_vector* Fwds,
-               gsl_vector* Vols,
-               gsl_matrix* Corr,
+void LN_to_M4( la_vector* Fwds,
+               la_vector* Vols,
+               la_matrix* Corr,
                double& M1,
                double& M2,
                double& M3,
@@ -24,7 +24,7 @@ void LN_to_M4( gsl_vector* Fwds,
           i < n;
           i++ )
     {
-        M1 += gsl_vector_get( Fwds, i );
+        M1 += la_vector_get( Fwds, i );
     }
 
     // 2nd order
@@ -37,7 +37,7 @@ void LN_to_M4( gsl_vector* Fwds,
               j < n;
               j++ )
         {
-            M2 += gsl_vector_get( Fwds, i ) * gsl_vector_get( Fwds, j ) * exp( gsl_vector_get( Vols, i ) * gsl_vector_get( Vols, j ) * gsl_matrix_get( Corr, i, j ) );
+            M2 += la_vector_get( Fwds, i ) * la_vector_get( Fwds, j ) * exp( la_vector_get( Vols, i ) * la_vector_get( Vols, j ) * la_matrix_get( Corr, i, j ) );
         }
     }
 
@@ -55,7 +55,7 @@ void LN_to_M4( gsl_vector* Fwds,
                   k < n;
                   k++ )
             {
-                M3 += gsl_vector_get( Fwds, i ) * gsl_vector_get( Fwds, j ) * gsl_vector_get( Fwds, k ) * exp( gsl_vector_get( Vols, i ) * gsl_vector_get( Vols, j ) * gsl_matrix_get( Corr, i, j ) + gsl_vector_get( Vols, i ) * gsl_vector_get( Vols, k ) * gsl_matrix_get( Corr, i, k ) + gsl_vector_get( Vols, j ) * gsl_vector_get( Vols, k ) * gsl_matrix_get( Corr, j, k ) );
+                M3 += la_vector_get( Fwds, i ) * la_vector_get( Fwds, j ) * la_vector_get( Fwds, k ) * exp( la_vector_get( Vols, i ) * la_vector_get( Vols, j ) * la_matrix_get( Corr, i, j ) + la_vector_get( Vols, i ) * la_vector_get( Vols, k ) * la_matrix_get( Corr, i, k ) + la_vector_get( Vols, j ) * la_vector_get( Vols, k ) * la_matrix_get( Corr, j, k ) );
             }
         }
     }
@@ -193,13 +193,13 @@ double SLN_Put_Price( const double Forward,
 }
 
 //! test if matrix is square
-bool ext_gsl_matrix_is_square( const gsl_matrix* m )
+bool ext_la_matrix_is_square( const la_matrix* m )
 {
     return ( m->size1 == m->size2 );
 }
 
 //! shift matrix to eps : ( 1 - e ).M + e.I
-void ext_gsl_matrix_shift_to_epsilon( gsl_matrix* m, double eps )
+void ext_la_matrix_shift_to_epsilon( la_matrix* m, double eps )
 {
     for ( size_t i = 0; i < m->size1; i++ )
     {
@@ -207,20 +207,20 @@ void ext_gsl_matrix_shift_to_epsilon( gsl_matrix* m, double eps )
         {
             if ( i != j )
             {
-                gsl_matrix_set( m, i, j, gsl_matrix_get( m, i, j ) * ( 1 - eps ) );
+                la_matrix_set( m, i, j, la_matrix_get( m, i, j ) * ( 1 - eps ) );
             }
         }
     }
 }
 
 //! robustification
-void ext_gsl_matrix_to_near_positive( gsl_matrix* m, double& eps )
+void ext_la_matrix_to_near_positive( la_matrix* m, double& eps )
 {
 
     //! RAII scratch copy (freed on every exit path)
     size_t n = m->size1;
-    GslMatrix A = gsl_matrix_alloc( n, n );
-    gsl_matrix_memcpy( A, m );
+    GslMatrix A = la_matrix_alloc( n, n );
+    la_matrix_memcpy( A, m );
 
     //!
     double eps_min = 0;
@@ -231,10 +231,10 @@ void ext_gsl_matrix_to_near_positive( gsl_matrix* m, double& eps )
     do
     {
         eps = ( eps_max + eps_min ) / 2;
-        gsl_matrix_memcpy( A, m );
-        ext_gsl_matrix_shift_to_epsilon( A, eps );
+        la_matrix_memcpy( A, m );
+        ext_la_matrix_shift_to_epsilon( A, eps );
 
-        if ( ext_gsl_matrix_is_positive( A ) )
+        if ( ext_la_matrix_is_positive( A ) )
         {
             eps_max = eps;
         }
@@ -253,16 +253,16 @@ void ext_gsl_matrix_to_near_positive( gsl_matrix* m, double& eps )
     }
     else
     {
-        ext_gsl_matrix_shift_to_epsilon( m, eps_max );
+        ext_la_matrix_shift_to_epsilon( m, eps_max );
     }
 }
 
 //! test if matrix is symmetric
-bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m )
+bool ext_la_matrix_is_symmetric( const la_matrix* m )
 {
 
     //! square matrix only
-    if ( !ext_gsl_matrix_is_square( m ) )
+    if ( !ext_la_matrix_is_square( m ) )
     {
         return false;
     }
@@ -273,7 +273,7 @@ bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m )
     {
         for ( size_t j = 0; j < i; j++ )
         {
-            if ( gsl_matrix_get( m, i, j ) != gsl_matrix_get( m, j, i ) )
+            if ( la_matrix_get( m, i, j ) != la_matrix_get( m, j, i ) )
             {
                 return false;
             }
@@ -285,20 +285,20 @@ bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m )
 }
 
 //! test if matrix is positive
-bool ext_gsl_matrix_is_positive( const gsl_matrix* m )
+bool ext_la_matrix_is_positive( const la_matrix* m )
 {
     //! square matrix
-    if ( !ext_gsl_matrix_is_symmetric( m ) )
+    if ( !ext_la_matrix_is_symmetric( m ) )
     {
         return false;
     }
 
     //! positive-definite iff the Cholesky factorisation succeeds (on a copy)
     size_t n = m->size1;
-    gsl_matrix* A = gsl_matrix_alloc( n, n );
-    gsl_matrix_memcpy( A, m );
+    la_matrix* A = la_matrix_alloc( n, n );
+    la_matrix_memcpy( A, m );
     bool positive = CholeskyDecomposeLower( A );
-    gsl_matrix_free( A );
+    la_matrix_free( A );
 
     return positive;
 }
@@ -343,8 +343,8 @@ vector<double> FromSymmetricMatrix( const vector<double>& Matrix )
 }
 
 //!
-double InterpolateWithSpline( gsl_vector* x_serie,
-                              gsl_vector* y_serie,
+double InterpolateWithSpline( la_vector* x_serie,
+                              la_vector* y_serie,
                               double x_point )
 {
 
@@ -355,8 +355,8 @@ double InterpolateWithSpline( gsl_vector* x_serie,
     vector<double> x( n ), y( n ), h( n - 1 ), m( n, 0.0 ), l( n ), mu( n ), z( n );
     for ( size_t i = 0; i < n; i++ )
     {
-        x[i] = gsl_vector_get( x_serie, i );
-        y[i] = gsl_vector_get( y_serie, i );
+        x[i] = la_vector_get( x_serie, i );
+        y[i] = la_vector_get( y_serie, i );
     }
     for ( size_t i = 0; i < n - 1; i++ )
     {
@@ -393,48 +393,48 @@ double InterpolateWithSpline( gsl_vector* x_serie,
 }
 
 //!
-gsl_matrix* ToGslMatrix( const vector<double>& Matrix )
+la_matrix* ToGslMatrix( const vector<double>& Matrix )
 {
     size_t n = (size_t)sqrt( (double)Matrix.size() );
-    gsl_matrix* m = gsl_matrix_alloc( n, n );
+    la_matrix* m = la_matrix_alloc( n, n );
     for ( size_t i = 0; i < n; i++ )
     {
         for ( size_t j = 0; j < n; j++ )
         {
-            gsl_matrix_set( m, i, j, Matrix[i * n + j] );
+            la_matrix_set( m, i, j, Matrix[i * n + j] );
         }
     }
     return m;
 }
 
 //!
-vector<double> FromGslMatrix( gsl_matrix* Matrix )
+vector<double> FromGslMatrix( la_matrix* Matrix )
 {
     vector<double> m;
     for ( size_t i = 0; i < Matrix->size1; i++ )
     {
         for ( size_t j = 0; j < Matrix->size2; j++ )
         {
-            m.push_back( gsl_matrix_get( Matrix, i, j ) );
+            m.push_back( la_matrix_get( Matrix, i, j ) );
         }
     }
     return m;
 }
 
 //!
-gsl_matrix* ext_gsl_vector_to_matrix( const gsl_vector* v,
+la_matrix* ext_la_vector_to_matrix( const la_vector* v,
                                       size_t row_size )
 {
     //! Reshape the flat vector into an owning matrix.  We copy rather than
     //! alias v's storage: the returned matrix is later released with
-    //! gsl_matrix_free(), which must own (and be allowed to free) its block.
+    //! la_matrix_free(), which must own (and be allowed to free) its block.
     size_t col_size = v->size / row_size;
-    gsl_matrix* m = gsl_matrix_alloc( col_size, row_size );
+    la_matrix* m = la_matrix_alloc( col_size, row_size );
     for ( size_t i = 0; i < col_size; i++ )
     {
         for ( size_t j = 0; j < row_size; j++ )
         {
-            gsl_matrix_set( m, i, j, gsl_vector_get( v, i * row_size + j ) );
+            la_matrix_set( m, i, j, la_vector_get( v, i * row_size + j ) );
         }
     }
     return m;
@@ -495,17 +495,17 @@ double ext_gsl_stats_wcovariance_m_v( const double weights[],
 //! into the lower triangle (diagonal included), like gsl_linalg_cholesky_decomp.
 //! Returns false if A is not positive-definite. The upper triangle is left
 //! untouched (callers read only the lower triangle).
-bool CholeskyDecomposeLower( gsl_matrix* A )
+bool CholeskyDecomposeLower( la_matrix* A )
 {
     const size_t n = A->size1;
     for ( size_t i = 0; i < n; i++ )
     {
         for ( size_t j = 0; j <= i; j++ )
         {
-            double sum = gsl_matrix_get( A, i, j );
+            double sum = la_matrix_get( A, i, j );
             for ( size_t k = 0; k < j; k++ )
             {
-                sum -= gsl_matrix_get( A, i, k ) * gsl_matrix_get( A, j, k );
+                sum -= la_matrix_get( A, i, k ) * la_matrix_get( A, j, k );
             }
             if ( i == j )
             {
@@ -513,11 +513,11 @@ bool CholeskyDecomposeLower( gsl_matrix* A )
                 {
                     return false; //!< not positive-definite
                 }
-                gsl_matrix_set( A, i, j, sqrt( sum ) );
+                la_matrix_set( A, i, j, sqrt( sum ) );
             }
             else
             {
-                gsl_matrix_set( A, i, j, sum / gsl_matrix_get( A, j, j ) );
+                la_matrix_set( A, i, j, sum / la_matrix_get( A, j, j ) );
             }
         }
     }
@@ -527,28 +527,28 @@ bool CholeskyDecomposeLower( gsl_matrix* A )
 //! solve a tridiagonal system M x = B by the Thomas algorithm. Diag has n
 //! entries; Super (M[i][i+1]) and Sub (M[i+1][i]) have n-1. Replaces
 //! gsl_linalg_solve_tridiag for the Crank-Nicolson PDE step (diagonally stable).
-void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
-                       const gsl_vector* Sub, const gsl_vector* B, gsl_vector* X )
+void SolveTridiagonal( const la_vector* Diag, const la_vector* Super,
+                       const la_vector* Sub, const la_vector* B, la_vector* X )
 {
     const size_t n = Diag->size;
     vector<double> c( n ), d( n ); //!< forward-swept super-diag and rhs
-    double beta = gsl_vector_get( Diag, 0 );
-    c[0] = ( n > 1 ? gsl_vector_get( Super, 0 ) : 0.0 ) / beta;
-    d[0] = gsl_vector_get( B, 0 ) / beta;
+    double beta = la_vector_get( Diag, 0 );
+    c[0] = ( n > 1 ? la_vector_get( Super, 0 ) : 0.0 ) / beta;
+    d[0] = la_vector_get( B, 0 ) / beta;
     for ( size_t i = 1; i < n; i++ )
     {
-        const double sub = gsl_vector_get( Sub, i - 1 );
-        beta = gsl_vector_get( Diag, i ) - sub * c[i - 1];
+        const double sub = la_vector_get( Sub, i - 1 );
+        beta = la_vector_get( Diag, i ) - sub * c[i - 1];
         if ( i < n - 1 )
         {
-            c[i] = gsl_vector_get( Super, i ) / beta;
+            c[i] = la_vector_get( Super, i ) / beta;
         }
-        d[i] = ( gsl_vector_get( B, i ) - sub * d[i - 1] ) / beta;
+        d[i] = ( la_vector_get( B, i ) - sub * d[i - 1] ) / beta;
     }
-    gsl_vector_set( X, n - 1, d[n - 1] );
+    la_vector_set( X, n - 1, d[n - 1] );
     for ( size_t i = n - 1; i-- > 0; )
     {
-        gsl_vector_set( X, i, d[i] - c[i] * gsl_vector_get( X, i + 1 ) );
+        la_vector_set( X, i, d[i] - c[i] * la_vector_get( X, i + 1 ) );
     }
 }
 
@@ -556,11 +556,11 @@ void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
 //! (X^T X) beta = X^T y, solved by Cholesky. X is n x p with p small and full
 //! column rank (the Longstaff-Schwartz {1, m, m^2} basis). Returns beta (size p).
 //! Replaces gsl_multifit_linear (only the coefficients are needed, not cov/chisq).
-vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y )
+vector<double> LeastSquares( const la_matrix* X, const la_vector* y )
 {
     const size_t n = X->size1;
     const size_t p = X->size2;
-    gsl_matrix* A = gsl_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD)
+    la_matrix* A = la_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD)
     vector<double> g( p, 0.0 );               //!< right-hand side X^T y
     for ( size_t a = 0; a < p; a++ )
     {
@@ -569,15 +569,15 @@ vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y )
             double s = 0.0;
             for ( size_t k = 0; k < n; k++ )
             {
-                s += gsl_matrix_get( X, k, a ) * gsl_matrix_get( X, k, b );
+                s += la_matrix_get( X, k, a ) * la_matrix_get( X, k, b );
             }
-            gsl_matrix_set( A, a, b, s );
-            gsl_matrix_set( A, b, a, s );
+            la_matrix_set( A, a, b, s );
+            la_matrix_set( A, b, a, s );
         }
         double sg = 0.0;
         for ( size_t k = 0; k < n; k++ )
         {
-            sg += gsl_matrix_get( X, k, a ) * gsl_vector_get( y, k );
+            sg += la_matrix_get( X, k, a ) * la_vector_get( y, k );
         }
         g[a] = sg;
     }
@@ -589,25 +589,25 @@ vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y )
         double s = g[i];
         for ( size_t k = 0; k < i; k++ )
         {
-            s -= gsl_matrix_get( A, i, k ) * z[k];
+            s -= la_matrix_get( A, i, k ) * z[k];
         }
-        z[i] = s / gsl_matrix_get( A, i, i );
+        z[i] = s / la_matrix_get( A, i, i );
     }
     for ( size_t i = p; i-- > 0; )
     {
         double s = z[i];
         for ( size_t k = i + 1; k < p; k++ )
         {
-            s -= gsl_matrix_get( A, k, i ) * beta[k]; //!< L^T[i][k] = L[k][i]
+            s -= la_matrix_get( A, k, i ) * beta[k]; //!< L^T[i][k] = L[k][i]
         }
-        beta[i] = s / gsl_matrix_get( A, i, i );
+        beta[i] = s / la_matrix_get( A, i, i );
     }
-    gsl_matrix_free( A );
+    la_matrix_free( A );
     return beta;
 }
 
 //! sum elments of vector
-double ext_gsl_vector_sum( gsl_vector* v )
+double ext_la_vector_sum( la_vector* v )
 {
-    return Sum( gsl_vector_ptr( v, 0 ), v->size );
+    return Sum( la_vector_ptr( v, 0 ), v->size );
 }

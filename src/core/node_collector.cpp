@@ -124,7 +124,7 @@ void NodeCollector::StartRecording( MonteCarloNode* Node,
     {
         record.tau.push_back( YearFraction( _date_list[0], _date_list[idx] ) );
     }
-    record.paths = gsl_matrix_alloc( NbDraws, DateIndices.size() );
+    record.paths = la_matrix_alloc( NbDraws, DateIndices.size() );
     _records.push_back( std::move( record ) );
 }
 
@@ -139,14 +139,14 @@ void NodeCollector::RecordPath()
         }
         for ( size_t c = 0; c < r.date_index.size(); c++ )
         {
-            gsl_matrix_set( r.paths, r.row, c, r.node->GetValue( r.date_index[c] ) );
+            la_matrix_set( r.paths, r.row, c, r.node->GetValue( r.date_index[c] ) );
         }
         r.row++;
     }
 }
 
 //! recorded [ nb_draws x nb_exercise_dates ] matrix for a node, or nullptr
-const gsl_matrix* NodeCollector::RecordedPaths( const string& NodeName ) const
+const la_matrix* NodeCollector::RecordedPaths( const string& NodeName ) const
 {
     for ( const auto& r : _records )
     {

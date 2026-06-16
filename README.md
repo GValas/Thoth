@@ -18,7 +18,7 @@ usable as a batch tool or as an HTTP service.
   (e.g. a 1y ATM call at 8k paths: pseudo error ~0.8, Sobol ~0.01). The Sobol
   sequence uses the **Joe-Kuo** direction numbers (`new-joe-kuo-6.21201`,
   embedded), so the low-discrepancy treatment extends to several thousand
-  dimensions rather than GSL's 40 — multi-asset books and finely-stepped
+  dimensions (well beyond the classic 40-dimension limit) — multi-asset books and finely-stepped
   path-dependent payoffs keep the QMC benefit. Reproducible: the node graph and
   factors are name-ordered, so results are independent of heap layout / build /
   platform.
@@ -118,13 +118,12 @@ Dependencies (Debian / Ubuntu):
 
 ```bash
 sudo apt-get install -y build-essential cmake pkg-config \
-    libgsl-dev libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
+    libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
 ```
 
 | Library      | Use                              |
 |--------------|----------------------------------|
-| GSL          | linear algebra, RNG, statistics  |
-| Boost        | date handling (header-only here) |
+| Boost        | date handling + Boost.Math (gamma CDF, Gauss-Kronrod quadrature) |
 | yaml-cpp     | configuration format             |
 | cpp-httplib  | HTTP server / client             |
 
@@ -237,7 +236,7 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 Send `Content-Type: application/x-yaml` for bodies over ~8 KB (`run_local_client.sh`
 already does); the default form content type is capped by the HTTP library.
 
-Requests are serialised (the engine shares global GSL state): the server logs
+Requests are serialised (the engine shares global progress/cancellation state): the server logs
 the client IP on arrival and again if a request has to wait. If a client
 disconnects mid-pricing the run is cancelled, freeing the server instead of
 finishing a result nobody will read. `run_docker_server.sh` passes `docker run -t`, so

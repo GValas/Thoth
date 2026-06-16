@@ -44,7 +44,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         cmake \
         clang-format \
         pkg-config \
-        libgsl-dev \
         libboost-all-dev \
         libyaml-cpp-dev \
         libcpp-httplib-dev \
@@ -73,11 +72,9 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DTHOTH_BUILD_TESTS=OFF \
 FROM ${RUNTIME_BASE} AS runtime
 
 # Runtime libs (Boost is header-only here, so it is intentionally absent):
-#   libgsl27 libgslcblas0  (GSL)   libyaml-cpp0.8 (YAML)  libcpp-httplib0.14t64 (HTTP)
+#   libyaml-cpp0.8 (YAML)   libcpp-httplib0.14t64 (HTTP)
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends \
-        libgsl27 \
-        libgslcblas0 \
         libyaml-cpp0.8 \
         libcpp-httplib0.14t64 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

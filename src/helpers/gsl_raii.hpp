@@ -10,8 +10,7 @@
 //! pointer member accesses keep working unchanged.
 //! ----------------------------------------------------------------------
 
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
+#include "linalg.hpp"
 
 template <class T, void ( *Free )( T* )>
 class GslOwner
@@ -66,5 +65,5 @@ class GslOwner
     }
 };
 
-using GslVector = GslOwner<gsl_vector, gsl_vector_free>;
-using GslMatrix = GslOwner<gsl_matrix, gsl_matrix_free>;
+using GslVector = GslOwner<la_vector, la_vector_free>;
+using GslMatrix = GslOwner<la_matrix, la_matrix_free>;

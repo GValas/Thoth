@@ -25,11 +25,8 @@
 #include <string>
 #include <vector>
 
-//! gsl libs (only the matrix/vector containers and the error handler remain;
-//! the rest of the numerics has been migrated off GSL)
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
+//! dense vector/matrix containers (in-repo; GSL has been fully removed)
+#include "linalg.hpp"
 
 //! boost
 #include <boost/algorithm/string.hpp>

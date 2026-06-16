@@ -10,7 +10,7 @@ AbsoluteBasket::AbsoluteBasket( const string& ObjectName ) : Basket( ObjectName,
 AbsoluteBasket::~AbsoluteBasket() = default;
 
 //! setter
-void AbsoluteBasket::SetWeightList( gsl_vector* WeightList )
+void AbsoluteBasket::SetWeightList( la_vector* WeightList )
 {
     _weight_list = WeightList;
 }
@@ -18,7 +18,7 @@ void AbsoluteBasket::SetWeightList( gsl_vector* WeightList )
 //!
 double AbsoluteBasket::GetSpot()
 {
-    return 100 * ext_gsl_vector_sum( _weight_list );
+    return 100 * ext_la_vector_sum( _weight_list );
 }
 
 //! compute equivalent BS vol
@@ -33,16 +33,16 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
     // mkt data (RAII: freed even if a callee below throws via ERR)
     size_t n = _underlying_list.size();
-    GslVector fwds = gsl_vector_alloc( n );
-    GslVector vols = gsl_vector_alloc( n );
+    GslVector fwds = la_vector_alloc( n );
+    GslVector vols = la_vector_alloc( n );
     vector<string> udl_list;
     vector<Forex*> fx_list;
     double dt = YearFraction( _today, MaturityDate );
     for ( size_t i = 0; i < n; i++ )
     {
         Underlying* u = _underlying_list[i];
-        gsl_vector_set( fwds, i, u->GetForward( MaturityDate, _currency ) / u->GetSpot() * _weight_list->data[i] );
-        gsl_vector_set( vols, i, u->GetImplicitVol( k, MaturityDate ) * sqrt( dt ) );
+        la_vector_set( fwds, i, u->GetForward( MaturityDate, _currency ) / u->GetSpot() * _weight_list->data[i] );
+        la_vector_set( vols, i, u->GetImplicitVol( k, MaturityDate ) * sqrt( dt ) );
         udl_list.push_back( u->GetName() );
     }
 
@@ -83,7 +83,7 @@ double AbsoluteBasket::GetForward( const date& MaturityDate,
     for ( size_t i = 0; i < n; i++ )
     {
         Underlying* u = _underlying_list[i];
-        f += u->GetForward( MaturityDate, QuantoCurrency ) / u->GetSpot() * gsl_vector_get( _weight_list, i );
+        f += u->GetForward( MaturityDate, QuantoCurrency ) / u->GetSpot() * la_vector_get( _weight_list, i );
     }
     return 100 * f;
 }
@@ -99,7 +99,7 @@ MonteCarloNode* AbsoluteBasket::GetNode( NodeCollector& NC )
             for ( size_t i = 0; i < _underlying_list.size(); i++ )
             {
                 E->PushUnderlying( _underlying_list[i]->GetNode( NC ) );
-                E->PushWeight( 100 * gsl_vector_get( _weight_list, i ) / _underlying_list[i]->GetSpot() );
+                E->PushWeight( 100 * la_vector_get( _weight_list, i ) / _underlying_list[i]->GetSpot() );
             }
         } );
 }

@@ -369,7 +369,7 @@ vector<bool> YamlConfig::GetBooleanList( const string& Path )
                           { return n.as<bool>(); } );
 }
 
-gsl_vector* YamlConfig::GetGslVector( const string& Path )
+la_vector* YamlConfig::GetGslVector( const string& Path )
 {
     YAML::Node s;
     try
@@ -384,12 +384,12 @@ gsl_vector* YamlConfig::GetGslVector( const string& Path )
     }
 
     //! own the vector while filling it so a bad element does not leak it
-    GslVector v = gsl_vector_alloc( s.size() );
+    GslVector v = la_vector_alloc( s.size() );
     try
     {
         for ( size_t i = 0; i < s.size(); i++ )
         {
-            gsl_vector_set( v, i, s[i].as<double>() );
+            la_vector_set( v, i, s[i].as<double>() );
         }
     }
     catch ( ... )
@@ -549,15 +549,15 @@ void YamlConfig::SetDoubleList( const string& Path,
 }
 
 void YamlConfig::SetGslMatrix( const string& Path,
-                               const gsl_matrix* Value )
+                               const la_matrix* Value )
 {
-    SetDoubleList( Path, Value->block->data, Value->block->size );
+    SetDoubleList( Path, Value->data, Value->size1 * Value->size2 );
 }
 
 void YamlConfig::SetGslVector( const string& Path,
-                               const gsl_vector* Value )
+                               const la_vector* Value )
 {
-    SetDoubleList( Path, Value->block->data, Value->block->size );
+    SetDoubleList( Path, Value->data, Value->size );
 }
 
 void YamlConfig::SetStringList( const string& Path,

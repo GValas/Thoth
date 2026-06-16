@@ -10,7 +10,7 @@ class AbsoluteBasket : public Basket
 
   public:
     //! setter
-    void SetWeightList( gsl_vector* WeightList );
+    void SetWeightList( la_vector* WeightList );
 
     //! mcl node
     MonteCarloNode* GetNode( NodeCollector& NC ) override;

@@ -59,61 +59,61 @@ void HistoricalCorrelationComputation::Execute()
     vector<GslVector> log_return_list;
     for ( size_t i = 0; i < histos_size; i++ )
     {
-        GslVector v = gsl_vector_alloc( _range_size );
+        GslVector v = la_vector_alloc( _range_size );
         for ( size_t j = 0; j < _range_size; j++ )
         {
-            gsl_vector* w = _historical_spots_fixing_list[i]->GetValueList();
-            double x = log( gsl_vector_get( w, w->size - _range_size + j ) /
-                            gsl_vector_get( w, w->size - _range_size + j - _time_step ) );
-            gsl_vector_set( v, j, x );
+            la_vector* w = _historical_spots_fixing_list[i]->GetValueList();
+            double x = log( la_vector_get( w, w->size - _range_size + j ) /
+                            la_vector_get( w, w->size - _range_size + j - _time_step ) );
+            la_vector_set( v, j, x );
         }
         log_return_list.push_back( std::move( v ) );
     }
 
     //! weights
-    GslVector weights = gsl_vector_alloc( _range_size );
+    GslVector weights = la_vector_alloc( _range_size );
     double r = exp( -log( 2. ) / _half_life );
     double w = 1;
     for ( size_t i = 0; i < _range_size; i++ )
     {
-        gsl_vector_set( weights, _range_size - i - 1, w );
+        la_vector_set( weights, _range_size - i - 1, w );
         w *= r;
     }
 
     //! compute weighted means, variances
-    GslVector weighted_means = gsl_vector_alloc( histos_size );
-    GslVector weighted_variances = gsl_vector_alloc( histos_size );
+    GslVector weighted_means = la_vector_alloc( histos_size );
+    GslVector weighted_variances = la_vector_alloc( histos_size );
     for ( size_t i = 0; i < histos_size; i++ )
     {
-        gsl_vector* v = log_return_list[i];
-        double wm = WeightedMean( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( v, 0 ), _range_size );
-        double wv = WeightedVarianceM( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( v, 0 ),
+        la_vector* v = log_return_list[i];
+        double wm = WeightedMean( la_vector_ptr( weights, 0 ), la_vector_ptr( v, 0 ), _range_size );
+        double wv = WeightedVarianceM( la_vector_ptr( weights, 0 ), la_vector_ptr( v, 0 ),
                                        _range_size, wm );
-        gsl_vector_set( weighted_means, i, wm );
-        gsl_vector_set( weighted_variances, i, wv );
+        la_vector_set( weighted_means, i, wm );
+        la_vector_set( weighted_variances, i, wv );
     }
 
     //! weighted covariances
-    _historical_matrix = gsl_matrix_alloc( histos_size, histos_size );
+    _historical_matrix = la_matrix_alloc( histos_size, histos_size );
     for ( size_t i = 0; i < histos_size; i++ )
     {
         for ( size_t j = i + 1; j < histos_size; j++ )
         {
-            double c = ext_gsl_stats_wcorrelation_m_v( gsl_vector_ptr( weights, 0 ), 1,
-                                                       gsl_vector_ptr( log_return_list[i], 0 ), 1,
-                                                       gsl_vector_ptr( log_return_list[j], 0 ), 1,
+            double c = ext_gsl_stats_wcorrelation_m_v( la_vector_ptr( weights, 0 ), 1,
+                                                       la_vector_ptr( log_return_list[i], 0 ), 1,
+                                                       la_vector_ptr( log_return_list[j], 0 ), 1,
                                                        _range_size,
-                                                       gsl_vector_get( weighted_means, i ),
-                                                       gsl_vector_get( weighted_means, j ),
-                                                       gsl_vector_get( weighted_variances, i ),
-                                                       gsl_vector_get( weighted_variances, j ) );
-            gsl_matrix_set( _historical_matrix, i, j, c );
-            gsl_matrix_set( _historical_matrix, j, i, c );
+                                                       la_vector_get( weighted_means, i ),
+                                                       la_vector_get( weighted_means, j ),
+                                                       la_vector_get( weighted_variances, i ),
+                                                       la_vector_get( weighted_variances, j ) );
+            la_matrix_set( _historical_matrix, i, j, c );
+            la_matrix_set( _historical_matrix, j, i, c );
         }
-        gsl_matrix_set( _historical_matrix, i, i, 1 );
+        la_matrix_set( _historical_matrix, i, i, 1 );
     }
 
-    // ext_gsl_matrix_log( historical_matrix );
+    // ext_la_matrix_log( historical_matrix );
 
     //! (GSL scratch vectors above are RAII-owned and free themselves)
     _exec_time = ExecTime( t0 );

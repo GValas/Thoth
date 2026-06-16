@@ -49,8 +49,6 @@ static string ExecuteYaml( const string& YamlRequest, const string& ExecName )
 int main( int argc,
           char* argv[] )
 {
-    //! disable gsl errors
-    gsl_set_error_handler_off();
 
     //! credits + build stamp (commit / compile time), so it is obvious which
     //! source a running or containerised server was built from

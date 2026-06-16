@@ -18,17 +18,17 @@ void Curve::SetDateList( const vector<date>& DateList )
 }
 
 //! setter
-void Curve::SetValueList( gsl_vector* ValueList )
+void Curve::SetValueList( la_vector* ValueList )
 {
     _value_list = ValueList;
-    gsl_vector_scale( _value_list, 0.01 );
+    la_vector_scale( _value_list, 0.01 );
 }
 
 //! flat curve: returns the first point regardless of maturity (term-structure
 //! interpolation is not implemented — see TODO.md Phase 6 / "collapse marketdata")
 double Curve::GetCurveValue( const date& /*MaturityDate*/ )
 {
-    return gsl_vector_get( _value_list, 0 ) + _curve_shift;
+    return la_vector_get( _value_list, 0 ) + _curve_shift;
 }
 
 MonteCarloNode* Curve::GetNode( NodeCollector& NC )

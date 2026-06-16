@@ -2,7 +2,7 @@
 # Thoth - CMake build (Linux / g++, Windows / MSVC)
 #
 # Dependencies (Debian/Ubuntu packages):
-#   build-essential cmake libgsl-dev libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
+#   build-essential cmake libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
 #
 # Usage:
 #   cmake -B build                 # configure
@@ -47,10 +47,8 @@ if(THOTH_ENABLE_CUDA)
 endif()
 
 # --- Dependencies ----------------------------------------------------------
-# GSL: provides imported targets GSL::gsl and GSL::gslcblas.
-find_package(GSL REQUIRED)
-
-# Boost: only the date_time component is linked by the legacy Makefile.
+# Boost: date_time is linked; Boost.Math (header-only) provides the gamma CDF
+# and the Gauss-Kronrod quadrature used by the analytics.
 find_package(Boost REQUIRED COMPONENTS date_time)
 
 # yaml-cpp provides a CMake package config (target yaml-cpp::yaml-cpp).
@@ -87,8 +85,6 @@ target_include_directories(thoth_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
 )
 target_link_libraries(thoth_core PUBLIC
-    GSL::gsl
-    GSL::gslcblas
     Boost::date_time
     yaml-cpp::yaml-cpp
     PkgConfig::HTTPLIB

@@ -14,7 +14,7 @@ void SimpleFixingData::SetDateList( const vector<date>& DateList )
 }
 
 //! setter
-void SimpleFixingData::SetValueList( gsl_vector* ValueList )
+void SimpleFixingData::SetValueList( la_vector* ValueList )
 {
     _value_list = ValueList;
 }
@@ -32,7 +32,7 @@ const vector<date> SimpleFixingData::GetDateList()
 }
 
 //! getter
-gsl_vector* SimpleFixingData::GetValueList()
+la_vector* SimpleFixingData::GetValueList()
 {
     return _value_list;
 }

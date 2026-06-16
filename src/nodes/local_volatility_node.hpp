@@ -9,7 +9,7 @@ class LocalVolatilityNode : public MonteCarloNode
     // gsl_interp_accel * _g_acc;
     // gsl_spline * _g_spline;
 
-    vector<gsl_vector*> _vol_vector_list;
+    vector<la_vector*> _vol_vector_list;
     vector<double> _ln_step_list;
     vector<size_t> _offset_list;
 
@@ -25,7 +25,7 @@ class LocalVolatilityNode : public MonteCarloNode
     void SetSpotNode( MonteCarloNode* SpotNode );
     void PushLnStep( double LnStep );
     void PushOffset( size_t Offset );
-    void PushVolVector( gsl_vector* VolVector );
+    void PushVolVector( la_vector* VolVector );
 
     LocalVolatilityNode( const string& Name );
     ~LocalVolatilityNode() override;

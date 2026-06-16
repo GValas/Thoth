@@ -2,7 +2,6 @@
 // misc
 const double NB_OF_DAYS_A_YEAR = 365;
 const double NB_OF_BUSINESS_DAYS_A_YEAR = 260;
-inline constexpr char GSL_LOG[] = "/tmp/gsl_log.txt";
 
 const int DECIMAL_PRECISION = 9;
 inline constexpr char ROOT_NODE[] = "root";

@@ -10,14 +10,14 @@ Correlation::Correlation( const string& ObjectName ) : Object( ObjectName, KIND_
 Correlation::~Correlation() = default;
 
 //! setter
-void Correlation::SetMatrix( gsl_vector* Matrix )
+void Correlation::SetMatrix( la_vector* Matrix )
 {
     size_t n = Matrix->size;
     double n_sqrt = sqrt( (double)n );
     if ( n_sqrt == (int)n_sqrt )
     {
-        _matrix = ext_gsl_vector_to_matrix( Matrix, (size_t)n_sqrt );
-        gsl_vector_free( Matrix ); //!< copied into _matrix; release the source
+        _matrix = ext_la_vector_to_matrix( Matrix, (size_t)n_sqrt );
+        la_vector_free( Matrix ); //!< copied into _matrix; release the source
     }
     else
     {
@@ -26,7 +26,7 @@ void Correlation::SetMatrix( gsl_vector* Matrix )
 }
 
 //! setter
-void Correlation::SetSymmetricMatrix( gsl_vector* /*SymmetricMatrix*/ )
+void Correlation::SetSymmetricMatrix( la_vector* /*SymmetricMatrix*/ )
 {
     //! not implemented; fail loudly rather than silently ignoring the matrix
     ERR( "correlation '" + _name + "' : symmetric_matrix is not supported (use matrix)" );
@@ -97,14 +97,14 @@ ForexSet Correlation::GetForexSet( const string& I,
 }
 
 //! get whole matrix
-gsl_matrix* Correlation::ExtractMatrix()
+la_matrix* Correlation::ExtractMatrix()
 {
     return _matrix;
 }
 
 // get matrix
 // udl, then fx
-gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
+la_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
                                         vector<Forex*> ForexList )
 {
 
@@ -119,7 +119,7 @@ gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
     }
 
     //! matrix to fill
-    gsl_matrix* mat = gsl_matrix_alloc( fx_size + ud_size, fx_size + ud_size );
+    la_matrix* mat = la_matrix_alloc( fx_size + ud_size, fx_size + ud_size );
 
     //! eq / eq
     if ( ud_size > 1 )
@@ -135,8 +135,8 @@ gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
             {
                 string v = UnderlyingNameList[j];
                 double x = GetValue( u, v );
-                gsl_matrix_set( mat, i, j, x );
-                gsl_matrix_set( mat, j, i, x );
+                la_matrix_set( mat, i, j, x );
+                la_matrix_set( mat, j, i, x );
             }
         }
     }
@@ -157,8 +157,8 @@ gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
                 double x = GetValue( a->GetUnderlyingCurrency()->GetName(),
                                      a->GetBaseCurrency()->GetName(),
                                      v );
-                gsl_matrix_set( mat, i, j + ud_size, x );
-                gsl_matrix_set( mat, j + ud_size, i, x );
+                la_matrix_set( mat, i, j + ud_size, x );
+                la_matrix_set( mat, j + ud_size, i, x );
             }
         }
     }
@@ -177,8 +177,8 @@ gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
                                      ( b )->GetUnderlyingCurrency()->GetName(),
                                      ( b )->GetBaseCurrency()->GetName() );
 
-                gsl_matrix_set( mat, i, j + fx_size, x );
-                gsl_matrix_set( mat, j + fx_size, i, x );
+                la_matrix_set( mat, i, j + fx_size, x );
+                la_matrix_set( mat, j + fx_size, i, x );
             }
         }
     }
@@ -188,10 +188,10 @@ gsl_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
           i < fx_size + ud_size;
           i++ )
     {
-        gsl_matrix_set( mat, i, i, 1 );
+        la_matrix_set( mat, i, i, 1 );
     }
 
-    // ext_gsl_matrix_log( mat );
+    // ext_la_matrix_log( mat );
 
     return mat;
 }
@@ -202,7 +202,7 @@ double Correlation::GetValue( const string& u1,
 {
     size_t i = LookAtPosition( _single_list, u1 );
     size_t j = LookAtPosition( _single_list, u2 );
-    return gsl_matrix_get( _matrix, i, j );
+    return la_matrix_get( _matrix, i, j );
 }
 
 //!
@@ -281,7 +281,7 @@ double Correlation::GetCholeskyValue( const string& u1,
 {
     size_t i = LookAtPosition( _cholesky_single_list, u1 );
     size_t j = LookAtPosition( _cholesky_single_list, u2 );
-    return ( j > i ) ? 0 : gsl_matrix_get( _cholesky_matrix, i, j );
+    return ( j > i ) ? 0 : la_matrix_get( _cholesky_matrix, i, j );
 }
 
 //!
@@ -323,7 +323,7 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
     SetCholeskySingleList();
 
     //! positiveness test
-    if ( !ext_gsl_matrix_is_positive( _cholesky_matrix ) )
+    if ( !ext_la_matrix_is_positive( _cholesky_matrix ) )
     {
         ERR( _name + " is not SDP" );
     }
@@ -332,7 +332,7 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
 }
 
 //!
-gsl_matrix* Correlation::ExtractCholeskyMatrix( const vector<string> /*UnderlyingNames*/ )
+la_matrix* Correlation::ExtractCholeskyMatrix( const vector<string> /*UnderlyingNames*/ )
 {
     //! not implemented (and currently unused)
     ERR( "correlation '" + _name + "' : ExtractCholeskyMatrix not implemented" );

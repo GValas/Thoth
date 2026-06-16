@@ -11,13 +11,13 @@ PricerPDE::PricerPDE( const string& ObjectName,
 
 PricerPDE::~PricerPDE() = default;
 
-double PricerPDE::GetGridPrice( double x, gsl_vector* Uy )
+double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 {
     // x_vector (owned locally, freed on return)
-    GslVector Ux = gsl_vector_alloc( Uy->size );
+    GslVector Ux = la_vector_alloc( Uy->size );
     for ( int j = 0; j < (int)Uy->size; j++ )
     {
-        gsl_vector_set( Ux, j, j * h );
+        la_vector_set( Ux, j, j * h );
     }
 
     // interpolation (inputs stay owned here)
@@ -272,7 +272,7 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
 }
 
 //! zero the solved layer in the knocked region (called at each monitoring step)
-void PricerPDE::ApplyDiscreteBarrier( gsl_vector* U )
+void PricerPDE::ApplyDiscreteBarrier( la_vector* U )
 {
     for ( int j = 0; j < J + 1; j++ )
     {
@@ -280,7 +280,7 @@ void PricerPDE::ApplyDiscreteBarrier( gsl_vector* U )
         bool knocked = _barrier_is_up ? ( X >= _barrier_level ) : ( X <= _barrier_level );
         if ( knocked )
         {
-            gsl_vector_set( U, j, 0 );
+            la_vector_set( U, j, 0 );
         }
     }
 }
@@ -290,18 +290,18 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 {
 
     // vectors & matrices allocations (RAII: freed on every exit, incl. ERR throw)
-    GslVector diag_u = gsl_vector_calloc( J );     // up diag
-    GslVector diag_m = gsl_vector_calloc( J + 1 ); // mid diag
-    GslVector diag_d = gsl_vector_calloc( J );     // down diag
-    GslVector D_1 = gsl_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
-    GslVector U_0 = gsl_vector_calloc( J + 1 );
-    GslVector U_1 = gsl_vector_calloc( J + 1 );
-    // gsl_matrix * V        = gsl_matrix_calloc(J+1, N+1);
+    GslVector diag_u = la_vector_calloc( J );     // up diag
+    GslVector diag_m = la_vector_calloc( J + 1 ); // mid diag
+    GslVector diag_d = la_vector_calloc( J );     // down diag
+    GslVector D_1 = la_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
+    GslVector U_0 = la_vector_calloc( J + 1 );
+    GslVector U_1 = la_vector_calloc( J + 1 );
+    // la_matrix * V        = la_matrix_calloc(J+1, N+1);
 
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
     for ( int i = 0; i < J + 1; i++ )
     {
-        gsl_vector_set( U_1, i, Ctr->PDE_EvalFlow( Phi( i * h ) ) );
+        la_vector_set( U_1, i, Ctr->PDE_EvalFlow( Phi( i * h ) ) );
     }
 
     //! discrete barrier observed at maturity (terminal step N)
@@ -310,19 +310,19 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         ApplyDiscreteBarrier( U_1 );
     }
 
-    // gsl_matrix_set_col (V, N, U_1);
+    // la_matrix_set_col (V, N, U_1);
     // PrintList(U_1);
 
     // diagonals
-    gsl_vector_set( diag_u, 0, 0 );
-    gsl_vector_set( diag_m, 0, 1 );
-    gsl_vector_set( diag_m, J, 1 );
-    gsl_vector_set( diag_d, J - 1, 0 );
+    la_vector_set( diag_u, 0, 0 );
+    la_vector_set( diag_m, 0, 1 );
+    la_vector_set( diag_m, J, 1 );
+    la_vector_set( diag_d, J - 1, 0 );
     for ( int j = 1; j < J; j++ )
     {
-        gsl_vector_set( diag_u, j, T_0( j, j + 1 ) );
-        gsl_vector_set( diag_m, j, T_0( j, j ) );
-        gsl_vector_set( diag_d, j - 1, T_0( j, j - 1 ) );
+        la_vector_set( diag_u, j, T_0( j, j + 1 ) );
+        la_vector_set( diag_m, j, T_0( j, j ) );
+        la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) );
     }
     // PrintList(diag_u);
     // PrintList(diag_m);
@@ -333,11 +333,11 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     {
 
         // right side
-        gsl_vector_set( D_1, 0, u_dw ); // down boundary (fonction de t?)
-        gsl_vector_set( D_1, J, u_up ); // up boundary (fonction de t?)
+        la_vector_set( D_1, 0, u_dw ); // down boundary (fonction de t?)
+        la_vector_set( D_1, J, u_up ); // up boundary (fonction de t?)
         for ( int j = 1; j < J; j++ )
         {
-            gsl_vector_set( D_1, j, T_1( j, j - 1 ) * gsl_vector_get( U_1, j - 1 ) + T_1( j, j ) * gsl_vector_get( U_1, j ) + T_1( j, j + 1 ) * gsl_vector_get( U_1, j + 1 ) );
+            la_vector_set( D_1, j, T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) + T_1( j, j ) * la_vector_get( U_1, j ) + T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 ) );
         }
 
         // PrintList(D_1);
@@ -355,14 +355,14 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         }
 
         // copy U_0 to U_1 for next step
-        gsl_vector_memcpy( U_1, U_0 );
+        la_vector_memcpy( U_1, U_0 );
 
         //! discrete barrier: zero the knocked region at scheduled steps
         if ( _discrete_monitor_steps.count( i ) )
         {
             ApplyDiscreteBarrier( U_1 );
         }
-        // gsl_matrix_set_col (V, i, U_0);
+        // la_matrix_set_col (V, i, U_0);
     }
 
     // read pricer from grid

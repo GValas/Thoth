@@ -35,7 +35,7 @@ class PricerPDE : public Pricer
 
     // outputs
     double Price;
-    double GetGridPrice( double x, gsl_vector* Uy );
+    double GetGridPrice( double x, la_vector* Uy );
 
     // original grid
     double X_0; // we look for V(X_0) = u(x_0)
@@ -117,7 +117,7 @@ class PricerPDE : public Pricer
     std::set<int> _discrete_monitor_steps;
 
     //! zero a solved layer in the knocked region (used at each monitoring step)
-    void ApplyDiscreteBarrier( gsl_vector* U );
+    void ApplyDiscreteBarrier( la_vector* U );
 
     //! init & solve. ApplyBarrier turns on barrier handling: a Dirichlet clamp
     //! for continuous monitoring, or the discrete-step zeroing set up here.

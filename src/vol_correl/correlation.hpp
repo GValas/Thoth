@@ -35,18 +35,18 @@ class Correlation : public Object
     void ComputeCholeskyMatrix( const vector<string>& UnderlyingList );
 
     //! setter
-    void SetMatrix( gsl_vector* Matrix );
-    void SetSymmetricMatrix( gsl_vector* SymmetricMatrix );
+    void SetMatrix( la_vector* Matrix );
+    void SetSymmetricMatrix( la_vector* SymmetricMatrix );
     void SetForexList( const vector<Forex*>& ForexList );
     void SetUnderlyingList( const vector<string>& UnderlyingList );
     void SetSubMatrix( const vector<string>& UnderlyingList,
                        vector<string> ForexList );
 
     //! access to matrix
-    gsl_matrix* ExtractCholeskyMatrix( const vector<string> UnderlyingNames );
-    gsl_matrix* ExtractMatrix( vector<string> UnderlyingNameList,
+    la_matrix* ExtractCholeskyMatrix( const vector<string> UnderlyingNames );
+    la_matrix* ExtractMatrix( vector<string> UnderlyingNameList,
                                vector<Forex*> ForexList );
-    gsl_matrix* ExtractMatrix();
+    la_matrix* ExtractMatrix();
 
     //! read correl matrix : 3 ways
     double GetValue( const string& udl1,

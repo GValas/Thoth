@@ -72,7 +72,7 @@ class YamlConfig
     vector<bool> GetBooleanList( const string& Path );
     vector<string> GetStringList( const string& Path );
     vector<double> GetDoubleList( const string& Path );
-    gsl_vector* GetGslVector( const string& Path );
+    la_vector* GetGslVector( const string& Path );
     vector<int> GetIntegerList( const string& Path );
     vector<date> GetDateList( const string& Path );
 
@@ -89,9 +89,9 @@ class YamlConfig
     void SetDateList( const string& Path,
                       const vector<date>& Value );
     void SetGslMatrix( const string& Path,
-                       const gsl_matrix* Value );
+                       const la_matrix* Value );
     void SetGslVector( const string& Path,
-                       const gsl_vector* Value );
+                       const la_vector* Value );
     void SetString( const string& Path,
                     const string& Value );
     void SetStringList( const string& Path,

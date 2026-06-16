@@ -50,34 +50,34 @@ void M3_to_SLN( const double M1,
                 double& Var,
                 double& D );
 
-void LN_to_M4( gsl_vector* Fwds,
-               gsl_vector* Vols,
-               gsl_matrix* Corr,
+void LN_to_M4( la_vector* Fwds,
+               la_vector* Vols,
+               la_matrix* Corr,
                double& M1,
                double& M2,
                double& M3,
                double& M4 );
 
-gsl_matrix* ext_gsl_vector_to_matrix( const gsl_vector* v,
+la_matrix* ext_la_vector_to_matrix( const la_vector* v,
                                       size_t row_size );
 //! in-place lower-triangular Cholesky (A = L L^T); false if not positive-definite
-bool CholeskyDecomposeLower( gsl_matrix* A );
+bool CholeskyDecomposeLower( la_matrix* A );
 //! solve a tridiagonal system M X = B (Thomas algorithm)
-void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
-                       const gsl_vector* Sub, const gsl_vector* B, gsl_vector* X );
+void SolveTridiagonal( const la_vector* Diag, const la_vector* Super,
+                       const la_vector* Sub, const la_vector* B, la_vector* X );
 //! ordinary least squares (normal equations + Cholesky); returns beta (size X cols)
-vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y );
-bool ext_gsl_matrix_is_positive( const gsl_matrix* m );
-bool ext_gsl_matrix_is_square( const gsl_matrix* m );
-bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m );
-void ext_gsl_matrix_to_near_positive( gsl_matrix* m,
+vector<double> LeastSquares( const la_matrix* X, const la_vector* y );
+bool ext_la_matrix_is_positive( const la_matrix* m );
+bool ext_la_matrix_is_square( const la_matrix* m );
+bool ext_la_matrix_is_symmetric( const la_matrix* m );
+void ext_la_matrix_to_near_positive( la_matrix* m,
                                       double& eps );
-void ext_gsl_matrix_shift_to_epsilon( gsl_matrix* m,
+void ext_la_matrix_shift_to_epsilon( la_matrix* m,
                                       double eps );
-void ext_gsl_matrix_from_symmetric( gsl_matrix* m );
-void ext_gsl_matrix_to_symmetric( gsl_matrix* m );
+void ext_la_matrix_from_symmetric( la_matrix* m );
+void ext_la_matrix_to_symmetric( la_matrix* m );
 
-double ext_gsl_vector_sum( gsl_vector* v );
+double ext_la_vector_sum( la_vector* v );
 
 double ext_gsl_stats_wcovariance_m( const double w[],
                                     const double data1[],
@@ -112,11 +112,11 @@ double ext_gsl_stats_wcovariance_m_v( const double w[],
 
 vector<double> ToSymmetricMatrix( const vector<double>& Matrix );
 vector<double> FromSymmetricMatrix( const vector<double>& Matrix );
-gsl_matrix* ToGslMatrix( const vector<double>& Matrix );
-vector<double> FromGslMatrix( gsl_matrix* Matrix );
+la_matrix* ToGslMatrix( const vector<double>& Matrix );
+vector<double> FromGslMatrix( la_matrix* Matrix );
 
 //
-double InterpolateWithSpline( gsl_vector* x_serie, gsl_vector* y_serie, double x_point );
+double InterpolateWithSpline( la_vector* x_serie, la_vector* y_serie, double x_point );
 
 //! computes the weighted correlation, given means and variances
 double ext_gsl_stats_wcorrelation_m_v( const double w[],
