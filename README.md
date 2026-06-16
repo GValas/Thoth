@@ -366,3 +366,7 @@ run_local_client.sh   POST one YAML to a running server, write <input>.out.yaml
 - Pricing currently uses a single reference (ATM) volatility per underlying, so
   a `sabr_volatility` smile only influences the price through its ATM level; a
   full local-vol grid is not wired in. `bs_volatility` (flat) is exact.
+- Monte-Carlo runs on CPU (multi-core within a process, multi-host via the
+  cluster). GPU (CUDA / RTX) acceleration is not implemented; see
+  [`docs/gpu_mcl.md`](docs/gpu_mcl.md) for a feasibility note and proposed
+  `mcl_gpu` engine design.
