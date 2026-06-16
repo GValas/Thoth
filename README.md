@@ -82,14 +82,19 @@ theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).
 
-**Stochastic volatility (Heston)** — `heston_volatility` (`init_vol`/`long_vol`/
+**Stochastic volatility (Heston / Bates)** — `heston_volatility` (`init_vol`/`long_vol`/
 `kappa`/`vol_of_vol`, vols in percent; the spot/variance correlation ρ lives in
 the global `correlation_matrix` as the underlying against its variance
 pseudo-underlying `<name>_var`) is priced consistently by all three engines: MCL via
 the Andersen QE variance scheme, ANA via the characteristic function (Carr–Madan /
 Little-Heston-Trap), and PDE via a 2-D `(S,v)` Douglas-ADI grid (European and
 American). The three agree to ~0.3% across moneyness, and the degenerate
-(vol-of-vol → 0) limit reproduces Black-Scholes.
+(vol-of-vol → 0) limit reproduces Black-Scholes. Adding lognormal
+(compound-Poisson) jumps — `jump_intensity` (λ per year), `jump_mean`, `jump_vol`
+— turns it into the **Bates** model: priced by **MCL** (an independent jump node
+on the QE spot) and **ANA** (the closed-form jump characteristic function
+multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). See
+`samples/bates_call.yaml`.
 
 **Analytics objects**
 - `pricer`, `historical_volatility_computation`,
@@ -121,7 +126,10 @@ cmake --build build -j        # -> ./build/thoth
 ```
 
 A devcontainer (`.devcontainer/`) and a production `Dockerfile` (multi-stage,
-lean runtime image) are provided.
+lean runtime image) are provided. The devcontainer preinstalls the C++ toolchain
+extensions plus **Graphviz Interactive Preview** (`tintinweb.graphviz-interactive-preview`),
+so the `generate_nodes_graph` `.dot` dumps can be previewed in-editor without an
+external `dot` render.
 
 ### Tests
 
@@ -158,8 +166,9 @@ so debug with a small book or a reduced `paths`.
 
 ```bash
 ./build/thoth -batch <input.yaml> <output.yaml> [exec_name]
-# convenience wrapper:
-./run_batch.sh
+# or build the production image and price in a container — the result is written
+# next to the input as <input>.out.yaml, owned by the invoking user:
+./run_docker_batch.sh --input samples/simple_call.yaml
 ```
 
 The output YAML is the input config with the computed `*_result` blocks added.
@@ -167,33 +176,33 @@ The output YAML is the input config with the computed `*_result` blocks added.
 To exercise every engine at once, `samples/matrix.yaml` is a `!sequence`
 task that runs the full pricer/product matrix (vanilla european/american,
 continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one
-process. `./run_matrix.sh` posts it to a running server (like `run_simple_call.sh`)
-and prints the premiums as a table.
+process — price it like any other book (`-batch`, or post it to a server with
+`run_local_client.sh`).
 
 ### HTTP pricing service
 
 ```bash
 ./build/thoth -server 8080                       # POST /price, GET /health
-# or via Docker:
-./run_serve.sh
+# or build the image and serve from a container:
+./run_docker_server.sh --port 8080
 
 curl --data-binary @samples/simple_call.yaml localhost:8080/price
 # the built-in client:
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
-# or the wrapper, which writes the result next to the input as
-# samples/<input>.out.yaml (these *.out.yaml files are gitignored):
-./run_simple_call.sh samples/simple_call.yaml        # -> samples/simple_call.out.yaml
+# or the wrapper, which POSTs the input to a running server and writes the result
+# next to it as samples/<input>.out.yaml (these *.out.yaml files are gitignored):
+./run_local_client.sh --input samples/simple_call.yaml --port 8080
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
 `X-Exec-Name` header selects which object to run (default: the `root` object).
-Send `Content-Type: application/x-yaml` for bodies over ~8 KB (`run_simple_call.sh`
+Send `Content-Type: application/x-yaml` for bodies over ~8 KB (`run_local_client.sh`
 already does); the default form content type is capped by the HTTP library.
 
 Requests are serialised (the engine shares global GSL state): the server logs
 the client IP on arrival and again if a request has to wait. If a client
 disconnects mid-pricing the run is cancelled, freeing the server instead of
-finishing a result nobody will read. `run_serve.sh` passes `docker run -t`, so
+finishing a result nobody will read. `run_docker_server.sh` passes `docker run -t`, so
 the server console shows the live single-line progress bar; captured later via
 `docker logs` (no live TTY) it reads as one bar line every 10%.
 
@@ -207,8 +216,11 @@ aggregate the results:
 ./build/thoth -server 8091 &                     # slaves
 ./build/thoth -server 8092 &
 ./build/thoth -cluster 8090 http://localhost:8091 http://localhost:8092
-# or the wrapper (launches N local slaves + master, posts a book, cleans up):
-./run_cluster.sh samples/simple_call.yaml 2
+# or the Docker wrapper: one container per slave + a master, all on a private
+# network (Ctrl-C, or the master exiting, tears the whole cluster down):
+./run_docker_cluster.sh --port 8090 --slaves 2
+# then POST a book to the master (single-MCL-pricer books get path-split):
+./run_local_client.sh --input samples/simple_call.yaml --port 8090
 ```
 
 The master splits `paths` evenly and gives each slave a distinct `seed`, which
@@ -307,10 +319,12 @@ matrices are flat number lists. Output YAML is emitted with fields in
 alphabetical order (stable, diff-friendly).
 
 `samples/` holds runnable books: `simple_call.yaml` (the 1y ATM call above,
-Black-Scholes ~15.71), `heston_call.yaml` (a Heston call priced by all three
-engines) and `matrix.yaml` — a `!sequence` running the full pricer/product matrix
-(vanilla european/american, quanto, continuous/discrete barriers, variance swap,
-across PDE / MCL / ANA) in one process.
+Black-Scholes ~15.71, with the node-graph debug switch enabled),
+`heston_call.yaml` (a Heston call priced by all three engines),
+`bates_call.yaml` (a Bates — Heston + jumps — call priced by MCL, dumping its
+node DAG to Graphviz) and `matrix.yaml` — a `!sequence` running the full
+pricer/product matrix (vanilla european/american, quanto, continuous/discrete
+barriers, variance swap, across PDE / MCL / ANA) in one process.
 
 ---
 
@@ -324,14 +338,12 @@ Dockerfile       production image (multi-stage)
 .devcontainer/   VS Code dev container
 .vscode/         editor tasks + gdb debug configs
 CMakeLists.txt   build
-format.sh        clang-format wrapper (--check for CI)
-run_batch.sh     batch convenience wrapper
-run_matrix.sh    post the full pricer/product matrix to a server (samples/matrix.yaml)
-run_heston.sh    post the Heston sample to a server (ANA/PDE/MCL premiums + Greeks)
-run_serve.sh     start the HTTP pricing server (Docker)
-run_simple_call.sh    post a config to a running server
-run_clients.sh   fire N parallel clients on one input (queue test)
-run_cluster.sh   launch a local master + N slaves and price one book through it
+format.sh             clang-format wrapper (--check for CI)
+run_docker_batch.sh   build the image and price one YAML in batch (in a container)
+run_docker_server.sh  build the image and run the HTTP pricing server (container)
+run_docker_cluster.sh build the image and bring up a master + N slave containers
+run_docker_common.sh  shared helper (builds the single Thoth image) — sourced, not run
+run_local_client.sh   POST one YAML to a running server, write <input>.out.yaml
 ```
 
 ---

@@ -1,0 +1,80 @@
+root: bates_call_pricing
+
+# 1y ATM call (spot 100, strike 100, rate 5%) on a Bates underlying.
+# Bates = Heston stochastic vol + lognormal (compound-Poisson) jumps. Priced by
+# the Monte-Carlo (mcl) engine: Andersen QE variance + a jump node on the QE
+# spot. The pricer attaches a debug_configuration with generate_nodes_graph so
+# the built MC node DAG is dumped as Graphviz to samples/bates_call_pricing_nodes.dot.
+
+bates_call_pricing: !pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  configuration: config
+  correlation: correl
+  indicators: [premium, delta, gamma, vega]
+  result: bates_call_result
+  debug_configuration: debug
+
+config: !pricer_configuration
+  method: mcl
+  mcl_configuration: mcl_config
+  log_path: "samples/"
+
+debug: !debug_configuration
+  generate_nodes_graph: true
+
+mcl_config: !mcl_configuration
+  max_time_step: 3
+  min_time_step: -1
+  paths: 200000
+  vol_time_step: 0.01
+  use_sobol: true
+  use_milstein: true
+
+book: !book
+  options: [bates_call]
+
+bates_call: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
+
+# Bates underlying: Heston dynamics (v0 = long var = 25% vol, kappa 2,
+# vol-of-vol 0.5, rho -0.7) plus lognormal jumps (0.5/yr, mean -10%, vol 15%).
+eq: !equity
+  spot: 100
+  volatility: bates_vol
+  currency: eur
+
+bates_vol: !heston_volatility
+  spot: 100
+  init_vol: 25       # sqrt(v0)    in percent
+  long_vol: 25       # sqrt(theta) in percent
+  kappa: 2           # mean-reversion speed
+  vol_of_vol: 0.5    # xi
+  jump_intensity: 0.5  # lambda (jumps per year)
+  jump_mean: -0.10     # log-jump mean (crash-like)
+  jump_vol: 0.15       # log-jump vol
+  calendar: calendar
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: eur_rate
+
+eur_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [5, 5]
+
+# Heston spot/variance correlation rho = -0.7: "eq" against its variance
+# pseudo-underlying "eq_var".
+correl: !correlation_matrix
+  underlyings: [eq, eq_var]
+  matrix: [1, -0.7, -0.7, 1]

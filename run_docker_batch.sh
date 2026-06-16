@@ -50,7 +50,10 @@ thoth_build_image
 echo "==> Pricing $IN_NAME -> $OUT_NAME (in $DATA_DIR)"
 # ENTRYPOINT is `thoth`, so the args below are thoth's. -t gives a live progress
 # bar; --rm cleans the container up; the dir is mounted read-write for the output.
-docker run --rm -t -v "$DATA_DIR:/data" "$THOTH_IMAGE" \
+# --user maps the container to the invoking host user so the written .out.yaml is
+# owned by us (not root) — otherwise a later host-side run (e.g. run_local_client.sh)
+# cannot overwrite the root-owned output and fails with "Permission denied".
+docker run --rm -t --user "$(id -u):$(id -g)" -v "$DATA_DIR:/data" "$THOTH_IMAGE" \
     -batch "/data/$IN_NAME" "/data/$OUT_NAME"
 
 echo "==> Done. Result written to $DATA_DIR/$OUT_NAME"

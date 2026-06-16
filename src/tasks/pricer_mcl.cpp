@@ -318,10 +318,15 @@ void PricerMCL::CreateBrownianNodes_()
         NoiseNode* N = _collector.NewNode<NoiseNode>( node_name );
         N->SetRandomGenerator( _gsl_r );
 
-        //! brownian
-        node_name = ( *u )->GetName() + "#brownian";
-        BrownianNode* B = _collector.NewBrownianNode( node_name );
-        B->SetNoiseNode( N );
+        //! brownian — only the local-vol SpotDiffusionNode consumes it; a Heston
+        //! spot reads its white-noise directly, so building one for a stochastic-vol
+        //! underlying would leave it orphaned (unused node, dead in the DAG/graph).
+        if ( !( *u )->GetVolatility()->IsStochastic() )
+        {
+            node_name = ( *u )->GetName() + "#brownian";
+            BrownianNode* B = _collector.NewBrownianNode( node_name );
+            B->SetNoiseNode( N );
+        }
 
         //! stochastic vol (Heston) underlyings need a second, independent noise
         //! for the variance process (pseudo-random; Sobol stays on the spot noise)

@@ -15,7 +15,8 @@
         "ms-vscode.cpptools-extension-pack",
         "ms-vscode.cmake-tools",
         "ms-vscode.makefile-tools",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "tintinweb.graphviz-interactive-preview"
       ],
       "settings": {
         // Le terminal "Claude Code" (.vscode/tasks.json) s'ouvre dans le Panel.
