@@ -6,7 +6,20 @@
   "features": {
     "ghcr.io/devcontainers/features/node:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    // CUDA toolkit (nvcc) for the GPU Monte-Carlo engine (mcl_gpu). Compiling the
+    // .cu only needs the toolkit; running the kernel needs the host GPU, attached
+    // via "hostRequirements.gpu" below (needs the NVIDIA Container Toolkit on the host).
+    "ghcr.io/devcontainers/features/nvidia-cuda:1": {
+      "installToolkit": true,
+      "installCudnn": false,
+      "cudaVersion": "12.4"
+    }
+  },
+  // Attach the host NVIDIA GPU when one is available. "optional" keeps the
+  // container working (CPU-only, mcl_gpu falls back to mcl) on a host with no GPU.
+  "hostRequirements": {
+    "gpu": "optional"
   },
   "customizations": {
     "vscode": {
@@ -25,6 +38,6 @@
       }
     }
   },
-  "postCreateCommand": "g++ --version && cmake --version && git --version && claude --version",
+  "postCreateCommand": "g++ --version && cmake --version && git --version && claude --version; (nvcc --version && nvidia-smi -L) || echo 'CUDA toolkit/GPU not detected (mcl_gpu will fall back to CPU)'",
   "remoteUser": "vscode"
 }

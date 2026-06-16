@@ -153,6 +153,18 @@ Or build/run the GPU Docker image (`Dockerfile.gpu`, needs the NVIDIA Container
 Toolkit) via `./run_docker_server_gpu.sh`. Without CUDA the engine still builds
 and falls back to the CPU `mcl` engine at run time.
 
+The **devcontainer** ships the CUDA toolkit (the `nvidia-cuda` feature) and
+requests the host GPU (`hostRequirements.gpu: optional`, needs the NVIDIA
+Container Toolkit on the host), so on a GPU host you can build and run the engine
+in-container directly:
+
+```bash
+cmake -B build-gpu -DTHOTH_ENABLE_CUDA=ON && cmake --build build-gpu -j
+./build-gpu/thoth -batch samples/gpu_call.yaml /tmp/out.yaml   # runs on the GPU
+```
+
+On a host with no GPU the devcontainer still opens (CPU-only, `mcl_gpu` falls back).
+
 ### Tests
 
 A doctest suite (`tests/`) covers European/American vanillas, barriers,
