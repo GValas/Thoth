@@ -26,18 +26,20 @@ GlobalProgress& global_progress()
     return g;
 }
 
-ProgressBar::ProgressBar( const string& Label, long Total, bool Enabled )
+ProgressBar::ProgressBar( const string& Label, long Total, bool Enabled, bool PublishGlobal )
     : _label( Label ),
       _total( Total > 0 ? Total : 1 ),
       _enabled( Enabled ),
+      _publish_global( PublishGlobal ),
       _tty( isatty( STDOUT_FILENO ) != 0 ),
       _start( time( nullptr ) ),
       _last_percent( -1 ),
       _last_width( 0 )
 {
-    //! only the visible (enabled) bar publishes globally; the silenced inner
-    //! re-price bars of bump-and-revalue Greeks must not clobber the snapshot.
-    if ( _enabled )
+    //! only the visible (enabled) bar publishes globally, and only when allowed;
+    //! the silenced inner re-price bars of bump-and-revalue Greeks must not
+    //! clobber the snapshot, nor must a slave-local pass (theta reprice).
+    if ( _enabled && _publish_global )
     {
         GlobalProgress& g = global_progress();
         g.total.store( _total );
@@ -57,7 +59,10 @@ void ProgressBar::Update( long Current, const std::function<string()>& InfoFn )
     {
         return;
     }
-    global_progress().current.store( Current );
+    if ( _publish_global )
+    {
+        global_progress().current.store( Current );
+    }
     int percent = (int)( 100.0 * Current / _total );
     if ( percent == _last_percent || percent >= 100 ) //!< nothing new; leave 100% to Done()
     {
@@ -78,9 +83,12 @@ void ProgressBar::Done( const string& Info )
     {
         return;
     }
-    GlobalProgress& g = global_progress();
-    g.current.store( _total );
-    g.active.store( false ); //!< pricing finished; master poller can stop counting it
+    if ( _publish_global )
+    {
+        GlobalProgress& g = global_progress();
+        g.current.store( _total );
+        g.active.store( false ); //!< pricing finished; master poller can stop counting it
+    }
     Render( _total, Info, true );
 }
 

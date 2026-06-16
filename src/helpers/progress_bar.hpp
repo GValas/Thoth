@@ -30,7 +30,11 @@ class ProgressBar
     //! Enabled=false makes the bar a no-op (Update/Done print nothing). Used to
     //! silence the inner re-prices of bump-and-revalue Greeks, which would
     //! otherwise redraw the bar once per bumped scenario.
-    ProgressBar( const string& Label, long Total, bool Enabled = true );
+    //! PublishGlobal=false keeps this bar's advancement out of the process-wide
+    //! GlobalProgress snapshot (GET /progress). Used for a slave-local pass (e.g.
+    //! the theta one-day reprice) that should still display locally but must not
+    //! disturb the cluster master's aggregate progress, which tracks the split.
+    ProgressBar( const string& Label, long Total, bool Enabled = true, bool PublishGlobal = true );
 
     void Update( long Current );
     //! lazy variant : InfoFn is only evaluated when the bar actually redraws
@@ -45,6 +49,7 @@ class ProgressBar
     string _label;
     long _total;
     bool _enabled;
+    bool _publish_global;
     bool _tty;
     time_t _start;
     int _last_percent;  //!< last drawn percent (throttles redraws to 1% steps)

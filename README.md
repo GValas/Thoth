@@ -47,7 +47,8 @@ engine then computes them the cheapest way for its structure:
 - **MCL** builds the base tree and every spot/vol/rate bump sub-tree into **one**
   node graph that shares the (expensive) Brownian/noise nodes, and prices them in
   a **single path sweep** — so delta/gamma/vega/rho cost one simulation, not one
-  per bump. theta is a separate one-day reprice. Sharing the path nodes is exact
+  per bump. theta is a separate one-day reprice (a second, base-only sweep, shown
+  under its own `MCL theta` progress bar). Sharing the path nodes is exact
   common-random-numbers, so the Greeks match the old reset-per-scenario values
   bit-for-bit. Books with American contracts or non-trivial (basket/composite)
   underlyings fall back to book-level bump-and-revalue.

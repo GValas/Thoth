@@ -38,6 +38,8 @@ class PricerMCL : public Pricer
     //! node; _scenario_premium holds each bump's MC premium after Tree_Read_.
     bool _build_greek_scenarios = false; //!< set per PriceBook_: build the bump sub-trees
     bool _suppress_scenarios = false;    //!< force a base-only tree (theta reprice / fallback)
+    bool _theta_pass = false;            //!< the theta one-day reprice: show a local "MCL theta"
+                                         //!< bar even while quiet, but keep it out of GlobalProgress
     vector<std::pair<string, MonteCarloNode*>> _scenario_roots;
     map<string, double> _scenario_premium;
     bool CanSingleTreeGreeks_() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)

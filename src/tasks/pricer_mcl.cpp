@@ -223,13 +223,15 @@ void PricerMCL::ComputeGreeks_()
             contract_trust.push_back( c->GetPremiumTrust() );
         }
 
-        _quiet_pricing = true;
+        _quiet_pricing = true; //!< suppress the status lines / node-graph dump...
+        _theta_pass = true;    //!< ...but still show a labelled "MCL theta" bar
         _suppress_scenarios = true;
         _today = base_today + days( 1 );
         PriceBook_(); //!< the single extra graph
         const double p1 = _book->GetPremium();
         _today = base_today;
         _suppress_scenarios = false;
+        _theta_pass = false;
         _quiet_pricing = false;
 
         //! restore the base scenario (dates + premiums) without repricing
@@ -495,7 +497,13 @@ void PricerMCL::Tree_Run_()
     //! (one backward step per exercise date, per American contract). For a plain
     //! European book the LSM part is 0, so the bar is just the sweep.
     const long lsm_steps = AmericanLsmSteps_();
-    _progress_bar = std::make_unique<ProgressBar>( "MCL", (long)n + lsm_steps, !_quiet_pricing );
+    //! the theta one-day reprice runs under _quiet_pricing (no status lines / graph
+    //! dump), but we still show its own labelled bar so it is not a silent gap
+    //! after the main sweep finishes; it is kept out of GlobalProgress so it does
+    //! not make a cluster master's aggregate bar run backwards during that tail.
+    const bool show_bar = !_quiet_pricing || _theta_pass;
+    const string bar_label = _theta_pass ? "MCL theta" : "MCL";
+    _progress_bar = std::make_unique<ProgressBar>( bar_label, (long)n + lsm_steps, show_bar, !_theta_pass );
 
     for ( int i = 0; i < n; i++ )
     {
