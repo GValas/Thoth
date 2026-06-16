@@ -55,6 +55,28 @@ TEST_CASE( "a missing referenced object is rejected" )
     CHECK_THROWS_AS( Price( o.str() ), std::runtime_error );
 }
 
+TEST_CASE( "a non positive-definite correlation matrix is rejected" )
+{
+    // off-diagonal 1.5 (>1) makes the 2x2 correlation matrix indefinite; the
+    // correlation object must reject it at load rather than misprice silently.
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( "ana", 1, 30, 6 )
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "cor: !correlation_matrix {underlyings: [eq, eq2], matrix: [1, 1.5, 1.5, 1]}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "eq2: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "book: !book {options: [o]}\n"
+      << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " maturity: 2000-12-31, type: call, exercise: european}\n";
+    CHECK_THROWS_AS( Price( o.str() ), std::runtime_error );
+}
+
 TEST_CASE( "YamlConfig getter without default throws on a missing key" )
 {
     YamlConfig cfg( YamlConfig::from_string_t{}, "node: {a: 1}\n" );

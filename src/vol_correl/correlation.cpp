@@ -18,6 +18,14 @@ void Correlation::SetMatrix( la_vector* Matrix )
     {
         _matrix = ext_la_vector_to_matrix( Matrix, (size_t)n_sqrt );
         la_vector_free( Matrix ); //!< copied into _matrix; release the source
+
+        //! fail fast on an invalid correlation matrix: every engine needs it
+        //! symmetric positive-definite (MCL Cholesky-factorises it; ANA/PDE read
+        //! its entries directly and would otherwise misprice silently).
+        if ( !ext_la_matrix_is_positive( _matrix ) )
+        {
+            ERR( "correlation '" + _name + "' : matrix is not symmetric positive-definite" );
+        }
     }
     else
     {

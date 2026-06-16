@@ -87,7 +87,8 @@ theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·
 - `yield_curve`, `repo_curve`, `continuous_dividends_curve`,
   `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
   read by **linear interpolation on the (continuously-compounded) rate** between
-  pillars (ACT/365 weight), held flat beyond the first/last pillar.
+  pillars (ACT/365 weight), held flat beyond the first/last pillar. A
+  `correlation_matrix` must be symmetric positive-definite (validated at load).
 - Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).
