@@ -6,16 +6,11 @@
   "features": {
     "ghcr.io/devcontainers/features/node:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-    // CUDA toolkit (nvcc) for the GPU Monte-Carlo engine (mcl_gpu). Compiling the
-    // .cu only needs the toolkit; running the kernel needs the host GPU, attached
-    // via "hostRequirements.gpu" below (needs the NVIDIA Container Toolkit on the host).
-    "ghcr.io/devcontainers/features/nvidia-cuda:1": {
-      "installToolkit": true,
-      "installCudnn": false,
-      "cudaVersion": "12.4"
-    }
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
+  // NOTE: CUDA (nvcc) is installed directly in the Dockerfile, not via the
+  // nvidia-cuda feature — the feature's full toolkit needs libtinfo5, which is
+  // unavailable on Ubuntu 24.04. See .devcontainer/Dockerfile.
   // Attach the host NVIDIA GPU when one is available. "optional" keeps the
   // container working (CPU-only, mcl_gpu falls back to mcl) on a host with no GPU.
   "hostRequirements": {

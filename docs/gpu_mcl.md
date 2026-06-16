@@ -21,8 +21,9 @@ paths), which is a different axis from the existing cluster (paths split across
   device, with per-contract bump-and-revalue Greeks under a **fixed kernel seed**
   (common random numbers → smooth Greeks). Any unsupported book, a CPU-only build,
   or a host with no GPU **falls back to the CPU `mcl` engine**.
-- Build: `-DTHOTH_ENABLE_CUDA=ON` (off by default). `Dockerfile.gpu` +
-  `run_docker_server_gpu.sh` (`--gpus all`). Sample: `samples/gpu_call.yaml`.
+- Build: `-DTHOTH_ENABLE_CUDA=ON` (off by default). The single `Dockerfile`
+  builds the GPU variant via `--build-arg` (CUDA base images + `ENABLE_CUDA=ON`);
+  use `run_docker_server.sh --gpu` (`--gpus all`). Sample: `samples/gpu_call.yaml`.
 - Verified on the CPU-only path (fallback matches `mcl` bit-comparable within MC
   error); the CUDA kernel itself is compiled/run on the RTX host (no GPU in CI).
 

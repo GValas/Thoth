@@ -87,7 +87,7 @@ void PricerMCLGpu::PriceContract_( Contract* Ctr )
         ERR( "gpu pricing '" + _name + "': contract '" + Ctr->GetName() + "' is not GPU-supported" );
     }
 
-    const long paths = (long)_configuration->_mcl->_paths;
+    const long paths = _configuration->_mcl->_paths;
     //! one fixed seed for the base price and every bump -> common random numbers
     const unsigned long seed = (unsigned long)_configuration->_mcl->_seed;
 

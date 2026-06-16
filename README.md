@@ -149,11 +149,15 @@ cmake -B build -DTHOTH_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89   # 89 = Ada
 cmake --build build -j
 ```
 
-Or build/run the GPU Docker image (`Dockerfile.gpu`, needs the NVIDIA Container
-Toolkit) via `./run_docker_server_gpu.sh`. Without CUDA the engine still builds
-and falls back to the CPU `mcl` engine at run time.
+Or build/run the GPU Docker image via `./run_docker_server.sh --gpu` (needs the
+NVIDIA Container Toolkit). The CPU and GPU images come from the **same**
+parameterised `Dockerfile`, and the same `run_docker_server.sh` wrapper runs
+both: `--gpu` swaps in the `nvidia/cuda` base images and `ENABLE_CUDA=ON` through
+`--build-arg` and attaches the host GPU with `--gpus all` (`--arch` sets the
+compute capability, default 89). Without CUDA the engine still builds and falls
+back to the CPU `mcl` engine at run time.
 
-The **devcontainer** ships the CUDA toolkit (the `nvidia-cuda` feature) and
+The **devcontainer** ships the CUDA toolkit (`nvcc`, installed in its Dockerfile) and
 requests the host GPU (`hostRequirements.gpu: optional`, needs the NVIDIA
 Container Toolkit on the host), so on a GPU host you can build and run the engine
 in-container directly:
@@ -312,7 +316,7 @@ my_config: !pricer_configuration
 my_mcl: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 50000
+  paths: 50000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
   vol_time_step: 0.01
   use_sobol: true
   use_milstein: true
@@ -376,15 +380,13 @@ continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one proc
 src/             C++ sources (engine, instruments, market data, IO)
 tests/           doctest regression suite
 samples/         example YAML configs
-Dockerfile       production image (multi-stage, CPU)
-Dockerfile.gpu   CUDA production image (mcl_gpu engine)
+Dockerfile       production image (multi-stage; CPU by default, GPU via build-args)
 .devcontainer/   VS Code dev container
 .vscode/         editor tasks + gdb debug configs
 CMakeLists.txt   build
 format.sh                 clang-format wrapper (--check for CI)
 run_docker_batch.sh       build the image and price one YAML in batch (in a container)
-run_docker_server.sh      build the image and run the HTTP pricing server (container)
-run_docker_server_gpu.sh  build the CUDA image and run a GPU HTTP server (--gpus all)
+run_docker_server.sh      build the image and run the HTTP pricing server (--gpu for the CUDA/--gpus all variant)
 run_docker_cluster.sh     build the image and bring up a master + N slave containers
 run_docker_common.sh      shared helper (builds the single Thoth image) — sourced, not run
 run_local_client.sh       POST one YAML to a running server, write <input>.out.yaml

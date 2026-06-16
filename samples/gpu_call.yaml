@@ -8,7 +8,7 @@ root: gpu_call_pricing
 # GPU, it transparently falls back to the CPU MCL engine -> identical results.
 # Black-Scholes reference premium ~15.71.
 #
-#   ./run_docker_server_gpu.sh                      # GPU server (needs an NVIDIA GPU)
+#   ./run_docker_server.sh --gpu                    # GPU server (needs an NVIDIA GPU)
 #   ./run_local_client.sh --input samples/gpu_call.yaml
 
 gpu_call_pricing: !pricer

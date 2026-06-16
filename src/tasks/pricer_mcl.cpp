@@ -491,7 +491,7 @@ void PricerMCL::Tree_Run_()
     }
 
     //! iterations
-    int n = _configuration->_mcl->_paths;
+    long n = _configuration->_mcl->_paths;
 
     //! the bar spans the whole job: the path sweep plus the American LSM fit
     //! (one backward step per exercise date, per American contract). For a plain
@@ -503,9 +503,9 @@ void PricerMCL::Tree_Run_()
     //! not make a cluster master's aggregate bar run backwards during that tail.
     const bool show_bar = !_quiet_pricing || _theta_pass;
     const string bar_label = _theta_pass ? LogLabel_() + " theta" : LogLabel_();
-    _progress_bar = std::make_unique<ProgressBar>( bar_label, (long)n + lsm_steps, show_bar, !_theta_pass );
+    _progress_bar = std::make_unique<ProgressBar>( bar_label, n + lsm_steps, show_bar, !_theta_pass );
 
-    for ( int i = 0; i < n; i++ )
+    for ( long i = 0; i < n; i++ )
     {
         //! bail out promptly if the request was cancelled (client disconnected)
         cancellation::CancellationPoint();

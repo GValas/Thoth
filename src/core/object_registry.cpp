@@ -433,7 +433,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
         MclConfiguration* M = m.collector().Add( std::make_unique<MclConfiguration>( n ) );
         M->_max_time_step = m.cfg().GetInteger( n + ".max_time_step" );
         M->_min_time_step = m.cfg().GetInteger( n + ".min_time_step" );
-        M->_paths = m.cfg().GetInteger( n + ".paths" );
+        M->_paths = m.cfg().GetLong( n + ".paths" );
         //! year-fraction sub-step, so it is a double (0.01, not 0)
         M->_vol_time_step = m.cfg().GetDouble( n + ".vol_time_step" );
         M->_node_file = m.cfg().GetString( n + ".node_file", MCL_NODE_PATH );

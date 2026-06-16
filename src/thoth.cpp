@@ -296,7 +296,7 @@ static string ClusterPrice( const string& Body,
     mcl = req.GetString( cfg + ".mcl_configuration" );
 
     const int N = (int)Slaves.size();
-    const long total = req.GetInteger( mcl + ".paths" );
+    const long total = req.GetLong( mcl + ".paths" );
     const string result = req.GetString( exec + ".result" );
     const vector<string> contracts = req.GetStringList( req.GetString( exec + ".book" ) + ".options" );
 

@@ -303,6 +303,28 @@ int YamlConfig::GetInteger( const string& Path )
     }
 }
 
+//! like GetInteger but 64-bit, so values above 2^31 (e.g. billions of MC paths)
+//! are not truncated.
+long YamlConfig::GetLong( const string& Path )
+{
+    try
+    {
+        YAML::Node n = LookUp( Path );
+        try
+        {
+            return n.as<long>();
+        }
+        catch ( ... )
+        {
+            return (long)n.as<double>(); //!< autoConvert float -> long
+        }
+    }
+    catch ( ... )
+    {
+        ERR( "parsing error : " + Path + " must be an integer" );
+    }
+}
+
 vector<string> YamlConfig::GetStringList( const string& Path )
 {
     return GetList<string>( Path, "string vector",
