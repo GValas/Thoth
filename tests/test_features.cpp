@@ -320,6 +320,58 @@ TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
     CHECK( std::abs( p - BsCall( 100, 100, 0.05, 0.30, T1 ) ) <= 0.3 );
 }
 
+// --- SABR local-vol Monte-Carlo : the MCL engine samples the Dupire local-vol
+// surface (built from the SABR implied surface) onto per-date log-spot grids and
+// diffuses along them. By the Dupire repricing property a European vanilla under
+// local vol must reproduce the implied-vol (ANA) price, both for a flat surface
+// (constant local vol) and for a genuine smile (non-constant surface).
+TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
+{
+    auto book = []( const std::string& method, const std::string& sabr )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( method, 300000, 7, 6 )
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0], " << sabr
+          << ", calendar: cal}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+          << "book: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+          << " is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n";
+        return o.str();
+    };
+
+    //! flat surface (nu -> 0): local vol is constant = alpha, so local-vol MC must
+    //! reproduce the ANA (= BS) price within Monte-Carlo error
+    {
+        const std::string flat = "rho: [0.0], nu: [0.001]";
+        double ana = Premium( Price( book( "ana", flat ) ) );
+        auto mr = Price( book( "mcl", flat ) );
+        double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( mcl );
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.2 );
+    }
+
+    //! genuine smile: the Dupire local vol reprices the ATM implied vol, so the
+    //! local-vol MC still matches ANA while now exercising a non-constant surface
+    {
+        const std::string smile = "rho: [-0.3], nu: [0.4]";
+        double ana = Premium( Price( book( "ana", smile ) ) );
+        auto mr = Price( book( "mcl", smile ) );
+        double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( mcl );
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.6 );
+    }
+}
+
 // --- Heston (MCL) : in the degenerate limit (vol-of-vol -> 0, v0 = theta) the
 // stochastic-vol diffusion collapses to constant-vol GBM, so it matches BS.
 TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )

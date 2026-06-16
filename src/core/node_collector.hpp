@@ -107,6 +107,10 @@ class NodeCollector
     //! getter
     size_t GetDateIndex( const date& AsOfDate );
 
+    //! the diffusion date schedule (ascending; [0] is today). Available after
+    //! SetDiffusionDates, so node builders can precompute per-date data.
+    const vector<date>& GetDateList() const { return _date_list; }
+
     //! drop every node, date map and recording so the owning pricer can rebuild
     //! a fresh tree (used by the bump-and-revalue Greeks: each scenario rebuilds
     //! the graph so the bumped market is picked up by the nodes)

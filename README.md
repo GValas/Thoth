@@ -411,9 +411,13 @@ run_local_client.sh       POST one YAML to a running server, write <input>.out.y
 - Yield/repo/dividend curves interpolate across their pillars for the ANA and PDE
   engines; the MCL diffusion still drives a single (front-pillar) rate over the
   whole path, so a sloped curve reaches MCL prices only through that front rate.
-- Pricing currently uses a single reference (ATM) volatility per underlying, so
-  a `sabr_volatility` smile only influences the price through its ATM level; a
-  full local-vol grid is not wired in. `bs_volatility` (flat) is exact.
+- Local volatility: the **MCL** engine diffuses a `sabr_volatility` surface as a
+  full **Dupire local-vol** surface for a single-asset (mono) underlying — the
+  surface is sampled onto a per-diffusion-date log-spot grid and read along each
+  path (composite/quanto and basket/multi-asset local-vol are not yet wired). The
+  **ANA** engine uses the implied vol at the option's strike, while the **PDE**
+  engine still uses a single ATM vol (no local-vol grid). `bs_volatility` (flat)
+  is exact in every engine.
 - GPU (CUDA) acceleration (`mcl_gpu`) currently covers **single-asset European
   vanillas under GBM** only; American / barrier / stochastic-vol / multi-asset
   books fall back to the CPU `mcl` engine. Extending the kernel to Heston-QE and

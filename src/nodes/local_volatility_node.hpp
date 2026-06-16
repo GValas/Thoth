@@ -5,15 +5,14 @@ class LocalVolatilityNode : public MonteCarloNode
 {
 
   private:
-    //! gsl interpolation stuff
-    // gsl_interp_accel * _g_acc;
-    // gsl_spline * _g_spline;
-
+    //! per diffusion date: the local vol sampled on a log-spot grid, the grid
+    //! spacing in log-spot, and the (signed) log-spot index of the grid's first
+    //! point (so grid point i sits at log-spot = (offset + i) * ln_step).
     vector<la_vector*> _vol_vector_list;
     vector<double> _ln_step_list;
-    vector<size_t> _offset_list;
+    vector<long> _offset_list;
 
-    //! for fast interpolation
+    //! the spot path this surface is sampled along (reads the previous step)
     MonteCarloNode* _spot_node;
 
   public:
@@ -24,7 +23,7 @@ class LocalVolatilityNode : public MonteCarloNode
 
     void SetSpotNode( MonteCarloNode* SpotNode );
     void PushLnStep( double LnStep );
-    void PushOffset( size_t Offset );
+    void PushOffset( long Offset );
     void PushVolVector( la_vector* VolVector );
 
     LocalVolatilityNode( const string& Name );
