@@ -11,8 +11,7 @@
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
-    gsl_rng_env_setup(); //!< must precede gsl_rng_alloc for GSL_RNG_SEED/TYPE to apply
-    _gsl_r = gsl_rng_alloc( gsl_rng_default );
+    //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom_ from the config seed
 }
 
 PricerMCL::~PricerMCL() = default;
@@ -66,7 +65,7 @@ void PricerMCL::PriceBook_()
     _collector.Reset();
     _scenario_roots.clear();
     _scenario_premium.clear();
-    gsl_rng_set( _gsl_r, (unsigned long)_configuration->_mcl->_seed );
+    _rng.Seed( (std::uint64_t)_configuration->_mcl->_seed );
 
     //! single-tree Greeks: build the bump sub-trees alongside the base tree (and
     //! price them in the same path sweep) when delta/gamma/vega/rho are requested
@@ -318,7 +317,7 @@ void PricerMCL::CreateBrownianNodes_()
         //! noise
         string node_name = ( *u )->GetName() + "#white_noise";
         NoiseNode* N = _collector.NewNode<NoiseNode>( node_name );
-        N->SetRandomGenerator( _gsl_r );
+        N->SetRandomGenerator( &_rng );
 
         //! brownian — only the local-vol SpotDiffusionNode consumes it; a Heston
         //! spot reads its white-noise directly, so building one for a stochastic-vol
@@ -335,7 +334,7 @@ void PricerMCL::CreateBrownianNodes_()
         if ( ( *u )->GetVolatility()->IsStochastic() )
         {
             NoiseNode* VN = _collector.NewNode<NoiseNode>( ( *u )->GetName() + "#vol_white_noise" );
-            VN->SetRandomGenerator( _gsl_r );
+            VN->SetRandomGenerator( &_rng );
 
             //! Bates : an independent compound-Poisson jump source (only created
             //! when the Heston vol carries jumps; pure Heston has no jump node)
@@ -344,7 +343,7 @@ void PricerMCL::CreateBrownianNodes_()
                 if ( h->HasJumps() )
                 {
                     JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + "#jump_noise" );
-                    JN->SetRandomGenerator( _gsl_r );
+                    JN->SetRandomGenerator( &_rng );
                     JN->SetJumpParameters( h->GetJumpIntensity(), h->GetJumpMean(), h->GetJumpVol() );
                 }
             }
@@ -375,7 +374,7 @@ void PricerMCL::SetupQuasiRandom_()
     //! (_sobol_skip, set by the master) so each slave draws a disjoint Sobol block.
     int factors = (int)_single_set.size();
     uint64_t sobol_skip = (uint64_t)_configuration->_mcl->_sobol_skip;
-    _path_generator = std::make_unique<PathGenerator>( times, factors, true, _gsl_r, sobol_skip );
+    _path_generator = std::make_unique<PathGenerator>( times, factors, true, &_rng, sobol_skip );
 
     int f = 0;
     for ( Single* s : _single_set )

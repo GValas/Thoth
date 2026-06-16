@@ -1,5 +1,6 @@
 #pragma once
 #include "thoth.hpp"
+#include "rng.hpp"
 #include <memory>
 
 class SobolGenerator; //!< Joe-Kuo direction-number Sobol sequence
@@ -24,7 +25,7 @@ class PathGenerator
     //! Times = year-fractions of the diffusion dates (Times[0] = 0 = today).
     //! SobolSkip discards that many leading Sobol points (one per path), so a
     //! cluster slave can draw a disjoint block of the low-discrepancy sequence.
-    PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, gsl_rng* Rng,
+    PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, Rng* RandomGenerator,
                    uint64_t SobolSkip = 0 );
     ~PathGenerator();
 
@@ -39,7 +40,7 @@ class PathGenerator
     int _m;            //!< number of steps (bridge points), = _t.size() - 1
     int _factors;
     bool _use_sobol;
-    gsl_rng* _rng; //!< pseudo-random source (tail dimensions / non-sobol)
+    Rng* _rng; //!< pseudo-random source (tail dimensions / non-sobol)
 
     //! Sobol sequence over the first _sobol_dim global dimensions
     std::unique_ptr<SobolGenerator> _sobol;

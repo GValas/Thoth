@@ -3,9 +3,9 @@
 #include "sobol_generator.hpp"
 #include "distributions.hpp"
 
-PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, gsl_rng* Rng,
+PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, Rng* RandomGenerator,
                               uint64_t SobolSkip )
-    : _t( Times ), _m( (int)Times.size() - 1 ), _factors( Factors ), _use_sobol( UseSobol ), _rng( Rng )
+    : _t( Times ), _m( (int)Times.size() - 1 ), _factors( Factors ), _use_sobol( UseSobol ), _rng( RandomGenerator )
 {
     BuildBridgeSchedule();
 
@@ -119,7 +119,7 @@ void PathGenerator::NextPath()
             }
             else
             {
-                z = gsl_ran_gaussian_ziggurat( _rng, 1.0 );
+                z = _rng->Gaussian();
             }
             _z[f][step] = z;
         }

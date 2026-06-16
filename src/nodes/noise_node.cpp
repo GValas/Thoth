@@ -14,10 +14,10 @@ void NoiseNode::ComputeValue( size_t DateIndex )
 {
     //! Sobol + Brownian-bridge increments when wired, else an independent draw
     _value_list[DateIndex] = _quasi_noise ? ( *_quasi_noise )[DateIndex]
-                                          : gsl_ran_gaussian_ziggurat( _random_generator, 1 );
+                                          : _random_generator->Gaussian();
 }
 
-void NoiseNode::SetRandomGenerator( gsl_rng* RandomGenerator )
+void NoiseNode::SetRandomGenerator( Rng* RandomGenerator )
 {
     _random_generator = RandomGenerator;
 }

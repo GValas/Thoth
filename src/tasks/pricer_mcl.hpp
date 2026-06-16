@@ -1,5 +1,6 @@
 #pragma once
 #include "pricer.hpp"
+#include "rng.hpp"
 #include <memory>
 
 class PathGenerator; //!< Sobol + Brownian-bridge per-path Gaussian generator
@@ -10,7 +11,7 @@ class PricerMCL : public Pricer
 
   private:
     //! random numbers
-    GslRng _gsl_r;
+    Rng _rng;
 
     //! one progress bar spanning the WHOLE American job: the path sweep fills the
     //! first part, the Longstaff-Schwartz post-pass (PriceAmerican / fit) fills

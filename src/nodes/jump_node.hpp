@@ -1,5 +1,6 @@
 #pragma once
 #include "monte_carlo_node.hpp"
+#include "rng.hpp"
 
 //! Bates compound-Poisson jump increment for one diffusion step, in log-spot
 //! space: the drift compensator -lambda*kbar*dt plus the realised jump. Over a
@@ -10,7 +11,7 @@
 class JumpNode : public MonteCarloNode
 {
   private:
-    gsl_rng* _rng = nullptr;
+    Rng* _rng = nullptr;
     double _lambda = 0; //!< jump intensity (per year)
     double _mu = 0;     //!< mean of the log jump size
     double _sigma = 0;  //!< vol of the log jump size
@@ -23,7 +24,7 @@ class JumpNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! setters
-    void SetRandomGenerator( gsl_rng* RandomGenerator );
+    void SetRandomGenerator( Rng* RandomGenerator );
     void SetJumpParameters( double Lambda, double Mu, double Sigma );
 
     JumpNode( const string& Name );

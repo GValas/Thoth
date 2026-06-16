@@ -11,8 +11,6 @@
 //! ----------------------------------------------------------------------
 
 #include <gsl/gsl_matrix.h>
-#include <gsl/gsl_qrng.h>
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_vector.h>
 
 template <class T, void ( *Free )( T* )>
@@ -70,5 +68,3 @@ class GslOwner
 
 using GslVector = GslOwner<gsl_vector, gsl_vector_free>;
 using GslMatrix = GslOwner<gsl_matrix, gsl_matrix_free>;
-using GslRng = GslOwner<gsl_rng, gsl_rng_free>;
-using GslQRng = GslOwner<gsl_qrng, gsl_qrng_free>;

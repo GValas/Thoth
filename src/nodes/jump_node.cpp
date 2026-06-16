@@ -1,10 +1,12 @@
 #include "thoth.hpp"
 #include "nodes.hpp"
 
+#include <random>
+
 JumpNode::JumpNode( const string& Name ) : MonteCarloNode( Name ) {}
 JumpNode::~JumpNode() = default;
 
-void JumpNode::SetRandomGenerator( gsl_rng* RandomGenerator )
+void JumpNode::SetRandomGenerator( Rng* RandomGenerator )
 {
     _rng = RandomGenerator;
 }
@@ -32,10 +34,11 @@ void JumpNode::ComputeValue( size_t DateIndex )
 
     //! realised jumps over the step : n ~ Poisson(lambda*dt), aggregate log jump
     //! of n lognormal jumps is N(n*mu, n*sigma^2)
-    unsigned int n = gsl_ran_poisson( _rng, _lambda * dt );
+    std::poisson_distribution<unsigned int> poisson( _lambda * dt );
+    unsigned int n = poisson( *_rng );
     if ( n > 0 )
     {
-        increment += n * _mu + _sigma * sqrt( (double)n ) * gsl_ran_gaussian_ziggurat( _rng, 1 );
+        increment += n * _mu + _sigma * sqrt( (double)n ) * _rng->Gaussian();
     }
 
     _value_list[DateIndex] = increment;

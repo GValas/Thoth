@@ -38,9 +38,6 @@
 #include <gsl/gsl_monte_miser.h>
 #include <gsl/gsl_monte_plain.h>
 #include <gsl/gsl_monte_vegas.h>
-#include <gsl/gsl_qrng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_vector.h>
 
 //! boost
