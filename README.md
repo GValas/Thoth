@@ -228,8 +228,9 @@ offsets the Sobol sequence by `seed * paths` (and seeds the pseudo-random
 generator), so the slaves draw **disjoint, independent** blocks. It pools the
 premium path-weighted and combines the per-slave variances for the trust. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
-precision. Only an MCL single-pricer is split; any other root is forwarded whole
-to one slave.
+precision. Only an MCL single-pricer is split; any other root (a non-MCL engine,
+a `!sequence`, a historical analytic, ...) is computed by the **master itself**
+rather than offloaded whole onto a slave.
 
 While the slaves run, the master draws an **approximate global progress bar** by
 polling each slave's `GET /progress` (the in-flight pricing's path count) and

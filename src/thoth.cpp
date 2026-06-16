@@ -285,8 +285,13 @@ static string ClusterPrice( const string& Body,
     }
     if ( !splittable )
     {
-        LOG( "CLU", "request is not an MCL pricer : forwarding whole to " + Slaves[0] );
-        return PostToSlave( Slaves[0], Body, ExecName );
+        //! nothing to distribute (non-MCL engine, a non-pricer root such as a
+        //! !sequence or a historical analytic, or an MCL pricer with no path
+        //! config) : the master computes it itself rather than offloading a whole,
+        //! unsplit job onto one slave. Runs under the master's price_mutex, so it
+        //! stays serialised with the rest of the cluster pricing.
+        LOG( "CLU", "request is not a splittable MCL pricer : computing on the master" );
+        return ExecuteYaml( Body, ExecName );
     }
     mcl = req.GetString( cfg + ".mcl_configuration" );
 
