@@ -105,8 +105,7 @@ multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). See
 `samples/bates_call.yaml`.
 
 **Analytics objects**
-- `pricer`, `historical_volatility_computation`,
-  `historical_correlation_computation`.
+- `pricer`.
 - `sequence` — a task that runs a list of other tasks in order, each writing its
   own result block (e.g. price a whole book of cases in one process).
 
@@ -173,7 +172,7 @@ On a host with no GPU the devcontainer still opens (CPU-only, `mcl_gpu` falls ba
 A doctest suite (`tests/`) covers European/American vanillas, barriers,
 dividends, multi-asset consistency, engine-vs-engine agreement (incl. quanto),
 variance swaps, baskets, composites, the SABR surface, Sobol QMC, the `!sequence`
-task, the historical vol/correlation analytics, determinism and config parsing
+task, determinism and config parsing
 (~71% line coverage). It is built alongside the binary:
 
 ```bash
@@ -270,7 +269,7 @@ the split is uneven. It pools the premium path-weighted and combines the
 per-slave variances for the trust. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
 precision. Only an MCL single-pricer is split; any other root (a non-MCL engine,
-a `!sequence`, a historical analytic, ...) is computed by the **master itself**
+a `!sequence`, ...) is computed by the **master itself**
 rather than offloaded whole onto a slave.
 
 While the slaves run, the master draws an **approximate global progress bar** by

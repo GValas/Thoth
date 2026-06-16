@@ -16,8 +16,6 @@
 #include "pricer_configuration.hpp"
 #include "debug_configuration.hpp"
 #include "sequence.hpp"
-#include "historical_volatility_computation.hpp"
-#include "historical_correlation_computation.hpp"
 
 //! instruments
 #include "book.hpp"
@@ -132,30 +130,6 @@ map<string, ObjectManager::Factory> MakeRegistry()
         S->SetTaskList( m.GetList<Task>( names ), names );
         S->SetResult( m.cfg().GetString( n + ".result", "" ) );
         return S;
-    };
-
-    r[KIND_HISTORICAL_VOLATILITY_COMPUTATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        HistoricalVolatilityComputation* H =
-            m.collector().Add( std::make_unique<HistoricalVolatilityComputation>( n, m.cfg() ) );
-        H->SetHalfLife( m.cfg().GetDouble( n + ".half_life" ) );
-        H->SetTimeStep( m.cfg().GetInteger( n + ".time_step" ) );
-        H->SetValueList( m.cfg().GetDoubleList( n + ".values" ) );
-        H->SetResult( m.cfg().GetString( n + ".result" ) );
-        return H;
-    };
-
-    r[KIND_HISTORICAL_CORRELATION_COMPUTATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        HistoricalCorrelationComputation* H =
-            m.collector().Add( std::make_unique<HistoricalCorrelationComputation>( n, m.cfg() ) );
-        H->SetHalfLife( m.cfg().GetDouble( n + ".half_life" ) );
-        H->SetTimeStep( m.cfg().GetInteger( n + ".time_step" ) );
-        H->SetRangeSize( m.cfg().GetInteger( n + ".range_size" ) );
-        H->SetCorrelation( m.Get<Correlation>( m.cfg().GetString( n + ".correlation" ) ) );
-        H->SetHistoricalSpotsFixingList( m.GetList<SimpleFixingData>( m.cfg().GetStringList( n + ".historical_spots_fixings" ) ) );
-        H->SetResult( m.cfg().GetString( n + ".result" ) );
-        return H;
     };
 
     // ---- instruments --------------------------------------------------
