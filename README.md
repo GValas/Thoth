@@ -37,7 +37,7 @@ usable as a batch tool or as an HTTP service.
   (common random numbers). Built only with `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only
   build, a host with no GPU, or any book it does not yet support (American /
   barrier / stochastic vol / multi-asset), it **falls back to the CPU `mcl` engine**
-  — so `method: mcl_gpu` is always valid. See [`docs/gpu_mcl.md`](docs/gpu_mcl.md).
+  — so `method: mcl_gpu` is always valid. See [`docs/gpu.md`](docs/gpu.md).
 
 Long runs show a `│███░░░│` progress bar with the running price/trust. On a
 terminal it redraws in place as a single updating line; when stdout is not a TTY
@@ -116,6 +116,16 @@ multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). See
 - `pricer`.
 - `sequence` — a task that runs a list of other tasks in order, each writing its
   own result block (e.g. price a whole book of cases in one process).
+
+---
+
+## Documentation
+
+In-depth guides live in [`docs/`](docs/) (see the [index](docs/README.md)):
+[running](docs/running.md) · [products](docs/products.md) ·
+[volatility](docs/volatility.md) · [Monte-Carlo](docs/monte_carlo.md) ·
+[PDE](docs/pde.md) · [GPU](docs/gpu.md) ·
+[agent workflow](docs/agent.md).
 
 ---
 
@@ -427,4 +437,4 @@ run_local_client.sh       POST one YAML to a running server: <input.yaml> [outpu
 - GPU (CUDA) acceleration (`mcl_gpu`) currently covers **single-asset European
   vanillas under GBM** only; American / barrier / stochastic-vol / multi-asset
   books fall back to the CPU `mcl` engine. Extending the kernel to Heston-QE and
-  multi-asset is future work — see [`docs/gpu_mcl.md`](docs/gpu_mcl.md).
+  multi-asset is future work — see [`docs/gpu.md`](docs/gpu.md).
