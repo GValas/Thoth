@@ -12,6 +12,7 @@ HestonVolatility::~HestonVolatility() = default;
 //! coarse single-number proxy (instantaneous vol, vega-bumped): used only by
 //! callers that still expect one vol (e.g. PDE grid bounds, quanto fallback).
 double HestonVolatility::GetImplicitVol( const double /*Strike*/,
+                                         const double /*Forward*/,
                                          const date& /*MaturityDate*/ )
 {
     return ( sqrt( _v0 ) + _vol_shift ) * GetDayWeight();

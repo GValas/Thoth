@@ -32,14 +32,19 @@ double Volatility::GetLocalVolatility( const double Strike,
     const double dK = .01;
     const double dT = 1.0 / NB_OF_DAYS_A_YEAR;
 
+    //! forward to each (possibly time-bumped) maturity: F(tau) = S * exp((r-q) tau)
+    double F = S * exp( ( r - q ) * T );
+    double F_Td = S * exp( ( r - q ) * YearFraction( _today, t - days( 1 ) ) );
+    double F_Tu = S * exp( ( r - q ) * YearFraction( _today, t + days( 1 ) ) );
+
     // mid vol
-    double V = GetImplicitVol( K, t );
+    double V = GetImplicitVol( K, F, t );
 
     // derivatives
-    double V_Kd = GetImplicitVol( K - dK, t );
-    double V_Ku = GetImplicitVol( K + dK, t );
-    double V_Td = GetImplicitVol( K, t - days( 1 ) );
-    double V_Tu = GetImplicitVol( K, t + days( 1 ) );
+    double V_Kd = GetImplicitVol( K - dK, F, t );
+    double V_Ku = GetImplicitVol( K + dK, F, t );
+    double V_Td = GetImplicitVol( K, F_Td, t - days( 1 ) );
+    double V_Tu = GetImplicitVol( K, F_Tu, t + days( 1 ) );
 
     // calculus
     double sT = sqrt( T );

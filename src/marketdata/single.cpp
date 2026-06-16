@@ -47,7 +47,9 @@ double Single::GetSpot()
 double Single::GetImplicitVol( const double Strike,
                                const date& MaturityDate )
 {
-    return _volatility->GetImplicitVol( Strike, MaturityDate );
+    //! supply the underlying's forward so a forward-measure surface (SABR) is
+    //! evaluated correctly; flat surfaces ignore it
+    return _volatility->GetImplicitVol( Strike, GetForward( MaturityDate ), MaturityDate );
 }
 
 //! mcl nodes

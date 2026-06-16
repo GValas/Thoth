@@ -10,7 +10,6 @@ SabrVolatility::SabrVolatility( const string& ObjectName ) : Volatility( ObjectN
 //!
 SabrVolatility::~SabrVolatility() = default;
 
-void SabrVolatility::SetSpot( double Spot ) { _spot = Spot; }
 void SabrVolatility::SetMaturityList( const vector<double>& MaturityList ) { _maturity_list = MaturityList; }
 void SabrVolatility::SetAlphaList( const vector<double>& AlphaList ) { _alpha_list = AlphaList; }
 void SabrVolatility::SetBetaList( const vector<double>& BetaList ) { _beta_list = BetaList; }
@@ -41,6 +40,7 @@ double SabrVolatility::Interp( const vector<double>& Values, double T ) const
 
 //! Hagan (2002) lognormal SABR implied volatility
 double SabrVolatility::GetImplicitVol( const double Strike,
+                                       const double Forward,
                                        const date& MaturityDate )
 {
     double T = YearFraction( _today, MaturityDate );
@@ -48,7 +48,7 @@ double SabrVolatility::GetImplicitVol( const double Strike,
     {
         T = 1.0 / NB_OF_DAYS_A_YEAR; //!< guard for same-day maturity bumps
     }
-    double F = _spot;
+    double F = Forward; //!< Hagan's formula is in the forward measure
     //! the engine passes Strike = 0 as a sentinel for the reference (ATM) vol
     double K = ( Strike > 0 ) ? Strike : F;
 

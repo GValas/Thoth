@@ -54,6 +54,7 @@ class HestonVolatility : public Volatility
     bool IsStochastic() const override { return true; }
 
     double GetImplicitVol( const double Strike,
+                           const double Forward,
                            const date& MaturityDate ) override;
 
     //! Heston has no Monte-Carlo "vol node"; the diffusion is built by the

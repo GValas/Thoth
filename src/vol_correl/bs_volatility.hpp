@@ -14,6 +14,7 @@ class BsVolatility : public Volatility
 
     //!
     double GetImplicitVol( const double Strike,
+                           const double Forward,
                            const date& MaturityDate ) override;
 
     //! mcl node

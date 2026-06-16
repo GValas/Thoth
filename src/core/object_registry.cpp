@@ -294,7 +294,6 @@ map<string, ObjectManager::Factory> MakeRegistry()
     r[KIND_SABR_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*
     {
         SabrVolatility* S = m.collector().Add( std::make_unique<SabrVolatility>( n ) );
-        S->SetSpot( m.cfg().GetDouble( n + ".spot" ) );
         S->SetMaturityList( m.cfg().GetDoubleList( n + ".maturities" ) );
         S->SetAlphaList( m.cfg().GetDoubleList( n + ".alpha" ) );
         S->SetBetaList( m.cfg().GetDoubleList( n + ".beta" ) );

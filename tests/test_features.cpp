@@ -310,7 +310,7 @@ TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
-      << "vol: !sabr_volatility {spot: 100, maturities: [1.0], alpha: [0.30], beta: [1.0],"
+      << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0],"
       << " rho: [0.0], nu: [0.01], calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "book: !book {options: [o]}\n"

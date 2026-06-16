@@ -17,6 +17,7 @@ void BsVolatility::SetVolatility( double BsVolatility )
 
 //! implicit vol (+ vega bump shift, if any)
 double BsVolatility::GetImplicitVol( const double /*Strike*/,
+                                     const double /*Forward*/,
                                      const date& /*MaturityDate*/ )
 {
     return ( _volatility + _vol_shift ) * GetDayWeight();

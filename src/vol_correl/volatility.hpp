@@ -30,8 +30,11 @@ class Volatility : public MarketData
     //! SpotDiffusionNode. Deterministic vols (bs / sabr) return false.
     virtual bool IsStochastic() const { return false; }
 
-    // local & implicit vols
+    // local & implicit vols. Forward is the underlying's forward to MaturityDate:
+    // SABR (a forward-measure model) evaluates Hagan's formula at it; the flat
+    // bs/heston surfaces ignore it. Callers that only know a spot may pass that.
     virtual double GetImplicitVol( const double Strike,
+                                   const double Forward,
                                    const date& MaturityDate ) = 0;
 
     double GetLocalVolatility( const double Strike,

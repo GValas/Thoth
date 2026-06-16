@@ -36,7 +36,8 @@ Currency* Forex::GetUnderlyingCurrency()
 //! getter
 double Forex::GetConstantVol() const
 {
-    return _volatility->GetImplicitVol( 0, date( 0 ) );
+    //! FX vol is flat (bs_volatility), so the forward is ignored; pass 0
+    return _volatility->GetImplicitVol( 0, 0, date( 0 ) );
 }
 
 double Forex::GetForward( const date& /*MaturityDate*/ )
