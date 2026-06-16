@@ -20,9 +20,10 @@ const bool MC_USE_SOBOL = true;
 const bool MC_USE_MILSTEIN = true;
 
 //! pricing method selectors (config field "method")
-inline constexpr char PRICING_METHOD_PDE[] = "pde"; //!< finite-difference PDE grid solving
-inline constexpr char PRICING_METHOD_MCL[] = "mcl"; //!< monte-carlo (longstaff-schwartz) tree
-inline constexpr char PRICING_METHOD_ANA[] = "ana"; //!< closed-form (analytic) formulas
+inline constexpr char PRICING_METHOD_PDE[] = "pde";         //!< finite-difference PDE grid solving
+inline constexpr char PRICING_METHOD_MCL[] = "mcl";         //!< monte-carlo (longstaff-schwartz) tree
+inline constexpr char PRICING_METHOD_ANA[] = "ana";         //!< closed-form (analytic) formulas
+inline constexpr char PRICING_METHOD_MCL_GPU[] = "mcl_gpu"; //!< GPU (CUDA) monte-carlo; CPU MCL fallback
 
 inline constexpr char MCL_NODE_PATH[] = "";
 

@@ -1,6 +1,19 @@
 #pragma once
 #include "underlying.hpp"
 
+//! GPU Monte-Carlo (mcl_gpu) parameters for a European vanilla under geometric
+//! Brownian motion — the forward-measure scalars (the same ones the analytic BS
+//! pricer uses). Filled by Contract::GPU_GbmParams for GPU-supported contracts.
+struct GpuGbmParams
+{
+    double forward = 0; //!< carries the carry / dividend / quanto drift
+    double strike = 0;
+    double t = 0;       //!< year fraction today -> maturity
+    double vol = 0;     //!< implied vol at (strike, maturity)
+    double df = 0;      //!< discount factor to maturity
+    bool is_call = true;
+};
+
 class Contract : public Object
 {
 
@@ -105,6 +118,15 @@ class Contract : public Object
     //! analytical
     virtual bool ANA_HasSolution() = 0;
     virtual void ANA_EvalPrice() = 0;
+
+    //! GPU Monte-Carlo (mcl_gpu): fill Out and return true iff this contract is a
+    //! GPU-supported European vanilla under (deterministic-vol) GBM; false for
+    //! American / barrier / stochastic-vol / multi-asset, so PricerMCLGpu falls
+    //! back to the CPU MCL engine. Default: unsupported.
+    virtual bool GPU_GbmParams( GpuGbmParams& /*Out*/ )
+    {
+        return false;
+    }
 
     //! fixing dates
     virtual set<date> GetFixingDates() = 0;

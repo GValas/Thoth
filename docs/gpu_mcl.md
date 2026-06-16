@@ -8,6 +8,29 @@ gives data-parallelism *inside one machine* (thousands of CUDA cores each runnin
 paths), which is a different axis from the existing cluster (paths split across
 *processes/hosts*). The two compose: a GPU slave inside the cluster.
 
+## Implementation status
+
+**Increment 1 (done).** A dedicated `mcl_gpu` engine is wired in end-to-end:
+- `gpu::PriceEuropeanGbm` CUDA kernel (`src/tasks/mcl_gpu.cu`): one thread per
+  path, cuRAND Philox normals, forward-measure lognormal terminal, shared-memory
+  block reduction of the payoff sum / sum-of-squares → premium + MC trust.
+- `Contract::GPU_GbmParams` (overridden in `Vanilla`) exposes the forward-measure
+  scalars for a **single-asset European vanilla under GBM** (the same scalars the
+  analytic BS pricer uses); anything else returns false.
+- `PricerMCLGpu` (method `mcl_gpu`) prices such books contract-by-contract on the
+  device, with per-contract bump-and-revalue Greeks under a **fixed kernel seed**
+  (common random numbers → smooth Greeks). Any unsupported book, a CPU-only build,
+  or a host with no GPU **falls back to the CPU `mcl` engine**.
+- Build: `-DTHOTH_ENABLE_CUDA=ON` (off by default). `Dockerfile.gpu` +
+  `run_docker_server_gpu.sh` (`--gpus all`). Sample: `samples/gpu_call.yaml`.
+- Verified on the CPU-only path (fallback matches `mcl` bit-comparable within MC
+  error); the CUDA kernel itself is compiled/run on the RTX host (no GPU in CI).
+
+**Next increments.** Heston-QE on GPU (variance + spot kernels); multi-asset
+(Cholesky-correlated factors); a true path-dependent kernel for barriers; QMC on
+GPU (Sobol + Brownian bridge) to match the CPU engine's low-discrepancy draws;
+and a GPU slave wired into the cluster master.
+
 ## Why the current engine does not map to the GPU directly
 
 The MCL engine is a **node dependency-DAG**: `NodeCollector::SortNodes` topologically

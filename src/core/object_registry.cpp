@@ -11,6 +11,7 @@
 #include "pricer.hpp"
 #include "pricer_ana.hpp"
 #include "pricer_mcl.hpp"
+#include "pricer_mcl_gpu.hpp"
 #include "pricer_pde.hpp"
 #include "pricer_configuration.hpp"
 #include "debug_configuration.hpp"
@@ -85,6 +86,10 @@ map<string, ObjectManager::Factory> MakeRegistry()
         {
             p = std::make_unique<PricerMCL>( n, m.cfg() );
         }
+        else if ( PC->_method == PRICING_METHOD_MCL_GPU )
+        {
+            p = std::make_unique<PricerMCLGpu>( n, m.cfg() );
+        }
         else if ( PC->_method == PRICING_METHOD_PDE )
         {
             p = std::make_unique<PricerPDE>( n, m.cfg() );
@@ -97,7 +102,8 @@ map<string, ObjectManager::Factory> MakeRegistry()
         {
             ERR( "pricing configuration '" + PC->GetName() + "' has unknown method '" +
                  PC->_method + "' (expected '" + PRICING_METHOD_PDE + "', '" +
-                 PRICING_METHOD_MCL + "' or '" + PRICING_METHOD_ANA + "')" );
+                 PRICING_METHOD_MCL + "', '" + PRICING_METHOD_MCL_GPU + "' or '" +
+                 PRICING_METHOD_ANA + "')" );
         }
         Pricer* B = m.collector().Add( std::move( p ) );
         B->SetCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".currency" ) ) );

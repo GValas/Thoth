@@ -34,6 +34,9 @@ class Vanilla : public Contract
     bool ANA_HasSolution() override;
     void ANA_EvalPrice() override;
 
+    //! gpu monte-carlo (mcl_gpu)
+    bool GPU_GbmParams( GpuGbmParams& Out ) override;
+
     //! fixing dates
     set<date> GetFixingDates() override;
     set<date> GetFlowDates() override;

@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# Thoth - GPU (CUDA) production image (multi-stage)
+#
+# Like Dockerfile, but built on the NVIDIA CUDA images with THOTH_ENABLE_CUDA=ON,
+# so the `mcl_gpu` engine runs its Monte-Carlo on the GPU. Books that are not
+# GPU-supported (or any other method) still price on the CPU.
+#
+#   build: docker build -f Dockerfile.gpu --build-arg CUDA_ARCH=89 -t thoth-gpu .
+#   run  : docker run --rm --gpus all -p 8080:8080 thoth-gpu      # GPU HTTP server
+#          (needs an NVIDIA GPU + driver + the NVIDIA Container Toolkit)
+#
+# Prefer the wrapper: ./run_docker_server_gpu.sh
+# ---------------------------------------------------------------------------
+
+# ---- build stage : CUDA toolchain (nvcc) + the -dev packages (discarded) ---
+FROM nvidia/cuda:12.4.1-devel-ubuntu24.04 AS build
+
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        pkg-config \
+        libgsl-dev \
+        libboost-all-dev \
+        libyaml-cpp-dev \
+        libcpp-httplib-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY CMakeLists.txt ./
+COPY src ./src
+COPY samples ./samples
+# git commit baked into the binary (printed at startup); CUDA arch of the target
+# GPU (89 = Ada / RTX 40-series, e.g. the 4070 Ti).
+ARG GIT_COMMIT=unknown
+ARG CUDA_ARCH=89
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DTHOTH_BUILD_TESTS=OFF \
+        -DTHOTH_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH}" \
+        -DTHOTH_BUILD_ID="${GIT_COMMIT}" \
+    && cmake --build build -j
+
+# ---- runtime stage : CUDA runtime libs (incl. cuRAND) + the engine's libs ---
+FROM nvidia/cuda:12.4.1-runtime-ubuntu24.04 AS runtime
+
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get install -y --no-install-recommends \
+        libgsl27 \
+        libgslcblas0 \
+        libyaml-cpp0.8 \
+        libcpp-httplib0.14t64 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/build/thoth /usr/local/bin/thoth
+COPY --from=build /src/samples /opt/thoth/samples
+
+WORKDIR /opt/thoth
+EXPOSE 8080
+
+# default: HTTP pricing service on 8080 (override args for batch/client)
+ENTRYPOINT ["thoth"]
+CMD ["-server", "8080"]

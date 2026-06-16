@@ -147,6 +147,34 @@ void Vanilla::ANA_EvalPrice()
     _volga_bs = BS_Volga( f, k, t, v, df );
 }
 
+//! gpu monte-carlo (mcl_gpu): genuine single-asset GBM only — a European equity
+//! vanilla with a deterministic implied vol. The forward-measure scalars mirror
+//! ANA_EvalPrice, so the GPU MC reproduces the analytic BS price within MC error.
+//! American / stochastic-vol (Heston) / multi-asset return false -> CPU fallback.
+bool Vanilla::GPU_GbmParams( GpuGbmParams& Out )
+{
+    if ( _exercise_mode != ExerciseMode::European )
+    {
+        return false;
+    }
+    if ( _underlying->GetKind() != KIND_EQUITY )
+    {
+        return false; //!< composite / basket need a multi-asset kernel (later step)
+    }
+    if ( HestonOf( _underlying ) )
+    {
+        return false; //!< stochastic vol needs the QE / CF path, not lognormal GBM
+    }
+
+    Out.t = YearFraction( _today, _maturity_date );
+    Out.df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
+    Out.forward = _underlying->GetForward( _maturity_date, _premium_currency );
+    Out.vol = _underlying->GetImplicitVol( _strike, _maturity_date );
+    Out.strike = _strike;
+    Out.is_call = ( _type == OptionType::Call );
+    return true;
+}
+
 //
 bool Vanilla::PDE_IsAmerican()
 {

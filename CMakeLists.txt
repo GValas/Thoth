@@ -28,6 +28,24 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# --- Optional GPU (CUDA) Monte-Carlo engine (pricing method "mcl_gpu") ------
+# OFF by default so the CPU-only build (this devcontainer / CI) needs no CUDA
+# toolkit; the engine then falls back to the CPU MCL engine at run time. Turn on
+# with -DTHOTH_ENABLE_CUDA=ON on a machine with nvcc + an NVIDIA GPU (see
+# Dockerfile.gpu / run_docker_server_gpu.sh).
+option(THOTH_ENABLE_CUDA "Build the CUDA GPU Monte-Carlo engine (needs nvcc + an NVIDIA GPU)" OFF)
+if(THOTH_ENABLE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    # Ada Lovelace (RTX 40-series, e.g. the 4070 Ti) is sm_89; override with
+    # -DCMAKE_CUDA_ARCHITECTURES=... for another GPU.
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 89)
+    endif()
+endif()
+
 # --- Dependencies ----------------------------------------------------------
 # GSL: provides imported targets GSL::gsl and GSL::gslcblas.
 find_package(GSL REQUIRED)
@@ -47,6 +65,13 @@ find_package(Threads REQUIRED)
 # Everything except the main entry point, so tests can link the engine.
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/thoth.cpp")
+
+# GPU backend: the CUDA kernel (mcl_gpu.cu) replaces the CPU stub when CUDA is on.
+# The .cu is not picked up by the *.cpp glob, so it is only ever built here.
+if(THOTH_ENABLE_CUDA)
+    list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/tasks/mcl_gpu_stub.cpp")
+    list(APPEND CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/tasks/mcl_gpu.cu")
+endif()
 
 add_library(thoth_core STATIC ${CORE_SOURCES})
 target_include_directories(thoth_core PUBLIC
@@ -77,7 +102,15 @@ target_link_libraries(thoth_core PUBLIC
 # target adds them in tests/CMakeLists.txt.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(THOTH_WARNING_FLAGS -Wall -Wextra -Wno-deprecated-declarations)
-    target_compile_options(thoth_core PRIVATE ${THOTH_WARNING_FLAGS})
+    # CXX only: nvcc must not receive the host -W flags directly (it would choke).
+    target_compile_options(thoth_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${THOTH_WARNING_FLAGS}>)
+endif()
+
+# Link the CUDA runtime + cuRAND and flag the engine as CUDA-built.
+if(THOTH_ENABLE_CUDA)
+    target_link_libraries(thoth_core PUBLIC CUDA::curand CUDA::cudart)
+    target_compile_definitions(thoth_core PUBLIC THOTH_CUDA)
+    set_target_properties(thoth_core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
 # --- Executable ------------------------------------------------------------

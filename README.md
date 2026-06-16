@@ -26,6 +26,13 @@ usable as a batch tool or as an HTTP service.
   exercise (backward induction `max(intrinsic, continuation)`).
 - **Analytic (`ana`)** — closed-form (Black-Scholes) for instruments that admit
   it.
+- **GPU Monte-Carlo (`mcl_gpu`)** — CUDA backend that simulates single-asset
+  European-vanilla GBM on an NVIDIA GPU (one thread per path, cuRAND, block-reduced
+  payoff), with per-contract bump-and-revalue Greeks under a fixed kernel seed
+  (common random numbers). Built only with `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only
+  build, a host with no GPU, or any book it does not yet support (American /
+  barrier / stochastic vol / multi-asset), it **falls back to the CPU `mcl` engine**
+  — so `method: mcl_gpu` is always valid. See [`docs/gpu_mcl.md`](docs/gpu_mcl.md).
 
 Long runs show a `│███░░░│` progress bar with the running price/trust. On a
 terminal it redraws in place as a single updating line; when stdout is not a TTY
@@ -131,6 +138,20 @@ lean runtime image) are provided. The devcontainer preinstalls the C++ toolchain
 extensions plus **Graphviz Interactive Preview** (`tintinweb.graphviz-interactive-preview`),
 so the `generate_nodes_graph` `.dot` dumps can be previewed in-editor without an
 external `dot` render.
+
+#### GPU (CUDA) build
+
+The `mcl_gpu` engine is off by default. On a machine with the CUDA toolkit
+(`nvcc`) and an NVIDIA GPU, enable it with:
+
+```bash
+cmake -B build -DTHOTH_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89   # 89 = Ada / RTX 40-series
+cmake --build build -j
+```
+
+Or build/run the GPU Docker image (`Dockerfile.gpu`, needs the NVIDIA Container
+Toolkit) via `./run_docker_server_gpu.sh`. Without CUDA the engine still builds
+and falls back to the CPU `mcl` engine at run time.
 
 ### Tests
 
@@ -273,7 +294,7 @@ my_pricing: !pricer
 # pricer_configuration selects the method and points at an mcl_configuration
 # and/or pde_configuration sub-object.
 my_config: !pricer_configuration
-  method: pde   # pde | mcl | ana
+  method: pde   # pde | mcl | mcl_gpu | ana
   mcl_configuration: my_mcl
   pde_configuration: my_pde
 my_mcl: !mcl_configuration
@@ -330,9 +351,10 @@ alphabetical order (stable, diff-friendly).
 Black-Scholes ~15.71, with the node-graph debug switch enabled),
 `heston_call.yaml` (a Heston call priced by all three engines),
 `bates_call.yaml` (a Bates — Heston + jumps — call priced by MCL, dumping its
-node DAG to Graphviz) and `matrix.yaml` — a `!sequence` running the full
-pricer/product matrix (vanilla european/american, quanto, continuous/discrete
-barriers, variance swap, across PDE / MCL / ANA) in one process.
+node DAG to Graphviz), `gpu_call.yaml` (a call priced by the GPU `mcl_gpu`
+engine, falling back to CPU off a GPU) and `matrix.yaml` — a `!sequence` running
+the full pricer/product matrix (vanilla european/american, quanto,
+continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one process.
 
 ---
 
@@ -342,16 +364,18 @@ barriers, variance swap, across PDE / MCL / ANA) in one process.
 src/             C++ sources (engine, instruments, market data, IO)
 tests/           doctest regression suite
 samples/         example YAML configs
-Dockerfile       production image (multi-stage)
+Dockerfile       production image (multi-stage, CPU)
+Dockerfile.gpu   CUDA production image (mcl_gpu engine)
 .devcontainer/   VS Code dev container
 .vscode/         editor tasks + gdb debug configs
 CMakeLists.txt   build
-format.sh             clang-format wrapper (--check for CI)
-run_docker_batch.sh   build the image and price one YAML in batch (in a container)
-run_docker_server.sh  build the image and run the HTTP pricing server (container)
-run_docker_cluster.sh build the image and bring up a master + N slave containers
-run_docker_common.sh  shared helper (builds the single Thoth image) — sourced, not run
-run_local_client.sh   POST one YAML to a running server, write <input>.out.yaml
+format.sh                 clang-format wrapper (--check for CI)
+run_docker_batch.sh       build the image and price one YAML in batch (in a container)
+run_docker_server.sh      build the image and run the HTTP pricing server (container)
+run_docker_server_gpu.sh  build the CUDA image and run a GPU HTTP server (--gpus all)
+run_docker_cluster.sh     build the image and bring up a master + N slave containers
+run_docker_common.sh      shared helper (builds the single Thoth image) — sourced, not run
+run_local_client.sh       POST one YAML to a running server, write <input>.out.yaml
 ```
 
 ---
@@ -368,7 +392,7 @@ run_local_client.sh   POST one YAML to a running server, write <input>.out.yaml
 - Pricing currently uses a single reference (ATM) volatility per underlying, so
   a `sabr_volatility` smile only influences the price through its ATM level; a
   full local-vol grid is not wired in. `bs_volatility` (flat) is exact.
-- Monte-Carlo runs on CPU (multi-core within a process, multi-host via the
-  cluster). GPU (CUDA / RTX) acceleration is not implemented; see
-  [`docs/gpu_mcl.md`](docs/gpu_mcl.md) for a feasibility note and proposed
-  `mcl_gpu` engine design.
+- GPU (CUDA) acceleration (`mcl_gpu`) currently covers **single-asset European
+  vanillas under GBM** only; American / barrier / stochastic-vol / multi-asset
+  books fall back to the CPU `mcl` engine. Extending the kernel to Heston-QE and
+  multi-asset is future work — see [`docs/gpu_mcl.md`](docs/gpu_mcl.md).
