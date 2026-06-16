@@ -11,7 +11,7 @@
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
-    //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom_ from the config seed
+    //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom from the config seed
 }
 
 PricerMCL::~PricerMCL() = default;
@@ -35,7 +35,7 @@ void PricerMCL::InitDates()
 }
 
 //! check the mcl configuration and correlation are present
-void PricerMCL::PreCheck_()
+void PricerMCL::PreCheck()
 {
     //! mcl pricing needs its parameter object (config field "mcl")
     if ( !_configuration->_mcl )
@@ -55,7 +55,7 @@ void PricerMCL::PreCheck_()
 //! price the whole book by Monte-Carlo. Re-runnable: the node tree is rebuilt
 //! from the current market each call and the RNG is reseeded, so the Greeks
 //! bumps share common random numbers with the base scenario (stable bumps).
-void PricerMCL::PriceBook_()
+void PricerMCL::PriceBook()
 {
     Pricer::InitPricing();
 
@@ -72,11 +72,11 @@ void PricerMCL::PriceBook_()
     //! and the book supports it. theta is handled separately (reprice), and the
     //! theta reprice / unsupported books set _suppress_scenarios.
     const bool spot_greeks = _request_delta || _request_gamma || _request_vega || _request_rho;
-    _build_greek_scenarios = spot_greeks && !_suppress_scenarios && CanSingleTreeGreeks_();
+    _build_greek_scenarios = spot_greeks && !_suppress_scenarios && CanSingleTreeGreeks();
 
-    Tree_Init_();
-    Tree_Run_();
-    Tree_Read_();
+    Tree_Init();
+    Tree_Run();
+    Tree_Read();
     PriceAmerican(); //!< override American contracts via Longstaff-Schwartz
 }
 
@@ -85,7 +85,7 @@ void PricerMCL::PriceBook_()
 //! supported: each scenario records its own bumped spot path and PriceAmerican
 //! re-prices it under the frozen LSM policy (see PriceAmerican). Non-Mono books
 //! (basket / composite) still fall back to bump-and-revalue.
-bool PricerMCL::CanSingleTreeGreeks_() const
+bool PricerMCL::CanSingleTreeGreeks() const
 {
     for ( Contract* c : _book->GetOptionList() )
     {
@@ -101,7 +101,7 @@ bool PricerMCL::CanSingleTreeGreeks_() const
 //! builds a scenario-tagged copy of the book sub-tree (which captures the bumped
 //! spot/vol/rate while reusing the shared Brownian/noise nodes), then restores
 //! the market. The roots are priced together with the base tree in one sweep.
-void PricerMCL::BuildGreekScenarios_()
+void PricerMCL::BuildGreekScenarios()
 {
     //! snapshot the singles first: building a sub-tree must not invalidate the
     //! iterator, and each spot bump is relative to the unbumped spot
@@ -151,27 +151,27 @@ void PricerMCL::BuildGreekScenarios_()
     if ( _request_vega )
     {
         build( "@V+", false, true, [&]
-               { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&]
-               { ApplyVolShift_( 0 ); } );
+               { ApplyVolShift( GREEK_VOL_BUMP ); }, [&]
+               { ApplyVolShift( 0 ); } );
     }
 
     //! rho : one-sided parallel rate bump on every currency's curve
     if ( _request_rho )
     {
         build( "@R+", true, false, [&]
-               { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&]
-               { ApplyRateShift_( 0 ); } );
+               { ApplyRateShift( GREEK_RATE_BUMP ); }, [&]
+               { ApplyRateShift( 0 ); } );
     }
 }
 //! single-tree Greeks: delta/gamma/vega/rho come from the bump sub-trees priced
 //! in the base path sweep (read back as _scenario_premium); theta is a separate
 //! reprice (rolling today changes the diffusion-date grid). Unsupported books
 //! (American / non-Mono) fall back to the bump-and-revalue base implementation.
-void PricerMCL::ComputeGreeks_()
+void PricerMCL::ComputeGreeks()
 {
     if ( !_build_greek_scenarios )
     {
-        Pricer::ComputeGreeks_(); //!< American / non-Mono : bump-and-revalue
+        Pricer::ComputeGreeks(); //!< American / non-Mono : bump-and-revalue
         return;
     }
 
@@ -236,7 +236,7 @@ void PricerMCL::ComputeGreeks_()
         _theta_pass = true;    //!< ...but still show a labelled "<engine> theta" bar
         _suppress_scenarios = true;
         _today = base_today + days( 1 );
-        PriceBook_(); //!< the single extra graph
+        PriceBook(); //!< the single extra graph
         const double p1 = _book->GetPremium();
         _today = base_today;
         _suppress_scenarios = false;
@@ -262,7 +262,7 @@ void PricerMCL::ComputeGreeks_()
     _premium = _book->GetPremium();
 }
 
-void PricerMCL::CorrelateBrownianNodes_()
+void PricerMCL::CorrelateBrownianNodes()
 {
     //! more than 1 asset : correlation of noises
     if ( _single_set.size() > 1 )
@@ -311,12 +311,12 @@ void PricerMCL::CorrelateBrownianNodes_()
     }
 }
 
-void PricerMCL::CreateContractualNodes_()
+void PricerMCL::CreateContractualNodes()
 {
     _root = _book->GetNode( _collector );
 }
 
-void PricerMCL::CreateBrownianNodes_()
+void PricerMCL::CreateBrownianNodes()
 {
 
     SingleSet::iterator u;
@@ -364,7 +364,7 @@ void PricerMCL::CreateBrownianNodes_()
 //! wire the Sobol + Brownian-bridge generator into the per-underlying noise
 //! nodes (only when use_sobol is set); otherwise the nodes keep drawing
 //! independent pseudo-random gaussians.
-void PricerMCL::SetupQuasiRandom_()
+void PricerMCL::SetupQuasiRandom()
 {
     if ( !_configuration->_mcl->_use_sobol )
     {
@@ -420,24 +420,24 @@ void PricerMCL::ComputeCholeskyMatrix()
 }
 
 //!
-void PricerMCL::Tree_Init_()
+void PricerMCL::Tree_Init()
 {
     //! node collector
     InitDates();
     _collector.SetDiffusionDates( _diffusion_dates );
 
     //! node tree
-    CreateBrownianNodes_();
-    SetupQuasiRandom_(); //!< wire Sobol + bridge increments into the noise nodes
-    CorrelateBrownianNodes_();
-    CreateContractualNodes_();
+    CreateBrownianNodes();
+    SetupQuasiRandom(); //!< wire Sobol + bridge increments into the noise nodes
+    CorrelateBrownianNodes();
+    CreateContractualNodes();
 
     //! base root + (optionally) the Greek bump sub-trees, all sorted into one
     //! schedule so a single path sweep prices price and Greeks together
     vector<MonteCarloNode*> roots{ _root };
     if ( _build_greek_scenarios )
     {
-        BuildGreekScenarios_();
+        BuildGreekScenarios();
         for ( auto& tagged : _scenario_roots )
         {
             roots.push_back( tagged.second );
@@ -458,7 +458,7 @@ void PricerMCL::Tree_Init_()
     {
         const string path = _configuration->_log_path + _name + "_nodes.dot";
         _collector.ExportGraph( path );
-        LOG( LogLabel_(), "node graph written to " + path );
+        LOG( LogLabel(), "node graph written to " + path );
     }
 
     //! status (only on the visible base build; the bump-and-revalue Greek
@@ -469,7 +469,7 @@ void PricerMCL::Tree_Init_()
         {
             std::ostringstream oss;
             oss << _collector.GetNodeNumber() << " created nodes";
-            LOG( LogLabel_(), oss.str() );
+            LOG( LogLabel(), oss.str() );
         }
         {
             std::ostringstream oss;
@@ -477,26 +477,26 @@ void PricerMCL::Tree_Init_()
                 << "contracts = " << _book->GetOptionList().size() << ", "
                 << "underlings = " << _single_set.size() << ", "
                 << "currencies = " << _currency_set.size();
-            LOG( LogLabel_(), oss.str() );
+            LOG( LogLabel(), oss.str() );
         }
         {
             std::ostringstream oss;
             oss << "drawings = " << _configuration->_mcl->_paths << ", "
                 << "max time step = " << _configuration->_mcl->_max_time_step << ", "
                 << "vol time step = " << _configuration->_mcl->_vol_time_step;
-            LOG( LogLabel_(), oss.str() );
+            LOG( LogLabel(), oss.str() );
         }
     }
 }
 
-void PricerMCL::Tree_Run_()
+void PricerMCL::Tree_Run()
 {
     //! report resident memory before the (potentially large) path loop starts
     //! (skipped for the silent inner re-prices of bump-and-revalue Greeks)
     if ( !_quiet_pricing )
     {
         string mem = CurrentMemoryUsage();
-        LOG( LogLabel_(), "starting pricing" + ( mem.empty() ? string() : ", memory = " + mem ) );
+        LOG( LogLabel(), "starting pricing" + ( mem.empty() ? string() : ", memory = " + mem ) );
     }
 
     //! iterations
@@ -505,13 +505,13 @@ void PricerMCL::Tree_Run_()
     //! the bar spans the whole job: the path sweep plus the American LSM fit
     //! (one backward step per exercise date, per American contract). For a plain
     //! European book the LSM part is 0, so the bar is just the sweep.
-    const long lsm_steps = AmericanLsmSteps_();
+    const long lsm_steps = AmericanLsmSteps();
     //! the theta one-day reprice runs under _quiet_pricing (no status lines / graph
     //! dump), but we still show its own labelled bar so it is not a silent gap
     //! after the main sweep finishes; it is kept out of GlobalProgress so it does
     //! not make a cluster master's aggregate bar run backwards during that tail.
     const bool show_bar = !_quiet_pricing || _theta_pass;
-    const string bar_label = _theta_pass ? LogLabel_() + " theta" : LogLabel_();
+    const string bar_label = _theta_pass ? LogLabel() + " theta" : LogLabel();
     _progress_bar = std::make_unique<ProgressBar>( bar_label, n + lsm_steps, show_bar, !_theta_pass );
 
     for ( long i = 0; i < n; i++ )
@@ -554,7 +554,7 @@ void PricerMCL::Tree_Run_()
 //! total backward-induction steps the LSM fit will run across all American
 //! contracts (one per interior exercise date) — used to size the progress bar so
 //! the American post-pass is embedded in the same bar as the path sweep.
-long PricerMCL::AmericanLsmSteps_() const
+long PricerMCL::AmericanLsmSteps() const
 {
     if ( !_collector.IsRecording() )
     {
@@ -579,9 +579,9 @@ long PricerMCL::AmericanLsmSteps_() const
 
 //! log / progress-bar label: "AMC" once American contracts are registered for
 //! path recording (Longstaff-Schwartz Monte-Carlo), "MCL" for a plain European
-//! run. IsRecording() is set in SetupAmericanRecording (early in Tree_Init_),
+//! run. IsRecording() is set in SetupAmericanRecording (early in Tree_Init),
 //! before every label site below.
-string PricerMCL::LogLabel_() const
+string PricerMCL::LogLabel() const
 {
     return _collector.IsRecording() ? "AMC" : "MCL";
 }
@@ -590,7 +590,7 @@ string PricerMCL::LogLabel_() const
 //! underlying for its node works for every kind (Mono -> "<name>#spot",
 //! composite -> "<eq>_compo_<ccy>#spot", basket -> its own node), unlike the
 //! "<underlying-name>#spot" convention which only holds for Mono.
-string PricerMCL::AmericanSpotName_( Contract* Contract )
+string PricerMCL::AmericanSpotName( Contract* Contract )
 {
     MonteCarloNode* spot = Contract->GetUnderlying()->GetNode( _collector );
     return spot ? spot->GetName() : "";
@@ -633,7 +633,7 @@ void PricerMCL::SetupAmericanRecording()
         std::ostringstream oss;
         oss << "recording " << grid.size() << " exercise dates on '"
             << spot_name << "' for American contract '" << c->GetName() << "'";
-        LOG( LogLabel_(), oss.str() );
+        LOG( LogLabel(), oss.str() );
     }
 }
 
@@ -650,7 +650,7 @@ void PricerMCL::LogRecordings()
         {
             continue;
         }
-        const string spot_name = AmericanSpotName_( c );
+        const string spot_name = AmericanSpotName( c );
         const la_matrix* paths = _collector.RecordedPaths( spot_name );
         if ( !paths || paths->size2 == 0 )
         {
@@ -666,7 +666,7 @@ void PricerMCL::LogRecordings()
         std::ostringstream oss;
         oss << "recorded '" << spot_name << "' paths : E[S_T] = " << mean
             << " (" << paths->size1 << " x " << paths->size2 << ")";
-        LOG( LogLabel_(), oss.str() );
+        LOG( LogLabel(), oss.str() );
     }
 }
 
@@ -674,7 +674,7 @@ void PricerMCL::LogRecordings()
 //! book. Single-tree Greeks: the exercise policy is fit ONCE per contract on its
 //! base paths and then applied (frozen) to the base paths AND to every bumped
 //! scenario's recorded paths, replacing that contract's European contribution in
-//! _scenario_premium so ComputeGreeks_ finite-differences the American values.
+//! _scenario_premium so ComputeGreeks finite-differences the American values.
 void PricerMCL::PriceAmerican()
 {
     if ( !_collector.IsRecording() )
@@ -700,7 +700,7 @@ void PricerMCL::PriceAmerican()
             continue;
         }
 
-        const string spot_name = AmericanSpotName_( c );
+        const string spot_name = AmericanSpotName( c );
         const la_matrix* S0 = _collector.RecordedPaths( spot_name );
         vector<double> tau = _collector.RecordedTau( spot_name );
         double r = c->GetPremiumCurrency()->GetRate()->GetCurveValue( c->GetMaturityDate() );
@@ -715,7 +715,7 @@ void PricerMCL::PriceAmerican()
         c->SetPremiumTrust( trust );
         std::ostringstream oss;
         oss << "american '" << c->GetName() << "' (LSM, frozen boundary) premium = " << premium;
-        LOG( LogLabel_(), oss.str() );
+        LOG( LogLabel(), oss.str() );
 
         //! re-price each Greek scenario for this contract under the frozen policy,
         //! swapping the contract's European contribution for its American value in
@@ -931,7 +931,7 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
     return std::max( mean, Contract->PDE_EvalFlow( s0_set ) );
 }
 
-void PricerMCL::Tree_Read_()
+void PricerMCL::Tree_Read()
 {
     // read results in tree
     MonteCarloNode* N = _root;
@@ -949,7 +949,7 @@ void PricerMCL::Tree_Read_()
     }
 
     //! per-bump book premium (single-tree Greeks): read each scenario root's
-    //! MC mean, keyed by its tag, for ComputeGreeks_ to finite-difference
+    //! MC mean, keyed by its tag, for ComputeGreeks to finite-difference
     for ( auto& tagged : _scenario_roots )
     {
         _scenario_premium[tagged.first] = tagged.second->GetIndicatorValue( 0 );

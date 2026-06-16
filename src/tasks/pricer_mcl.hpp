@@ -23,7 +23,7 @@ class PricerMCL : public Pricer
     //! optional quasi-random path generator (Sobol + Brownian bridge); only
     //! created when the configuration sets use_sobol
     std::unique_ptr<PathGenerator> _path_generator;
-    void SetupQuasiRandom_();
+    void SetupQuasiRandom();
 
     //! dates
     set<date> _diffusion_dates;
@@ -36,37 +36,37 @@ class PricerMCL : public Pricer
     //! single-tree Greeks: the base tree and every spot/vol/rate bump sub-tree
     //! are built into one collector and priced in a single path sweep (sharing
     //! the Brownian/noise nodes). _scenario_roots maps a bump tag to its book
-    //! node; _scenario_premium holds each bump's MC premium after Tree_Read_.
-    bool _build_greek_scenarios = false; //!< set per PriceBook_: build the bump sub-trees
+    //! node; _scenario_premium holds each bump's MC premium after Tree_Read.
+    bool _build_greek_scenarios = false; //!< set per PriceBook: build the bump sub-trees
     bool _suppress_scenarios = false;    //!< force a base-only tree (theta reprice / fallback)
     bool _theta_pass = false;            //!< the theta one-day reprice: show a local "MCL theta"
                                          //!< bar even while quiet, but keep it out of GlobalProgress
     vector<std::pair<string, MonteCarloNode*>> _scenario_roots;
     map<string, double> _scenario_premium;
-    bool CanSingleTreeGreeks_() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)
-    void BuildGreekScenarios_();       //!< build the delta/gamma/vega/rho bump sub-trees
+    bool CanSingleTreeGreeks() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)
+    void BuildGreekScenarios();       //!< build the delta/gamma/vega/rho bump sub-trees
 
     //! tree
-    void Tree_Init_();
-    void Tree_Run_();
-    void Tree_Read_();
+    void Tree_Init();
+    void Tree_Run();
+    void Tree_Read();
 
-    void CreateBrownianNodes_();
-    void CorrelateBrownianNodes_();
-    void CreateContractualNodes_();
+    void CreateBrownianNodes();
+    void CorrelateBrownianNodes();
+    void CreateContractualNodes();
 
     void ComputeCholeskyMatrix();
 
     //! American path recording (opt-in : only when American contracts exist)
     void SetupAmericanRecording();
     void LogRecordings();
-    long AmericanLsmSteps_() const; //!< progress-bar steps the LSM fit will run
-    string LogLabel_() const;       //!< "AMC" for an American (LSM) run, else "MCL"
+    long AmericanLsmSteps() const; //!< progress-bar steps the LSM fit will run
+    string LogLabel() const;       //!< "AMC" for an American (LSM) run, else "MCL"
     //! the diffusion node carrying the contract's exercise value. Resolved from
     //! the underlying itself (not the "<name>#spot" convention) so it also works
     //! for composite / basket, whose spot node is named differently from the
     //! underlying. Empty if the node has not been built.
-    string AmericanSpotName_( Contract* Contract );
+    string AmericanSpotName( Contract* Contract );
 
     //! American pricing via Longstaff-Schwartz on the recorded paths.
     //!
@@ -98,11 +98,11 @@ class PricerMCL : public Pricer
                                 double& Trust );
 
   protected:
-    void PreCheck_() override; //!< require an mcl_configuration and a correlation
-    void PriceBook_() override;
+    void PreCheck() override; //!< require an mcl_configuration and a correlation
+    void PriceBook() override;
     //! single-tree Greeks (delta/gamma/vega/rho in one path sweep); theta stays
-    //! bump-and-revalue. Falls back to Pricer::ComputeGreeks_ when !CanSingleTreeGreeks_.
-    void ComputeGreeks_() override;
+    //! bump-and-revalue. Falls back to Pricer::ComputeGreeks when !CanSingleTreeGreeks.
+    void ComputeGreeks() override;
 
   public:
     //! constructor, destructor

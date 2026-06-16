@@ -64,29 +64,29 @@ date Pricer::GetToday() const
 void Pricer::Execute()
 {
     //! validate the book / configuration once for the chosen engine
-    PreCheck_();
+    PreCheck();
 
     double t0 = WallClockSeconds();
 
     //! base scenario : price the whole book at the quoted market. For the
-    //! per-contract engines (PDE, ANA) PriceBook_ already folds in each
-    //! contract's Greeks inside its contract loop, so ComputeGreeks_ is skipped.
-    PriceBook_();
+    //! per-contract engines (PDE, ANA) PriceBook already folds in each
+    //! contract's Greeks inside its contract loop, so ComputeGreeks is skipped.
+    PriceBook();
     _premium = _book->GetPremium();
 
     //! optional Greeks by book-level bump-and-revalue (MCL); restores the base book
     const bool greeks = _request_delta || _request_gamma || _request_vega ||
                         _request_rho || _request_theta;
-    if ( greeks && !GreeksPerContract_() )
+    if ( greeks && !GreeksPerContract() )
     {
-        ComputeGreeks_();
+        ComputeGreeks();
     }
 
     _exec_time = ExecTime( t0 );
 }
 
 //! parallel vol shift applied to every underlying's volatility
-void Pricer::ApplyVolShift_( double Shift )
+void Pricer::ApplyVolShift( double Shift )
 {
     for ( Single* s : _single_set )
     {
@@ -95,7 +95,7 @@ void Pricer::ApplyVolShift_( double Shift )
 }
 
 //! parallel shift applied to every currency's yield curve
-void Pricer::ApplyRateShift_( double Shift )
+void Pricer::ApplyRateShift( double Shift )
 {
     for ( Currency* c : _currency_set )
     {
@@ -105,7 +105,7 @@ void Pricer::ApplyRateShift_( double Shift )
 
 //! engines that can price one contract in isolation override this; the base
 //! refuses (MCL prices the whole correlated book at once and never calls it).
-void Pricer::PriceContract_( Contract* Ctr )
+void Pricer::PriceContract( Contract* Ctr )
 {
     ERR( "book pricing '" + _name + "': engine does not support per-contract pricing for '" +
          Ctr->GetName() + "'" );
@@ -115,7 +115,7 @@ void Pricer::PriceContract_( Contract* Ctr )
 //! bar over the contracts, each step pricing a contract and (when requested)
 //! its bump-and-revalue Greeks. The book/pricer totals are accumulated as each
 //! contract completes, so the bar reflects the real per-contract work.
-void Pricer::PriceBookByContract_( const string& Label )
+void Pricer::PriceBookByContract( const string& Label )
 {
     Pricer::InitPricing();
 
@@ -131,17 +131,17 @@ void Pricer::PriceBookByContract_( const string& Label )
     {
         cancellation::CancellationPoint(); //!< abort promptly if the client disconnected
 
-        PriceContract_( c ); //!< base price for this contract
+        PriceContract( c ); //!< base price for this contract
         if ( greeks )
         {
-            ComputeContractGreeks_( c );
+            ComputeContractGreeks( c );
         }
 
         AggregateContract( c ); //!< premium (+ bump delta/gamma) -> book totals
 
         //! book-currency Greek totals (delta/gamma already folded into the book
         //! by AggregateContract; vega/rho/theta live at pricer level)
-        const double fx = FxToBook_( c );
+        const double fx = FxToBook( c );
         _delta += c->GetDelta() * fx;
         _gamma += c->GetGamma() * fx;
         _vega += c->GetVega() * fx;
@@ -154,10 +154,10 @@ void Pricer::PriceBookByContract_( const string& Label )
 }
 
 //! per-contract bump-and-revalue Greeks: bump only this contract's market and
-//! reprice just this contract. Mirrors the book-level ComputeGreeks_ bumps but
+//! reprice just this contract. Mirrors the book-level ComputeGreeks bumps but
 //! scoped to one contract, storing the results on the contract. Restores the
 //! contract's base price on exit (so AggregateContract sees the unbumped premium).
-void Pricer::ComputeContractGreeks_( Contract* Ctr )
+void Pricer::ComputeContractGreeks( Contract* Ctr )
 {
     const double p0 = Ctr->GetPremium();
 
@@ -176,7 +176,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
-                PriceContract_( Ctr );
+                PriceContract( Ctr );
                 const double pu = Ctr->GetPremium();
                 s->SetSpot( spot ); //!< restore
                 delta += ( pu - p0 ) / h;
@@ -186,10 +186,10 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
-                PriceContract_( Ctr );
+                PriceContract( Ctr );
                 const double pu = Ctr->GetPremium();
                 s->SetSpot( spot - h );
-                PriceContract_( Ctr );
+                PriceContract( Ctr );
                 const double pd = Ctr->GetPremium();
                 s->SetSpot( spot ); //!< restore
                 gamma += ( pu - 2 * p0 + pd ) / ( h * h );
@@ -206,7 +206,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         {
             s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
         }
-        PriceContract_( Ctr );
+        PriceContract( Ctr );
         const double pu = Ctr->GetPremium();
         for ( Single* s : singles )
         {
@@ -226,7 +226,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         {
             c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
         }
-        PriceContract_( Ctr );
+        PriceContract( Ctr );
         const double pu = Ctr->GetPremium();
         for ( Currency* c : ccys )
         {
@@ -244,7 +244,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
         const date base = _today;
         _today = base + days( 1 );
         Ctr->SetToday( _today );
-        PriceContract_( Ctr );
+        PriceContract( Ctr );
         const double p1 = Ctr->GetPremium();
         _today = base; //!< restore
         Ctr->SetToday( _today );
@@ -253,7 +253,7 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
 
     //! restore the contract to its base price BEFORE writing the Greeks: the
     //! restore reprice (PDE) overwrites delta/gamma from the grid, so set ours after.
-    PriceContract_( Ctr );
+    PriceContract( Ctr );
     Ctr->SetDelta( delta );
     Ctr->SetGamma( gamma );
     Ctr->SetVega( vega );
@@ -261,12 +261,12 @@ void Pricer::ComputeContractGreeks_( Contract* Ctr )
     Ctr->SetTheta( theta );
 }
 
-//! bump-and-revalue Greeks. Every scenario re-runs PriceBook_ with one market
+//! bump-and-revalue Greeks. Every scenario re-runs PriceBook with one market
 //! input bumped; for Monte-Carlo the random sequence is reset each run so the
 //! scenarios share common random numbers and the differences stay stable.
-void Pricer::ComputeGreeks_()
+void Pricer::ComputeGreeks()
 {
-    //! every PriceBook_ below is an inner bump revaluation: silence the engine's
+    //! every PriceBook below is an inner bump revaluation: silence the engine's
     //! per-sweep progress bar and status logs (restored on the way out). One
     //! "GRK" bar replaces them, advancing once per bump so the whole Greek job
     //! shows as a single line instead of N repeated re-price blocks.
@@ -294,7 +294,7 @@ void Pricer::ComputeGreeks_()
 
     //! delta / gamma : per-underlying relative spot bump (summed over underlyings),
     //! with a small bump for delta and a wider one for gamma (see GREEK_*_BUMP).
-    //! snapshot the singles first: PriceBook_ -> InitPricing rebuilds _single_set,
+    //! snapshot the singles first: PriceBook -> InitPricing rebuilds _single_set,
     //! which would invalidate an iterator held over it here.
     if ( _request_delta || _request_gamma )
     {
@@ -309,7 +309,7 @@ void Pricer::ComputeGreeks_()
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
-                PriceBook_();
+                PriceBook();
                 greek_bar.Update( ++greek_done );
                 const double pu = _book->GetPremium();
                 s->SetSpot( spot ); //!< restore
@@ -320,11 +320,11 @@ void Pricer::ComputeGreeks_()
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
-                PriceBook_();
+                PriceBook();
                 greek_bar.Update( ++greek_done );
                 const double pu = _book->GetPremium();
                 s->SetSpot( spot - h );
-                PriceBook_();
+                PriceBook();
                 greek_bar.Update( ++greek_done );
                 const double pd = _book->GetPremium();
                 s->SetSpot( spot ); //!< restore
@@ -338,24 +338,24 @@ void Pricer::ComputeGreeks_()
     //! vega : one-sided parallel vol bump, reported per 1 vol point (0.01 of vol)
     if ( _request_vega )
     {
-        ApplyVolShift_( GREEK_VOL_BUMP );
-        PriceBook_();
+        ApplyVolShift( GREEK_VOL_BUMP );
+        PriceBook();
         greek_bar.Update( ++greek_done );
         const double pu = _book->GetPremium();
 
-        ApplyVolShift_( 0 ); //!< restore
+        ApplyVolShift( 0 ); //!< restore
         _vega = ( pu - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
 
     //! rho : one-sided parallel rate bump, reported per 1% (0.01) rate move
     if ( _request_rho )
     {
-        ApplyRateShift_( GREEK_RATE_BUMP );
-        PriceBook_();
+        ApplyRateShift( GREEK_RATE_BUMP );
+        PriceBook();
         greek_bar.Update( ++greek_done );
         const double pu = _book->GetPremium();
 
-        ApplyRateShift_( 0 ); //!< restore
+        ApplyRateShift( 0 ); //!< restore
         _rho = ( pu - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
@@ -364,7 +364,7 @@ void Pricer::ComputeGreeks_()
     {
         const date base_today = _today;
         _today = base_today + days( 1 );
-        PriceBook_();
+        PriceBook();
         greek_bar.Update( ++greek_done );
         const double p1 = _book->GetPremium();
         _today = base_today; //!< restore
@@ -372,7 +372,7 @@ void Pricer::ComputeGreeks_()
     }
 
     //! restore the book to the base scenario so the premium output is unbumped
-    PriceBook_();
+    PriceBook();
     greek_bar.Update( ++greek_done );
     greek_bar.Done();
     _premium = _book->GetPremium();
@@ -440,7 +440,7 @@ void Pricer::WriteResults()
 
     //! per-contract premium (and, for the per-contract engines, per-contract
     //! Greeks attributed to each option)
-    const bool per_contract_greeks = GreeksPerContract_();
+    const bool per_contract_greeks = GreeksPerContract();
     for ( Contract* c : _book->GetOptionList() )
     {
         const string p = _result + "." + c->GetName();
@@ -482,7 +482,7 @@ set<date> Pricer::GetFixingDates()
 }
 
 //! FX factor converting a contract premium into the book currency
-double Pricer::FxToBook_( Contract* Ctr )
+double Pricer::FxToBook( Contract* Ctr )
 {
     if ( _currency == Ctr->GetPremiumCurrency() )
     {
@@ -500,7 +500,7 @@ double Pricer::FxToBook_( Contract* Ctr )
 //! add a priced contract's premium/delta/gamma to the book (with FX conversion)
 void Pricer::AggregateContract( Contract* Ctr )
 {
-    double fx = FxToBook_( Ctr );
+    double fx = FxToBook( Ctr );
     _book->SetPremium( _book->GetPremium() + Ctr->GetPremium() * fx );
     _book->SetDelta( _book->GetDelta() + Ctr->GetDelta() * fx );
     _book->SetGamma( _book->GetGamma() + Ctr->GetGamma() * fx );

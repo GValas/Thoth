@@ -15,7 +15,7 @@ PricerMCLGpu::~PricerMCLGpu() = default;
 //! GPU-priceable iff a device is present and every contract is a GPU-supported
 //! European vanilla under GBM. All-or-nothing: a mixed book falls back to CPU MCL
 //! so the result is never a half-GPU/half-CPU patchwork.
-bool PricerMCLGpu::BookIsGpuSupported_()
+bool PricerMCLGpu::BookIsGpuSupported()
 {
     if ( !gpu::Available() )
     {
@@ -32,11 +32,11 @@ bool PricerMCLGpu::BookIsGpuSupported_()
     return true;
 }
 
-void PricerMCLGpu::PreCheck_()
+void PricerMCLGpu::PreCheck()
 {
-    PricerMCL::PreCheck_(); //!< same mcl_configuration + correlation requirements
+    PricerMCL::PreCheck(); //!< same mcl_configuration + correlation requirements
 
-    _use_gpu = BookIsGpuSupported_();
+    _use_gpu = BookIsGpuSupported();
     if ( _use_gpu )
     {
         LOG( "GPU", "device Monte-Carlo enabled: " + gpu::DeviceInfo() );
@@ -49,42 +49,42 @@ void PricerMCLGpu::PreCheck_()
     }
 }
 
-bool PricerMCLGpu::GreeksPerContract_() const
+bool PricerMCLGpu::GreeksPerContract() const
 {
     //! GPU mode prices contract by contract (per-contract bump Greeks); the CPU
     //! fallback keeps MCL's book-level single-tree Greeks.
     return _use_gpu;
 }
 
-void PricerMCLGpu::PriceBook_()
+void PricerMCLGpu::PriceBook()
 {
     if ( !_use_gpu )
     {
-        PricerMCL::PriceBook_(); //!< CPU fallback (book-level diffusion tree)
+        PricerMCL::PriceBook(); //!< CPU fallback (book-level diffusion tree)
         return;
     }
 
     //! per-contract loop (+ per-contract Greeks when requested), reusing the same
     //! machinery as the PDE / ANA engines.
-    PriceBookByContract_( "GPU" );
+    PriceBookByContract( "GPU" );
 
     //! AggregateContract sums premia but not the Monte-Carlo trust; for independent
     //! contracts the book MC error adds in quadrature (FX-scaled to book currency).
     double var = 0;
     for ( Contract* c : _book->GetOptionList() )
     {
-        const double t = c->GetPremiumTrust() * FxToBook_( c );
+        const double t = c->GetPremiumTrust() * FxToBook( c );
         var += t * t;
     }
     _book->SetPremiumTrust( std::sqrt( var ) );
 }
 
-void PricerMCLGpu::PriceContract_( Contract* Ctr )
+void PricerMCLGpu::PriceContract( Contract* Ctr )
 {
     GpuGbmParams p;
     if ( !Ctr->GPU_GbmParams( p ) )
     {
-        //! BookIsGpuSupported_ guarantees every contract is supported in GPU mode
+        //! BookIsGpuSupported guarantees every contract is supported in GPU mode
         ERR( "gpu pricing '" + _name + "': contract '" + Ctr->GetName() + "' is not GPU-supported" );
     }
 

@@ -51,7 +51,7 @@ class Pricer : public Task
     SingleSet _single_set;
     CurrencySet _currency_set;
 
-    //! set while the book-level ComputeGreeks_ (MCL) re-prices the whole book for
+    //! set while the book-level ComputeGreeks (MCL) re-prices the whole book for
     //! bumped scenarios, so the engine silences its progress bar for those inner
     //! prices (the bar is shown only for the one base price, not per Greek bump).
     //! The per-contract engines (PDE, ANA) instead show one bar over the contract
@@ -82,37 +82,37 @@ class Pricer : public Task
     void InitPricing();
 
     //! engine-specific hooks (one orchestration in Pricer::Execute drives them):
-    //! PreCheck_ validates the book/config once; PriceBook_ prices the whole book
+    //! PreCheck validates the book/config once; PriceBook prices the whole book
     //! for the current market state into the book accumulators (re-runnable, so
     //! the bump-and-revalue Greeks can call it repeatedly with a bumped market).
-    virtual void PreCheck_() {}
-    virtual void PriceBook_() = 0;
+    virtual void PreCheck() {}
+    virtual void PriceBook() = 0;
 
     //! price a single contract for the current market state (engines that can
     //! isolate one contract override this: PDE solves its grid, ANA its formula).
     //! Used by the per-contract loop and its bump-and-revalue Greeks.
-    virtual void PriceContract_( Contract* Ctr );
+    virtual void PriceContract( Contract* Ctr );
 
     //! true for engines whose Greeks are computed per contract inside the
     //! contract loop (PDE, ANA). MCL stays book-level (correlated diffusion can
-    //! not isolate a single contract), so it keeps ComputeGreeks_.
-    virtual bool GreeksPerContract_() const { return false; }
+    //! not isolate a single contract), so it keeps ComputeGreeks.
+    virtual bool GreeksPerContract() const { return false; }
 
     //! shared contract loop for the per-contract engines: prices each contract,
     //! computes its Greeks (when requested) by bumping only that contract's
     //! market, and advances a single progress bar over the contracts.
-    void PriceBookByContract_( const string& Label );
+    void PriceBookByContract( const string& Label );
 
     //! bump-and-revalue Greeks for one contract (delta, gamma, vega, rho, theta),
     //! repricing only that contract; restores its base scenario when done.
-    void ComputeContractGreeks_( Contract* Ctr );
+    void ComputeContractGreeks( Contract* Ctr );
 
     //! bump-and-revalue Greeks for the indicators requested (delta, gamma, vega,
     //! rho, theta); leaves the book back at the base scenario when done. Virtual
     //! so MCL can override it with a single-tree (shared-path) implementation.
-    virtual void ComputeGreeks_();
-    void ApplyVolShift_( double Shift );  //!< parallel vol shift on every underlying
-    void ApplyRateShift_( double Shift ); //!< parallel shift on every currency's curve
+    virtual void ComputeGreeks();
+    void ApplyVolShift( double Shift );  //!< parallel vol shift on every underlying
+    void ApplyRateShift( double Shift ); //!< parallel shift on every currency's curve
 
     //! add a priced contract's premium/delta/gamma to the book (FX-converted to
     //! the book currency). Shared by every engine's Execute().
@@ -120,7 +120,7 @@ class Pricer : public Task
 
     //! FX factor converting a contract premium into the book currency (1 when
     //! the currencies match). Shared by AggregateContract and the Greek sums.
-    double FxToBook_( Contract* Ctr );
+    double FxToBook( Contract* Ctr );
 
     //! verify every contract in the book supports the engine's pricing method
     void CheckAllowed( const std::function<bool( Contract* )>& HasSolution,

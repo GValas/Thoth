@@ -25,7 +25,7 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 }
 
 //! check that PDE resolution is allowed and the configuration is complete
-void PricerPDE::PreCheck_()
+void PricerPDE::PreCheck()
 {
     CheckAllowed( []( Contract* c )
                   { return c->PDE_HasSolution(); }, "PDE" );
@@ -38,25 +38,20 @@ void PricerPDE::PreCheck_()
 }
 
 //! solve the grid for every contract (re-runnable for the Greeks bumps)
-void PricerPDE::PriceBook_()
+void PricerPDE::PriceBook()
 {
     //! one progress bar over the contracts; each step prices the contract and,
-    //! when requested, its bump-and-revalue Greeks (see Pricer::PriceBookByContract_).
-    PriceBookByContract_( "PDE" );
+    //! when requested, its bump-and-revalue Greeks (see Pricer::PriceBookByContract).
+    PriceBookByContract( "PDE" );
 }
 
 //! single-contract grid solve hook used by the per-contract loop and its Greeks
-void PricerPDE::PriceContract_( Contract* Ctr )
-{
-    PriceContract( Ctr );
-}
-
 //! price one contract: vanilla, knock-out, or knock-in (= vanilla - knock-out)
 void PricerPDE::PriceContract( Contract* Ctr )
 {
 
     //! Heston stochastic vol vanilla : 2-D (S, v) ADI grid
-    if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston_( Ctr ) )
+    if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston( Ctr ) )
     {
         GridResult r = SolveHestonGrid( Ctr );
         Ctr->SetPremium( r.premium );
@@ -486,7 +481,7 @@ inline double PricerPDE::T_1( int i, int j )
 //! ----------------------------------------------------------------------
 
 //! true iff the contract's underlying is a mono with a stochastic-vol (Heston)
-bool PricerPDE::UnderlyingIsHeston_( Contract* Ctr )
+bool PricerPDE::UnderlyingIsHeston( Contract* Ctr )
 {
     SingleSet s = Ctr->GetUnderlying()->GetSingleSet();
     if ( s.size() != 1 )

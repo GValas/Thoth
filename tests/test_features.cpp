@@ -264,7 +264,7 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
 }
 
 // --- regression : a non-Mono underlying (composite) priced with MCL Greeks goes
-// through bump-and-revalue, which re-enters PriceBook_ (and ComputeCholeskyMatrix)
+// through bump-and-revalue, which re-enters PriceBook (and ComputeCholeskyMatrix)
 // several times. The cholesky working lists must be rebuilt each call, else they
 // accumulate duplicate rows and the correlation is reported "not SDP". A few
 // thousand paths suffice: this guards against the throw, not a numeric value.

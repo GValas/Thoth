@@ -9,10 +9,10 @@ class PricerANA : public Pricer
 {
 
   protected:
-    void PreCheck_() override; //!< require a closed-form solution for every contract
-    void PriceBook_() override;
-    void PriceContract_( Contract* Ctr ) override; //!< single-contract closed-form price
-    bool GreeksPerContract_() const override { return true; }
+    void PreCheck() override; //!< require a closed-form solution for every contract
+    void PriceBook() override;
+    void PriceContract( Contract* Ctr ) override; //!< single-contract closed-form price
+    bool GreeksPerContract() const override { return true; }
 
   public:
     //! constructor, destructor

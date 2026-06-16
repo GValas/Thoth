@@ -20,12 +20,12 @@ class PricerMCLGpu : public PricerMCL
     ~PricerMCLGpu() override;
 
   protected:
-    void PreCheck_() override;                     //!< MCL checks + decide GPU vs CPU fallback
-    bool GreeksPerContract_() const override;      //!< true in GPU mode (per-contract bumps)
-    void PriceBook_() override;                    //!< GPU per-contract loop, or CPU MCL fallback
-    void PriceContract_( Contract* Ctr ) override; //!< one contract on the device
+    void PreCheck() override;                     //!< MCL checks + decide GPU vs CPU fallback
+    bool GreeksPerContract() const override;      //!< true in GPU mode (per-contract bumps)
+    void PriceBook() override;                    //!< GPU per-contract loop, or CPU MCL fallback
+    void PriceContract( Contract* Ctr ) override; //!< one contract on the device
 
   private:
-    bool BookIsGpuSupported_(); //!< gpu::Available() && every contract GPU_GbmParams
-    bool _use_gpu = false;      //!< decided once in PreCheck_
+    bool BookIsGpuSupported(); //!< gpu::Available() && every contract GPU_GbmParams
+    bool _use_gpu = false;     //!< decided once in PreCheck
 };

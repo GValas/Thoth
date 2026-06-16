@@ -124,22 +124,20 @@ class PricerPDE : public Pricer
     void InitGrid( Contract*, bool ApplyBarrier );
     GridResult SolveGrid( Contract* );
 
-    //! price one contract (vanilla, knock-out, or knock-in via in/out parity)
-    void PriceContract( Contract* );
-
     //! Heston stochastic vol : a 2-D (S, v) Douglas-ADI finite-difference solve
     //! (cross term explicit, S- and v-sweeps implicit). European + American.
     //! Only plain vanillas on a mono Heston underlying are routed here.
-    bool UnderlyingIsHeston_( Contract* Ctr );
+    bool UnderlyingIsHeston( Contract* Ctr );
     GridResult SolveHestonGrid( Contract* Ctr );
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
   protected:
-    void PreCheck_() override; //!< require a PDE solution + a pde_configuration
-    void PriceBook_() override;
-    void PriceContract_( Contract* Ctr ) override; //!< single-contract grid solve
-    bool GreeksPerContract_() const override { return true; }
+    void PreCheck() override; //!< require a PDE solution + a pde_configuration
+    void PriceBook() override;
+    //! price one contract (vanilla, knock-out, or knock-in via in/out parity)
+    void PriceContract( Contract* Ctr ) override; //!< single-contract grid solve
+    bool GreeksPerContract() const override { return true; }
 
   public:
     //! constructor, destructor

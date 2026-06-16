@@ -24,8 +24,15 @@ class Rng
         return ( X << K ) | ( X >> ( 64 - K ) );
     }
 
+  public:
+    using result_type = std::uint64_t;
+    static constexpr result_type min() { return 0; }
+    static constexpr result_type max() { return UINT64_MAX; }
+
+    explicit Rng( std::uint64_t Seed = 0 ) { this->Seed( Seed ); }
+
     //! splitmix64: expand a single seed into the 256-bit state (recommended seeding)
-    void Seed_( std::uint64_t Seed )
+    void Seed( std::uint64_t Seed )
     {
         std::uint64_t z = Seed;
         for ( int i = 0; i < 4; i++ )
@@ -37,15 +44,6 @@ class Rng
             _s[i] = x ^ ( x >> 31 );
         }
     }
-
-  public:
-    using result_type = std::uint64_t;
-    static constexpr result_type min() { return 0; }
-    static constexpr result_type max() { return UINT64_MAX; }
-
-    explicit Rng( std::uint64_t Seed = 0 ) { Seed_( Seed ); }
-
-    void Seed( std::uint64_t Seed ) { Seed_( Seed ); }
 
     //! next 64 random bits (xoshiro256++)
     result_type operator()()
