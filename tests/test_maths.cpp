@@ -32,7 +32,7 @@ TEST_CASE( "ext_la_matrix_to_near_positive repairs a non-PSD correlation" )
     ext_la_matrix_to_near_positive( m, eps );
 
     CHECK( ext_la_matrix_is_positive( m ) );          //!< now repaired
-    CHECK( eps > 0 );                                  //!< a strictly positive shift was needed
+    CHECK( eps > 0 );                                 //!< a strictly positive shift was needed
     CHECK( la_matrix_get( m, 0, 0 ) == Approx( 1 ) ); //!< unit diagonal preserved
     la_matrix_free( m );
 }

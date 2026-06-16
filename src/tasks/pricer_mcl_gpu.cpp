@@ -44,7 +44,8 @@ void PricerMCLGpu::PreCheck_()
     else
     {
         LOG( "GPU", "GPU pricing unavailable or unsupported for this book — falling back "
-                    "to the CPU MCL engine (" + gpu::DeviceInfo() + ")" );
+                    "to the CPU MCL engine (" +
+                        gpu::DeviceInfo() + ")" );
     }
 }
 

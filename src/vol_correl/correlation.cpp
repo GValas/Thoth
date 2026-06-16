@@ -60,7 +60,7 @@ void Correlation::SetUnderlyingList( const vector<string>& UnderlyingList )
 
 //! getter
 Forex* Correlation::GetForex( const string& UnderlyingCurrency,
-                                            const string& BaseCurrency )
+                              const string& BaseCurrency )
 {
 
     vector<Forex*>::iterator e;
@@ -80,7 +80,7 @@ Forex* Correlation::GetForex( const string& UnderlyingCurrency,
 
 //!
 ForexSet Correlation::GetForexSet( const string& I,
-                                                 const string& J )
+                                   const string& J )
 {
     ForexSet s;
 
@@ -105,7 +105,7 @@ la_matrix* Correlation::ExtractMatrix()
 // get matrix
 // udl, then fx
 la_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
-                                        vector<Forex*> ForexList )
+                                       vector<Forex*> ForexList )
 {
 
     //! sizes

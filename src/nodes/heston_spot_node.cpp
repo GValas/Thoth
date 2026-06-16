@@ -38,7 +38,7 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
     const double vp = _variance_node->GetValue( DateIndex - 1 );
     const double vc = _variance_node->GetValue( DateIndex );
     const double b = _drift_node->GetValue( DateIndex ); //!< carry r - q (- repo)
-    const double z = _noise_node->GetValue( DateIndex );  //!< independent N(0,1)
+    const double z = _noise_node->GetValue( DateIndex ); //!< independent N(0,1)
 
     double step;
     if ( _xi > 1e-12 )

@@ -68,7 +68,7 @@ TEST_CASE( "variance swap: MCL and ANA agree" )
     auto mr = Price( OneContract( "mcl", c ) );
     double mcl = Premium( mr );
 
-    CHECK( ana > 0.0 );                              //!< 30% realized vs 20% strike -> positive
+    CHECK( ana > 0.0 );                                        //!< 30% realized vs 20% strike -> positive
     CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 2.0 ); //!< engines agree (MC error)
 }
 
@@ -95,7 +95,7 @@ TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     double a = Premium( Price( o.str() ) );
     double b = Premium( Price( o.str() ) );
-    CHECK( a == doctest::Approx( b ).epsilon( 1e-12 ) );        //!< deterministic
+    CHECK( a == doctest::Approx( b ).epsilon( 1e-12 ) );                //!< deterministic
     CHECK( std::abs( a - BsCall( 100, 100, 0.06, 0.30, T1 ) ) <= 0.2 ); //!< QMC accuracy
 }
 
@@ -258,9 +258,9 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
     CAPTURE( am_mcl );
     CAPTURE( am_pde );
 
-    CHECK( am_mcl > eu_mcl );                            //!< early-exercise premium captured
+    CHECK( am_mcl > eu_mcl );                             //!< early-exercise premium captured
     CHECK( am_mcl <= am_pde + 6.0 * Trust( am ) + 5e-2 ); //!< LSM is a (biased-low) lower bound
-    CHECK( am_mcl >= am_pde * 0.95 );                   //!< within ~5% of the oracle
+    CHECK( am_mcl >= am_pde * 0.95 );                     //!< within ~5% of the oracle
 }
 
 // --- regression : a non-Mono underlying (composite) priced with MCL Greeks goes
@@ -291,10 +291,10 @@ TEST_CASE( "composite MCL Greeks do not corrupt the correlation Cholesky" )
       << "book: !book {options: [o]}\n"
       << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
       << " maturity: 2000-12-31, type: call, exercise: european}\n";
-    auto r = Price( o.str() );                 //!< must not throw "cor is not SDP"
+    auto r = Price( o.str() ); //!< must not throw "cor is not SDP"
     CHECK( std::isfinite( Premium( r ) ) );
     CHECK( std::isfinite( Greek( r, "delta" ) ) );
-    CHECK( Greek( r, "vega" ) > 0.0 );         //!< composite vega is positive
+    CHECK( Greek( r, "vega" ) > 0.0 ); //!< composite vega is positive
 }
 
 // --- SABR : with beta = 1 and a tiny vol-of-vol the ATM SABR implied vol is ~alpha,

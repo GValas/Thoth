@@ -28,7 +28,7 @@ class Correlation : public Object
 
     //! public
     Forex* GetForex( const string& UnderlyingCurrency,
-                                   const string& BaseCurrency );
+                     const string& BaseCurrency );
 
   public:
     //! cholesky
@@ -45,7 +45,7 @@ class Correlation : public Object
     //! access to matrix
     la_matrix* ExtractCholeskyMatrix( const vector<string> UnderlyingNames );
     la_matrix* ExtractMatrix( vector<string> UnderlyingNameList,
-                               vector<Forex*> ForexList );
+                              vector<Forex*> ForexList );
     la_matrix* ExtractMatrix();
 
     //! read correl matrix : 3 ways
@@ -71,7 +71,7 @@ class Correlation : public Object
 
     //!
     ForexSet GetForexSet( const string& UnderlyingCurrency,
-                                        const string& BaseCurrency );
+                          const string& BaseCurrency );
 
     //! mcl nodes
     MonteCarloNode* GetCholeskyNode( NodeCollector& NC,

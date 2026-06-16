@@ -15,7 +15,7 @@ class NodeCollector
     map<string, std::unique_ptr<MonteCarloNode>> _node_map; //!< owns every node
     map<string, BrownianNode*> _brownian_node_map;          //!< non-owning view
 
-    string _scenario_suffix; //!< appended to node names while building a Greek bump
+    string _scenario_suffix;           //!< appended to node names while building a Greek bump
     bool _scenario_bumps_rate = false; //!< scenario bumps rates (rho)
     bool _scenario_bumps_vol = false;  //!< scenario bumps vols (vega)
 
@@ -30,7 +30,7 @@ class NodeCollector
         MonteCarloNode* node = nullptr;
         vector<size_t> date_index; //!< columns: diffusion-date indices
         vector<double> tau;        //!< year fraction of each column from today
-        LaMatrix paths;           //!< [ nb_draws x date_index.size() ]
+        LaMatrix paths;            //!< [ nb_draws x date_index.size() ]
         size_t row = 0;            //!< next draw to fill
     };
     vector<PathRecord> _records;

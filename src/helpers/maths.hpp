@@ -59,7 +59,7 @@ void LN_to_M4( la_vector* Fwds,
                double& M4 );
 
 la_matrix* ext_la_vector_to_matrix( const la_vector* v,
-                                      size_t row_size );
+                                    size_t row_size );
 //! in-place lower-triangular Cholesky (A = L L^T); false if not positive-definite
 bool CholeskyDecomposeLower( la_matrix* A );
 //! solve a tridiagonal system M X = B (Thomas algorithm)
@@ -71,44 +71,44 @@ bool ext_la_matrix_is_positive( const la_matrix* m );
 bool ext_la_matrix_is_square( const la_matrix* m );
 bool ext_la_matrix_is_symmetric( const la_matrix* m );
 void ext_la_matrix_to_near_positive( la_matrix* m,
-                                      double& eps );
+                                     double& eps );
 void ext_la_matrix_shift_to_epsilon( la_matrix* m,
-                                      double eps );
+                                     double eps );
 void ext_la_matrix_from_symmetric( la_matrix* m );
 void ext_la_matrix_to_symmetric( la_matrix* m );
 
 double ext_la_vector_sum( la_vector* v );
 
 double ext_stats_wcovariance_m( const double w[],
-                                    const double data1[],
-                                    const size_t stride1,
-                                    const double data2[],
-                                    const size_t stride2,
-                                    const size_t n,
-                                    const double wmean1,
-                                    const double wmean2 );
+                                const double data1[],
+                                const size_t stride1,
+                                const double data2[],
+                                const size_t stride2,
+                                const size_t n,
+                                const double wmean1,
+                                const double wmean2 );
 
 double ext_stats_wcorrelation_m_v( const double w[],
-                                       const double data1[],
-                                       const size_t stride1,
-                                       const double data2[],
-                                       const size_t stride2,
-                                       const size_t n,
-                                       const double wmean1,
-                                       const double wmean2,
-                                       const double wvar1,
-                                       const double wvar2 );
+                                   const double data1[],
+                                   const size_t stride1,
+                                   const double data2[],
+                                   const size_t stride2,
+                                   const size_t n,
+                                   const double wmean1,
+                                   const double wmean2,
+                                   const double wvar1,
+                                   const double wvar2 );
 
 //! computes the weighted covariance, given means
 double ext_stats_wcovariance_m_v( const double w[],
-                                      size_t wstride,
-                                      const double data1[],
-                                      size_t stride1,
-                                      const double data2[],
-                                      size_t stride2,
-                                      size_t n,
-                                      double wmean1,
-                                      double wmean2 );
+                                  size_t wstride,
+                                  const double data1[],
+                                  size_t stride1,
+                                  const double data2[],
+                                  size_t stride2,
+                                  size_t n,
+                                  double wmean1,
+                                  double wmean2 );
 
 vector<double> ToSymmetricMatrix( const vector<double>& Matrix );
 vector<double> FromSymmetricMatrix( const vector<double>& Matrix );
@@ -120,13 +120,13 @@ double InterpolateWithSpline( la_vector* x_serie, la_vector* y_serie, double x_p
 
 //! computes the weighted correlation, given means and variances
 double ext_stats_wcorrelation_m_v( const double w[],
-                                       size_t wstride,
-                                       const double data1[],
-                                       size_t stride1,
-                                       const double data2[],
-                                       size_t stride2,
-                                       size_t n,
-                                       double wmean1,
-                                       double wmean2,
-                                       double wvariance1,
-                                       double wvariance2 );
+                                   size_t wstride,
+                                   const double data1[],
+                                   size_t stride1,
+                                   const double data2[],
+                                   size_t stride2,
+                                   size_t n,
+                                   double wmean1,
+                                   double wmean2,
+                                   double wvariance1,
+                                   double wvariance2 );

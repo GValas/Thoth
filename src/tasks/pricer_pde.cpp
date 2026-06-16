@@ -552,9 +552,12 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double dt = T / Nt;
     const double q = 0.5; //!< ADI implicitness (Crank-Nicolson directional)
 
-    auto S = [&]( int i ) { return i * dS; };
-    auto V = [&]( int i ) { return i * dv; };
-    auto IX = [&]( int i, int j ) { return i * ( Nv + 1 ) + j; };
+    auto S = [&]( int i )
+    { return i * dS; };
+    auto V = [&]( int i )
+    { return i * dv; };
+    auto IX = [&]( int i, int j )
+    { return i * ( Nv + 1 ) + j; };
 
     vector<double> U( ( NS + 1 ) * ( Nv + 1 ), 0.0 );
 
@@ -604,7 +607,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     {
         for ( int j = 0; j <= Nv; j++ )
         {
-            g[IX( 0, j )] = intrinsic0 * exp( -rd * tau );             //!< S=0 (Dirichlet)
+            g[IX( 0, j )] = intrinsic0 * exp( -rd * tau );                //!< S=0 (Dirichlet)
             g[IX( NS, j )] = 2 * g[IX( NS - 1, j )] - g[IX( NS - 2, j )]; //!< S=Smax (linear)
         }
         for ( int i = 0; i <= NS; i++ )
@@ -724,12 +727,14 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     int i0 = std::min( NS - 1, std::max( 0, (int)( S0 / dS ) ) );
     int j0 = std::min( Nv - 1, std::max( 0, (int)( v0 / dv ) ) );
     double ws = ( S0 - S( i0 ) ) / dS, wv = ( v0 - V( j0 ) ) / dv;
-    auto at = [&]( int i, int j ) { return U[IX( i, j )]; };
+    auto at = [&]( int i, int j )
+    { return U[IX( i, j )]; };
     double price = ( 1 - ws ) * ( 1 - wv ) * at( i0, j0 ) + ws * ( 1 - wv ) * at( i0 + 1, j0 ) +
                    ( 1 - ws ) * wv * at( i0, j0 + 1 ) + ws * wv * at( i0 + 1, j0 + 1 );
 
     //! delta / gamma by finite differences in S at v0 (central, one grid step)
-    auto price_at = [&]( int i ) {
+    auto price_at = [&]( int i )
+    {
         return ( 1 - wv ) * at( i, j0 ) + wv * at( i, j0 + 1 );
     };
     GridResult res;

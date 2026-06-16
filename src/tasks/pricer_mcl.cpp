@@ -131,26 +131,36 @@ void PricerMCL::BuildGreekScenarios_()
         if ( _request_delta )
         {
             const double h = GREEK_SPOT_BUMP * spot;
-            build( "@D+:" + s->GetName(), false, false, [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@D+:" + s->GetName(), false, false, [&]
+                   { s->SetSpot( spot + h ); }, [&]
+                   { s->SetSpot( spot ); } );
         }
         if ( _request_gamma )
         {
             const double h = GREEK_GAMMA_BUMP * spot;
-            build( "@G+:" + s->GetName(), false, false, [&] { s->SetSpot( spot + h ); }, [&] { s->SetSpot( spot ); } );
-            build( "@G-:" + s->GetName(), false, false, [&] { s->SetSpot( spot - h ); }, [&] { s->SetSpot( spot ); } );
+            build( "@G+:" + s->GetName(), false, false, [&]
+                   { s->SetSpot( spot + h ); }, [&]
+                   { s->SetSpot( spot ); } );
+            build( "@G-:" + s->GetName(), false, false, [&]
+                   { s->SetSpot( spot - h ); }, [&]
+                   { s->SetSpot( spot ); } );
         }
     }
 
     //! vega : one-sided parallel vol bump on every underlying
     if ( _request_vega )
     {
-        build( "@V+", false, true, [&] { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&] { ApplyVolShift_( 0 ); } );
+        build( "@V+", false, true, [&]
+               { ApplyVolShift_( GREEK_VOL_BUMP ); }, [&]
+               { ApplyVolShift_( 0 ); } );
     }
 
     //! rho : one-sided parallel rate bump on every currency's curve
     if ( _request_rho )
     {
-        build( "@R+", true, false, [&] { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&] { ApplyRateShift_( 0 ); } );
+        build( "@R+", true, false, [&]
+               { ApplyRateShift_( GREEK_RATE_BUMP ); }, [&]
+               { ApplyRateShift_( 0 ); } );
     }
 }
 //! single-tree Greeks: delta/gamma/vega/rho come from the bump sub-trees priced
@@ -765,9 +775,9 @@ void PricerMCL::PriceAmerican()
 //! per-date coefficients are stored. The fitted continuation also drives the
 //! cashflow roll-back so earlier dates regress against the realised policy value.
 PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
-                                                       const la_matrix* Paths,
-                                                       const vector<double>& Tau,
-                                                       double Rate )
+                                                        const la_matrix* Paths,
+                                                        const vector<double>& Tau,
+                                                        double Rate )
 {
     AmericanPolicy pol;
     if ( !Paths || Paths->size2 < 2 )
@@ -775,8 +785,8 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
         return pol;
     }
 
-    size_t N = Paths->size1; //!< paths
-    size_t M = Paths->size2; //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
+    size_t N = Paths->size1;               //!< paths
+    size_t M = Paths->size2;               //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
     pol.s0 = la_matrix_get( Paths, 0, 0 ); //!< initial spot (constant across base paths)
     pol.tau = Tau;
     pol.b0.assign( M, 0.0 );

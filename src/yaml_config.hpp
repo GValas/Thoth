@@ -89,9 +89,9 @@ class YamlConfig
     void SetDateList( const string& Path,
                       const vector<date>& Value );
     void SetLaMatrix( const string& Path,
-                       const la_matrix* Value );
+                      const la_matrix* Value );
     void SetLaVector( const string& Path,
-                       const la_vector* Value );
+                      const la_vector* Value );
     void SetString( const string& Path,
                     const string& Value );
     void SetStringList( const string& Path,

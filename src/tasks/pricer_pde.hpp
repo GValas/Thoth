@@ -138,7 +138,7 @@ class PricerPDE : public Pricer
   protected:
     void PreCheck_() override; //!< require a PDE solution + a pde_configuration
     void PriceBook_() override;
-    void PriceContract_( Contract* Ctr ) override;     //!< single-contract grid solve
+    void PriceContract_( Contract* Ctr ) override; //!< single-contract grid solve
     bool GreeksPerContract_() const override { return true; }
 
   public:

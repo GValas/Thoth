@@ -8,9 +8,9 @@ struct GpuGbmParams
 {
     double forward = 0; //!< carries the carry / dividend / quanto drift
     double strike = 0;
-    double t = 0;       //!< year fraction today -> maturity
-    double vol = 0;     //!< implied vol at (strike, maturity)
-    double df = 0;      //!< discount factor to maturity
+    double t = 0;   //!< year fraction today -> maturity
+    double vol = 0; //!< implied vol at (strike, maturity)
+    double df = 0;  //!< discount factor to maturity
     bool is_call = true;
 };
 

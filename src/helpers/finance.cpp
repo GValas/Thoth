@@ -270,7 +270,8 @@ double heston_probability( HestonParams h, int j )
     h.j = j;
     //! semi-infinite integral from a small epsilon (integrand is regular at 0),
     //! adaptive Gauss-Kronrod — the same rule family as the GSL qagiu it replaces
-    auto integrand = [&h]( double phi ) { return heston_integrand( phi, &h ); };
+    auto integrand = [&h]( double phi )
+    { return heston_integrand( phi, &h ); };
     const double result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(
         integrand, 1e-8, std::numeric_limits<double>::infinity(), 15, 1e-8 );
     return 0.5 + result / M_PI;

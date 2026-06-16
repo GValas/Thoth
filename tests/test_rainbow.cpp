@@ -115,7 +115,7 @@ TEST_CASE( "rainbow ordering and identity for two identical assets" )
     CAPTURE( best );
     CAPTURE( worst );
     CAPTURE( single );
-    CHECK( best >= single - 0.1 );                          //!< best-of dominates
-    CHECK( worst <= single + 0.1 );                         //!< worst-of dominated
+    CHECK( best >= single - 0.1 );                             //!< best-of dominates
+    CHECK( worst <= single + 0.1 );                            //!< worst-of dominated
     CHECK( std::abs( ( best + worst ) - 2 * single ) <= 0.2 ); //!< identity (identical assets)
 }

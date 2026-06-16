@@ -279,11 +279,16 @@ void Pricer::ComputeGreeks_()
     //! plus one final restore re-price.
     const long ns = (long)_single_set.size();
     long greek_total = 1; //!< final restore
-    if ( _request_delta ) greek_total += ns;
-    if ( _request_gamma ) greek_total += 2 * ns;
-    if ( _request_vega ) greek_total += 1;
-    if ( _request_rho ) greek_total += 1;
-    if ( _request_theta ) greek_total += 1;
+    if ( _request_delta )
+        greek_total += ns;
+    if ( _request_gamma )
+        greek_total += 2 * ns;
+    if ( _request_vega )
+        greek_total += 1;
+    if ( _request_rho )
+        greek_total += 1;
+    if ( _request_theta )
+        greek_total += 1;
     ProgressBar greek_bar( "GRK", greek_total );
     long greek_done = 0;
 

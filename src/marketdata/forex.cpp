@@ -47,7 +47,7 @@ double Forex::GetForward( const date& /*MaturityDate*/ )
 
 //! local vol
 double Forex::GetLocalVolatility( const double /*Strike*/,
-                                         const date& /*MaturityDate*/ )
+                                  const date& /*MaturityDate*/ )
 {
     return GetConstantVol();
 }

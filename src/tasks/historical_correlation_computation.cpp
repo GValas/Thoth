@@ -100,13 +100,13 @@ void HistoricalCorrelationComputation::Execute()
         for ( size_t j = i + 1; j < histos_size; j++ )
         {
             double c = ext_stats_wcorrelation_m_v( la_vector_ptr( weights, 0 ), 1,
-                                                       la_vector_ptr( log_return_list[i], 0 ), 1,
-                                                       la_vector_ptr( log_return_list[j], 0 ), 1,
-                                                       _range_size,
-                                                       la_vector_get( weighted_means, i ),
-                                                       la_vector_get( weighted_means, j ),
-                                                       la_vector_get( weighted_variances, i ),
-                                                       la_vector_get( weighted_variances, j ) );
+                                                   la_vector_ptr( log_return_list[i], 0 ), 1,
+                                                   la_vector_ptr( log_return_list[j], 0 ), 1,
+                                                   _range_size,
+                                                   la_vector_get( weighted_means, i ),
+                                                   la_vector_get( weighted_means, j ),
+                                                   la_vector_get( weighted_variances, i ),
+                                                   la_vector_get( weighted_variances, j ) );
             la_matrix_set( _historical_matrix, i, j, c );
             la_matrix_set( _historical_matrix, j, i, c );
         }

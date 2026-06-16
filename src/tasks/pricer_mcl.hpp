@@ -78,12 +78,12 @@ class PricerMCL : public Pricer
     //! theorem makes a first-order boundary error contribute only at second order).
     struct AmericanPolicy
     {
-        double s0 = 0;          //!< base-path initial spot (moneyness normaliser m = S/s0)
-        vector<double> tau;     //!< year fractions of the recorded exercise grid
-        vector<double> b0;      //!< continuation regression constant per exercise date
-        vector<double> b1;      //!< continuation regression slope (m) per exercise date
-        vector<double> b2;      //!< continuation regression curvature (m^2) per exercise date
-        vector<bool> has_fit;   //!< true where a continuation fit exists (enough ITM points)
+        double s0 = 0;        //!< base-path initial spot (moneyness normaliser m = S/s0)
+        vector<double> tau;   //!< year fractions of the recorded exercise grid
+        vector<double> b0;    //!< continuation regression constant per exercise date
+        vector<double> b1;    //!< continuation regression slope (m) per exercise date
+        vector<double> b2;    //!< continuation regression curvature (m^2) per exercise date
+        vector<bool> has_fit; //!< true where a continuation fit exists (enough ITM points)
     };
     void PriceAmerican();
     AmericanPolicy FitAmericanPolicy( Contract* Contract,

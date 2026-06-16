@@ -78,7 +78,7 @@ YAML::Node SortKeysAlpha( const YAML::Node& Node )
         std::sort( keys.begin(), keys.end() );
 
         YAML::Node out( YAML::NodeType::Map );
-        out.SetStyle( Node.Style() ); //!< keep flow/block layout
+        out.SetStyle( Node.Style() );                        //!< keep flow/block layout
         if ( Node.Tag().size() > 1 && Node.Tag()[0] == '!' ) //!< keep "!kind"
         {
             out.SetTag( Node.Tag() );
@@ -549,13 +549,13 @@ void YamlConfig::SetDoubleList( const string& Path,
 }
 
 void YamlConfig::SetLaMatrix( const string& Path,
-                               const la_matrix* Value )
+                              const la_matrix* Value )
 {
     SetDoubleList( Path, Value->data, Value->size1 * Value->size2 );
 }
 
 void YamlConfig::SetLaVector( const string& Path,
-                               const la_vector* Value )
+                              const la_vector* Value )
 {
     SetDoubleList( Path, Value->data, Value->size );
 }

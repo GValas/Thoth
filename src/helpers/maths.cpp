@@ -423,7 +423,7 @@ vector<double> FromLaMatrix( la_matrix* Matrix )
 
 //!
 la_matrix* ext_la_vector_to_matrix( const la_vector* v,
-                                      size_t row_size )
+                                    size_t row_size )
 {
     //! Reshape the flat vector into an owning matrix.  We copy rather than
     //! alias v's storage: the returned matrix is later released with
@@ -442,40 +442,40 @@ la_matrix* ext_la_vector_to_matrix( const la_vector* v,
 
 //! computes the weighted correlation, given means and variances
 double ext_stats_wcorrelation_m_v( const double w[],
-                                       size_t wstride,
-                                       const double data1[],
-                                       size_t stride1,
-                                       const double data2[],
-                                       size_t stride2,
-                                       size_t n,
-                                       double wmean1,
-                                       double wmean2,
-                                       double wvariance1,
-                                       double wvariance2 )
+                                   size_t wstride,
+                                   const double data1[],
+                                   size_t stride1,
+                                   const double data2[],
+                                   size_t stride2,
+                                   size_t n,
+                                   double wmean1,
+                                   double wmean2,
+                                   double wvariance1,
+                                   double wvariance2 )
 {
     double cov = ext_stats_wcovariance_m_v( w,
-                                                wstride,
-                                                data1,
-                                                stride1,
-                                                data2,
-                                                stride2,
-                                                n,
-                                                wmean1,
-                                                wmean2 );
+                                            wstride,
+                                            data1,
+                                            stride1,
+                                            data2,
+                                            stride2,
+                                            n,
+                                            wmean1,
+                                            wmean2 );
 
     return cov / sqrt( wvariance1 * wvariance2 );
 }
 
 //! computes the weighted covariance, given means
 double ext_stats_wcovariance_m_v( const double weights[],
-                                      size_t wstride,
-                                      const double data1[],
-                                      size_t stride1,
-                                      const double data2[],
-                                      size_t stride2,
-                                      size_t n,
-                                      double wmean1,
-                                      double wmean2 )
+                                  size_t wstride,
+                                  const double data1[],
+                                  size_t stride1,
+                                  const double data2[],
+                                  size_t stride2,
+                                  size_t n,
+                                  double wmean1,
+                                  double wmean2 )
 {
     double sum = 0;
     double sum_w2 = 0;
@@ -561,7 +561,7 @@ vector<double> LeastSquares( const la_matrix* X, const la_vector* y )
     const size_t n = X->size1;
     const size_t p = X->size2;
     la_matrix* A = la_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD)
-    vector<double> g( p, 0.0 );               //!< right-hand side X^T y
+    vector<double> g( p, 0.0 );             //!< right-hand side X^T y
     for ( size_t a = 0; a < p; a++ )
     {
         for ( size_t b = 0; b <= a; b++ )
