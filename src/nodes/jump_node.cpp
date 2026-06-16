@@ -33,9 +33,17 @@ void JumpNode::ComputeValue( size_t DateIndex )
     double increment = -_lambda * _kbar * dt;
 
     //! realised jumps over the step : n ~ Poisson(lambda*dt), aggregate log jump
-    //! of n lognormal jumps is N(n*mu, n*sigma^2)
-    std::poisson_distribution<unsigned int> poisson( _lambda * dt );
-    unsigned int n = poisson( *_rng );
+    //! of n lognormal jumps is N(n*mu, n*sigma^2). The per-step distributions are
+    //! built once (dt is per-date) and reused, not reconstructed every path.
+    if ( _poisson.empty() )
+    {
+        _poisson.reserve( _dt_list.size() );
+        for ( double step_dt : _dt_list )
+        {
+            _poisson.emplace_back( _lambda * step_dt );
+        }
+    }
+    unsigned int n = _poisson[DateIndex]( *_rng );
     if ( n > 0 )
     {
         increment += n * _mu + _sigma * sqrt( (double)n ) * _rng->Gaussian();

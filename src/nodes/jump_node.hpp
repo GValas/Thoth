@@ -2,6 +2,8 @@
 #include "monte_carlo_node.hpp"
 #include "rng.hpp"
 
+#include <random>
+
 //! Bates compound-Poisson jump increment for one diffusion step, in log-spot
 //! space: the drift compensator -lambda*kbar*dt plus the realised jump. Over a
 //! step the number of jumps is Poisson(lambda*dt) and the aggregate log jump of
@@ -16,6 +18,10 @@ class JumpNode : public MonteCarloNode
     double _mu = 0;     //!< mean of the log jump size
     double _sigma = 0;  //!< vol of the log jump size
     double _kbar = 0;   //!< E[e^J - 1] compensator
+
+    //! one Poisson(lambda*dt) per diffusion step, built once and reused across paths
+    //! (dt is per-date, not per-path) instead of reconstructed on every ComputeValue
+    vector<std::poisson_distribution<unsigned int>> _poisson;
 
   public:
     void ComputeValue( size_t DateIndex ) override;
