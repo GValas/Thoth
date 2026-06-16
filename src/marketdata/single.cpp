@@ -100,11 +100,10 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
             {
                 LocalVolatilityNode* lv = BuildLocalVolNode( NC, S );
                 S->SetLocalVolNode( lv );
-                //! refine the local-vol diffusion with the Milstein step when asked
-                if ( NC.UseMilstein() )
-                {
-                    S->EnableMilstein( lv );
-                }
+                //! always refine the local-vol diffusion with the Milstein step
+                //! (its correction is a no-op for constant vol, so it is only ever
+                //! applied here, where the vol genuinely depends on the spot)
+                S->EnableMilstein( lv );
             }
             else
             {

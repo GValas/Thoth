@@ -385,7 +385,6 @@ shared_mcl: !mcl_configuration
   paths: 50000
   vol_time_step: 0.01
   use_sobol: true
-  use_milstein: true
 
 # --- books (one contract each) ---------------------------------------------
 book_van_eu: !book

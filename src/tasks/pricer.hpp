@@ -17,7 +17,6 @@ const int PDE_VANILLA_PRECISION_HIGH_N_T = 1301;
 const double PDE_SIGMA_FACTOR = 5.0;
 const double PDE_THETA = 0.5;
 const bool MC_USE_SOBOL = true;
-const bool MC_USE_MILSTEIN = true;
 
 //! pricing method selectors (config field "method")
 inline constexpr char PRICING_METHOD_PDE[] = "pde";         //!< finite-difference PDE grid solving

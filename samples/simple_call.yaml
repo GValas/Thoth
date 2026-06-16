@@ -30,7 +30,6 @@ mcl_config: !mcl_configuration
   paths: 10000000
   vol_time_step: 0.01
   use_sobol: true
-  use_milstein: true
   generate_nodes_graph: true
 
 pde_config: !pde_configuration

@@ -411,7 +411,6 @@ map<string, ObjectManager::Factory> MakeRegistry()
         M->_vol_time_step = m.cfg().GetDouble( n + ".vol_time_step" );
         M->_node_file = m.cfg().GetString( n + ".node_file", MCL_NODE_PATH );
         M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
-        M->_use_milstein = m.cfg().GetBoolean( n + ".use_milstein", MC_USE_MILSTEIN );
         M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
         M->_sobol_skip = m.cfg().GetLong( n + ".sobol_skip", 0 );
         //! guard against degenerate grids: paths <= 0 -> NaN premium, and

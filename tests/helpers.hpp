@@ -118,7 +118,7 @@ inline std::string CfgBlock( const std::string& method, int draws, int max_time_
       << ", mcl_configuration: cfg_mcl, pde_configuration: cfg_pde, log_path: \"/tmp/\"}\n"
       << "cfg_mcl: !mcl_configuration {max_time_step: " << max_time_step
       << ", min_time_step: -1, paths: " << draws
-      << ", vol_time_step: 0.01, use_sobol: false, use_milstein: true}\n"
+      << ", vol_time_step: 0.01, use_sobol: false}\n"
       << "cfg_pde: !pde_configuration {vanilla_precision: " << PrecisionLevel( pde_precision )
       << "}\n";
     return o.str();

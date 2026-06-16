@@ -18,7 +18,6 @@ class NodeCollector
     string _scenario_suffix;           //!< appended to node names while building a Greek bump
     bool _scenario_bumps_rate = false; //!< scenario bumps rates (rho)
     bool _scenario_bumps_vol = false;  //!< scenario bumps vols (vega)
-    bool _use_milstein = false;        //!< local-vol diffusion uses the Milstein step
 
     //! (node,index)
     vector<MonteCarloNode*> _node_list;
@@ -111,11 +110,6 @@ class NodeCollector
     //! the diffusion date schedule (ascending; [0] is today). Available after
     //! SetDiffusionDates, so node builders can precompute per-date data.
     const vector<date>& GetDateList() const { return _date_list; }
-
-    //! Milstein step for the local-vol diffusion (from the mcl_configuration);
-    //! read by node builders. No effect on constant-vol (the correction vanishes).
-    void SetUseMilstein( bool Use ) { _use_milstein = Use; }
-    bool UseMilstein() const { return _use_milstein; }
 
     //! drop every node, date map and recording so the owning pricer can rebuild
     //! a fresh tree (used by the bump-and-revalue Greeks: each scenario rebuilds

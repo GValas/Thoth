@@ -83,7 +83,7 @@ TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
       << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 50000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [6, 6]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -137,7 +137,7 @@ TEST_CASE( "basket: near-perfectly correlated 50/50 basket equals the single ass
       << " correlation: cor, indicators: [premium], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 60000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -178,7 +178,7 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
           << "cfg: !pricer_configuration {method: " << method
           << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
-          << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << " vol_time_step: 0.01, use_sobol: true}\n"
           << "pd: !pde_configuration {vanilla_precision: high}\n"
           << "eur: !currency {rate: r_eur}\n"
           << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
@@ -231,7 +231,7 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
           << "cfg: !pricer_configuration {method: " << method
           << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
-          << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << " vol_time_step: 0.01, use_sobol: true}\n"
           << "pd: !pde_configuration {vanilla_precision: high}\n"
           << "eur: !currency {rate: r_eur}\n"
           << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
@@ -276,7 +276,7 @@ TEST_CASE( "composite MCL Greeks do not corrupt the correlation Cholesky" )
       << " correlation: cor, indicators: [premium, delta, vega, rho, theta], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 8000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: r_eur}\n"
       << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "usd: !currency {rate: r_usd}\n"
@@ -372,28 +372,6 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
     }
 }
 
-// --- Milstein no-op for constant vol : the log-space Milstein correction is
-// 1/2 v (dv/dlnS)(dW^2-dt); with a flat bs_volatility dv/dlnS = 0, so the step is
-// identical to the log-Euler step. A bs-vol MCL price must be bit-identical with
-// use_milstein on vs off (same paths, zero correction) — proving the Milstein step
-// only ever refines the local-vol diffusion and never perturbs constant-vol books.
-TEST_CASE( "Milstein is a no-op for constant volatility (MCL unchanged)" )
-{
-    const std::string c = "o: !vanilla {underlying: eq, premium_currency: eur,"
-                          " strike: 100, maturity: 2000-12-31, type: call, exercise: european}\n";
-    auto without = []( std::string y )
-    {
-        const std::string from = "use_milstein: true";
-        y.replace( y.find( from ), from.size(), "use_milstein: false" );
-        return y;
-    };
-    double on = Premium( Price( OneContract( "mcl", c ) ) );
-    double off = Premium( Price( without( OneContract( "mcl", c ) ) ) );
-    CAPTURE( on );
-    CAPTURE( off );
-    CHECK( on == doctest::Approx( off ).epsilon( 1e-9 ) );
-}
-
 // --- Heston (MCL) : in the degenerate limit (vol-of-vol -> 0, v0 = theta) the
 // stochastic-vol diffusion collapses to constant-vol GBM, so it matches BS.
 TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
@@ -404,7 +382,7 @@ TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
       << " correlation: cor, indicators: [premium], result: res}\n"
       << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -429,7 +407,7 @@ TEST_CASE( "Heston MCL negative-rho skew enriches the OTM put" )
       << " correlation: cor, indicators: [premium], result: res}\n"
       << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 5, min_time_step: -1, paths: 200000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -456,7 +434,7 @@ TEST_CASE( "Heston ANA characteristic function agrees with MCL" )
           << " correlation: cor, indicators: [premium], result: res}\n"
           << "c: !pricer_configuration {method: " << method << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_time_step: 3, min_time_step: -1, paths: " << mcl
-          << ", vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+          << ", vol_time_step: 0.01, use_sobol: true}\n"
           << "eur: !currency {rate: rate}\n"
           << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
           << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

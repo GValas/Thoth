@@ -395,7 +395,6 @@
         "vol_time_step": { "type": "number", "description": "Variance sub-step." },
         "node_file": { "type": "string" },
         "use_sobol": { "type": "boolean", "description": "Sobol + Brownian-bridge quasi-random paths." },
-        "use_milstein": { "type": "boolean", "description": "Milstein diffusion scheme." },
         "seed": { "type": "integer" },
         "generate_nodes_graph": { "type": "boolean", "description": "Deprecated here and ignored; use a !debug_configuration referenced by the pricer's debug_configuration field instead." }
       }

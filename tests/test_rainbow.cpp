@@ -18,7 +18,7 @@ std::string RainbowCfg( const std::string& type, double strike,
       << " correlation: cor, indicators: [premium], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: " << draws
-      << ", vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << ", vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -44,7 +44,7 @@ std::string SingleCfg( double spot, double vol, double strike )
       << " correlation: cor, indicators: [premium], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
-      << " vol_time_step: 0.01, use_sobol: true, use_milstein: true}\n"
+      << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

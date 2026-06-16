@@ -80,7 +80,6 @@ mcl_cfg: !mcl_configuration
   paths: 200000
   vol_time_step: 0.01
   use_sobol: true
-  use_milstein: true
 
 # --- book / contract -------------------------------------------------------
 book: !book

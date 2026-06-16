@@ -31,7 +31,6 @@ mcl_config: !mcl_configuration
   paths: 1000000
   vol_time_step: 0.01
   use_sobol: true
-  use_milstein: true
 
 book: !book
   options: [gpu_call]
