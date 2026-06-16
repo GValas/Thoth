@@ -230,10 +230,11 @@ so debug with a small book or a reduced `paths`.
 The output YAML is the input config with the computed `*_result` blocks added.
 
 To exercise every engine at once, `samples/matrix.yaml` is a `!sequence`
-task that runs the full pricer/product matrix (vanilla european/american,
-continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one
-process — price it like any other book (`-batch`, or post it to a server with
-`run_local_client.sh`).
+task that runs the full pricer/product matrix (vanilla european/american, quanto,
+composite, basket / best-of / worst-of, continuous & discrete and **knock-in**
+barriers, variance swap, Heston, Bates, and **SABR local-vol** — across PDE / MCL /
+ANA) in one process — price it like any other book (`-batch`, or post it to a
+server with `run_local_client.sh`).
 
 ### HTTP pricing service
 
@@ -390,8 +391,9 @@ node DAG to Graphviz), `sabr_call.yaml` (a realistic SABR equity surface priced
 by ANA and by the Dupire local-vol MCL — the two agree, repricing the smile,
 including a skewed OTM put), `gpu_call.yaml` (a call priced by the GPU `mcl_gpu`
 engine, falling back to CPU off a GPU) and `matrix.yaml` — a `!sequence` running
-the full pricer/product matrix (vanilla european/american, quanto,
-continuous/discrete barriers, variance swap, across PDE / MCL / ANA) in one process.
+the full pricer/product matrix (vanilla european/american, quanto, composite,
+basket / best-of / worst-of, continuous / discrete / knock-in barriers, variance
+swap, Heston, Bates, SABR local-vol, across PDE / MCL / ANA) in one process.
 
 ---
 

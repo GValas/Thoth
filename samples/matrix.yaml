@@ -8,19 +8,27 @@ root: matrix
 #
 #   product (mono/multi, call/put; sorted alphabetically)   method(s)
 #   barrier mono continuous call            ana   mcl   pde
+#   barrier mono continuous in call         ana   mcl   pde (knock-in; in/out parity)
 #   barrier mono discrete call              mcl   pde
 #   vanilla mono am put                     mcl   pde
 #   vanilla mono am put quanto              mcl   pde
 #   vanilla mono eu call                    ana   mcl   pde
 #   vanilla mono eu call bates (hes+jumps)  ana   mcl   (ANA jump CF / MCL compound Poisson)
 #   vanilla mono eu call compo (EUR->USD)   ana   mcl   pde
+#   vanilla mono eu call compo sabr         ana   mcl   (local vol; ANA implied vs MCL Dupire)
 #   vanilla mono eu call heston (stoch vol) ana   mcl   pde
 #   vanilla mono eu call quanto             ana   mcl   pde
+#   vanilla mono eu call sabr (local vol)   ana   mcl   (ANA strike implied vs MCL Dupire; agree)
 #   vanilla mono us put compo (american)    mcl   pde
 #   vanilla multi eu call basket (50/50)    ana   mcl   pde
+#   vanilla multi eu call basket sabr       mcl         (per-component local vol; MCL-only)
 #   vanilla multi eu call best-of           mcl         (max of 2 assets; MCL-only)
 #   vanilla multi eu call worst-of          mcl         (min of 2 assets; MCL-only)
 #   variance swap mono                      ana   mcl
+#
+# The SABR cases exercise the Dupire local-vol Monte-Carlo (the SABR implied surface
+# is turned into a local-vol surface and diffused): ANA prices at the strike's
+# implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
@@ -65,6 +73,16 @@ matrix: !sequence
     - vanilla_multi_eu_call_worst_of_mcl
     - variance_swap_mono_ana
     - variance_swap_mono_mcl
+    #! local-vol (SABR) — ANA at the strike implied vol vs MCL on the Dupire surface
+    - vanilla_mono_eu_call_sabr_ana
+    - vanilla_mono_eu_call_sabr_mcl
+    - vanilla_mono_eu_call_compo_sabr_ana
+    - vanilla_mono_eu_call_compo_sabr_mcl
+    - vanilla_multi_eu_call_basket_sabr_mcl
+    #! knock-in barrier (up&in, continuous) — vanilla = knock_in + knock_out parity
+    - barrier_mono_continuous_in_call_ana
+    - barrier_mono_continuous_in_call_mcl
+    - barrier_mono_continuous_in_call_pde
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
@@ -364,6 +382,84 @@ variance_swap_mono_ana: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: variance_swap_mono_ana_result
 
+# SABR local-vol ATM call: ANA prices Black-Scholes at the strike's SABR implied
+# vol; MCL diffuses the Dupire local vol built from the surface. They agree
+# (Dupire repricing). The PDE is omitted — it uses only the ATM vol, not the smile.
+vanilla_mono_eu_call_sabr_ana: !pricer
+  today: 2000-01-01
+  book: book_sabr
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl_sabr
+  indicators: [premium]
+  result: vanilla_mono_eu_call_sabr_ana_result
+vanilla_mono_eu_call_sabr_mcl: !pricer
+  today: 2000-01-01
+  book: book_sabr
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_sabr
+  indicators: [premium]
+  result: vanilla_mono_eu_call_sabr_mcl_result
+
+# SABR composite (EUR asset settled in USD): the inner spot diffuses on the full
+# Dupire local vol, the quanto drift uses the ATM vol (as ANA/PDE do). ANA and MCL
+# agree to within the quanto-ATM approximation.
+vanilla_mono_eu_call_compo_sabr_ana: !pricer
+  today: 2000-01-01
+  book: book_compo_sabr
+  currency: usd
+  configuration: cfg_ana
+  correlation: correl_compo_sabr
+  indicators: [premium]
+  result: vanilla_mono_eu_call_compo_sabr_ana_result
+vanilla_mono_eu_call_compo_sabr_mcl: !pricer
+  today: 2000-01-01
+  book: book_compo_sabr
+  currency: usd
+  configuration: cfg_mcl
+  correlation: correl_compo_sabr
+  indicators: [premium]
+  result: vanilla_mono_eu_call_compo_sabr_mcl_result
+
+# SABR basket: each component diffuses on its own Dupire local vol. MCL-only (the
+# basket ANA is a moment-matched lognormal, which does not reprice the smile).
+vanilla_multi_eu_call_basket_sabr_mcl: !pricer
+  today: 2000-01-01
+  book: book_basket_sabr
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_basket_sabr
+  indicators: [premium]
+  result: vanilla_multi_eu_call_basket_sabr_mcl_result
+
+# continuous up-and-in barrier call (knock-in): pays the vanilla payoff only if the
+# barrier is touched. ANA, PDE and MCL agree via in/out parity (vanilla = in + out).
+barrier_mono_continuous_in_call_ana: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_in
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: barrier_mono_continuous_in_call_ana_result
+barrier_mono_continuous_in_call_mcl: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_in
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: barrier_mono_continuous_in_call_mcl_result
+barrier_mono_continuous_in_call_pde: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_in
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: barrier_mono_continuous_in_call_pde_result
+
 # --- shared pricing configurations -----------------------------------------
 cfg_pde: !pricer_configuration
   method: pde
@@ -415,6 +511,14 @@ book_bates: !book
   options: [c_bates]
 book_basket: !book
   options: [c_basket]
+book_sabr: !book
+  options: [c_sabr]
+book_compo_sabr: !book
+  options: [c_compo_sabr]
+book_basket_sabr: !book
+  options: [c_basket_sabr]
+book_barr_cont_in: !book
+  options: [c_barr_cont_in]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -534,6 +638,40 @@ c_basket: !vanilla
   type: call
   exercise: european
 
+# SABR local-vol contracts (mono ATM, composite ATM at S*FX=150, basket ATM)
+c_sabr: !vanilla
+  underlying: eq_sabr
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+c_compo_sabr: !vanilla
+  underlying: comp_sabr
+  premium_currency: usd
+  strike: 150
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+c_basket_sabr: !vanilla
+  underlying: bskt_sabr
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+
+# continuous up-and-in barrier call (same 130 level as the up-and-out twin)
+c_barr_cont_in: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  barrier_type: up&in
+  barrier_monitoring_type: continuous_monitoring
+  barrier_up_level: 130
+
 # --- shared market data ----------------------------------------------------
 eq: !equity
   spot: 100
@@ -557,6 +695,29 @@ rb_worst: !rainbow
 # weighted-average basket on (eq, eq2)
 bskt: !basket
   underlyings: [eq, eq2]
+  weights: [0.5, 0.5]
+# SABR local-vol equities (single-maturity smiled surface: ATM 30%, downside skew
+# rho<0, vol-of-vol nu) and the composite / basket views built on them
+eq_sabr: !equity
+  spot: 100
+  volatility: sabr_vol
+  currency: eur
+eq2_sabr: !equity
+  spot: 100
+  volatility: sabr_vol
+  currency: eur
+sabr_vol: !sabr_volatility
+  maturities: [1.0]
+  alpha: [0.30]
+  beta: [1.0]
+  rho: [-0.3]
+  nu: [0.4]
+  calendar: calendar
+comp_sabr: !composite
+  equity: eq_sabr
+  composite_currency: usd
+bskt_sabr: !basket
+  underlyings: [eq_sabr, eq2_sabr]
   weights: [0.5, 0.5]
 # heston / bates stochastic-vol underlyings (rho carried by the *_var pseudo-udl)
 eq_h: !equity
@@ -624,5 +785,16 @@ eur/usd_vol: !bs_volatility
   volatility: 15
 correl_q: !correlation_matrix
   underlyings: [eq]
+  forexs: [eur/usd]
+  matrix: [1, 0.5, 0.5, 1]
+# SABR local-vol correlations (mono, basket on eq_sabr/eq2_sabr at 0.5, composite)
+correl_sabr: !correlation_matrix
+  underlyings: [eq_sabr]
+  matrix: [1]
+correl_basket_sabr: !correlation_matrix
+  underlyings: [eq_sabr, eq2_sabr]
+  matrix: [1, 0.5, 0.5, 1]
+correl_compo_sabr: !correlation_matrix
+  underlyings: [eq_sabr]
   forexs: [eur/usd]
   matrix: [1, 0.5, 0.5, 1]
