@@ -373,21 +373,21 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         result.premium = GetGridPrice( x_0, U_0 );
     }
 
-    // delta, gamma
+    // delta, gamma : central differences around X_0 with spot half-bump h = X_0 * SHIFT/2
+    const double h = X_0 * GREEK_SPOT_SHIFT / 2;
     double delta_price_sup, delta_price_inf;
     if ( _request_delta || _request_gamma )
     {
-        double x_inf = Psi( X_0 * ( 1 - GREEK_SPOT_SHIFT / 2 ) );
-        double x_sup = Psi( X_0 * ( 1 + GREEK_SPOT_SHIFT / 2 ) );
+        double x_inf = Psi( X_0 - h );
+        double x_sup = Psi( X_0 + h );
         delta_price_inf = GetGridPrice( x_inf, U_0 );
         delta_price_sup = GetGridPrice( x_sup, U_0 );
-        result.delta = ( delta_price_sup - delta_price_inf ) / GREEK_SPOT_SHIFT;
+        result.delta = ( delta_price_sup - delta_price_inf ) / ( 2 * h ); //!< dV/dS
     }
 
     if ( _request_gamma )
     {
-        result.gamma = ( delta_price_sup + delta_price_inf - 2 * result.premium ) /
-                       ( X_0 * X_0 * GREEK_SPOT_SHIFT * GREEK_SPOT_SHIFT );
+        result.gamma = ( delta_price_sup + delta_price_inf - 2 * result.premium ) / ( h * h ); //!< d2V/dS2
     }
 
     return result; //!< LaVector members above free themselves at scope exit
