@@ -4,6 +4,7 @@
 #include "thoth.hpp"
 #include "object_manager.hpp"
 #include "cancellation.hpp"
+#include "progress_bar.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -123,6 +124,16 @@ int RunHttpServer( int Port )
     server.Get( "/health", []( const httplib::Request&, httplib::Response& res )
                 { res.set_content( "ok\n", "text/plain" ); } );
 
+    //! progress of the in-flight pricing : "<current> <total> <active 0|1>". Reads
+    //! only atomics (no price_mutex), so it answers while a price runs — this is
+    //! what the cluster master polls to draw an approximate global progress bar.
+    server.Get( "/progress", []( const httplib::Request&, httplib::Response& res )
+                {
+        const GlobalProgress& g = global_progress();
+        std::ostringstream oss;
+        oss << g.current.load() << " " << g.total.load() << " " << ( g.active.load() ? 1 : 0 );
+        res.set_content( oss.str(), "text/plain" ); } );
+
     server.Post( "/price", []( const httplib::Request& req, httplib::Response& res )
                  {
         //! copy what the worker needs : the provider runs after this returns
@@ -231,6 +242,29 @@ static string PostToSlave( const string& Url,
     return res->body;
 }
 
+//! GET a slave's /progress ("<current> <total> <active>"); false on any failure
+//! (unreachable, timeout, old slave without the endpoint) so polling degrades
+//! gracefully instead of stalling the master.
+static bool PollSlaveProgress( const string& Url, long& Current, long& Total, bool& Active )
+{
+    httplib::Client client( Url );
+    client.set_connection_timeout( 1 );
+    client.set_read_timeout( 2 );
+    auto res = client.Get( "/progress" );
+    if ( !res || res->status != 200 )
+    {
+        return false;
+    }
+    std::istringstream iss( res->body );
+    int a = 0;
+    if ( !( iss >> Current >> Total >> a ) )
+    {
+        return false;
+    }
+    Active = ( a != 0 );
+    return true;
+}
+
 //! split a single-pricer MCL request across the slaves and aggregate; anything
 //! else (non-MCL, or a non-pricer root) is forwarded whole to the first slave.
 static string ClusterPrice( const string& Body,
@@ -286,10 +320,39 @@ static string ClusterPrice( const string& Body,
             try { responses[k] = PostToSlave( Slaves[k], bodies[k], ExecName ); }
             catch ( ... ) { errs[k] = std::current_exception(); } } );
     }
+
+    //! approximate global progress : poll every slave's /progress and draw one
+    //! aggregate bar (sum of paths done / sum of paths total, as a percent). It is
+    //! "approximate" because slaves report at their own pace and a slow/old slave
+    //! that fails to answer simply drops out of the running total for that tick.
+    std::atomic<bool> dispatching{ true };
+    std::thread poller( [&]()
+                        {
+        ProgressBar bar( "CLU", 100 ); //!< driven in whole percent
+        while ( dispatching.load() )
+        {
+            long sum_cur = 0, sum_tot = 0;
+            for ( const string& s : Slaves )
+            {
+                long c = 0, t = 0; bool a = false;
+                if ( PollSlaveProgress( s, c, t, a ) ) { sum_cur += c; sum_tot += t; }
+            }
+            if ( sum_tot > 0 )
+            {
+                long pct = std::min<long>( 99, 100 * sum_cur / sum_tot ); //!< 100% left to Done()
+                bar.Update( pct );
+            }
+            std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+        }
+        bar.Done(); } );
+
     for ( auto& t : threads )
     {
         t.join();
     }
+    dispatching.store( false );
+    poller.join();
+
     for ( int k = 0; k < N; k++ )
     {
         if ( errs[k] )

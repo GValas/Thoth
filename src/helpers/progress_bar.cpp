@@ -20,6 +20,12 @@ constexpr int TTY_BLOCKS = 10; //!< short bar so the in-place line fits one row
 constexpr int LOG_BLOCKS = 30; //!< wider bar for the (newline) log fallback
 } // namespace
 
+GlobalProgress& global_progress()
+{
+    static GlobalProgress g;
+    return g;
+}
+
 ProgressBar::ProgressBar( const string& Label, long Total, bool Enabled )
     : _label( Label ),
       _total( Total > 0 ? Total : 1 ),
@@ -29,6 +35,15 @@ ProgressBar::ProgressBar( const string& Label, long Total, bool Enabled )
       _last_percent( -1 ),
       _last_width( 0 )
 {
+    //! only the visible (enabled) bar publishes globally; the silenced inner
+    //! re-price bars of bump-and-revalue Greeks must not clobber the snapshot.
+    if ( _enabled )
+    {
+        GlobalProgress& g = global_progress();
+        g.total.store( _total );
+        g.current.store( 0 );
+        g.active.store( true );
+    }
 }
 
 void ProgressBar::Update( long Current )
@@ -42,6 +57,7 @@ void ProgressBar::Update( long Current, const std::function<string()>& InfoFn )
     {
         return;
     }
+    global_progress().current.store( Current );
     int percent = (int)( 100.0 * Current / _total );
     if ( percent == _last_percent || percent >= 100 ) //!< nothing new; leave 100% to Done()
     {
@@ -62,6 +78,9 @@ void ProgressBar::Done( const string& Info )
     {
         return;
     }
+    GlobalProgress& g = global_progress();
+    g.current.store( _total );
+    g.active.store( false ); //!< pricing finished; master poller can stop counting it
     Render( _total, Info, true );
 }
 

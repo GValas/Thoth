@@ -231,6 +231,12 @@ pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
 precision. Only an MCL single-pricer is split; any other root is forwarded whole
 to one slave.
 
+While the slaves run, the master draws an **approximate global progress bar** by
+polling each slave's `GET /progress` (the in-flight pricing's path count) and
+summing them — paths done / paths total across the cluster, as a percent. A slave
+that fails to answer a poll simply drops out of that tick's total, so the bar
+degrades gracefully rather than stalling.
+
 ### Docker
 
 ```bash

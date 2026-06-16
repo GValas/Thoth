@@ -1,6 +1,19 @@
 #pragma once
 #include "thoth.hpp"
+#include <atomic>
 #include <functional>
+
+//! Process-wide snapshot of the most recently active (enabled) progress bar, so
+//! an HTTP server can report the in-flight pricing's advancement (GET /progress)
+//! to a cluster master without coupling to the pricer internals. Pricings are
+//! serialised on a server, so at most one enabled bar is live at a time.
+struct GlobalProgress
+{
+    std::atomic<long> current{ 0 };
+    std::atomic<long> total{ 0 };
+    std::atomic<bool> active{ false }; //!< true while a pricing is running
+};
+GlobalProgress& global_progress();
 
 //! Single-line progress bar for long pricing loops.
 //!
