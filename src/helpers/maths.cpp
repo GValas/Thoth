@@ -148,7 +148,7 @@ void M3_to_SLN( const double M1,
 
     double x, y, z;
     y = ( 0.5 * ( ( E2 * E2 * E2 ) / ( E3 * E3 ) ) * ( E3 + 2 * E2 * E2 * E2 / E3 + sqrt( max( 0.0, 4 * E2 * E2 * E2 + E3 * E3 ) ) ) );
-    x = ( y == 0 ? 0 : 1 ) * ( y < 0 ? -1 : 1 ) * exp( log( abs( y ) ) / 3 );
+    x = ( y == 0 ? 0 : 1 ) * ( y < 0 ? -1 : 1 ) * exp( log( fabs( y ) ) / 3 );
     z = x + E2 * E2 / E3 * ( 1 + E2 * E2 / ( E3 * x ) );
 
     D = E1 - z;
