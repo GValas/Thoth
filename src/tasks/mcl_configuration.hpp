@@ -15,10 +15,14 @@ class MclConfiguration : public Object
     bool _use_sobol;
     bool _use_milstein;
 
-    //! random-stream index: seeds the pseudo-random generator and offsets the
-    //! Sobol sequence by _seed * _paths points, so cluster slaves draw disjoint,
-    //! independent paths. Default 0 (single-process pricing).
+    //! random-stream index: seeds the pseudo-random generator so cluster slaves
+    //! draw independent pseudo-random paths. Default 0 (single-process pricing).
     int _seed = 0;
+
+    //! leading Sobol points to skip — the running path count of the cluster slaves
+    //! before this one, so the Sobol blocks are strictly disjoint even for an
+    //! uneven split (set by the cluster master). Default 0 (single-process).
+    long _sobol_skip = 0;
 
     //!
     MclConfiguration( const string& ObjectName );

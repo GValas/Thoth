@@ -78,7 +78,7 @@ as the automatic fallback for anything exotic:
 
 - The YAML config, the node-graph build (used to *derive* model parameters and to
   fall back), and especially the **cluster aggregation**: disjoint Sobol blocks via
-  `seed * paths`, path-weighted premium pooling and combined-variance trust all
+  an explicit per-slave skip, path-weighted premium pooling and combined-variance trust all
   carry over verbatim. A GPU slave is just a `-server` whose MCL pricing runs the
   CUDA kernel; the master splits and pools exactly as today.
 

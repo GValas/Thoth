@@ -261,10 +261,12 @@ aggregate the results:
 ./run_local_client.sh --input samples/simple_call.yaml --port 8090
 ```
 
-The master splits `paths` evenly and gives each slave a distinct `seed`, which
-offsets the Sobol sequence by `seed * paths` (and seeds the pseudo-random
-generator), so the slaves draw **disjoint, independent** blocks. It pools the
-premium path-weighted and combines the per-slave variances for the trust. The
+The master splits `paths` as evenly as possible (capping the fan-out at `paths`
+so no slave gets zero) and gives each slave a distinct `seed` for the pseudo-
+random generator plus an explicit Sobol skip (the running path count of the
+slaves before it), so the slaves draw **disjoint, independent** blocks even when
+the split is uneven. It pools the premium path-weighted and combines the
+per-slave variances for the trust. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
 precision. Only an MCL single-pricer is split; any other root (a non-MCL engine,
 a `!sequence`, a historical analytic, ...) is computed by the **master itself**

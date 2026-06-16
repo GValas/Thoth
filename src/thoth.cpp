@@ -295,20 +295,35 @@ static string ClusterPrice( const string& Body,
     }
     mcl = req.GetString( cfg + ".mcl_configuration" );
 
-    const int N = (int)Slaves.size();
     const long total = req.GetLong( mcl + ".paths" );
     const string result = req.GetString( exec + ".result" );
     const vector<string> contracts = req.GetStringList( req.GetString( exec + ".book" ) + ".options" );
 
-    //! split paths (remainder to the first slave), one disjoint seed per slave
+    //! slaves actually used: never hand a slave 0 paths (a zero-path book is
+    //! rejected with "paths must be > 0"), so cap the fan-out at `total`. A
+    //! non-positive total falls through to the slaves' own validation error.
+    const int N = ( total > 0 && total < (long)Slaves.size() ) ? (int)total : (int)Slaves.size();
+
+    //! balanced split: the first (total % N) slaves take one extra path. Each slave
+    //! gets an explicit Sobol skip = the running path count of the slaves before it,
+    //! so the per-slave blocks stay strictly disjoint even when the split is uneven.
     vector<long> npaths( N, total / N );
-    npaths[0] += total - ( total / N ) * N;
+    for ( long i = 0; i < total % (long)N; i++ )
+    {
+        npaths[i] += 1;
+    }
+    vector<long> skip( N, 0 );
+    for ( int k = 1; k < N; k++ )
+    {
+        skip[k] = skip[k - 1] + npaths[k - 1];
+    }
 
     vector<string> bodies( N );
     for ( int k = 0; k < N; k++ )
     {
         req.SetString( mcl + ".paths", std::to_string( npaths[k] ) );
         req.SetString( mcl + ".seed", std::to_string( k ) );
+        req.SetString( mcl + ".sobol_skip", std::to_string( skip[k] ) );
         bodies[k] = req.Dump();
     }
 
@@ -337,10 +352,10 @@ static string ClusterPrice( const string& Body,
         while ( dispatching.load() )
         {
             long sum_cur = 0, sum_tot = 0;
-            for ( const string& s : Slaves )
+            for ( int k = 0; k < N; k++ )
             {
                 long c = 0, t = 0; bool a = false;
-                if ( PollSlaveProgress( s, c, t, a ) ) { sum_cur += c; sum_tot += t; }
+                if ( PollSlaveProgress( Slaves[k], c, t, a ) ) { sum_cur += c; sum_tot += t; }
             }
             if ( sum_tot > 0 )
             {

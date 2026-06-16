@@ -697,6 +697,12 @@ int YamlConfig::GetInteger( const string& Path,
     return IsInteger( Path ) ? GetInteger( Path ) : ElseValue;
 }
 
+long YamlConfig::GetLong( const string& Path,
+                          const long ElseValue )
+{
+    return IsInteger( Path ) ? GetLong( Path ) : ElseValue;
+}
+
 double YamlConfig::GetDouble( const string& Path,
                               const double ElseValue )
 {

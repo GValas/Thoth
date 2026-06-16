@@ -371,10 +371,10 @@ void PricerMCL::SetupQuasiRandom_()
     }
 
     //! one factor per diffused underlying (name-ordered, for reproducibility).
-    //! a non-zero seed (cluster slave) offsets the Sobol sequence by seed*paths
-    //! points so each slave draws a disjoint block.
+    //! a cluster slave skips the running path count of the slaves before it
+    //! (_sobol_skip, set by the master) so each slave draws a disjoint Sobol block.
     int factors = (int)_single_set.size();
-    uint64_t sobol_skip = (uint64_t)_configuration->_mcl->_seed * (uint64_t)_configuration->_mcl->_paths;
+    uint64_t sobol_skip = (uint64_t)_configuration->_mcl->_sobol_skip;
     _path_generator = std::make_unique<PathGenerator>( times, factors, true, _gsl_r, sobol_skip );
 
     int f = 0;

@@ -440,6 +440,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
         M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
         M->_use_milstein = m.cfg().GetBoolean( n + ".use_milstein", MC_USE_MILSTEIN );
         M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
+        M->_sobol_skip = m.cfg().GetLong( n + ".sobol_skip", 0 );
         //! guard against degenerate grids: paths <= 0 -> NaN premium, and
         //! max_time_step <= 0 -> a zero-day diffusion step that never advances
         if ( M->_paths <= 0 )

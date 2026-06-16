@@ -54,6 +54,8 @@ class YamlConfig
     int GetInteger( const string& Path,
                     const int ElseValue );
     long GetLong( const string& Path ); //!< 64-bit integer (e.g. path counts > 2^31)
+    long GetLong( const string& Path,
+                  const long ElseValue );
     double GetDouble( const string& Path );
     double GetDouble( const string& Path,
                       const double ElseValue );
