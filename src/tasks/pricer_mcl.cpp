@@ -785,6 +785,12 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
         return pol;
     }
 
+    //! minimum in-the-money paths required before fitting the {1, m, m^2}
+    //! continuation regression: with only a handful the 3-parameter fit is exactly
+    //! determined (interpolation, not regression) and yields unreliable
+    //! continuation values, so demand several observations per basis function.
+    constexpr size_t MIN_ITM_FOR_REGRESSION = 50;
+
     size_t N = Paths->size1;               //!< paths
     size_t M = Paths->size2;               //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
     pol.s0 = la_matrix_get( Paths, 0, 0 ); //!< initial spot (constant across base paths)
@@ -826,9 +832,9 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
                 itm.push_back( p );
             }
         }
-        if ( itm.size() < 3 )
+        if ( itm.size() < MIN_ITM_FOR_REGRESSION )
         {
-            continue; //!< not enough points to regress -> never exercise here
+            continue; //!< too few points for a meaningful fit -> hold at this date
         }
 
         //! regress discounted continuation cashflow on { 1, m, m^2 }
