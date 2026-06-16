@@ -25,14 +25,9 @@
 #include <string>
 #include <vector>
 
-//! gsl libs
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_complex.h>
-#include <gsl/gsl_complex_math.h>
-#include <gsl/gsl_eigen.h>
+//! gsl libs (only the matrix/vector containers and the error handler remain;
+//! the rest of the numerics has been migrated off GSL)
 #include <gsl/gsl_errno.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_math.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 

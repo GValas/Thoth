@@ -343,7 +343,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         // PrintList(D_1);
 
         // solving system
-        gsl_linalg_solve_tridiag( diag_m, diag_u, diag_d, D_1, U_0 );
+        SolveTridiagonal( diag_m, diag_u, diag_d, D_1, U_0 );
 
         // american mode : max(intrinsec value, expected value)
         if ( is_american )

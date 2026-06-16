@@ -58,10 +58,13 @@ void LN_to_M4( gsl_vector* Fwds,
                double& M3,
                double& M4 );
 
-void ext_gsl_vector_log( gsl_vector* v );
-void ext_gsl_matrix_log( gsl_matrix* m );
 gsl_matrix* ext_gsl_vector_to_matrix( const gsl_vector* v,
                                       size_t row_size );
+//! in-place lower-triangular Cholesky (A = L L^T); false if not positive-definite
+bool CholeskyDecomposeLower( gsl_matrix* A );
+//! solve a tridiagonal system M X = B (Thomas algorithm)
+void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
+                       const gsl_vector* Sub, const gsl_vector* B, gsl_vector* X );
 bool ext_gsl_matrix_is_positive( const gsl_matrix* m );
 bool ext_gsl_matrix_is_square( const gsl_matrix* m );
 bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m );

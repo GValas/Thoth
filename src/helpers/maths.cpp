@@ -293,14 +293,14 @@ bool ext_gsl_matrix_is_positive( const gsl_matrix* m )
         return false;
     }
 
-    //! try to use cholesky
+    //! positive-definite iff the Cholesky factorisation succeeds (on a copy)
     size_t n = m->size1;
     gsl_matrix* A = gsl_matrix_alloc( n, n );
     gsl_matrix_memcpy( A, m );
-    int gsl_error = gsl_linalg_cholesky_decomp( A );
+    bool positive = CholeskyDecomposeLower( A );
     gsl_matrix_free( A );
 
-    return gsl_error != GSL_EDOM;
+    return positive;
 }
 
 //!
@@ -491,32 +491,65 @@ double ext_gsl_stats_wcovariance_m_v( const double weights[],
     return sum * bias;
 }
 
-//! log gsl_vector
-void ext_gsl_vector_log( gsl_vector* v )
+//! in-place lower-triangular Cholesky factorisation: A = L * L^T, with L written
+//! into the lower triangle (diagonal included), like gsl_linalg_cholesky_decomp.
+//! Returns false if A is not positive-definite. The upper triangle is left
+//! untouched (callers read only the lower triangle).
+bool CholeskyDecomposeLower( gsl_matrix* A )
 {
-    ofstream log_file( GSL_LOG, ios::out );
-    log_file << setprecision( DECIMAL_PRECISION );
-    for ( size_t i = 0; i < v->size; i++ )
+    const size_t n = A->size1;
+    for ( size_t i = 0; i < n; i++ )
     {
-        log_file << gsl_vector_get( v, i ) << endl;
+        for ( size_t j = 0; j <= i; j++ )
+        {
+            double sum = gsl_matrix_get( A, i, j );
+            for ( size_t k = 0; k < j; k++ )
+            {
+                sum -= gsl_matrix_get( A, i, k ) * gsl_matrix_get( A, j, k );
+            }
+            if ( i == j )
+            {
+                if ( sum <= 0.0 )
+                {
+                    return false; //!< not positive-definite
+                }
+                gsl_matrix_set( A, i, j, sqrt( sum ) );
+            }
+            else
+            {
+                gsl_matrix_set( A, i, j, sum / gsl_matrix_get( A, j, j ) );
+            }
+        }
     }
-    log_file.close();
+    return true;
 }
 
-//! log gsl_matrix
-void ext_gsl_matrix_log( gsl_matrix* m )
+//! solve a tridiagonal system M x = B by the Thomas algorithm. Diag has n
+//! entries; Super (M[i][i+1]) and Sub (M[i+1][i]) have n-1. Replaces
+//! gsl_linalg_solve_tridiag for the Crank-Nicolson PDE step (diagonally stable).
+void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
+                       const gsl_vector* Sub, const gsl_vector* B, gsl_vector* X )
 {
-    ofstream log_file( GSL_LOG, ios::out );
-    log_file << setprecision( DECIMAL_PRECISION );
-    for ( size_t i = 0; i < m->size1; i++ )
+    const size_t n = Diag->size;
+    vector<double> c( n ), d( n ); //!< forward-swept super-diag and rhs
+    double beta = gsl_vector_get( Diag, 0 );
+    c[0] = ( n > 1 ? gsl_vector_get( Super, 0 ) : 0.0 ) / beta;
+    d[0] = gsl_vector_get( B, 0 ) / beta;
+    for ( size_t i = 1; i < n; i++ )
     {
-        for ( size_t j = 0; j < m->size2; j++ )
+        const double sub = gsl_vector_get( Sub, i - 1 );
+        beta = gsl_vector_get( Diag, i ) - sub * c[i - 1];
+        if ( i < n - 1 )
         {
-            log_file << gsl_matrix_get( m, i, j ) << "\t";
+            c[i] = gsl_vector_get( Super, i ) / beta;
         }
-        log_file << endl;
+        d[i] = ( gsl_vector_get( B, i ) - sub * d[i - 1] ) / beta;
     }
-    log_file.close();
+    gsl_vector_set( X, n - 1, d[n - 1] );
+    for ( size_t i = n - 1; i-- > 0; )
+    {
+        gsl_vector_set( X, i, d[i] - c[i] * gsl_vector_get( X, i + 1 ) );
+    }
 }
 
 //! sum elments of vector

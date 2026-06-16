@@ -328,9 +328,7 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
         ERR( _name + " is not SDP" );
     }
 
-    // ext_gsl_matrix_log( _cholesky_matrix ) ;
-    gsl_linalg_cholesky_decomp( _cholesky_matrix );
-    // ext_gsl_matrix_log( _cholesky_matrix ) ;
+    CholeskyDecomposeLower( _cholesky_matrix );
 }
 
 //!
