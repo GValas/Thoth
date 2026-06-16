@@ -7,7 +7,7 @@ class Curve : public MarketData
   private:
     //! attributes
     vector<date> _date_list;
-    GslVector _value_list;
+    LaVector _value_list;
 
     //! additive parallel shift added to every curve value; used by the
     //! bump-and-revalue rho (on yield curves). Zero in normal pricing.

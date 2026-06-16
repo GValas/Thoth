@@ -7,7 +7,7 @@ Curve::Curve( const string& ObjectName,
 {
 }
 
-//! _value_list is owned by its GslVector wrapper; nothing to free by hand
+//! _value_list is owned by its LaVector wrapper; nothing to free by hand
 Curve::~Curve() = default;
 
 //! setter

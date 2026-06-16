@@ -20,8 +20,8 @@ void HistoricalVolatilityComputation::Execute()
     size_t return_size = data_size - _time_step;
     double w = 1;
     double r = ( _half_life == 0 ) ? 1 : exp( -M_LN2 / _half_life );
-    GslVector log_returns = la_vector_alloc( return_size );
-    GslVector weights = la_vector_alloc( return_size );
+    LaVector log_returns = la_vector_alloc( return_size );
+    LaVector weights = la_vector_alloc( return_size );
     for ( size_t i = 0; i < return_size; i++ )
     {
         // log return

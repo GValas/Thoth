@@ -14,7 +14,7 @@ PricerPDE::~PricerPDE() = default;
 double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 {
     // x_vector (owned locally, freed on return)
-    GslVector Ux = la_vector_alloc( Uy->size );
+    LaVector Ux = la_vector_alloc( Uy->size );
     for ( int j = 0; j < (int)Uy->size; j++ )
     {
         la_vector_set( Ux, j, j * h );
@@ -290,12 +290,12 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 {
 
     // vectors & matrices allocations (RAII: freed on every exit, incl. ERR throw)
-    GslVector diag_u = la_vector_calloc( J );     // up diag
-    GslVector diag_m = la_vector_calloc( J + 1 ); // mid diag
-    GslVector diag_d = la_vector_calloc( J );     // down diag
-    GslVector D_1 = la_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
-    GslVector U_0 = la_vector_calloc( J + 1 );
-    GslVector U_1 = la_vector_calloc( J + 1 );
+    LaVector diag_u = la_vector_calloc( J );     // up diag
+    LaVector diag_m = la_vector_calloc( J + 1 ); // mid diag
+    LaVector diag_d = la_vector_calloc( J );     // down diag
+    LaVector D_1 = la_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
+    LaVector U_0 = la_vector_calloc( J + 1 );
+    LaVector U_1 = la_vector_calloc( J + 1 );
     // la_matrix * V        = la_matrix_calloc(J+1, N+1);
 
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
@@ -395,7 +395,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
                        ( X_0 * X_0 * GREEK_SPOT_SHIFT * GREEK_SPOT_SHIFT );
     }
 
-    return result; //!< GslVector members above free themselves at scope exit
+    return result; //!< LaVector members above free themselves at scope exit
 }
 
 inline double PricerPDE::Phi( double x )

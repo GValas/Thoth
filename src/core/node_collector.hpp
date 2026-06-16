@@ -30,7 +30,7 @@ class NodeCollector
         MonteCarloNode* node = nullptr;
         vector<size_t> date_index; //!< columns: diffusion-date indices
         vector<double> tau;        //!< year fraction of each column from today
-        GslMatrix paths;           //!< [ nb_draws x date_index.size() ]
+        LaMatrix paths;           //!< [ nb_draws x date_index.size() ]
         size_t row = 0;            //!< next draw to fill
     };
     vector<PathRecord> _records;

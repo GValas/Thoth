@@ -7,14 +7,14 @@ class Correlation : public Object
 
   private:
     //! mandatory
-    GslMatrix _matrix;
+    LaMatrix _matrix;
     vector<Forex*> _forex_list;
     vector<string> _underlying_list;
     vector<string> _single_list; // = forex_list + underlying_list
     void SetSingleList();
 
     //! sub matrix : contains useful information for pricing
-    GslMatrix _cholesky_matrix;
+    LaMatrix _cholesky_matrix;
     vector<Forex*> _cholesky_forex_list;
     vector<string> _cholesky_underlying_list;
     vector<string> _cholesky_single_list; // = forex_list + underlying_list

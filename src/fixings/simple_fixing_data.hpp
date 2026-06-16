@@ -6,7 +6,7 @@ class SimpleFixingData : public Object
 
   private:
     vector<date> _date_list;
-    GslVector _value_list;
+    LaVector _value_list;
     string _underlying;
 
   public:

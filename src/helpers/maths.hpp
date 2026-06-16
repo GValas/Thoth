@@ -79,7 +79,7 @@ void ext_la_matrix_to_symmetric( la_matrix* m );
 
 double ext_la_vector_sum( la_vector* v );
 
-double ext_gsl_stats_wcovariance_m( const double w[],
+double ext_stats_wcovariance_m( const double w[],
                                     const double data1[],
                                     const size_t stride1,
                                     const double data2[],
@@ -88,7 +88,7 @@ double ext_gsl_stats_wcovariance_m( const double w[],
                                     const double wmean1,
                                     const double wmean2 );
 
-double ext_gsl_stats_wcorrelation_m_v( const double w[],
+double ext_stats_wcorrelation_m_v( const double w[],
                                        const double data1[],
                                        const size_t stride1,
                                        const double data2[],
@@ -100,7 +100,7 @@ double ext_gsl_stats_wcorrelation_m_v( const double w[],
                                        const double wvar2 );
 
 //! computes the weighted covariance, given means
-double ext_gsl_stats_wcovariance_m_v( const double w[],
+double ext_stats_wcovariance_m_v( const double w[],
                                       size_t wstride,
                                       const double data1[],
                                       size_t stride1,
@@ -112,14 +112,14 @@ double ext_gsl_stats_wcovariance_m_v( const double w[],
 
 vector<double> ToSymmetricMatrix( const vector<double>& Matrix );
 vector<double> FromSymmetricMatrix( const vector<double>& Matrix );
-la_matrix* ToGslMatrix( const vector<double>& Matrix );
-vector<double> FromGslMatrix( la_matrix* Matrix );
+la_matrix* ToLaMatrix( const vector<double>& Matrix );
+vector<double> FromLaMatrix( la_matrix* Matrix );
 
 //
 double InterpolateWithSpline( la_vector* x_serie, la_vector* y_serie, double x_point );
 
 //! computes the weighted correlation, given means and variances
-double ext_gsl_stats_wcorrelation_m_v( const double w[],
+double ext_stats_wcorrelation_m_v( const double w[],
                                        size_t wstride,
                                        const double data1[],
                                        size_t stride1,

@@ -219,7 +219,7 @@ void ext_la_matrix_to_near_positive( la_matrix* m, double& eps )
 
     //! RAII scratch copy (freed on every exit path)
     size_t n = m->size1;
-    GslMatrix A = la_matrix_alloc( n, n );
+    LaMatrix A = la_matrix_alloc( n, n );
     la_matrix_memcpy( A, m );
 
     //!
@@ -393,7 +393,7 @@ double InterpolateWithSpline( la_vector* x_serie,
 }
 
 //!
-la_matrix* ToGslMatrix( const vector<double>& Matrix )
+la_matrix* ToLaMatrix( const vector<double>& Matrix )
 {
     size_t n = (size_t)sqrt( (double)Matrix.size() );
     la_matrix* m = la_matrix_alloc( n, n );
@@ -408,7 +408,7 @@ la_matrix* ToGslMatrix( const vector<double>& Matrix )
 }
 
 //!
-vector<double> FromGslMatrix( la_matrix* Matrix )
+vector<double> FromLaMatrix( la_matrix* Matrix )
 {
     vector<double> m;
     for ( size_t i = 0; i < Matrix->size1; i++ )
@@ -441,7 +441,7 @@ la_matrix* ext_la_vector_to_matrix( const la_vector* v,
 }
 
 //! computes the weighted correlation, given means and variances
-double ext_gsl_stats_wcorrelation_m_v( const double w[],
+double ext_stats_wcorrelation_m_v( const double w[],
                                        size_t wstride,
                                        const double data1[],
                                        size_t stride1,
@@ -453,7 +453,7 @@ double ext_gsl_stats_wcorrelation_m_v( const double w[],
                                        double wvariance1,
                                        double wvariance2 )
 {
-    double cov = ext_gsl_stats_wcovariance_m_v( w,
+    double cov = ext_stats_wcovariance_m_v( w,
                                                 wstride,
                                                 data1,
                                                 stride1,
@@ -467,7 +467,7 @@ double ext_gsl_stats_wcorrelation_m_v( const double w[],
 }
 
 //! computes the weighted covariance, given means
-double ext_gsl_stats_wcovariance_m_v( const double weights[],
+double ext_stats_wcovariance_m_v( const double weights[],
                                       size_t wstride,
                                       const double data1[],
                                       size_t stride1,

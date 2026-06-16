@@ -33,8 +33,8 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
     // mkt data (RAII: freed even if a callee below throws via ERR)
     size_t n = _underlying_list.size();
-    GslVector fwds = la_vector_alloc( n );
-    GslVector vols = la_vector_alloc( n );
+    LaVector fwds = la_vector_alloc( n );
+    LaVector vols = la_vector_alloc( n );
     vector<string> udl_list;
     vector<Forex*> fx_list;
     double dt = YearFraction( _today, MaturityDate );
@@ -58,7 +58,7 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
     //! moment matching
     double M1, M2, M3, M4;
-    GslMatrix correls = _correlation->ExtractMatrix( udl_list, fx_list );
+    LaMatrix correls = _correlation->ExtractMatrix( udl_list, fx_list );
     LN_to_M4( fwds, vols, correls, M1, M2, M3, M4 );
 
     //! shifted log normal formula

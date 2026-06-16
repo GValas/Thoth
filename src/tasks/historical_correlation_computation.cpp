@@ -56,10 +56,10 @@ void HistoricalCorrelationComputation::Execute()
     }
 
     //! log returns vectors (RAII: freed on every exit, including ERR throw)
-    vector<GslVector> log_return_list;
+    vector<LaVector> log_return_list;
     for ( size_t i = 0; i < histos_size; i++ )
     {
-        GslVector v = la_vector_alloc( _range_size );
+        LaVector v = la_vector_alloc( _range_size );
         for ( size_t j = 0; j < _range_size; j++ )
         {
             la_vector* w = _historical_spots_fixing_list[i]->GetValueList();
@@ -71,7 +71,7 @@ void HistoricalCorrelationComputation::Execute()
     }
 
     //! weights
-    GslVector weights = la_vector_alloc( _range_size );
+    LaVector weights = la_vector_alloc( _range_size );
     double r = exp( -log( 2. ) / _half_life );
     double w = 1;
     for ( size_t i = 0; i < _range_size; i++ )
@@ -81,8 +81,8 @@ void HistoricalCorrelationComputation::Execute()
     }
 
     //! compute weighted means, variances
-    GslVector weighted_means = la_vector_alloc( histos_size );
-    GslVector weighted_variances = la_vector_alloc( histos_size );
+    LaVector weighted_means = la_vector_alloc( histos_size );
+    LaVector weighted_variances = la_vector_alloc( histos_size );
     for ( size_t i = 0; i < histos_size; i++ )
     {
         la_vector* v = log_return_list[i];
@@ -99,7 +99,7 @@ void HistoricalCorrelationComputation::Execute()
     {
         for ( size_t j = i + 1; j < histos_size; j++ )
         {
-            double c = ext_gsl_stats_wcorrelation_m_v( la_vector_ptr( weights, 0 ), 1,
+            double c = ext_stats_wcorrelation_m_v( la_vector_ptr( weights, 0 ), 1,
                                                        la_vector_ptr( log_return_list[i], 0 ), 1,
                                                        la_vector_ptr( log_return_list[j], 0 ), 1,
                                                        _range_size,
@@ -135,5 +135,5 @@ void HistoricalCorrelationComputation::WriteResults()
         underlying_list.push_back( ( *s )->GetUnderlying() );
     }
     _cfg->SetStringList( _correlation->GetName() + ".underlyings", underlying_list );
-    _cfg->SetGslMatrix( _correlation->GetName() + ".matrix", _historical_matrix );
+    _cfg->SetLaMatrix( _correlation->GetName() + ".matrix", _historical_matrix );
 }

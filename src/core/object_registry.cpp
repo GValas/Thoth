@@ -223,7 +223,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
     {
         AbsoluteBasket* B = m.collector().Add( std::make_unique<AbsoluteBasket>( n ) );
         B->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
-        B->SetWeightList( m.cfg().GetGslVector( n + ".weights" ) );
+        B->SetWeightList( m.cfg().GetLaVector( n + ".weights" ) );
         return B;
     };
 
@@ -271,7 +271,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
     {
         YieldCurve* Y = m.collector().Add( std::make_unique<YieldCurve>( n ) );
         Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetGslVector( n + ".values" ) );
+        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
         return Y;
     };
 
@@ -279,7 +279,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
     {
         RepoCurve* Y = m.collector().Add( std::make_unique<RepoCurve>( n ) );
         Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetGslVector( n + ".values" ) );
+        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
         return Y;
     };
 
@@ -287,7 +287,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
     {
         ContinuousDividendsCurve* Y = m.collector().Add( std::make_unique<ContinuousDividendsCurve>( n ) );
         Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetGslVector( n + ".values" ) );
+        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
         return Y;
     };
 
@@ -335,11 +335,11 @@ map<string, ObjectManager::Factory> MakeRegistry()
         Correlation* C = m.collector().Add( std::make_unique<Correlation>( n ) );
         if ( m.cfg().IsDoubleList( n + ".matrix" ) )
         {
-            C->SetMatrix( m.cfg().GetGslVector( n + ".matrix" ) );
+            C->SetMatrix( m.cfg().GetLaVector( n + ".matrix" ) );
         }
         else if ( m.cfg().IsDoubleList( n + ".symmetric_matrix" ) )
         {
-            C->SetSymmetricMatrix( m.cfg().GetGslVector( n + ".symmetric_matrix" ) );
+            C->SetSymmetricMatrix( m.cfg().GetLaVector( n + ".symmetric_matrix" ) );
         }
         else
         {
@@ -466,7 +466,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
     {
         SimpleFixingData* S = m.collector().Add( std::make_unique<SimpleFixingData>( n ) );
         S->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        S->SetValueList( m.cfg().GetGslVector( n + ".values" ) );
+        S->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
         S->SetUnderlying( m.cfg().GetString( n + ".underlying" ) );
         return S;
     };

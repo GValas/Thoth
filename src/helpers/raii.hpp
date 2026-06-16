@@ -1,34 +1,33 @@
 #pragma once
 
 //! ----------------------------------------------------------------------
-//! RAII ownership for GSL C handles.
+//! RAII ownership for the C-style linalg handles (la_vector / la_matrix).
 //!
-//! GSL exposes a C API whose objects are created with gsl_*_alloc and must
-//! be released with gsl_*_free.  GslOwner wraps such a handle so the free
-//! happens automatically (no explicit alloc/free in client code).  It
-//! converts implicitly to the raw pointer, so existing gsl_* calls and
-//! pointer member accesses keep working unchanged.
+//! Those containers are created with la_*_alloc and released with la_*_free.
+//! LaOwner wraps such a handle so the free happens automatically (no explicit
+//! alloc/free in client code).  It converts implicitly to the raw pointer, so
+//! the free-function calls and pointer member accesses keep working unchanged.
 //! ----------------------------------------------------------------------
 
 #include "linalg.hpp"
 
 template <class T, void ( *Free )( T* )>
-class GslOwner
+class LaOwner
 {
     T* _p = nullptr;
 
   public:
-    GslOwner() = default;
-    GslOwner( T* p ) : _p( p ) {} //!< adopt a raw handle
+    LaOwner() = default;
+    LaOwner( T* p ) : _p( p ) {} //!< adopt a raw handle
 
-    ~GslOwner()
+    ~LaOwner()
     {
         if ( _p )
             Free( _p );
     }
 
-    GslOwner( GslOwner&& o ) noexcept : _p( o._p ) { o._p = nullptr; }
-    GslOwner& operator=( GslOwner&& o ) noexcept
+    LaOwner( LaOwner&& o ) noexcept : _p( o._p ) { o._p = nullptr; }
+    LaOwner& operator=( LaOwner&& o ) noexcept
     {
         if ( this != &o )
         {
@@ -40,7 +39,7 @@ class GslOwner
         return *this;
     }
 
-    GslOwner& operator=( T* p ) //!< adopt a raw handle
+    LaOwner& operator=( T* p ) //!< adopt a raw handle
     {
         if ( _p && _p != p )
             Free( _p );
@@ -48,8 +47,8 @@ class GslOwner
         return *this;
     }
 
-    GslOwner( const GslOwner& ) = delete;
-    GslOwner& operator=( const GslOwner& ) = delete;
+    LaOwner( const LaOwner& ) = delete;
+    LaOwner& operator=( const LaOwner& ) = delete;
 
     operator T*() const { return _p; } //!< implicit decay to raw
     T* operator->() const { return _p; }
@@ -65,5 +64,5 @@ class GslOwner
     }
 };
 
-using GslVector = GslOwner<la_vector, la_vector_free>;
-using GslMatrix = GslOwner<la_matrix, la_matrix_free>;
+using LaVector = LaOwner<la_vector, la_vector_free>;
+using LaMatrix = LaOwner<la_matrix, la_matrix_free>;

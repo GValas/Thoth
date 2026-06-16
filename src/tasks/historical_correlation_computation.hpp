@@ -8,7 +8,7 @@ class HistoricalCorrelationComputation : public Task
 
   private:
     //!
-    GslMatrix _historical_matrix;
+    LaMatrix _historical_matrix;
 
     //! cfg attributes
     Correlation* _correlation;

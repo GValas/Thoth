@@ -6,7 +6,7 @@ class AbsoluteBasket : public Basket
 
   private:
     //! attributes
-    GslVector _weight_list;
+    LaVector _weight_list;
 
   public:
     //! setter

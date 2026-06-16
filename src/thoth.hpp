@@ -78,7 +78,7 @@ using boost::gregorian::to_simple_string;
 //! constants
 #include "constants.hpp"
 #include "enums.hpp"
-#include "gsl_raii.hpp"
+#include "raii.hpp"
 #include "object_sets.hpp"
 #include "finance.hpp"
 #include "maths.hpp"
