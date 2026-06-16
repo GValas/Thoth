@@ -224,7 +224,7 @@ void PricerMCL::ComputeGreeks_()
         }
 
         _quiet_pricing = true; //!< suppress the status lines / node-graph dump...
-        _theta_pass = true;    //!< ...but still show a labelled "MCL theta" bar
+        _theta_pass = true;    //!< ...but still show a labelled "<engine> theta" bar
         _suppress_scenarios = true;
         _today = base_today + days( 1 );
         PriceBook_(); //!< the single extra graph
@@ -449,7 +449,7 @@ void PricerMCL::Tree_Init_()
     {
         const string path = _configuration->_log_path + _name + "_nodes.dot";
         _collector.ExportGraph( path );
-        LOG( "MCL", "node graph written to " + path );
+        LOG( LogLabel_(), "node graph written to " + path );
     }
 
     //! status (only on the visible base build; the bump-and-revalue Greek
@@ -460,7 +460,7 @@ void PricerMCL::Tree_Init_()
         {
             std::ostringstream oss;
             oss << _collector.GetNodeNumber() << " created nodes";
-            LOG( "MCL", oss.str() );
+            LOG( LogLabel_(), oss.str() );
         }
         {
             std::ostringstream oss;
@@ -468,14 +468,14 @@ void PricerMCL::Tree_Init_()
                 << "contracts = " << _book->GetOptionList().size() << ", "
                 << "underlings = " << _single_set.size() << ", "
                 << "currencies = " << _currency_set.size();
-            LOG( "MCL", oss.str() );
+            LOG( LogLabel_(), oss.str() );
         }
         {
             std::ostringstream oss;
             oss << "drawings = " << _configuration->_mcl->_paths << ", "
                 << "max time step = " << _configuration->_mcl->_max_time_step << ", "
                 << "vol time step = " << _configuration->_mcl->_vol_time_step;
-            LOG( "MCL", oss.str() );
+            LOG( LogLabel_(), oss.str() );
         }
     }
 }
@@ -487,7 +487,7 @@ void PricerMCL::Tree_Run_()
     if ( !_quiet_pricing )
     {
         string mem = CurrentMemoryUsage();
-        LOG( "MCL", "starting pricing" + ( mem.empty() ? string() : ", memory = " + mem ) );
+        LOG( LogLabel_(), "starting pricing" + ( mem.empty() ? string() : ", memory = " + mem ) );
     }
 
     //! iterations
@@ -502,7 +502,7 @@ void PricerMCL::Tree_Run_()
     //! after the main sweep finishes; it is kept out of GlobalProgress so it does
     //! not make a cluster master's aggregate bar run backwards during that tail.
     const bool show_bar = !_quiet_pricing || _theta_pass;
-    const string bar_label = _theta_pass ? "MCL theta" : "MCL";
+    const string bar_label = _theta_pass ? LogLabel_() + " theta" : LogLabel_();
     _progress_bar = std::make_unique<ProgressBar>( bar_label, (long)n + lsm_steps, show_bar, !_theta_pass );
 
     for ( int i = 0; i < n; i++ )
@@ -568,6 +568,15 @@ long PricerMCL::AmericanLsmSteps_() const
     return steps;
 }
 
+//! log / progress-bar label: "AMC" once American contracts are registered for
+//! path recording (Longstaff-Schwartz Monte-Carlo), "MCL" for a plain European
+//! run. IsRecording() is set in SetupAmericanRecording (early in Tree_Init_),
+//! before every label site below.
+string PricerMCL::LogLabel_() const
+{
+    return _collector.IsRecording() ? "AMC" : "MCL";
+}
+
 //! name of the diffusion node carrying a contract's exercise value. Asking the
 //! underlying for its node works for every kind (Mono -> "<name>#spot",
 //! composite -> "<eq>_compo_<ccy>#spot", basket -> its own node), unlike the
@@ -615,7 +624,7 @@ void PricerMCL::SetupAmericanRecording()
         std::ostringstream oss;
         oss << "recording " << grid.size() << " exercise dates on '"
             << spot_name << "' for American contract '" << c->GetName() << "'";
-        LOG( "MCL", oss.str() );
+        LOG( LogLabel_(), oss.str() );
     }
 }
 
@@ -648,7 +657,7 @@ void PricerMCL::LogRecordings()
         std::ostringstream oss;
         oss << "recorded '" << spot_name << "' paths : E[S_T] = " << mean
             << " (" << paths->size1 << " x " << paths->size2 << ")";
-        LOG( "MCL", oss.str() );
+        LOG( LogLabel_(), oss.str() );
     }
 }
 
@@ -697,7 +706,7 @@ void PricerMCL::PriceAmerican()
         c->SetPremiumTrust( trust );
         std::ostringstream oss;
         oss << "american '" << c->GetName() << "' (LSM, frozen boundary) premium = " << premium;
-        LOG( "MCL", oss.str() );
+        LOG( LogLabel_(), oss.str() );
 
         //! re-price each Greek scenario for this contract under the frozen policy,
         //! swapping the contract's European contribution for its American value in

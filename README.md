@@ -48,7 +48,7 @@ engine then computes them the cheapest way for its structure:
   node graph that shares the (expensive) Brownian/noise nodes, and prices them in
   a **single path sweep** — so delta/gamma/vega/rho cost one simulation, not one
   per bump. theta is a separate one-day reprice (a second, base-only sweep, shown
-  under its own `MCL theta` progress bar). Sharing the path nodes is exact
+  under its own `MCL theta` / `AMC theta` progress bar). Sharing the path nodes is exact
   common-random-numbers, so the Greeks match the old reset-per-scenario values
   bit-for-bit. Books with American contracts or non-trivial (basket/composite)
   underlyings fall back to book-level bump-and-revalue.
@@ -360,7 +360,8 @@ run_local_client.sh   POST one YAML to a running server, write <input>.out.yaml
 
 - **American vanilla** exercise is supported by **both** the PDE pricer and the
   Monte-Carlo pricer (Longstaff-Schwartz least-squares MC, a lower bound on the
-  true value). American basket / path-dependent payoffs are not yet covered.
+  true value). American basket / path-dependent payoffs are not yet covered. An
+  American MC run logs under the `AMC` label (vs `MCL` for a plain European run).
 - The `nominal` contract field is not yet wired into the engine (premiums are
   per unit).
 - The HTTP server serialises pricing requests (single global engine state).

@@ -60,6 +60,7 @@ class PricerMCL : public Pricer
     void SetupAmericanRecording();
     void LogRecordings();
     long AmericanLsmSteps_() const; //!< progress-bar steps the LSM fit will run
+    string LogLabel_() const;       //!< "AMC" for an American (LSM) run, else "MCL"
     //! the diffusion node carrying the contract's exercise value. Resolved from
     //! the underlying itself (not the "<name>#spot" convention) so it also works
     //! for composite / basket, whose spot node is named differently from the
