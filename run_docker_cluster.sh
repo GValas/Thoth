@@ -72,7 +72,10 @@ urls=()
 for (( i = 1; i <= SLAVES; i++ )); do
     name="${SLAVE_PREFIX}-$i"
     echo "==> starting slave container $name (inner $INNER_PORT)"
-    docker run -d --name "$name" --network "$NETWORK" "$THOTH_IMAGE" \
+    # --init : tini as PID 1 forwards SIGTERM to thoth (which installs no signal
+    # handler, so as PID 1 it would otherwise ignore it) -> `docker rm -f` / stop
+    # terminate the slave promptly instead of waiting for the 10s SIGKILL timeout.
+    docker run -d --init --name "$name" --network "$NETWORK" "$THOTH_IMAGE" \
         -server "$INNER_PORT" >/dev/null
     urls+=( "http://$name:$INNER_PORT" )
 done
@@ -100,5 +103,10 @@ echo "==> Cluster on http://localhost:$PORT  ($SLAVES slave container(s))  (Ctrl
 # Master in the foreground so it owns this console (live -t progress bar) and so
 # Ctrl-C reaches it; on exit the trap removes every container and the network.
 # --rm here removes the master itself; slaves are removed by cluster_down.
-docker run --rm -t --name "$MASTER" --network "$NETWORK" -p "$PORT:$INNER_PORT" \
+# --init is essential: without it thoth is the container's PID 1, and since it
+# installs no signal handler the kernel ignores the SIGINT the docker CLI forwards
+# on Ctrl-C -> `docker run` never returns, the EXIT/INT trap never fires, and
+# master+slaves leak. tini (PID 1 via --init) forwards the signal so thoth exits,
+# docker run returns, and cluster_down tears the whole cluster down.
+docker run --rm -t --init --name "$MASTER" --network "$NETWORK" -p "$PORT:$INNER_PORT" \
     "$THOTH_IMAGE" -cluster "$INNER_PORT" "${urls[@]}"
