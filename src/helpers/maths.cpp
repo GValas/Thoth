@@ -552,6 +552,60 @@ void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
     }
 }
 
+//! ordinary least squares: minimise ||X beta - y||^2 via the normal equations
+//! (X^T X) beta = X^T y, solved by Cholesky. X is n x p with p small and full
+//! column rank (the Longstaff-Schwartz {1, m, m^2} basis). Returns beta (size p).
+//! Replaces gsl_multifit_linear (only the coefficients are needed, not cov/chisq).
+vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y )
+{
+    const size_t n = X->size1;
+    const size_t p = X->size2;
+    gsl_matrix* A = gsl_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD)
+    vector<double> g( p, 0.0 );               //!< right-hand side X^T y
+    for ( size_t a = 0; a < p; a++ )
+    {
+        for ( size_t b = 0; b <= a; b++ )
+        {
+            double s = 0.0;
+            for ( size_t k = 0; k < n; k++ )
+            {
+                s += gsl_matrix_get( X, k, a ) * gsl_matrix_get( X, k, b );
+            }
+            gsl_matrix_set( A, a, b, s );
+            gsl_matrix_set( A, b, a, s );
+        }
+        double sg = 0.0;
+        for ( size_t k = 0; k < n; k++ )
+        {
+            sg += gsl_matrix_get( X, k, a ) * gsl_vector_get( y, k );
+        }
+        g[a] = sg;
+    }
+    //! A = L L^T, then solve L z = g (forward) and L^T beta = z (back)
+    CholeskyDecomposeLower( A );
+    vector<double> z( p ), beta( p );
+    for ( size_t i = 0; i < p; i++ )
+    {
+        double s = g[i];
+        for ( size_t k = 0; k < i; k++ )
+        {
+            s -= gsl_matrix_get( A, i, k ) * z[k];
+        }
+        z[i] = s / gsl_matrix_get( A, i, i );
+    }
+    for ( size_t i = p; i-- > 0; )
+    {
+        double s = z[i];
+        for ( size_t k = i + 1; k < p; k++ )
+        {
+            s -= gsl_matrix_get( A, k, i ) * beta[k]; //!< L^T[i][k] = L[k][i]
+        }
+        beta[i] = s / gsl_matrix_get( A, i, i );
+    }
+    gsl_matrix_free( A );
+    return beta;
+}
+
 //! sum elments of vector
 double ext_gsl_vector_sum( gsl_vector* v )
 {

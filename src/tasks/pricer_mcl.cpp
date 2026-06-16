@@ -5,8 +5,8 @@
 #include "mono.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
+#include "maths.hpp"
 #include <algorithm>
-#include <gsl/gsl_multifit.h>
 
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
@@ -833,14 +833,10 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
             gsl_matrix_set( X, k, 2, m * m );
             gsl_vector_set( y, k, cf[itm[k]] );
         }
-        gsl_vector* beta = gsl_vector_alloc( 3 );
-        gsl_matrix* cov = gsl_matrix_alloc( 3, 3 );
-        double chisq = 0;
-        gsl_multifit_linear_workspace* w = gsl_multifit_linear_alloc( ni, 3 );
-        gsl_multifit_linear( X, y, beta, cov, &chisq, w );
-        pol.b0[t] = gsl_vector_get( beta, 0 );
-        pol.b1[t] = gsl_vector_get( beta, 1 );
-        pol.b2[t] = gsl_vector_get( beta, 2 );
+        vector<double> beta = LeastSquares( X, y );
+        pol.b0[t] = beta[0];
+        pol.b1[t] = beta[1];
+        pol.b2[t] = beta[2];
         pol.has_fit[t] = true;
 
         //! roll the cashflow back through the fitted exercise decision
@@ -856,11 +852,8 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
             }
         }
 
-        gsl_multifit_linear_free( w );
         gsl_matrix_free( X );
         gsl_vector_free( y );
-        gsl_vector_free( beta );
-        gsl_matrix_free( cov );
     }
 
     return pol;

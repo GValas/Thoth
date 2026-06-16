@@ -65,6 +65,8 @@ bool CholeskyDecomposeLower( gsl_matrix* A );
 //! solve a tridiagonal system M X = B (Thomas algorithm)
 void SolveTridiagonal( const gsl_vector* Diag, const gsl_vector* Super,
                        const gsl_vector* Sub, const gsl_vector* B, gsl_vector* X );
+//! ordinary least squares (normal equations + Cholesky); returns beta (size X cols)
+vector<double> LeastSquares( const gsl_matrix* X, const gsl_vector* y );
 bool ext_gsl_matrix_is_positive( const gsl_matrix* m );
 bool ext_gsl_matrix_is_square( const gsl_matrix* m );
 bool ext_gsl_matrix_is_symmetric( const gsl_matrix* m );
