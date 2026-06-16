@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "historical_volatility_computation.hpp"
+#include "statistics.hpp"
 
 HistoricalVolatilityComputation::HistoricalVolatilityComputation( const string& ObjectName,
                                                                   YamlConfig& YamlConfig ) : Task( ObjectName, YamlConfig, KIND_HISTORICAL_VOLATILITY_COMPUTATION )
@@ -33,7 +34,7 @@ void HistoricalVolatilityComputation::Execute()
     }
 
     //! weighted variance
-    _vol = gsl_stats_wsd( gsl_vector_ptr( weights, 0 ), 1, gsl_vector_ptr( log_returns, 0 ), 1, return_size ) * sqrt( NB_OF_BUSINESS_DAYS_A_YEAR / _time_step ) * 100;
+    _vol = WeightedSd( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( log_returns, 0 ), return_size ) * sqrt( NB_OF_BUSINESS_DAYS_A_YEAR / _time_step ) * 100;
 
     _exec_time = ExecTime( t0 );
 }

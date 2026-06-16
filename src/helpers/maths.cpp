@@ -1,5 +1,6 @@
 #include "maths.hpp"
 #include "distributions.hpp"
+#include "statistics.hpp"
 
 //! constants
 const size_t NEAR_POSITIVE_MATRIX_MAX_ITER = 24;
@@ -347,22 +348,48 @@ double InterpolateWithSpline( gsl_vector* x_serie,
                               double x_point )
 {
 
-    // allocations. Natural (non-periodic) cubic spline: the data (e.g. a PDE
-    // price profile) is not periodic, so cspline_periodic — which assumes
-    // y[0] == y[n-1] — would be the wrong boundary condition.
-    gsl_interp_accel* acc = gsl_interp_accel_alloc();
-    const gsl_interp_type* t = gsl_interp_cspline;
-    gsl_spline* spline = gsl_spline_alloc( t, x_serie->size );
-    gsl_spline_init( spline, gsl_vector_ptr( x_serie, 0 ), gsl_vector_ptr( y_serie, 0 ), x_serie->size );
-
-    // interpolate
-    double y_point = gsl_spline_eval( spline, x_point, acc );
-
-    // free only what this function allocated; inputs stay owned by the caller
-    gsl_spline_free( spline );
-    gsl_interp_accel_free( acc );
-
-    return y_point;
+    // Natural (non-periodic) cubic spline solved in place (Burden & Faires):
+    // second derivatives are zero at both ends, so a PDE price profile (which is
+    // not periodic) gets the correct boundary condition. Matches gsl_interp_cspline.
+    const size_t n = x_serie->size;
+    vector<double> x( n ), y( n ), h( n - 1 ), m( n, 0.0 ), l( n ), mu( n ), z( n );
+    for ( size_t i = 0; i < n; i++ )
+    {
+        x[i] = gsl_vector_get( x_serie, i );
+        y[i] = gsl_vector_get( y_serie, i );
+    }
+    for ( size_t i = 0; i < n - 1; i++ )
+    {
+        h[i] = x[i + 1] - x[i];
+    }
+    // tridiagonal solve for the interior second derivatives m[1..n-2] (Thomas)
+    l[0] = 1.0;
+    mu[0] = 0.0;
+    z[0] = 0.0;
+    for ( size_t i = 1; i < n - 1; i++ )
+    {
+        double alpha = 3.0 * ( ( y[i + 1] - y[i] ) / h[i] - ( y[i] - y[i - 1] ) / h[i - 1] );
+        l[i] = 2.0 * ( x[i + 1] - x[i - 1] ) - h[i - 1] * mu[i - 1];
+        mu[i] = h[i] / l[i];
+        z[i] = ( alpha - h[i - 1] * z[i - 1] ) / l[i];
+    }
+    l[n - 1] = 1.0;
+    z[n - 1] = 0.0;
+    for ( size_t j = n - 1; j-- > 0; )
+    {
+        m[j] = z[j] - mu[j] * m[j + 1];
+    }
+    // locate the interval [x[k], x[k+1]] containing x_point (clamp at the ends)
+    size_t k = 0;
+    while ( k < n - 2 && x_point > x[k + 1] )
+    {
+        k++;
+    }
+    const double dx = x_point - x[k];
+    const double b = ( y[k + 1] - y[k] ) / h[k] - h[k] * ( 2.0 * m[k] + m[k + 1] ) / 6.0;
+    const double c = m[k] / 2.0;
+    const double d = ( m[k + 1] - m[k] ) / ( 6.0 * h[k] );
+    return y[k] + dx * ( b + dx * ( c + dx * d ) );
 }
 
 //!
@@ -495,6 +522,5 @@ void ext_gsl_matrix_log( gsl_matrix* m )
 //! sum elments of vector
 double ext_gsl_vector_sum( gsl_vector* v )
 {
-    size_t n = v->size;
-    return gsl_stats_mean( gsl_vector_ptr( v, 0 ), 1, n ) * n;
+    return Sum( gsl_vector_ptr( v, 0 ), v->size );
 }

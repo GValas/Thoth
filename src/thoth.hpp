@@ -31,7 +31,6 @@
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_eigen.h>
 #include <gsl/gsl_errno.h>
-#include <gsl/gsl_interp.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_matrix.h>
@@ -42,9 +41,6 @@
 #include <gsl/gsl_qrng.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_rng.h>
-#include <gsl/gsl_sort.h>
-#include <gsl/gsl_spline.h>
-#include <gsl/gsl_statistics.h>
 #include <gsl/gsl_vector.h>
 
 //! boost

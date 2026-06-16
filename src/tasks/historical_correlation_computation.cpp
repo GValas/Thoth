@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "historical_correlation_computation.hpp"
+#include "statistics.hpp"
 
 HistoricalCorrelationComputation::HistoricalCorrelationComputation( const string& ObjectName,
                                                                     YamlConfig& YamlConfig ) : Task( ObjectName, YamlConfig, KIND_HISTORICAL_CORRELATION_COMPUTATION )
@@ -85,12 +86,9 @@ void HistoricalCorrelationComputation::Execute()
     for ( size_t i = 0; i < histos_size; i++ )
     {
         gsl_vector* v = log_return_list[i];
-        double wm = gsl_stats_wmean( gsl_vector_ptr( weights, 0 ), 1,
-                                     gsl_vector_ptr( v, 0 ), 1,
-                                     _range_size );
-        double wv = gsl_stats_wvariance_m( gsl_vector_ptr( weights, 0 ), 1,
-                                           gsl_vector_ptr( v, 0 ), 1,
-                                           _range_size, wm );
+        double wm = WeightedMean( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( v, 0 ), _range_size );
+        double wv = WeightedVarianceM( gsl_vector_ptr( weights, 0 ), gsl_vector_ptr( v, 0 ),
+                                       _range_size, wm );
         gsl_vector_set( weighted_means, i, wm );
         gsl_vector_set( weighted_variances, i, wv );
     }
