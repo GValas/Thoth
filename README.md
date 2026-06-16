@@ -85,7 +85,9 @@ theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·
 
 **Market data**
 - `yield_curve`, `repo_curve`, `continuous_dividends_curve`,
-  `correlation_matrix`.
+  `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
+  read by **linear interpolation on the (continuously-compounded) rate** between
+  pillars (ACT/365 weight), held flat beyond the first/last pillar.
 - Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).
@@ -405,6 +407,9 @@ run_local_client.sh       POST one YAML to a running server, write <input>.out.y
 - The `nominal` contract field is not yet wired into the engine (premiums are
   per unit).
 - The HTTP server serialises pricing requests (single global engine state).
+- Yield/repo/dividend curves interpolate across their pillars for the ANA and PDE
+  engines; the MCL diffusion still drives a single (front-pillar) rate over the
+  whole path, so a sloped curve reaches MCL prices only through that front rate.
 - Pricing currently uses a single reference (ATM) volatility per underlying, so
   a `sabr_volatility` smile only influences the price through its ATM level; a
   full local-vol grid is not wired in. `bs_volatility` (flat) is exact.

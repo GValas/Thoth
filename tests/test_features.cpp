@@ -460,3 +460,28 @@ TEST_CASE( "Heston PDE 2-D ADI matches ANA and supports American" )
     double am = Premium( Price( cfg( "pde", 80, "put", "american" ) ) );
     CHECK( am >= eu - 1e-6 );
 }
+
+// --- yield curve term-structure interpolation : a sloped curve [r_lo, r_hi] must
+// price a mid-maturity (2005, ~halfway between the 2000/2010 pillars) call strictly
+// between the two flat-pillar extremes — rho is positive for a call, so a higher
+// effective rate gives a higher premium. Exercises Curve::GetCurveValue's
+// linear-on-rate interpolation; a flat curve would price all three identically.
+TEST_CASE( "yield curve: linear rate interpolation between pillars" )
+{
+    const std::string c = "o: !vanilla {underlying: eq, premium_currency: eur,"
+                          " strike: 100, maturity: 2005-01-01, type: call, exercise: european}\n";
+    auto with_rate = []( std::string yaml, const std::string& vals )
+    {
+        const std::string from = "values: [8, 8]";
+        yaml.replace( yaml.find( from ), from.size(), "values: [" + vals + "]" );
+        return yaml;
+    };
+    double lo = Premium( Price( with_rate( OneContract( "ana", c ), "4, 4" ) ) );
+    double hi = Premium( Price( with_rate( OneContract( "ana", c ), "12, 12" ) ) );
+    double mid = Premium( Price( with_rate( OneContract( "ana", c ), "4, 12" ) ) );
+    CAPTURE( lo );
+    CAPTURE( hi );
+    CAPTURE( mid );
+    CHECK( lo < mid );
+    CHECK( mid < hi );
+}
