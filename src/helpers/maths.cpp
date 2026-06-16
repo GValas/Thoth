@@ -1,4 +1,5 @@
 #include "maths.hpp"
+#include "distributions.hpp"
 
 //! constants
 const size_t NEAR_POSITIVE_MATRIX_MAX_ITER = 24;
@@ -66,8 +67,8 @@ double IG_Call_Price( const double Forward,
                       const double Alpha,
                       const double Beta )
 {
-    double G1 = gsl_cdf_gamma_P( 1 / Strike, Alpha - 1, Beta );
-    double G2 = gsl_cdf_gamma_P( 1 / Strike, Alpha, Beta );
+    double G1 = GammaCdf( 1 / Strike, Alpha - 1, Beta );
+    double G2 = GammaCdf( 1 / Strike, Alpha, Beta );
     return DiscountFactor * ( Forward * G1 - Strike * G2 );
 }
 
@@ -90,8 +91,8 @@ double LN_Call_Price( const double Forward,
 {
     double d1 = ( log( Forward / Strike ) + Var / 2 ) / sqrt( Var );
     double d2 = ( log( Forward / Strike ) - Var / 2 ) / sqrt( Var );
-    double Nd1 = gsl_cdf_gaussian_P( d1, 1 );
-    double Nd2 = gsl_cdf_gaussian_P( d2, 1 );
+    double Nd1 = NormalCdf( d1 );
+    double Nd2 = NormalCdf( d2 );
     return DiscountFactor * ( Forward * Nd1 - Strike * Nd2 );
 }
 
@@ -172,8 +173,8 @@ double SLN_Call_Price( const double /*Forward*/,
         double v = sqrt( Var );
         double d1 = ( -log( Strike - D ) + Mu + Var ) / v;
         double d2 = d1 - v;
-        double Nd1 = gsl_cdf_gaussian_P( d1, 1 );
-        double Nd2 = gsl_cdf_gaussian_P( d2, 1 );
+        double Nd1 = NormalCdf( d1 );
+        double Nd2 = NormalCdf( d2 );
         return DiscountFactor * ( exp( Mu + 0.5 * Var ) * Nd1 - ( Strike - D ) * Nd2 );
     }
 }

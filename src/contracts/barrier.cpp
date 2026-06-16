@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "barrier.hpp"
+#include "distributions.hpp"
 
 Barrier::Barrier( const string& ObjectName ) : Contract( ObjectName, KIND_BARRIER )
 {
@@ -157,13 +158,13 @@ double Barrier::ANA_BarrierPrice( double S,
     double pHS_m = pow( H / S, 2 * mu );
 
     auto A = [&]()
-    { return phi * Sbr * gsl_cdf_ugaussian_P( phi * x1 ) - phi * Kdf * gsl_cdf_ugaussian_P( phi * ( x1 - sqt ) ); };
+    { return phi * Sbr * NormalCdf( phi * x1 ) - phi * Kdf * NormalCdf( phi * ( x1 - sqt ) ); };
     auto B = [&]()
-    { return phi * Sbr * gsl_cdf_ugaussian_P( phi * x2 ) - phi * Kdf * gsl_cdf_ugaussian_P( phi * ( x2 - sqt ) ); };
+    { return phi * Sbr * NormalCdf( phi * x2 ) - phi * Kdf * NormalCdf( phi * ( x2 - sqt ) ); };
     auto C = [&]()
-    { return phi * Sbr * pHS_p1 * gsl_cdf_ugaussian_P( eta * y1 ) - phi * Kdf * pHS_m * gsl_cdf_ugaussian_P( eta * ( y1 - sqt ) ); };
+    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y1 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y1 - sqt ) ); };
     auto D = [&]()
-    { return phi * Sbr * pHS_p1 * gsl_cdf_ugaussian_P( eta * y2 ) - phi * Kdf * pHS_m * gsl_cdf_ugaussian_P( eta * ( y2 - sqt ) ); };
+    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y2 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y2 - sqt ) ); };
 
     //! knock-in value (rebate = 0)
     double knock_in;

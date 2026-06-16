@@ -1,4 +1,5 @@
 #include "finance.hpp"
+#include "distributions.hpp"
 #include <complex>
 #include <gsl/gsl_integration.h>
 
@@ -72,8 +73,8 @@ double BS_Call_Price( const double Forward,
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double d2 = d1 - v_sqr_t;
-        double Nd1 = gsl_cdf_ugaussian_P( d1 );
-        double Nd2 = gsl_cdf_ugaussian_P( d2 );
+        double Nd1 = NormalCdf( d1 );
+        double Nd2 = NormalCdf( d2 );
         return DiscountFactor * ( Forward * Nd1 - Strike * Nd2 );
     }
 }
@@ -105,7 +106,7 @@ double BS_Call_Delta( const double Forward,
     {
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
-        double Nd1 = gsl_cdf_ugaussian_P( d1 );
+        double Nd1 = NormalCdf( d1 );
         return DiscountFactor * Nd1;
     }
 }
@@ -138,7 +139,7 @@ double BS_Vega( const double Forward,
         double sqr_t = sqrt( TimeToMaturity );
         double v_sqr_t = Volatility * sqr_t;
         double d2 = log( Forward / Strike ) / v_sqr_t - 0.5 * v_sqr_t;
-        double Fd2 = gsl_ran_ugaussian_pdf( d2 );
+        double Fd2 = NormalPdf( d2 );
         return DiscountFactor * Strike * sqr_t * Fd2;
     }
 }
@@ -158,7 +159,7 @@ double BS_Gamma( const double Forward,
     {
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
-        double Fd1 = gsl_ran_ugaussian_pdf( d1 );
+        double Fd1 = NormalPdf( d1 );
         return DiscountFactor * Fd1 / Forward / v_sqr_t;
     }
 }
@@ -179,7 +180,7 @@ double BS_Volga( const double Forward,
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double d2 = d1 - v_sqr_t;
-        double Fd1 = gsl_ran_ugaussian_pdf( d1 );
+        double Fd1 = NormalPdf( d1 );
         return DiscountFactor * Forward * Fd1 * v_sqr_t * d1 * d2;
     }
 }

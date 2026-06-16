@@ -1,8 +1,7 @@
 #include "thoth.hpp"
 #include "path_generator.hpp"
 #include "sobol_generator.hpp"
-
-#include <gsl/gsl_cdf.h>
+#include "distributions.hpp"
 
 PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, gsl_rng* Rng,
                               uint64_t SobolSkip )
@@ -116,7 +115,7 @@ void PathGenerator::NextPath()
             if ( dim < _sobol_dim )
             {
                 double u = min( 1.0 - 1e-12, max( 1e-12, _u[dim] ) );
-                z = gsl_cdf_ugaussian_Pinv( u );
+                z = NormalCdfInv( u );
             }
             else
             {

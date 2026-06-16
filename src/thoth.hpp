@@ -27,7 +27,6 @@
 
 //! gsl libs
 #include <gsl/gsl_blas.h>
-#include <gsl/gsl_cdf.h>
 #include <gsl/gsl_complex.h>
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_eigen.h>
