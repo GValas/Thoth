@@ -214,7 +214,7 @@ so debug with a small book or a reduced `paths`.
 ./build/thoth -batch <input.yaml> <output.yaml> [exec_name]
 # or build the production image and price in a container — the result is written
 # next to the input as <input>.out.yaml, owned by the invoking user:
-./run_docker_batch.sh --input samples/simple_call.yaml
+./run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
 ```
 
 The output YAML is the input config with the computed `*_result` blocks added.
@@ -237,7 +237,7 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 # or the wrapper, which POSTs the input to a running server and writes the result
 # next to it as samples/<input>.out.yaml (these *.out.yaml files are gitignored):
-./run_local_client.sh --input samples/simple_call.yaml --port 8080
+./run_local_client.sh samples/simple_call.yaml --port 8080
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
@@ -262,11 +262,11 @@ aggregate the results:
 ./build/thoth -server 8091 &                     # slaves
 ./build/thoth -server 8092 &
 ./build/thoth -cluster 8090 http://localhost:8091 http://localhost:8092
-# or the Docker wrapper: one container per slave + a master, all on a private
-# network (Ctrl-C, or the master exiting, tears the whole cluster down):
-./run_docker_cluster.sh --port 8090 --slaves 2
+# or the Docker wrapper with --slaves: one container per slave + a master, all on a
+# private network (Ctrl-C, or the master exiting, tears the whole cluster down):
+./run_docker_server.sh --port 8090 --slaves 2
 # then POST a book to the master (single-MCL-pricer books get path-split):
-./run_local_client.sh --input samples/simple_call.yaml --port 8090
+./run_local_client.sh samples/simple_call.yaml --port 8090
 ```
 
 The master splits `paths` as evenly as possible (capping the fan-out at `paths`
@@ -396,11 +396,10 @@ Dockerfile       production image (multi-stage; CPU by default, GPU via build-ar
 .vscode/         editor tasks + gdb debug configs
 CMakeLists.txt   build
 format.sh                 clang-format wrapper (--check for CI)
-run_docker_batch.sh       build the image and price one YAML in batch (in a container)
-run_docker_server.sh      build the image and run the HTTP pricing server (--gpu for the CUDA/--gpus all variant)
-run_docker_cluster.sh     build the image and bring up a master + N slave containers
-run_docker_common.sh      shared helper (builds the single Thoth image) — sourced, not run
-run_local_client.sh       POST one YAML to a running server, write <input>.out.yaml
+run_docker_batch.sh       build the image and price one YAML in batch: <input.yaml> [output.yaml]
+run_docker_server.sh      build the image and serve over HTTP ([--gpu] CUDA/--gpus all; [--slaves N] master + N slave cluster)
+run_docker_common.sh      shared helpers (image build, input/output paths) — sourced, not run
+run_local_client.sh       POST one YAML to a running server: <input.yaml> [output.yaml] [--port N] [--exec-name X]
 ```
 
 ---

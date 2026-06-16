@@ -2,11 +2,12 @@
 # ---------------------------------------------------------------------------
 # run_docker_common.sh - shared helpers for the run_docker_*.sh wrappers.
 #
-# Sourced (not executed) by run_docker_batch.sh / run_docker_server.sh /
-# run_docker_cluster.sh. Mutualises the one thing they all need: building the
-# single Thoth production image (Dockerfile) once, tagged "thoth". The git commit
-# is baked in (printed in the startup banner) so a stale image is obvious; Docker
-# layer caching makes rebuilds a no-op when src/ is unchanged.
+# Sourced (not executed) by run_docker_server.sh / run_docker_batch.sh /
+# run_local_client.sh. Mutualises what they share: building the single Thoth
+# production image (Dockerfile) once, tagged "thoth" (the git commit is baked in
+# and printed in the banner so a stale image is obvious; Docker layer caching makes
+# rebuilds a no-op when src/ is unchanged), and the input/output path helpers the
+# batch and client wrappers both use.
 #
 # Requires the caller to have set ROOT (the project directory).
 # ---------------------------------------------------------------------------
@@ -41,4 +42,20 @@ thoth_build_image() {
         echo "==> Building image '$THOTH_IMAGE' at commit $commit ..." >&2
         docker build --build-arg GIT_COMMIT="$commit" -t "$THOTH_IMAGE" "$ROOT"
     fi
+}
+
+# Validate an input YAML path and echo its absolute path (exit non-zero on error).
+# Shared by the batch and client wrappers, which both take a positional input.
+require_input_file() {
+    local in="${1:-}"
+    [[ -n "$in" ]] || { echo "error: an input YAML file is required" >&2; return 1; }
+    [[ -f "$in" ]] || { echo "error: input file '$in' not found" >&2; return 1; }
+    realpath "$in"
+}
+
+# Default result path for an input: <input>.out.yaml (replace the .yaml suffix, or
+# append if there is none). Shared by the batch and client wrappers.
+default_output() {
+    local in="$1"
+    if [[ "$in" == *.yaml ]]; then echo "${in%.yaml}.out.yaml"; else echo "${in}.out.yaml"; fi
 }

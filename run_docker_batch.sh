@@ -2,16 +2,18 @@
 # ---------------------------------------------------------------------------
 # run_docker_batch.sh - Build the Thoth image and price a YAML file in batch.
 #
-# Builds the production image (Dockerfile), then runs the container in -batch
-# mode on the given input. The input's directory is mounted at /data, so the
-# result is written next to the input as <script>.out.yaml on the host.
+# Builds the production image (Dockerfile), then runs the container in -batch mode
+# on the given input. The input's directory is bind-mounted read-only and the
+# output's directory read-write, so the result can be written anywhere.
 #
 # Usage:
-#     ./run_docker_batch.sh --input <script.yaml>
+#     ./run_docker_batch.sh <input.yaml> [output.yaml]
 #
-# Example:
-#     ./run_docker_batch.sh --input samples/heston_call.yaml
-#     -> writes samples/heston_call.out.yaml
+# The output argument is optional; it defaults to <input>.out.yaml next to the input.
+#
+# Examples:
+#     ./run_docker_batch.sh samples/heston_call.yaml         # -> samples/heston_call.out.yaml
+#     ./run_docker_batch.sh samples/heston_call.yaml /tmp/r.yaml
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -20,40 +22,27 @@ cd "$ROOT"
 # shellcheck source=run_docker_common.sh
 source "$ROOT/run_docker_common.sh"
 
-INPUT=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --input) INPUT="$2"; shift 2 ;;
-        --input=*) INPUT="${1#*=}"; shift ;;
-        -h | --help) echo "usage: $0 --input <script.yaml>"; exit 0 ;;
-        *) echo "error: unknown argument '$1' (usage: $0 --input <script.yaml>)" >&2; exit 1 ;;
-    esac
-done
+usage() { echo "usage: $0 <input.yaml> [output.yaml]"; }
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
 
-if [[ -z "$INPUT" ]]; then
-    echo "usage: $0 --input <script.yaml>" >&2
-    exit 1
-fi
-if [[ ! -f "$INPUT" ]]; then
-    echo "error: input file '$INPUT' not found" >&2
-    exit 1
-fi
+if ! ABS_INPUT="$(require_input_file "${1:-}")"; then usage >&2; exit 1; fi #!< validate + absolutise
+OUTPUT="${2:-$(default_output "$1")}"
+ABS_OUTPUT="$(realpath -m "$OUTPUT")"        #!< -m: output need not exist yet
 
-# Absolute paths so the input's directory can be bind-mounted at /data.
-ABS_INPUT="$(realpath "$INPUT")"
-DATA_DIR="$(dirname "$ABS_INPUT")"
-IN_NAME="$(basename "$ABS_INPUT")"
-OUT_NAME="${IN_NAME%.yaml}.out.yaml" #!< <script>.out.yaml, next to the input
+IN_DIR="$(dirname "$ABS_INPUT")";  IN_NAME="$(basename "$ABS_INPUT")"
+OUT_DIR="$(dirname "$ABS_OUTPUT")"; OUT_NAME="$(basename "$ABS_OUTPUT")"
+mkdir -p "$OUT_DIR"
 
 thoth_build_image
 
-echo "==> Pricing $IN_NAME -> $OUT_NAME (in $DATA_DIR)"
-# ENTRYPOINT is `thoth`, so the args below are thoth's. -t gives a live progress
-# bar; --rm cleans the container up; the dir is mounted read-write for the output.
-# --user maps the container to the invoking host user so the written .out.yaml is
-# owned by us (not root) — otherwise a later host-side run (e.g. run_local_client.sh)
-# cannot overwrite the root-owned output and fails with "Permission denied".
-docker run --rm -t --user "$(id -u):$(id -g)" -v "$DATA_DIR:/data" "$THOTH_IMAGE" \
-    -batch "/data/$IN_NAME" "/data/$OUT_NAME"
+echo "==> Pricing $IN_NAME -> $OUT_NAME"
+# ENTRYPOINT is `thoth`, so the args below are thoth's. -t gives a live progress bar;
+# --rm cleans the container up. The input dir is mounted read-only at /in and the
+# output dir read-write at /out. --user maps the container to the invoking host user
+# so the written result is owned by us (not root) and a later host-side run can
+# overwrite it instead of failing with "Permission denied".
+docker run --rm -t --user "$(id -u):$(id -g)" \
+    -v "$IN_DIR:/in:ro" -v "$OUT_DIR:/out" "$THOTH_IMAGE" \
+    -batch "/in/$IN_NAME" "/out/$OUT_NAME"
 
-echo "==> Done. Result written to $DATA_DIR/$OUT_NAME"
+echo "==> Done. Result written to $ABS_OUTPUT"

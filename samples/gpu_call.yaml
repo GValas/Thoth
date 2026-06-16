@@ -9,7 +9,7 @@ root: gpu_call_pricing
 # Black-Scholes reference premium ~15.71.
 #
 #   ./run_docker_server.sh --gpu                    # GPU server (needs an NVIDIA GPU)
-#   ./run_local_client.sh --input samples/gpu_call.yaml
+#   ./run_local_client.sh samples/gpu_call.yaml
 
 gpu_call_pricing: !pricer
   today: 2000-01-01
