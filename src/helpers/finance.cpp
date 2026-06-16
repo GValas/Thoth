@@ -1,7 +1,9 @@
 #include "finance.hpp"
 #include "distributions.hpp"
 #include <complex>
-#include <gsl/gsl_integration.h>
+#include <limits>
+
+#include <boost/math/quadrature/gauss_kronrod.hpp>
 
 //! vanilla price
 double payoff_vanilla( const double spot,
@@ -266,15 +268,11 @@ double heston_integrand( double phi, void* params )
 double heston_probability( HestonParams h, int j )
 {
     h.j = j;
-    gsl_integration_workspace* w = gsl_integration_workspace_alloc( 1000 );
-    gsl_function fn;
-    fn.function = &heston_integrand;
-    fn.params = &h;
-    double result = 0;
-    double err = 0;
-    //! semi-infinite integral from a small epsilon (integrand is regular at 0)
-    gsl_integration_qagiu( &fn, 1e-8, 1e-8, 1e-8, 1000, w, &result, &err );
-    gsl_integration_workspace_free( w );
+    //! semi-infinite integral from a small epsilon (integrand is regular at 0),
+    //! adaptive Gauss-Kronrod — the same rule family as the GSL qagiu it replaces
+    auto integrand = [&h]( double phi ) { return heston_integrand( phi, &h ); };
+    const double result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(
+        integrand, 1e-8, std::numeric_limits<double>::infinity(), 15, 1e-8 );
     return 0.5 + result / M_PI;
 }
 } // namespace
