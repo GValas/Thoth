@@ -18,6 +18,7 @@ void Correlation::SetMatrix( la_vector* Matrix )
     {
         _matrix = ext_la_vector_to_matrix( Matrix, (size_t)n_sqrt );
         la_vector_free( Matrix ); //!< copied into _matrix; release the source
+        _cholesky_key.clear();    //!< invalidate any cached Cholesky factor
 
         //! fail fast on an invalid correlation matrix: every engine needs it
         //! symmetric positive-definite (MCL Cholesky-factorises it; ANA/PDE read
@@ -295,10 +296,25 @@ double Correlation::GetCholeskyValue( const string& u1,
 //!
 void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
 {
+    //! cache: the factor depends only on the requested sub-set and the correlation
+    //! matrix (immutable during a run — there is no correlation bump), so skip the
+    //! rebuild when the sub-set is unchanged. Bump-and-revalue Greeks call this once
+    //! per reprice with the same sub-set; it only recomputes when the sub-set changes
+    //! (e.g. another book in a !sequence) or the matrix is reloaded (SetMatrix).
+    string key;
+    for ( const string& s : SingleNameList )
+    {
+        key += s;
+        key += '\n';
+    }
+    if ( _cholesky_matrix && key == _cholesky_key )
+    {
+        return;
+    }
 
-    //! rebuilt from scratch on every call: bump-and-revalue Greeks (and any other
-    //! re-pricing) call this repeatedly, so the lists must be cleared or they
-    //! accumulate duplicate rows and the extracted matrix is no longer SDP
+    //! rebuilt from scratch: bump-and-revalue Greeks (and any other re-pricing) call
+    //! this repeatedly, so the lists must be cleared or they accumulate duplicate
+    //! rows and the extracted matrix is no longer SDP
     _cholesky_underlying_list.clear();
     _cholesky_forex_list.clear();
     _cholesky_single_list.clear();
@@ -337,6 +353,7 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
     }
 
     CholeskyDecomposeLower( _cholesky_matrix );
+    _cholesky_key = key; //!< mark the sub-set this factor is now valid for
 }
 
 //!

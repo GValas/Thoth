@@ -20,6 +20,12 @@ class Correlation : public Object
     vector<string> _cholesky_single_list; // = forex_list + underlying_list
     void SetCholeskySingleList();
 
+    //! cache key: the requested sub-set the current _cholesky_matrix was built for.
+    //! The factor depends only on this sub-set and the (run-immutable) correlation
+    //! matrix, so a matching key lets ComputeCholeskyMatrix skip the rebuild that
+    //! every bump-and-revalue reprice would otherwise repeat. Cleared by SetMatrix.
+    string _cholesky_key;
+
     //! additional
     set<string> _currency_list;
     string _pivot_currency;
