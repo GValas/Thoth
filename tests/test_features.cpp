@@ -372,6 +372,99 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
     }
 }
 
+// --- basket local-vol : each component of a basket diffuses with its own Dupire
+// local vol. A basket of flat SABR surfaces (constant local vol = alpha) must match
+// the same basket priced with the equivalent bs_volatility, proving the local-vol
+// components plug into the basket diffusion and reduce to constant vol.
+TEST_CASE( "basket local-vol MCL: flat SABR components match the BS basket" )
+{
+    auto book = []( const std::string& vol_obj )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+          << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 200000,"
+          << " vol_time_step: 0.01, use_sobol: true}\n"
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq1: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "eq2: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << vol_obj
+          << "cor: !correlation_matrix {underlyings: [eq1, eq2], matrix: [1, 0.3, 0.3, 1]}\n"
+          << "bk: !basket {underlyings: [eq1, eq2], weights: [0.5, 0.5]}\n"
+          << "book: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: bk, premium_currency: eur, strike: 100,"
+          << " is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n";
+        return o.str();
+    };
+    const std::string bs = "vol: !bs_volatility {volatility: 30, calendar: cal}\n";
+    const std::string sabr = "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30],"
+                             " beta: [1.0], rho: [0.0], nu: [0.001], calendar: cal}\n";
+    double p_bs = Premium( Price( book( bs ) ) );
+    auto sr = Price( book( sabr ) );
+    double p_sabr = Premium( sr );
+    CAPTURE( p_bs );
+    CAPTURE( p_sabr );
+    CHECK( std::abs( p_sabr - p_bs ) <= 6.0 * Trust( sr ) + 0.2 );
+}
+
+// --- composite local-vol : a EUR equity settled in USD, with a SABR surface. The
+// inner spot diffuses on the full Dupire local vol; the quanto drift uses the ATM
+// vol (as ANA/PDE do). By Dupire repricing the local-vol composite must match the
+// ANA composite (which combines the strike implied vol with the FX vol).
+TEST_CASE( "composite local-vol MCL reprices the implied surface (matches ANA)" )
+{
+    auto cfg = []( const std::string& method, const std::string& vol_obj )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "cfg: !pricer_configuration {method: " << method
+          << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
+          << "m: !mcl_configuration {max_time_step: 7, min_time_step: -1, paths: 300000,"
+          << " vol_time_step: 0.01, use_sobol: true}\n"
+          << "eur: !currency {rate: r_eur}\n"
+          << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "usd: !currency {rate: r_usd}\n"
+          << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << vol_obj
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur, spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 15}\n"
+          << "comp: !composite {equity: eq, composite_currency: usd}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
+          << "book: !book {options: [o]}\n"
+          << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
+          << " maturity: 2000-12-31, type: call, exercise: european}\n";
+        return o.str();
+    };
+    const std::string bs = "vol: !bs_volatility {volatility: 30, calendar: cal}\n";
+    const std::string flat = "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30],"
+                             " beta: [1.0], rho: [0.0], nu: [0.001], calendar: cal}\n";
+    const std::string smile = "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30],"
+                              " beta: [1.0], rho: [-0.3], nu: [0.4], calendar: cal}\n";
+
+    //! flat surface -> constant local vol -> matches the BS composite (machinery)
+    double p_bs = Premium( Price( cfg( "mcl", bs ) ) );
+    auto fr = Price( cfg( "mcl", flat ) );
+    CAPTURE( p_bs );
+    CAPTURE( Premium( fr ) );
+    CHECK( std::abs( Premium( fr ) - p_bs ) <= 6.0 * Trust( fr ) + 0.3 );
+
+    //! smile -> Dupire repricing -> matches the ANA composite (inner local vol
+    //! reprices the equity smile; the quanto drift uses the ATM vol, as ANA/PDE do)
+    double ana = Premium( Price( cfg( "ana", smile ) ) );
+    auto mr = Price( cfg( "mcl", smile ) );
+    CAPTURE( ana );
+    CAPTURE( Premium( mr ) );
+    CHECK( std::abs( Premium( mr ) - ana ) <= 6.0 * Trust( mr ) + 0.8 );
+}
+
 // --- Heston (MCL) : in the degenerate limit (vol-of-vol -> 0, v0 = theta) the
 // stochastic-vol diffusion collapses to constant-vol GBM, so it matches BS.
 TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )

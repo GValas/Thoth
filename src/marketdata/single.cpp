@@ -114,6 +114,20 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
 
 MonteCarloNode* Single::GetVolNode( NodeCollector& NC )
 {
+    //! A local surface (SABR) has no single scalar "vol node" — the spot diffusion
+    //! reads its full grid (see BuildLocalVolNode). The remaining scalar-vol callers
+    //! (the quanto drift correction, the composite vol/correl nodes) only need a
+    //! representative level, so give them a constant ATM vol at the last diffusion
+    //! date — the same ATM vol the ANA/PDE quanto correction uses. Rebuilt per Greek
+    //! scenario (suffixed GetOrCreate) so a vega bump re-samples it.
+    if ( _volatility->_is_local )
+    {
+        const vector<date>& dates = NC.GetDateList();
+        double atm = GetImplicitVol( 0, dates.back() );
+        return NC.GetOrCreate<ConstantNode>( _name + "#atmvol",
+                                             [&]( ConstantNode* C )
+                                             { C->SetConstantValue( atm ); } );
+    }
     return _volatility->GetNode( NC );
 }
 

@@ -11,9 +11,10 @@ usable as a batch tool or as an HTTP service.
 **Pricers** (selected per book via `method`)
 - **Monte-Carlo (`mcl`)** — correlated geometric Brownian motion via a Cholesky
   factorisation of the correlation matrix; exact log-Euler step for constant
-  volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`,
-  single-asset) it diffuses the **Dupire** local vol sampled onto per-date log-spot
-  grids, with a log-space **Milstein** step that cuts the state-dependent
+  volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`;
+  mono, basket and composite underlyings) it diffuses the **Dupire** local vol
+  sampled onto per-date log-spot grids, with a log-space **Milstein** step that
+  cuts the state-dependent
   discretisation bias (automatically a no-op for constant vol). With
   `use_sobol: true` the increments are
   drawn from a **Sobol** low-discrepancy sequence laid out by a **Brownian
@@ -415,12 +416,13 @@ run_local_client.sh       POST one YAML to a running server, write <input>.out.y
   engines; the MCL diffusion still drives a single (front-pillar) rate over the
   whole path, so a sloped curve reaches MCL prices only through that front rate.
 - Local volatility: the **MCL** engine diffuses a `sabr_volatility` surface as a
-  full **Dupire local-vol** surface for a single-asset (mono) underlying — the
-  surface is sampled onto a per-diffusion-date log-spot grid and read along each
-  path (composite/quanto and basket/multi-asset local-vol are not yet wired). The
-  **ANA** engine uses the implied vol at the option's strike, while the **PDE**
-  engine still uses a single ATM vol (no local-vol grid). `bs_volatility` (flat)
-  is exact in every engine.
+  full **Dupire local-vol** surface — the surface is sampled onto a
+  per-diffusion-date log-spot grid and read along each path. Mono, **basket**
+  (each component on its own local vol) and **composite** underlyings are covered
+  (the composite's quanto drift correction uses the ATM vol, as ANA/PDE do).
+  The **ANA** engine uses the implied vol at the option's strike, while the
+  **PDE** engine still uses a single ATM vol (no local-vol grid). `bs_volatility`
+  (flat) is exact in every engine.
 - GPU (CUDA) acceleration (`mcl_gpu`) currently covers **single-asset European
   vanillas under GBM** only; American / barrier / stochastic-vol / multi-asset
   books fall back to the CPU `mcl` engine. Extending the kernel to Heston-QE and
