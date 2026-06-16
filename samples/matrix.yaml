@@ -9,10 +9,18 @@ root: matrix
 #   product (mono/multi, call/put; sorted alphabetically)   method(s)
 #   barrier mono continuous call            ana   mcl   pde
 #   barrier mono continuous in call         ana   mcl   pde (knock-in; in/out parity)
+#   barrier mono continuous down-out call   ana   mcl   pde (down barrier)
+#   barrier mono continuous down-in call    ana   mcl   pde (down knock-in)
+#   barrier mono continuous up-out put      ana   mcl   pde (put barrier)
+#   barrier mono discrete in call           mcl   pde     (discrete knock-in)
 #   barrier mono discrete call              mcl   pde
+#   vanilla mono am call                    mcl   pde   (no dividend -> = european)
 #   vanilla mono am put                     mcl   pde
+#   vanilla mono am put heston (stoch vol)  mcl   pde   (American under Heston: ADI / QE+LSM)
 #   vanilla mono am put quanto              mcl   pde
 #   vanilla mono eu call                    ana   mcl   pde
+#   vanilla mono eu call (pseudo-random)    mcl         (use_sobol: false, vs the Sobol row)
+#   vanilla mono eu put                     ana   mcl   pde
 #   vanilla mono eu call bates (hes+jumps)  ana   mcl   (ANA jump CF / MCL compound Poisson)
 #   vanilla mono eu call compo (EUR->USD)   ana   mcl   pde
 #   vanilla mono eu call compo sabr         ana   mcl   (local vol; ANA implied vs MCL Dupire)
@@ -29,6 +37,10 @@ root: matrix
 # The SABR cases exercise the Dupire local-vol Monte-Carlo (the SABR implied surface
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
+#
+# Not in the matrix: the GPU engine (mcl_gpu). It is build-gated (-DTHOTH_ENABLE_CUDA=ON)
+# and on a CPU-only build it transparently falls back to the CPU mcl engine, so a row
+# would not exercise the CUDA kernel here — see samples/gpu_call.yaml and docs/gpu.md.
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
@@ -83,6 +95,28 @@ matrix: !sequence
     - barrier_mono_continuous_in_call_ana
     - barrier_mono_continuous_in_call_mcl
     - barrier_mono_continuous_in_call_pde
+    #! coverage fill: barrier down/put/discrete-in variants
+    - barrier_mono_continuous_down_out_call_ana
+    - barrier_mono_continuous_down_out_call_mcl
+    - barrier_mono_continuous_down_out_call_pde
+    - barrier_mono_continuous_down_in_call_ana
+    - barrier_mono_continuous_down_in_call_mcl
+    - barrier_mono_continuous_down_in_call_pde
+    - barrier_mono_continuous_up_out_put_ana
+    - barrier_mono_continuous_up_out_put_mcl
+    - barrier_mono_continuous_up_out_put_pde
+    - barrier_mono_discrete_in_call_mcl
+    - barrier_mono_discrete_in_call_pde
+    #! coverage fill: vanilla put/call corners (eu put, am call) and American Heston
+    - vanilla_mono_eu_put_ana
+    - vanilla_mono_eu_put_mcl
+    - vanilla_mono_eu_put_pde
+    - vanilla_mono_am_call_mcl
+    - vanilla_mono_am_call_pde
+    - vanilla_mono_am_put_heston_mcl
+    - vanilla_mono_am_put_heston_pde
+    #! coverage fill: the pseudo-random (non-Sobol) MCL path
+    - vanilla_mono_eu_call_mcl_pseudo
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
@@ -460,6 +494,174 @@ barrier_mono_continuous_in_call_pde: !pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_in_call_pde_result
 
+# down-and-out / down-and-in barrier call (barrier 70, below spot) and an up-and-out
+# PUT (barrier 130): exercise the down-barrier and put-barrier formulas. Continuous,
+# so all three engines price them (knock-in via in/out parity).
+barrier_mono_continuous_down_out_call_ana: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_do
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_out_call_ana_result
+barrier_mono_continuous_down_out_call_mcl: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_do
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_out_call_mcl_result
+barrier_mono_continuous_down_out_call_pde: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_do
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_out_call_pde_result
+barrier_mono_continuous_down_in_call_ana: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_di
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_in_call_ana_result
+barrier_mono_continuous_down_in_call_mcl: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_di
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_in_call_mcl_result
+barrier_mono_continuous_down_in_call_pde: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_di
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_down_in_call_pde_result
+barrier_mono_continuous_up_out_put_ana: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_put
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_up_out_put_ana_result
+barrier_mono_continuous_up_out_put_mcl: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_put
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_up_out_put_mcl_result
+barrier_mono_continuous_up_out_put_pde: !pricer
+  today: 2000-01-01
+  book: book_barr_cont_put
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_continuous_up_out_put_pde_result
+
+# discrete (monthly) up-and-in barrier call — knock-in under discrete monitoring
+# (PDE / MCL; ANA is continuous-only)
+barrier_mono_discrete_in_call_mcl: !pricer
+  today: 2000-01-01
+  book: book_barr_disc_in
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_discrete_in_call_mcl_result
+barrier_mono_discrete_in_call_pde: !pricer
+  today: 2000-01-01
+  book: book_barr_disc_in
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: barrier_mono_discrete_in_call_pde_result
+
+# vanilla put/call corners: european put (all engines) and american call (PDE / MCL;
+# with no dividend the American call never exercises early, so it equals the European)
+vanilla_mono_eu_put_ana: !pricer
+  today: 2000-01-01
+  book: book_van_eu_put
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_eu_put_ana_result
+vanilla_mono_eu_put_mcl: !pricer
+  today: 2000-01-01
+  book: book_van_eu_put
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_eu_put_mcl_result
+vanilla_mono_eu_put_pde: !pricer
+  today: 2000-01-01
+  book: book_van_eu_put
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_eu_put_pde_result
+vanilla_mono_am_call_mcl: !pricer
+  today: 2000-01-01
+  book: book_van_am_call
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_am_call_mcl_result
+vanilla_mono_am_call_pde: !pricer
+  today: 2000-01-01
+  book: book_van_am_call
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_am_call_pde_result
+
+# American put under Heston stochastic vol: PDE solves the 2-D ADI grid with the
+# early-exercise projection; MCL records the QE spot path and runs Longstaff-Schwartz.
+vanilla_mono_am_put_heston_mcl: !pricer
+  today: 2000-01-01
+  book: book_heston_am
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl_h
+  indicators: [premium]
+  result: vanilla_mono_am_put_heston_mcl_result
+vanilla_mono_am_put_heston_pde: !pricer
+  today: 2000-01-01
+  book: book_heston_am
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl_h
+  indicators: [premium]
+  result: vanilla_mono_am_put_heston_pde_result
+
+# the european call again, but with pseudo-random paths (use_sobol: false): same book
+# as vanilla_mono_eu_call_mcl, so the two show the Sobol vs pseudo convergence at 50k.
+vanilla_mono_eu_call_mcl_pseudo: !pricer
+  today: 2000-01-01
+  book: book_van_eu
+  currency: eur
+  configuration: cfg_mcl_pseudo
+  correlation: correl
+  indicators: [premium]
+  result: vanilla_mono_eu_call_mcl_pseudo_result
+
 # --- shared pricing configurations -----------------------------------------
 cfg_pde: !pricer_configuration
   method: pde
@@ -481,6 +683,17 @@ shared_mcl: !mcl_configuration
   paths: 50000
   vol_time_step: 0.01
   use_sobol: true
+# same as shared_mcl but pseudo-random (no Sobol), for the convergence-comparison row
+cfg_mcl_pseudo: !pricer_configuration
+  method: mcl
+  mcl_configuration: shared_mcl_pseudo
+  log_path: "/tmp/"
+shared_mcl_pseudo: !mcl_configuration
+  max_time_step: 1
+  min_time_step: -1
+  paths: 50000
+  vol_time_step: 0.01
+  use_sobol: false
 
 # --- books (one contract each) ---------------------------------------------
 book_van_eu: !book
@@ -519,6 +732,20 @@ book_basket_sabr: !book
   options: [c_basket_sabr]
 book_barr_cont_in: !book
   options: [c_barr_cont_in]
+book_barr_cont_do: !book
+  options: [c_barr_cont_do]
+book_barr_cont_di: !book
+  options: [c_barr_cont_di]
+book_barr_cont_put: !book
+  options: [c_barr_cont_put]
+book_barr_disc_in: !book
+  options: [c_barr_disc_in]
+book_van_eu_put: !book
+  options: [c_van_eu_put]
+book_van_am_call: !book
+  options: [c_van_am_call]
+book_heston_am: !book
+  options: [c_heston_am]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla
@@ -671,6 +898,69 @@ c_barr_cont_in: !barrier
   barrier_type: up&in
   barrier_monitoring_type: continuous_monitoring
   barrier_up_level: 130
+
+# coverage-fill barriers: down-and-out / down-and-in call (barrier 70, below spot),
+# an up-and-out put (barrier 130), and a discrete up-and-in call (monthly, 130)
+c_barr_cont_do: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  barrier_type: down&out
+  barrier_monitoring_type: continuous_monitoring
+  barrier_down_level: 70
+c_barr_cont_di: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  barrier_type: down&in
+  barrier_monitoring_type: continuous_monitoring
+  barrier_down_level: 70
+c_barr_cont_put: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: put
+  barrier_type: up&out
+  barrier_monitoring_type: continuous_monitoring
+  barrier_up_level: 130
+c_barr_disc_in: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  barrier_type: up&in
+  barrier_monitoring_type: discrete_monitoring
+  monitoring_period_days: 30
+  barrier_up_level: 130
+
+# coverage-fill vanillas: european put, american call, and an american Heston put
+c_van_eu_put: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: put
+  exercise: european
+c_van_am_call: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: call
+  exercise: american
+c_heston_am: !vanilla
+  underlying: eq_h
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: put
+  exercise: american
 
 # --- shared market data ----------------------------------------------------
 eq: !equity

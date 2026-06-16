@@ -230,11 +230,13 @@ so debug with a small book or a reduced `paths`.
 The output YAML is the input config with the computed `*_result` blocks added.
 
 To exercise every engine at once, `samples/matrix.yaml` is a `!sequence`
-task that runs the full pricer/product matrix (vanilla european/american, quanto,
-composite, basket / best-of / worst-of, continuous & discrete and **knock-in**
-barriers, variance swap, Heston, Bates, and **SABR local-vol** — across PDE / MCL /
-ANA) in one process — price it like any other book (`-batch`, or post it to a
-server with `run_local_client.sh`).
+task that runs the full pricer/product matrix (vanilla european/american — call &
+put, quanto, composite, basket / best-of / worst-of, up/down & in/out, continuous &
+discrete barriers, American Heston, variance swap, Heston, Bates, and **SABR
+local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL) in one
+process — price it like any other book (`-batch`, or post it to a server with
+`run_local_client.sh`). `run_local_client_matrix.sh` posts it and prints a
+per-product table (method, time, premium and every Greek) — see below.
 
 ### HTTP pricing service
 
@@ -249,6 +251,9 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 # or the wrapper, which POSTs the input to a running server and writes the result
 # next to it as samples/<input>.out.yaml (these *.out.yaml files are gitignored):
 ./run_local_client.sh samples/simple_call.yaml --port 8080
+# post the whole pricer matrix and print a per-product table (method, time spent,
+# premium and every Greek; defaults to samples/matrix.yaml, --raw keeps the YAML):
+./run_local_client_matrix.sh --port 8080
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
@@ -412,6 +417,7 @@ run_docker_batch.sh       build the image and price one YAML in batch: <input.ya
 run_docker_server.sh      build the image and serve over HTTP ([--gpu] CUDA/--gpus all; [--slaves N] master + N slave cluster)
 run_docker_common.sh      shared helpers (image build, input/output paths) — sourced, not run
 run_local_client.sh       POST one YAML to a running server: <input.yaml> [output.yaml] [--port N] [--exec-name X]
+run_local_client_matrix.sh POST the pricer matrix to a running server and tabulate it: [input.yaml] [--port N] [--raw out.yaml]
 ```
 
 ---
