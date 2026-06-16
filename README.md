@@ -185,6 +185,8 @@ ctest --test-dir build --output-on-failure
 
 `./format.sh` runs clang-format (style in `.clang-format`) over `src/` and
 `tests/`; `./format.sh --check` fails on unformatted files (CI gate).
+`clang-format` is preinstalled in the devcontainer (and the production build
+image); for a manual setup, `sudo apt-get install -y clang-format`.
 
 ### Debugging (VS Code)
 

@@ -10,6 +10,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         g++ \
         make \
         cmake \
+        clang-format \
         pkg-config \
         gdb \
         git \
