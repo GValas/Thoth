@@ -127,13 +127,14 @@ void ProgressBar::Render( long Current, const string& Info, bool Final )
         }
         size_t width = body.size() - extra; //!< displayed columns
 
-        string line = "\r" + body;
         if ( width < _last_width ) //!< clear leftovers from a previous longer line
         {
-            line += string( _last_width - width, ' ' );
+            body += string( _last_width - width, ' ' );
         }
         _last_width = width;
-        cout << line << std::flush;
+        //! grey, to match the LOG lines (a progress bar's context is never SEQ);
+        //! the '\r' stays first, the colour wraps the content, reset at the end.
+        cout << "\r\033[90m" << body << "\033[0m" << std::flush;
         if ( Final )
         {
             cout << endl;
