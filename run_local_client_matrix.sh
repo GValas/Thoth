@@ -73,9 +73,10 @@ awk '
 function flush() {
     if (name == "" || !is_pricer) { name=""; return }
     n = name; sub(/_result$/, "", n)
-    if (n ~ /_mcl_pseudo$/)      { method="mcl_pseudo"; prod=substr(n, 1, length(n)-11) }
+    if (n ~ /_mcl_pseudo$/)         { method="mcl_pseudo"; prod=substr(n, 1, length(n)-11) }
+    else if (n ~ /_mcl_gpu$/)       { method="mcl_gpu";    prod=substr(n, 1, length(n)-8) }
     else if (n ~ /_(ana|mcl|pde)$/) { method=substr(n, length(n)-2);  prod=substr(n, 1, length(n)-4) }
-    else                        { method="-";          prod=n }
+    else                            { method="-";          prod=n }
     rows[nr] = sprintf("%-40s %-11s %10s %12s %10s %10s %10s %10s %10s",
                        prod, method, fmt_time(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
     #! sort key: product then method. SUBSEP (\034) sorts below '_' and letters, so

@@ -395,7 +395,9 @@
         "vol_time_step": { "type": "number", "description": "Variance sub-step." },
         "node_file": { "type": "string" },
         "use_sobol": { "type": "boolean", "description": "Sobol + Brownian-bridge quasi-random paths." },
+        "allow_gpu": { "type": "boolean", "description": "Run on a CUDA GPU when one is present and the book is GPU-supported (single-asset European GBM vanillas); otherwise runs on the CPU. Default false." },
         "seed": { "type": "integer" },
+        "sobol_skip": { "type": "integer", "description": "Leading Sobol points to skip (set by the cluster master so per-slave blocks stay disjoint). Default 0." },
         "generate_nodes_graph": { "type": "boolean", "description": "Deprecated here and ignored; use a !debug_configuration referenced by the pricer's debug_configuration field instead." }
       }
     },

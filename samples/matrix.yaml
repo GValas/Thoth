@@ -20,7 +20,9 @@ root: matrix
 #   vanilla mono am put quanto              mcl   pde
 #   vanilla mono eu call                    ana   mcl   pde
 #   vanilla mono eu call (pseudo-random)    mcl         (use_sobol: false, vs the Sobol row)
+#   vanilla mono eu call (gpu)              mcl         (allow_gpu: true; device on a CUDA build, else CPU)
 #   vanilla mono eu put                     ana   mcl   pde
+#   vanilla mono eu put (gpu)               mcl         (allow_gpu: true; device on a CUDA build, else CPU)
 #   vanilla mono eu call bates (hes+jumps)  ana   mcl   (ANA jump CF / MCL compound Poisson)
 #   vanilla mono eu call compo (EUR->USD)   ana   mcl   pde
 #   vanilla mono eu call compo sabr         ana   mcl   (local vol; ANA implied vs MCL Dupire)
@@ -38,10 +40,11 @@ root: matrix
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
 #
-# Not in the matrix: GPU acceleration (mcl with allow_gpu: true). It is build-gated
-# (-DTHOTH_ENABLE_CUDA=ON) and on a CPU-only build an allow_gpu book transparently
-# runs on the CPU mcl engine, so a row would not exercise the CUDA kernel here —
-# see samples/gpu_call.yaml and docs/gpu.md.
+# The "(gpu)" rows ask for GPU acceleration (mcl with allow_gpu: true). It is
+# build-gated (-DTHOTH_ENABLE_CUDA=ON): on a CUDA build with a device the single-
+# asset European vanilla runs on the GPU; on a CPU-only build the same book
+# transparently runs on the CPU mcl engine (identical numbers, no acceleration),
+# so the rows are always valid — see samples/gpu_call.yaml and docs/gpu.md.
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
@@ -65,6 +68,7 @@ matrix: !sequence
     - vanilla_mono_am_put_quanto_pde
     - vanilla_mono_eu_call_ana
     - vanilla_mono_eu_call_mcl
+    - vanilla_mono_eu_call_mcl_gpu
     - vanilla_mono_eu_call_pde
     - vanilla_mono_eu_call_bates_ana
     - vanilla_mono_eu_call_bates_mcl
@@ -111,6 +115,7 @@ matrix: !sequence
     #! coverage fill: vanilla put/call corners (eu put, am call) and American Heston
     - vanilla_mono_eu_put_ana
     - vanilla_mono_eu_put_mcl
+    - vanilla_mono_eu_put_mcl_gpu
     - vanilla_mono_eu_put_pde
     - vanilla_mono_am_call_mcl
     - vanilla_mono_am_call_pde
@@ -663,6 +668,26 @@ vanilla_mono_eu_call_mcl_pseudo: !pricer
   indicators: [premium]
   result: vanilla_mono_eu_call_mcl_pseudo_result
 
+# the european call/put again, with GPU acceleration requested (cfg_mcl_gpu sets
+# allow_gpu: true). On a CUDA build with a device these run the single-asset GBM
+# kernel; on a CPU-only build they run the CPU mcl engine -> identical numbers.
+vanilla_mono_eu_call_mcl_gpu: !pricer
+  today: 2000-01-01
+  book: book_van_eu
+  currency: eur
+  configuration: cfg_mcl_gpu
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_mcl_gpu_result
+vanilla_mono_eu_put_mcl_gpu: !pricer
+  today: 2000-01-01
+  book: book_van_eu_put
+  currency: eur
+  configuration: cfg_mcl_gpu
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_put_mcl_gpu_result
+
 # --- shared pricing configurations -----------------------------------------
 cfg_pde: !pricer_configuration
   method: pde
@@ -695,6 +720,19 @@ shared_mcl_pseudo: !mcl_configuration
   paths: 50000
   vol_time_step: 0.01
   use_sobol: false
+# same as shared_mcl but with GPU acceleration requested (allow_gpu): runs on the
+# device on a CUDA build, transparently on the CPU otherwise
+cfg_mcl_gpu: !pricer_configuration
+  method: mcl
+  mcl_configuration: shared_mcl_gpu
+  log_path: "/tmp/"
+shared_mcl_gpu: !mcl_configuration
+  max_time_step: 1
+  min_time_step: -1
+  paths: 50000
+  vol_time_step: 0.01
+  use_sobol: true
+  allow_gpu: true
 
 # --- books (one contract each) ---------------------------------------------
 book_van_eu: !book
