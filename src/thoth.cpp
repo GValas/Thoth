@@ -454,14 +454,15 @@ static string ClusterPriceSequence( const string& Body,
 {
     YamlConfig out( YamlConfig::from_string_t{}, Body ); //!< accumulator = input doc
     const vector<string> tasks = out.GetStringList( Exec + ".tasks" );
-    LOG( "CLU", "sequence '" + Exec + "' : dispatching " + std::to_string( tasks.size() ) +
-                    " task(s) across the cluster" );
+    LOG( "SEQ", "sequence '" + Exec + "' : dispatching " + std::to_string( tasks.size() ) +
+                    " task(s) across the cluster", LOG_COLOR_CYAN );
 
     const double t0 = WallClockSeconds();
     for ( size_t i = 0; i < tasks.size(); i++ )
     {
-        LOG( "CLU", "sequence task " + std::to_string( i + 1 ) + "/" +
-                        std::to_string( tasks.size() ) + " : " + tasks[i] );
+        LOG( "SEQ", "task " + std::to_string( i + 1 ) + "/" +
+                        std::to_string( tasks.size() ) + " : " + tasks[i],
+             LOG_COLOR_CYAN );
         const string resp = ClusterPrice( Body, tasks[i], Slaves );
         YamlConfig r( YamlConfig::from_string_t{}, resp );
         out.CopyTopLevel( out.GetString( tasks[i] + ".result" ), r );
