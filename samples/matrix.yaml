@@ -409,7 +409,7 @@ vanilla_mono_eu_call_bates_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl_b
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_bates_mcl_result
 
 # variance swap
@@ -447,7 +447,7 @@ vanilla_mono_eu_call_sabr_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl_sabr
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_sabr_mcl_result
 
 # SABR composite (EUR asset settled in USD): the inner spot diffuses on the full
@@ -459,7 +459,7 @@ vanilla_mono_eu_call_compo_sabr_ana: !pricer
   currency: usd
   configuration: cfg_ana
   correlation: correl_compo_sabr
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_sabr_ana_result
 vanilla_mono_eu_call_compo_sabr_mcl: !pricer
   today: 2000-01-01
@@ -467,7 +467,7 @@ vanilla_mono_eu_call_compo_sabr_mcl: !pricer
   currency: usd
   configuration: cfg_mcl
   correlation: correl_compo_sabr
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_sabr_mcl_result
 
 # SABR basket: each component diffuses on its own Dupire local vol. MCL-only (the
@@ -478,7 +478,7 @@ vanilla_multi_eu_call_basket_sabr_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl_basket_sabr
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_basket_sabr_mcl_result
 
 # continuous up-and-in barrier call (knock-in): pays the vanilla payoff only if the
@@ -517,7 +517,7 @@ barrier_mono_continuous_down_out_call_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_out_call_ana_result
 barrier_mono_continuous_down_out_call_mcl: !pricer
   today: 2000-01-01
@@ -525,7 +525,7 @@ barrier_mono_continuous_down_out_call_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_out_call_mcl_result
 barrier_mono_continuous_down_out_call_pde: !pricer
   today: 2000-01-01
@@ -533,7 +533,7 @@ barrier_mono_continuous_down_out_call_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_out_call_pde_result
 barrier_mono_continuous_down_in_call_ana: !pricer
   today: 2000-01-01
@@ -541,7 +541,7 @@ barrier_mono_continuous_down_in_call_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_in_call_ana_result
 barrier_mono_continuous_down_in_call_mcl: !pricer
   today: 2000-01-01
@@ -549,7 +549,7 @@ barrier_mono_continuous_down_in_call_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_in_call_mcl_result
 barrier_mono_continuous_down_in_call_pde: !pricer
   today: 2000-01-01
@@ -557,7 +557,7 @@ barrier_mono_continuous_down_in_call_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_down_in_call_pde_result
 barrier_mono_continuous_up_out_put_ana: !pricer
   today: 2000-01-01
@@ -565,7 +565,7 @@ barrier_mono_continuous_up_out_put_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_up_out_put_ana_result
 barrier_mono_continuous_up_out_put_mcl: !pricer
   today: 2000-01-01
@@ -573,7 +573,7 @@ barrier_mono_continuous_up_out_put_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_up_out_put_mcl_result
 barrier_mono_continuous_up_out_put_pde: !pricer
   today: 2000-01-01
@@ -581,7 +581,7 @@ barrier_mono_continuous_up_out_put_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_continuous_up_out_put_pde_result
 
 # discrete (monthly) up-and-in barrier call — knock-in under discrete monitoring
@@ -592,7 +592,7 @@ barrier_mono_discrete_in_call_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_discrete_in_call_mcl_result
 barrier_mono_discrete_in_call_pde: !pricer
   today: 2000-01-01
@@ -600,7 +600,7 @@ barrier_mono_discrete_in_call_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: barrier_mono_discrete_in_call_pde_result
 
 # vanilla put/call corners: european put (all engines) and american call (PDE / MCL;
@@ -611,7 +611,7 @@ vanilla_mono_eu_put_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_put_ana_result
 vanilla_mono_eu_put_mcl: !pricer
   today: 2000-01-01
@@ -619,7 +619,7 @@ vanilla_mono_eu_put_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_put_mcl_result
 vanilla_mono_eu_put_pde: !pricer
   today: 2000-01-01
@@ -627,7 +627,7 @@ vanilla_mono_eu_put_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_put_pde_result
 vanilla_mono_am_call_mcl: !pricer
   today: 2000-01-01
@@ -635,7 +635,7 @@ vanilla_mono_am_call_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_call_mcl_result
 vanilla_mono_am_call_pde: !pricer
   today: 2000-01-01
@@ -643,7 +643,7 @@ vanilla_mono_am_call_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_call_pde_result
 
 # American put under Heston stochastic vol: PDE solves the 2-D ADI grid with the
@@ -654,7 +654,7 @@ vanilla_mono_am_put_heston_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl_h
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_heston_mcl_result
 vanilla_mono_am_put_heston_pde: !pricer
   today: 2000-01-01
@@ -662,7 +662,7 @@ vanilla_mono_am_put_heston_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl_h
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_heston_pde_result
 
 # the european call again, but with pseudo-random paths (use_sobol: false): same book
@@ -673,7 +673,7 @@ vanilla_mono_eu_call_mcl_pseudo: !pricer
   currency: eur
   configuration: cfg_mcl_pseudo
   correlation: correl
-  indicators: [premium]
+  indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_mcl_pseudo_result
 
 # the european call/put again, with GPU acceleration requested (cfg_mcl_gpu sets
@@ -714,7 +714,7 @@ shared_pde: !pde_configuration
 shared_mcl: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 50000
+  paths: 100000
   vol_time_step: 0.01
   use_sobol: true
 # same as shared_mcl but pseudo-random (no Sobol), for the convergence-comparison row
@@ -725,7 +725,7 @@ cfg_mcl_pseudo: !pricer_configuration
 shared_mcl_pseudo: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 50000
+  paths: 100000
   vol_time_step: 0.01
   use_sobol: false
 # same as shared_mcl but with GPU acceleration requested (allow_gpu): runs on the
@@ -737,7 +737,7 @@ cfg_mcl_gpu: !pricer_configuration
 shared_mcl_gpu: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 50000
+  paths: 100000
   vol_time_step: 0.01
   use_sobol: true
   allow_gpu: true
