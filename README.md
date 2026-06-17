@@ -1,5 +1,7 @@
 # Thoth
 
+[![CI](https://github.com/GValas/Thoth/actions/workflows/ci.yml/badge.svg)](https://github.com/GValas/Thoth/actions/workflows/ci.yml)
+
 A C++23 pricing engine for equity derivatives — Monte-Carlo, PDE and analytic
 pricers, multi-asset / multi-currency books, driven by a YAML configuration,
 usable as a batch tool or as an HTTP service.
@@ -232,6 +234,19 @@ ctest --test-dir build --output-on-failure
 `clang-format` is preinstalled in the devcontainer (and the production build
 image); for a manual setup, `sudo apt-get install -y clang-format`.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` (GitHub Actions) runs on every push and pull request
+to `main` and mirrors the local checks above on `ubuntu-24.04`:
+
+- **build-test** — `cmake -B build` → `cmake --build build -j` → `ctest` (g++,
+  Release, the same Debian/Ubuntu deps; doctest's header is fetched by the test
+  CMake when absent);
+- **format** — `./format.sh --check` with `clang-format-18` (the version that
+  produced `.clang-format`).
+
+The status badge at the top of this README reflects the latest `main` run.
+
 ### Debugging (VS Code)
 
 `.vscode/launch.json` ships two gdb configurations — **Debug thoth -batch**
@@ -438,6 +453,7 @@ samples/         example YAML configs
 Dockerfile       production image (multi-stage; CPU by default, GPU via build-args)
 .devcontainer/   VS Code dev container
 .vscode/         editor tasks + gdb debug configs
+.github/workflows/ CI (build + ctest + clang-format gate)
 CMakeLists.txt   build
 format.sh                 clang-format wrapper (--check for CI)
 run_docker_batch.sh       build the image and price one YAML in batch: <input.yaml> [output.yaml]

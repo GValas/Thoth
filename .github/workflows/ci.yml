@@ -1,0 +1,59 @@
+name: CI
+
+# Build + test + formatting gate for the engine. Mirrors the local commands in
+# CLAUDE.md / README (cmake build, ctest, ./format.sh --check) so a green CI means
+# the same checks a developer runs by hand have passed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & test (Ubuntu, g++, Release)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Debian/Ubuntu packages the CMakeLists header lists. doctest is not
+      # installed: the test CMake fetches its single header when absent.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  format:
+    name: clang-format gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # ubuntu-24.04 ships clang-format 18, matching the local toolchain that
+      # produced .clang-format; pin the major so a runner image bump can't
+      # silently reformat differently.
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-18
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
+
+      - name: Check formatting
+        run: ./format.sh --check
