@@ -6,26 +6,23 @@ using doctest::Approx;
 
 TEST_CASE( "matrix predicates: square, symmetric, positive" )
 {
-    la_matrix* id = ToLaMatrix( { 1, 0, 0, 0, 1, 0, 0, 0, 1 } );
+    LaMatrix id = ToLaMatrix( { 1, 0, 0, 0, 1, 0, 0, 0, 1 } );
     CHECK( ext_la_matrix_is_square( id ) );
     CHECK( ext_la_matrix_is_symmetric( id ) );
     CHECK( ext_la_matrix_is_positive( id ) );
-    la_matrix_free( id );
 
     // a genuine 2x2 correlation is positive semi-definite
-    la_matrix* c = ToLaMatrix( { 1, 0.5, 0.5, 1 } );
+    LaMatrix c = ToLaMatrix( { 1, 0.5, 0.5, 1 } );
     CHECK( ext_la_matrix_is_positive( c ) );
-    la_matrix_free( c );
 
     // an impossible "correlation" (|rho| > 1) is not PSD
-    la_matrix* bad = ToLaMatrix( { 1, 1.5, 1.5, 1 } );
+    LaMatrix bad = ToLaMatrix( { 1, 1.5, 1.5, 1 } );
     CHECK_FALSE( ext_la_matrix_is_positive( bad ) );
-    la_matrix_free( bad );
 }
 
 TEST_CASE( "ext_la_matrix_to_near_positive repairs a non-PSD correlation" )
 {
-    la_matrix* m = ToLaMatrix( { 1, 1.5, 1.5, 1 } );
+    LaMatrix m = ToLaMatrix( { 1, 1.5, 1.5, 1 } );
     REQUIRE_FALSE( ext_la_matrix_is_positive( m ) );
 
     double eps = 0;
@@ -34,7 +31,6 @@ TEST_CASE( "ext_la_matrix_to_near_positive repairs a non-PSD correlation" )
     CHECK( ext_la_matrix_is_positive( m ) );          //!< now repaired
     CHECK( eps > 0 );                                 //!< a strictly positive shift was needed
     CHECK( la_matrix_get( m, 0, 0 ) == Approx( 1 ) ); //!< unit diagonal preserved
-    la_matrix_free( m );
 }
 
 TEST_CASE( "asinh inverts sinh" )

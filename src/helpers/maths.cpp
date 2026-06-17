@@ -295,12 +295,9 @@ bool ext_la_matrix_is_positive( const la_matrix* m )
 
     //! positive-definite iff the Cholesky factorisation succeeds (on a copy)
     size_t n = m->size1;
-    la_matrix* A = la_matrix_alloc( n, n );
+    LaMatrix A = la_matrix_alloc( n, n ); //!< RAII: freed on return
     la_matrix_memcpy( A, m );
-    bool positive = CholeskyDecomposeLower( A );
-    la_matrix_free( A );
-
-    return positive;
+    return CholeskyDecomposeLower( A );
 }
 
 //!
@@ -393,10 +390,10 @@ double InterpolateWithSpline( la_vector* x_serie,
 }
 
 //!
-la_matrix* ToLaMatrix( const vector<double>& Matrix )
+LaMatrix ToLaMatrix( const vector<double>& Matrix )
 {
     size_t n = (size_t)sqrt( (double)Matrix.size() );
-    la_matrix* m = la_matrix_alloc( n, n );
+    LaMatrix m = la_matrix_alloc( n, n );
     for ( size_t i = 0; i < n; i++ )
     {
         for ( size_t j = 0; j < n; j++ )

@@ -9,16 +9,16 @@ Correlation::Correlation( const string& ObjectName ) : Object( ObjectName, KIND_
 //!
 Correlation::~Correlation() = default;
 
-//! setter
-void Correlation::SetMatrix( la_vector* Matrix )
+//! setter (takes ownership of Matrix)
+void Correlation::SetMatrix( LaVector Matrix )
 {
     size_t n = Matrix->size;
     double n_sqrt = sqrt( (double)n );
     if ( n_sqrt == (int)n_sqrt )
     {
         _matrix = ext_la_vector_to_matrix( Matrix, (size_t)n_sqrt );
-        la_vector_free( Matrix ); //!< copied into _matrix; release the source
-        _cholesky_key.clear();    //!< invalidate any cached Cholesky factor
+        //! Matrix (the source la_vector) is freed by its RAII LaVector at return
+        _cholesky_key.clear(); //!< invalidate any cached Cholesky factor
 
         //! fail fast on an invalid correlation matrix: every engine needs it
         //! symmetric positive-definite (MCL Cholesky-factorises it; ANA/PDE read
@@ -105,16 +105,10 @@ ForexSet Correlation::GetForexSet( const string& I,
     return s;
 }
 
-//! get whole matrix
-la_matrix* Correlation::ExtractMatrix()
-{
-    return _matrix;
-}
-
-// get matrix
+// get matrix (owned by the caller, RAII LaMatrix)
 // udl, then fx
-la_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
-                                       vector<Forex*> ForexList )
+LaMatrix Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
+                                     vector<Forex*> ForexList )
 {
 
     //! sizes
@@ -128,7 +122,7 @@ la_matrix* Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
     }
 
     //! matrix to fill
-    la_matrix* mat = la_matrix_alloc( fx_size + ud_size, fx_size + ud_size );
+    LaMatrix mat = la_matrix_alloc( fx_size + ud_size, fx_size + ud_size );
 
     //! eq / eq
     if ( ud_size > 1 )

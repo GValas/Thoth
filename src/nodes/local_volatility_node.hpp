@@ -1,5 +1,6 @@
 #pragma once
 #include "monte_carlo_node.hpp"
+#include "raii.hpp"
 
 //! Local (Dupire) volatility along the path: looks up sigma_loc(S_{i-1}, t_i) on a
 //! precomputed per-date log-spot grid by clamped linear interpolation. Built from a
@@ -10,8 +11,9 @@ class LocalVolatilityNode : public MonteCarloNode
   private:
     //! per diffusion date: the local vol sampled on a log-spot grid, the grid
     //! spacing in log-spot, and the (signed) log-spot index of the grid's first
-    //! point (so grid point i sits at log-spot = (offset + i) * ln_step).
-    vector<la_vector*> _vol_vector_list;
+    //! point (so grid point i sits at log-spot = (offset + i) * ln_step). The
+    //! vectors are owned here (RAII: freed when the node is destroyed).
+    vector<LaVector> _vol_vector_list;
     vector<double> _ln_step_list;
     vector<long> _offset_list;
 

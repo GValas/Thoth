@@ -9,14 +9,9 @@ LocalVolatilityNode::LocalVolatilityNode( const string& Name ) : MonteCarloNode(
     _spot_node = nullptr;
 }
 
-//! the per-date vol vectors are owned here (allocated by the node builder)
-LocalVolatilityNode::~LocalVolatilityNode()
-{
-    for ( la_vector* v : _vol_vector_list )
-    {
-        la_vector_free( v );
-    }
-}
+//! the per-date vol vectors are owned here as RAII LaVector, so the default
+//! destructor frees them (no manual la_vector_free loop)
+LocalVolatilityNode::~LocalVolatilityNode() = default;
 
 //! local vol at the spot reached on the previous step: read it off the precomputed
 //! log-spot grid for this date by linear interpolation, clamped to the grid ends

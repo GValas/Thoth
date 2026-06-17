@@ -112,7 +112,7 @@ double ext_stats_wcovariance_m_v( const double w[],
 
 vector<double> ToSymmetricMatrix( const vector<double>& Matrix );
 vector<double> FromSymmetricMatrix( const vector<double>& Matrix );
-la_matrix* ToLaMatrix( const vector<double>& Matrix );
+LaMatrix ToLaMatrix( const vector<double>& Matrix ); //!< caller-owned (RAII)
 vector<double> FromLaMatrix( la_matrix* Matrix );
 
 //

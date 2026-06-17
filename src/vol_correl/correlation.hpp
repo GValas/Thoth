@@ -43,19 +43,18 @@ class Correlation : public Object
     //! cholesky
     void ComputeCholeskyMatrix( const vector<string>& UnderlyingList );
 
-    //! setter
-    void SetMatrix( la_vector* Matrix );
+    //! setter (takes ownership of Matrix: the RAII LaVector frees it on return)
+    void SetMatrix( LaVector Matrix );
     void SetSymmetricMatrix( la_vector* SymmetricMatrix );
     void SetForexList( const vector<Forex*>& ForexList );
     void SetUnderlyingList( const vector<string>& UnderlyingList );
     void SetSubMatrix( const vector<string>& UnderlyingList,
                        vector<string> ForexList );
 
-    //! access to matrix
+    //! access to matrix (ExtractMatrix returns a freshly-built, caller-owned matrix)
     la_matrix* ExtractCholeskyMatrix( const vector<string> UnderlyingNames );
-    la_matrix* ExtractMatrix( vector<string> UnderlyingNameList,
-                              vector<Forex*> ForexList );
-    la_matrix* ExtractMatrix();
+    LaMatrix ExtractMatrix( vector<string> UnderlyingNameList,
+                            vector<Forex*> ForexList );
 
     //! read correl matrix : 3 ways
     double GetValue( const string& udl1,
