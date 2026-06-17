@@ -336,9 +336,8 @@
       "type": "object",
       "title": "!sabr_volatility",
       "additionalProperties": false,
-      "required": ["spot", "maturities", "alpha", "beta", "rho", "nu"],
+      "required": ["maturities", "alpha", "beta", "rho", "nu"],
       "properties": {
-        "spot": { "type": "number" },
         "maturities": { "$ref": "#/$defs/numberList", "description": "Pillar maturities (years)." },
         "alpha": { "$ref": "#/$defs/numberList" },
         "beta": { "$ref": "#/$defs/numberList" },
