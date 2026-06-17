@@ -85,15 +85,20 @@ bool VarianceSwap::ANA_HasSolution()
              _underlying->GetKind() == KIND_BASKET );
 }
 
-//! path-dependent in spot: no terminal-spot finite-difference grid
+//! priced on the spot grid via the expected-accumulated-variance PDE (the pricer
+//! routes a variance swap to SolveVarianceGrid). Same underlyings as the analytic.
 bool VarianceSwap::PDE_HasSolution()
 {
-    return false;
+    return ( _underlying->GetKind() == KIND_EQUITY ||
+             _underlying->GetKind() == KIND_COMPOSITE ||
+             _underlying->GetKind() == KIND_BASKET );
 }
 
+//! the variance PDE has a zero terminal condition and its own (remaining-variance)
+//! boundaries — there is no terminal spot payoff here, so this is just 0.
 double VarianceSwap::PDE_EvalFlow( const double /*Spot*/ )
 {
-    ERR( "variance_swap '" + _name + "' : no PDE solution (path-dependent payoff)" );
+    return 0.0;
 }
 
 bool VarianceSwap::PDE_IsAmerican()

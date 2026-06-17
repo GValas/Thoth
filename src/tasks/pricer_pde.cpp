@@ -3,6 +3,7 @@
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
 #include "heston_volatility.hpp"
+#include "variance_swap.hpp"
 
 PricerPDE::PricerPDE( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
@@ -49,6 +50,13 @@ void PricerPDE::PriceBook()
 //! price one contract: vanilla, knock-out, or knock-in (= vanilla - knock-out)
 void PricerPDE::PriceContract( Contract* Ctr )
 {
+
+    //! variance swap : expected-accumulated-variance grid solve (sets premium)
+    if ( dynamic_cast<VarianceSwap*>( Ctr ) )
+    {
+        SolveVarianceSwap( Ctr );
+        return;
+    }
 
     //! Heston stochastic vol vanilla : 2-D (S, v) ADI grid
     if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston( Ctr ) )
@@ -393,6 +401,69 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     return result; //!< LaVector members above free themselves at scope exit
 }
 
+//! Variance swap on the 1-D spot grid. Solves the expected accumulated variance
+//!   u_t + 0.5 sigma^2 S^2 u_SS + (r-q) S u_S + sigma^2 = 0,  u(.,T) = 0
+//! (Kolmogorov backward, NO discount — it is an undiscounted expectation — with a
+//! +sigma^2 source). The fair annualized variance is u(S0,0)/T, and the value is
+//!   PV = notional * DF * (fair_var - strike_var).
+//! sigma^2 here is the (flat / ATM) diffusion variance, so for a flat surface the
+//! grid reproduces sigma^2 exactly; a Dupire-local-variance source is future work.
+//! Reuses the transformed grid + Crank-Nicolson solve, with C() = 0 (_variance_mode).
+void PricerPDE::SolveVarianceSwap( Contract* Ctr )
+{
+    InitGrid( Ctr, false ); //!< transformed grid, v (ATM vol), r, T_max, ...
+    _variance_mode = true;  //!< drop the reaction term: C() = 0
+
+    const double var = v * v; //!< instantaneous variance source (flat / ATM vol)
+
+    LaVector diag_u = la_vector_calloc( J );
+    LaVector diag_m = la_vector_calloc( J + 1 );
+    LaVector diag_d = la_vector_calloc( J );
+    LaVector D_1 = la_vector_calloc( J + 1 );
+    LaVector U_0 = la_vector_calloc( J + 1 );
+    LaVector U_1 = la_vector_calloc( J + 1 );
+
+    //! terminal condition: zero accumulated variance at maturity (U_1 starts at 0)
+
+    //! diagonals (c = 0 in variance mode)
+    la_vector_set( diag_u, 0, 0 );
+    la_vector_set( diag_m, 0, 1 );
+    la_vector_set( diag_m, J, 1 );
+    la_vector_set( diag_d, J - 1, 0 );
+    for ( int j = 1; j < J; j++ )
+    {
+        la_vector_set( diag_u, j, T_0( j, j + 1 ) );
+        la_vector_set( diag_m, j, T_0( j, j ) );
+        la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) );
+    }
+
+    for ( int i = N - 1; i >= 0; i-- )
+    {
+        const double tau = T_max - i * k;   //!< remaining time -> remaining variance
+        la_vector_set( D_1, 0, var * tau ); //!< Dirichlet boundaries: v^2 * remaining time
+        la_vector_set( D_1, J, var * tau );
+        for ( int j = 1; j < J; j++ )
+        {
+            double rhs = T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) +
+                         T_1( j, j ) * la_vector_get( U_1, j ) +
+                         T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 );
+            la_vector_set( D_1, j, rhs + k * var ); //!< + source sigma^2 dt
+        }
+        SolveTridiagonal( diag_m, diag_u, diag_d, D_1, U_0 );
+        la_vector_memcpy( U_1, U_0 );
+    }
+
+    const double fair_var = ( T_max > 0 ) ? GetGridPrice( x_0, U_0 ) / T_max : var;
+    _variance_mode = false;
+
+    VarianceSwap* vs = dynamic_cast<VarianceSwap*>( Ctr );
+    const double k_var = vs->GetVolatilityStrike() * vs->GetVolatilityStrike();
+    const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( maturity );
+    Ctr->SetPremium( vs->GetNotional() * df * ( fair_var - k_var ) );
+    Ctr->SetDelta( 0 );
+    Ctr->SetGamma( 0 );
+}
+
 inline double PricerPDE::Phi( double x )
 {
     return X_0 + cc * sinh( aa * x + bb );
@@ -419,7 +490,9 @@ double PricerPDE::B( double x )
 }
 double PricerPDE::C( double /*x*/ )
 {
-    return r_disc;
+    //! variance-swap solve accumulates expected variance (an undiscounted
+    //! expectation), so there is no reaction/discount term there.
+    return _variance_mode ? 0.0 : r_disc;
 }
 inline double PricerPDE::a( double x )
 {
@@ -536,6 +609,17 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double rho = hv->GetRho();
     const bool american = Ctr->PDE_IsAmerican();
 
+    //! Bates jumps (lambda = 0 -> pure Heston): lognormal jump size e^Z, Z~N(muJ,
+    //! sigJ^2), mean relative jump kbar = e^{muJ+0.5 sigJ^2}-1. The PIDE adds an
+    //! explicit jump integral lambda*E_J[V(S e^Z) - V] and a -lambda*kbar*S V_S
+    //! compensator drift (folded into the diffusion drift bdrift, kept implicit).
+    const double lambda = hv->GetJumpIntensity();
+    const double muJ = hv->GetJumpMean();
+    const double sigJ = hv->GetJumpVol();
+    const bool bates = lambda > 0.0;
+    const double kbar = bates ? ( exp( muJ + 0.5 * sigJ * sigJ ) - 1.0 ) : 0.0;
+    const double bdrift = b - lambda * kbar; //!< == b for pure Heston
+
     //! grid extents
     const double vmax = std::max( 1.0, 6.0 * std::max( v0, th ) );
     const double smax = std::max( 3.0 * S0, S0 * exp( 5.0 * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
@@ -567,13 +651,54 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     }
     const double intrinsic0 = Ctr->PDE_EvalFlow( 0.0 ); //!< payoff at S=0 (0 call, K put)
 
+    //! Bates jump integral. Discretise the jump size Z ~ N(muJ, sigJ^2) on a grid
+    //! out to +/-6 sigma (re-normalised for truncation), and read V at the jumped
+    //! spot S*e^Z by linear interpolation in S (linear extrapolation past Smax).
+    const int NJ = 40;
+    vector<double> zval, zwt;
+    if ( bates )
+    {
+        const double sg = std::max( sigJ, 1e-8 );
+        const double zlo = muJ - 6 * sg, zhi = muJ + 6 * sg, dz = ( zhi - zlo ) / NJ;
+        double wsum = 0;
+        for ( int m = 0; m <= NJ; m++ )
+        {
+            double z = zlo + m * dz;
+            double pdf = exp( -0.5 * ( z - muJ ) * ( z - muJ ) / ( sg * sg ) ) / ( sg * sqrt( 2 * M_PI ) );
+            double w = pdf * dz * ( ( m == 0 || m == NJ ) ? 0.5 : 1.0 ); //!< trapezoid
+            zval.push_back( z );
+            zwt.push_back( w );
+            wsum += w;
+        }
+        for ( double& w : zwt )
+            w /= wsum; //!< normalise to sum 1 (truncation correction)
+    }
+    auto Vinterp = [&]( double St, int j, const vector<double>& g )
+    {
+        double fi = St / dS; //!< grid index (S(i) = i*dS)
+        if ( fi <= 0 )
+            return g[IX( 0, j )];
+        int i = (int)fi;
+        if ( i >= NS ) //!< linear extrapolation beyond Smax
+            return g[IX( NS, j )] + ( fi - NS ) * ( g[IX( NS, j )] - g[IX( NS - 1, j )] );
+        double w = fi - i;
+        return ( 1 - w ) * g[IX( i, j )] + w * g[IX( i + 1, j )];
+    };
+    auto Jump = [&]( int i, int j, const vector<double>& g ) //!< lambda*(E_J[V(S e^Z)] - V)
+    {
+        double ej = 0;
+        for ( int m = 0; m <= NJ; m++ )
+            ej += zwt[m] * Vinterp( S( i ) * exp( zval[m] ), j, g );
+        return lambda * ( ej - g[IX( i, j )] );
+    };
+
     //! per-step operator applications and tridiagonal coefficients
     auto A1 = [&]( int i, int j, const vector<double>& g ) //!< S-direction (+ half discount)
     {
         double si = S( i ), vj = V( j );
         double vss = ( g[IX( i + 1, j )] - 2 * g[IX( i, j )] + g[IX( i - 1, j )] ) / ( dS * dS );
         double vs = ( g[IX( i + 1, j )] - g[IX( i - 1, j )] ) / ( 2 * dS );
-        return 0.5 * vj * si * si * vss + b * si * vs - 0.5 * rd * g[IX( i, j )];
+        return 0.5 * vj * si * si * vss + bdrift * si * vs - 0.5 * rd * g[IX( i, j )];
     };
     auto A2 = [&]( int i, int j, const vector<double>& g ) //!< v-direction (+ half discount)
     {
@@ -622,7 +747,8 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         {
             for ( int j = 0; j < Nv; j++ )
             {
-                Y0[IX( i, j )] = U[IX( i, j )] + dt * ( A0( i, j, U ) + A1( i, j, U ) + A2( i, j, U ) );
+                Y0[IX( i, j )] = U[IX( i, j )] + dt * ( A0( i, j, U ) + A1( i, j, U ) + A2( i, j, U ) +
+                                                        ( bates ? Jump( i, j, U ) : 0.0 ) );
             }
         }
 
@@ -636,7 +762,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
             {
                 double si = S( i );
                 double diff = 0.5 * vj * si * si / ( dS * dS );
-                double drift = b * si / ( 2 * dS );
+                double drift = bdrift * si / ( 2 * dS );
                 double lo = diff - drift, up = diff + drift, di = -2 * diff - 0.5 * rd;
                 int idx = i - 1;
                 a[idx] = -q * dt * lo;
@@ -718,23 +844,28 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         }
     }
 
-    //! interpolate the price at (S0, v0): bilinear on the grid
-    int i0 = std::min( NS - 1, std::max( 0, (int)( S0 / dS ) ) );
     int j0 = std::min( Nv - 1, std::max( 0, (int)( v0 / dv ) ) );
-    double ws = ( S0 - S( i0 ) ) / dS, wv = ( v0 - V( j0 ) ) / dv;
+    double wv = ( v0 - V( j0 ) ) / dv;
     auto at = [&]( int i, int j )
     { return U[IX( i, j )]; };
-    double price = ( 1 - ws ) * ( 1 - wv ) * at( i0, j0 ) + ws * ( 1 - wv ) * at( i0 + 1, j0 ) +
-                   ( 1 - ws ) * wv * at( i0, j0 + 1 ) + ws * wv * at( i0 + 1, j0 + 1 );
 
-    //! delta / gamma by finite differences in S at v0 (central, one grid step)
-    auto price_at = [&]( int i )
+    //! bilinear price at an arbitrary spot St (v-interpolated at v0, S-interpolated)
+    auto price_at_spot = [&]( double St )
     {
-        return ( 1 - wv ) * at( i, j0 ) + wv * at( i, j0 + 1 );
+        double fi = std::min( (double)( NS - 1 ), std::max( 0.0, St / dS ) );
+        int i = (int)fi;
+        double ws = fi - i;
+        double pi = ( 1 - wv ) * at( i, j0 ) + wv * at( i, j0 + 1 );
+        double pi1 = ( 1 - wv ) * at( i + 1, j0 ) + wv * at( i + 1, j0 + 1 );
+        return ( 1 - ws ) * pi + ws * pi1;
     };
+
+    //! delta / gamma by a central spot bump of GREEK_SPOT_SHIFT (consistent with the
+    //! 1-D PDE and the bump-and-revalue baseline), not the coarse raw grid step dS.
+    const double hb = S0 * GREEK_SPOT_SHIFT / 2;
     GridResult res;
-    res.premium = price;
-    res.delta = ( price_at( i0 + 1 ) - price_at( i0 - 1 < 0 ? 0 : i0 - 1 ) ) / ( 2 * dS );
-    res.gamma = ( price_at( i0 + 1 ) - 2 * price_at( i0 ) + price_at( i0 - 1 < 0 ? 0 : i0 - 1 ) ) / ( dS * dS );
+    res.premium = price_at_spot( S0 );
+    res.delta = ( price_at_spot( S0 + hb ) - price_at_spot( S0 - hb ) ) / ( 2 * hb );
+    res.gamma = ( price_at_spot( S0 + hb ) - 2 * res.premium + price_at_spot( S0 - hb ) ) / ( hb * hb );
     return res;
 }

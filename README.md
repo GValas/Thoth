@@ -28,7 +28,10 @@ usable as a batch tool or as an HTTP service.
   factors are name-ordered, so results are independent of heap layout / build /
   platform.
 - **PDE (`pde`)** — Crank-Nicolson finite-difference scheme; supports **American**
-  exercise (backward induction `max(intrinsic, continuation)`).
+  exercise (backward induction `max(intrinsic, continuation)`), a 2-D `(S,v)`
+  Douglas-ADI grid for **Heston** (and **Bates** as a PIDE — the ADI plus an
+  explicit jump integral, IMEX), and the **variance swap** fair strike as a
+  backward expected-accumulated-variance solve.
 - **Analytic (`ana`)** — closed-form (Black-Scholes) for instruments that admit
   it.
 - **GPU acceleration (`mcl` + `allow_gpu`)** — the `mcl` engine offloads to a CUDA
@@ -100,9 +103,11 @@ the ANA cells. A parameter no underlying's surface exposes is silently skipped.
   discrete monitoring** (`monitoring_period_days`); PDE, MCL and (continuous-only)
   closed-form.
 - `variance_swap` — pays `notional * (realized_variance - strike_variance)`;
-  priced by **Monte-Carlo** (realized variance of the simulated path) or
+  priced by **Monte-Carlo** (realized variance of the simulated path),
   **analytically** by static replication (the 1/K²-weighted option strip, so a
-  smile feeds in).
+  smile feeds in), or by **PDE** (the fair variance as a backward
+  expected-accumulated-variance grid solve). The three agree (5y, 30% flat,
+  ~336).
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
@@ -128,8 +133,9 @@ American). The three agree to ~0.3% across moneyness, and the degenerate
 (vol-of-vol → 0) limit reproduces Black-Scholes. Adding lognormal
 (compound-Poisson) jumps — `jump_intensity` (λ per year), `jump_mean`, `jump_vol`
 — turns it into the **Bates** model: priced by **MCL** (an independent jump node
-on the QE spot) and **ANA** (the closed-form jump characteristic function
-multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). The
+on the QE spot), **ANA** (the closed-form jump characteristic function multiplies
+the Heston CF) and **PDE** (the Bates PIDE — the Heston ADI plus an explicit
+log-spot jump-integral term, IMEX, with the `−λk̄` compensator in the drift). The
 Heston, Bates and SABR cases are exercised by the cells in `samples/matrix.yaml`.
 
 **Analytics objects**

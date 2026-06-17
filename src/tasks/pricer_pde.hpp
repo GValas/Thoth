@@ -126,9 +126,17 @@ class PricerPDE : public Pricer
 
     //! Heston stochastic vol : a 2-D (S, v) Douglas-ADI finite-difference solve
     //! (cross term explicit, S- and v-sweeps implicit). European + American.
-    //! Only plain vanillas on a mono Heston underlying are routed here.
+    //! Only plain vanillas on a mono Heston underlying are routed here. With Bates
+    //! jumps (jump_intensity > 0) it adds the explicit PIDE jump term (IMEX).
     bool UnderlyingIsHeston( Contract* Ctr );
     GridResult SolveHestonGrid( Contract* Ctr );
+
+    //! variance swap : the fair variance is E[ integral sigma^2 dt ], solved on the
+    //! 1-D spot grid as the expected accumulated variance (a backward PDE with a
+    //! local-variance source, no discount), then PV = notional * DF * (fair - strike).
+    //! _variance_mode drops the reaction term (C = 0) while reusing the grid solve.
+    bool _variance_mode = false;
+    void SolveVarianceSwap( Contract* Ctr );
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
