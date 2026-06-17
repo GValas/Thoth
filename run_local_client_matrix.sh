@@ -140,7 +140,15 @@ END {
         while (j >= 0 && keys[ord[j]] > keys[k]) { ord[j + 1] = ord[j]; j-- }
         ord[j + 1] = k
     }
-    for (i = 0; i < nr; i++) print rows[ord[i]]
+    #! print sorted, with a blank separator between products so each product's
+    #! engine rows (ana / mcl / pde / ...) read as one block
+    prev = ""
+    for (i = 0; i < nr; i++) {
+        split(keys[ord[i]], kp, SUBSEP)   #!< kp[1] = product label
+        if (i > 0 && kp[1] != prev) print ""
+        print rows[ord[i]]
+        prev = kp[1]
+    }
     printf "\n%d priced cell(s).\n", nr
 }
 ' "$OUT"
