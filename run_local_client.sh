@@ -18,7 +18,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT"
+# NB: do NOT cd into $ROOT — the input path is given relative to the caller's
+# working directory (e.g. `./Thoth/samples/x.yaml` from the repo's parent), so
+# resolving it must happen from where the user is, not from the script's dir.
 # shellcheck source=run_docker_common.sh
 source "$ROOT/run_docker_common.sh" #!< require_input_file / default_output
 

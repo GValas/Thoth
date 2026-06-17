@@ -27,7 +27,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT"
+# NB: do NOT cd into $ROOT — a caller-supplied input path is relative to the
+# caller's cwd. The default below is resolved against $ROOT explicitly instead.
 
 PORT=8080
 INPUT=""
@@ -52,7 +53,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -z "$INPUT" ]] && INPUT="samples/matrix.yaml"
+[[ -z "$INPUT" ]] && INPUT="$ROOT/samples/matrix.yaml" #!< default: the repo's matrix, not cwd-relative
 [[ -f "$INPUT" ]] || { echo "error: input file '$INPUT' not found" >&2; usage >&2; exit 1; }
 
 if [[ -n "$RAW" ]]; then OUT="$RAW"; else OUT="$(mktemp -t thoth_matrix.XXXXXX.yaml)"; trap 'rm -f "$OUT"' EXIT; fi
