@@ -194,7 +194,10 @@ void Pricer::PriceBookByContract( const string& Label )
     _delta = _gamma = _vega = _rho = _theta = 0;
 
     long done = 0;
-    ProgressBar bar( Label, (long)_book->GetOptionList().size() );
+    //! disable the bar during an inner bump-revalue (ComputeParamGreeks reprices the
+    //! whole book per parameter): otherwise each reprice redraws a full "<engine> 100%"
+    //! line. The base price (Execute) runs with _quiet_pricing = false, so it shows.
+    ProgressBar bar( Label, (long)_book->GetOptionList().size(), !_quiet_pricing );
     for ( Contract* c : _book->GetOptionList() )
     {
         cancellation::CancellationPoint(); //!< abort promptly if the client disconnected
