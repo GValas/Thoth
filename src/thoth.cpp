@@ -478,12 +478,17 @@ static string ClusterPriceSequence( const string& Body,
         out.CopyTopLevel( out.GetString( tasks[i] + ".result" ), r );
     }
 
+    //! final SEQ line with the total time, mirroring the in-process Sequence::Execute
+    const double total_time = ExecTime( t0 );
+    LOG( "SEQ", "ran " + std::to_string( tasks.size() ) + " task(s), exec_time = " +
+                    ToString( total_time ) + " sec" );
+
     //! sequence summary block, mirroring Sequence::WriteResults
     const string seq_result = out.GetString( Exec + ".result", "" );
     if ( !seq_result.empty() )
     {
         out.SetString( seq_result + ".kind", "sequence_result" );
-        out.SetDouble( seq_result + ".exec_time", ExecTime( t0 ) );
+        out.SetDouble( seq_result + ".exec_time", total_time );
         out.SetStringList( seq_result + ".tasks", tasks );
     }
     out.SetString( "system_information.cluster",
