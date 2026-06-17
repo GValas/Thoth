@@ -40,6 +40,14 @@ root: matrix
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
 #
+# Model-parameter Greeks (vega_<param>): the SABR (vega_alpha/beta/rho/nu), Heston
+# (vega_v0/kappa/theta/xi/rho) and Bates (+ vega_jump_intensity/jump_mean/jump_vol)
+# cells request these on the ANA engine, where the closed-form (Hagan / characteristic
+# function) reprice gives them exactly. They are computed by bump-and-revalue, so the
+# engine that prices the model reads the bumped parameter; the same indicators work on
+# MCL too (with Monte-Carlo noise) but are shown here on ANA only — the PDE grid and
+# the SABR Dupire-local-vol diffusion do not give reliable parameter sensitivities.
+#
 # The "(gpu)" rows ask for GPU acceleration (mcl with allow_gpu: true). It is
 # build-gated (-DTHOTH_ENABLE_CUDA=ON): on a CUDA build with a device the single-
 # asset European vanilla runs on the GPU; on a CPU-only build the same book
@@ -381,7 +389,7 @@ vanilla_mono_eu_call_heston_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl_h
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium, delta, gamma, vega, rho, theta, vega_v0, vega_kappa, vega_theta, vega_xi, vega_rho]
   result: vanilla_mono_eu_call_heston_ana_result
 
 # bates = heston + lognormal jumps (crash-like). ANA adds a closed-form jump
@@ -393,7 +401,7 @@ vanilla_mono_eu_call_bates_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl_b
-  indicators: [premium]
+  indicators: [premium, vega_v0, vega_kappa, vega_theta, vega_xi, vega_rho, vega_jump_intensity, vega_jump_mean, vega_jump_vol]
   result: vanilla_mono_eu_call_bates_ana_result
 vanilla_mono_eu_call_bates_mcl: !pricer
   today: 2000-01-01
@@ -431,7 +439,7 @@ vanilla_mono_eu_call_sabr_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl_sabr
-  indicators: [premium]
+  indicators: [premium, vega_alpha, vega_beta, vega_rho, vega_nu]
   result: vanilla_mono_eu_call_sabr_ana_result
 vanilla_mono_eu_call_sabr_mcl: !pricer
   today: 2000-01-01

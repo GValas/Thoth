@@ -87,7 +87,15 @@
         "indicators": {
           "type": "array",
           "description": "Outputs to compute.",
-          "items": { "enum": ["premium", "delta", "gamma", "vega", "rho", "theta"] }
+          "items": {
+            "enum": [
+              "premium", "delta", "gamma", "vega", "rho", "theta",
+              "vega_alpha", "vega_beta", "vega_nu",
+              "vega_v0", "vega_kappa", "vega_theta", "vega_xi", "vega_rho",
+              "vega_jump_intensity", "vega_jump_mean", "vega_jump_vol"
+            ],
+            "description": "Standard Greeks plus model-parameter Greeks: vega_<param> bumps a SABR (alpha/beta/rho/nu), Heston (v0/kappa/theta/xi/rho) or Bates jump (jump_intensity/jump_mean/jump_vol) parameter."
+          }
         },
         "result": { "type": "string", "description": "Name of the result block written back into the output." }
       }

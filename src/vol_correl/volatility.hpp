@@ -1,6 +1,7 @@
 #pragma once
 #include "market_data.hpp"
 #include "node_collector.hpp"
+#include <map>
 
 //! Abstract volatility surface: returns the implied vol at a (strike, forward,
 //! maturity) and the Dupire local vol derived from it; concrete kinds are
@@ -18,12 +19,30 @@ class Volatility : public MarketData
     //! used by the bump-and-revalue vega. Zero in normal pricing.
     double _vol_shift = 0.0;
 
+    //! additive shift per named model parameter, used by the vega_<param> Greeks
+    //! (e.g. vega_alpha bumps the SABR alpha, vega_kappa the Heston kappa). Empty
+    //! in normal pricing; a derived surface reads it in its parameter accessors.
+    std::map<string, double> _param_shift;
+    double ParamShift( const string& Name ) const
+    {
+        auto it = _param_shift.find( Name );
+        return ( it == _param_shift.end() ) ? 0.0 : it->second;
+    }
+
   public:
     // setter
     void SetNonWorkingDaysWeight( double Weight );
 
     //! set the parallel vol shift (vega bump); 0 restores the quoted surface
     void SetVolShift( double Shift ) { _vol_shift = Shift; }
+
+    //! does this surface expose a model parameter of this name (alpha, kappa, ...)?
+    //! Default: none. Stochastic / local-vol surfaces override to list theirs.
+    virtual bool HasParam( const string& /*Name*/ ) const { return false; }
+
+    //! additive bump on a named model parameter (the vega_<param> Greeks); 0
+    //! restores it. Reading is via ParamShift in the derived accessors.
+    void SetParamShift( const string& Name, double Shift ) { _param_shift[Name] = Shift; }
 
     //
     bool _is_local;

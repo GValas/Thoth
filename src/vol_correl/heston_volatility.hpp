@@ -41,17 +41,27 @@ class HestonVolatility : public Volatility
     //! bump (_vol_shift) raises the whole vol level, so it shifts the variance
     //! levels v0 and theta by (sqrt(v) + shift)^2 — this makes the standard
     //! bump-and-revalue vega work for Heston too.
-    double GetV0() const { return Shifted( _v0 ); }
-    double GetKappa() const { return _kappa; }
-    double GetTheta() const { return Shifted( _theta ); }
-    double GetXi() const { return _xi; }
-    double GetRho() const { return _rho; }
-    double GetJumpIntensity() const { return _jump_intensity; }
-    double GetJumpMean() const { return _jump_mean; }
-    double GetJumpVol() const { return _jump_vol; }
+    //! each getter adds any vega_<param> bump (ParamShift is 0 in normal pricing).
+    //! v0 / theta are variances, so the parallel vol-level vega bump goes through
+    //! Shifted() while the parameter bump is additive on the variance itself.
+    double GetV0() const { return Shifted( _v0 ) + ParamShift( "v0" ); }
+    double GetKappa() const { return _kappa + ParamShift( "kappa" ); }
+    double GetTheta() const { return Shifted( _theta ) + ParamShift( "theta" ); }
+    double GetXi() const { return _xi + ParamShift( "xi" ); }
+    double GetRho() const { return _rho + ParamShift( "rho" ); }
+    double GetJumpIntensity() const { return _jump_intensity + ParamShift( "jump_intensity" ); }
+    double GetJumpMean() const { return _jump_mean + ParamShift( "jump_mean" ); }
+    double GetJumpVol() const { return _jump_vol + ParamShift( "jump_vol" ); }
     bool HasJumps() const { return _jump_intensity > 0; }
 
     bool IsStochastic() const override { return true; }
+
+    //! Heston / Bates model parameters exposed to the vega_<param> Greeks
+    bool HasParam( const string& Name ) const override
+    {
+        return Name == "v0" || Name == "kappa" || Name == "theta" || Name == "xi" || Name == "rho" ||
+               Name == "jump_intensity" || Name == "jump_mean" || Name == "jump_vol";
+    }
 
     double GetImplicitVol( const double Strike,
                            const double Forward,

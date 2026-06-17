@@ -73,6 +73,16 @@ rate move, theta per calendar day. On a 1y ATM call the three engines agree and
 sit close to Black-Scholes (delta ≈0.67, gamma ≈0.012, vega ≈0.37, rho ≈0.50,
 theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·ε).
 
+**Model-parameter Greeks** — for the stochastic / local-vol surfaces you can also
+request `vega_<param>` indicators that bump one model parameter and revalue (per
+unit parameter): SABR `vega_alpha` / `vega_beta` / `vega_rho` / `vega_nu`, Heston
+`vega_v0` / `vega_kappa` / `vega_theta` / `vega_xi` / `vega_rho`, and Bates' jumps
+`vega_jump_intensity` / `vega_jump_mean` / `vega_jump_vol`. They work on any engine
+that prices the model, but only the **ANA** engine (Hagan / characteristic-function
+reprice) gives them reliably — the PDE grid and the SABR Dupire-local-vol diffusion
+don't yield clean parameter sensitivities, so `samples/matrix.yaml` requests them on
+the ANA cells. A parameter no underlying's surface exposes is silently skipped.
+
 **Instruments**
 - `vanilla` — call / put, **european** or **american**, absolute or
   relative strike. **Quanto** (a foreign-currency asset paid in the book
@@ -409,7 +419,9 @@ including a skewed OTM put), `gpu_call.yaml` (a call priced by the `mcl` engine
 with `allow_gpu: true`, running on the CPU off a GPU) and `matrix.yaml` — a `!sequence` running
 the full pricer/product matrix (vanilla european/american, quanto, composite,
 basket / best-of / worst-of, continuous / discrete / knock-in barriers, variance
-swap, Heston, Bates, SABR local-vol, across PDE / MCL / ANA) in one process.
+swap, Heston, Bates, SABR local-vol, across PDE / MCL / ANA) in one process, and
+`matrix_gpu.yaml` (an ATM European put priced by ANA / CPU-MCL / `allow_gpu`-MCL —
+the three agree, the GPU row running on the device on a CUDA build, else the CPU).
 
 ---
 

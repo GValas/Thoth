@@ -52,10 +52,11 @@ double SabrVolatility::GetImplicitVol( const double Strike,
     //! the engine passes Strike = 0 as a sentinel for the reference (ATM) vol
     double K = ( Strike > 0 ) ? Strike : F;
 
-    double alpha = Interp( _alpha_list, T );
-    double beta = Interp( _beta_list, T );
-    double rho = Interp( _rho_list, T );
-    double nu = Interp( _nu_list, T );
+    //! quoted parameters + any vega_<param> bump (the shift is 0 in normal pricing)
+    double alpha = Interp( _alpha_list, T ) + ParamShift( "alpha" );
+    double beta = Interp( _beta_list, T ) + ParamShift( "beta" );
+    double rho = Interp( _rho_list, T ) + ParamShift( "rho" );
+    double nu = Interp( _nu_list, T ) + ParamShift( "nu" );
 
     double one_mb = 1.0 - beta;
     double log_fk = log( F / K );

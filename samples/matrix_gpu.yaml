@@ -1,0 +1,106 @@
+root: gpu_matrix
+
+# Minimal GPU acceleration check. A single-asset ATM European put — the shape the
+# CUDA kernel supports (forward-measure GBM) — priced three ways:
+#   ana       closed-form Black-Scholes (exact reference)
+#   mcl       CPU Monte-Carlo
+#   mcl_gpu   MCL with allow_gpu: true
+# On a CUDA build (-DTHOTH_ENABLE_CUDA=ON) with a device the mcl_gpu row runs the
+# kernel on the GPU; on a CPU-only build it transparently runs the CPU MCL engine,
+# so the three engines agree (GPU == CPU == analytic within Monte-Carlo error).
+# spot 100, strike 100, 1y, rate 8%, vol 30%.
+#
+# Run:
+#   ./build/thoth -batch samples/matrix_gpu.yaml out.yaml
+#   ./run_docker_server.sh --gpu --port 7777        # GPU server (or plain --port for CPU)
+#   ./run_local_client_matrix.sh samples/matrix_gpu.yaml --port 7777   # per-engine table
+
+gpu_matrix: !sequence
+  result: gpu_matrix_result
+  tasks:
+    - vanilla_eu_put_k100_ana
+    - vanilla_eu_put_k100_mcl
+    - vanilla_eu_put_k100_mcl_gpu
+
+# --- pricers : the same ATM put priced by ana / mcl / mcl_gpu -------------------
+vanilla_eu_put_k100_ana: !pricer
+  today: 2000-01-01
+  book: book_put_k100
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_eu_put_k100_ana_result
+vanilla_eu_put_k100_mcl: !pricer
+  today: 2000-01-01
+  book: book_put_k100
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_eu_put_k100_mcl_result
+vanilla_eu_put_k100_mcl_gpu: !pricer
+  today: 2000-01-01
+  book: book_put_k100
+  currency: eur
+  configuration: cfg_mcl_gpu
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_eu_put_k100_mcl_gpu_result
+
+# --- pricing configurations ----------------------------------------------------
+cfg_ana: !pricer_configuration
+  method: ana
+  log_path: "/tmp/"
+cfg_mcl: !pricer_configuration
+  method: mcl
+  mcl_configuration: shared_mcl
+  log_path: "/tmp/"
+# same MC settings, GPU-accelerated when a device is available
+cfg_mcl_gpu: !pricer_configuration
+  method: mcl
+  mcl_configuration: shared_mcl_gpu
+  log_path: "/tmp/"
+shared_mcl: !mcl_configuration
+  max_time_step: 3
+  min_time_step: -1
+  paths: 1000000
+  vol_time_step: 0.01
+  use_sobol: true
+shared_mcl_gpu: !mcl_configuration
+  max_time_step: 3
+  min_time_step: -1
+  paths: 1000000
+  vol_time_step: 0.01
+  use_sobol: true
+  allow_gpu: true
+
+# --- book & contract -----------------------------------------------------------
+book_put_k100: !book
+  options: [c_put_k100]
+c_put_k100: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  type: put
+  exercise: european
+
+# --- market data ---------------------------------------------------------------
+eq: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+vol: !bs_volatility
+  volatility: 30
+  calendar: calendar
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+eur: !currency
+  rate: eur_rate
+eur_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [8, 8]
+correl: !correlation_matrix
+  underlyings: [eq]
+  matrix: [1]

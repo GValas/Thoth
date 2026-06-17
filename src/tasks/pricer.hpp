@@ -5,6 +5,7 @@
 #include "pricer_configuration.hpp"
 #include "single.hpp"
 #include "task.hpp"
+#include <map>
 
 //! constants
 //! grid sizes per Precision level (see PricerConfiguration.h)
@@ -34,6 +35,11 @@ const double GREEK_GAMMA_BUMP = 0.10;  //!< wider relative spot bump (10%) for g
                                        //!< gamma needs the curvature signal to dominate
 const double GREEK_VOL_BUMP = 0.01;    //!< absolute vol bump (1 vol point) for vega
 const double GREEK_RATE_BUMP = 0.0001; //!< absolute rate bump (1 bp) for rho
+const double GREEK_PARAM_BUMP = 0.01;  //!< absolute bump on a model parameter for the
+                                       //!< vega_<param> Greeks (SABR / Heston / Bates),
+                                       //!< reported per unit parameter. Sized like the vega
+                                       //!< bump (one point) so the signal clears the MC /
+                                       //!< PDE-grid / local-vol-resampling noise floor
 
 class Pricer : public Task
 {
@@ -65,6 +71,11 @@ class Pricer : public Task
     bool _request_rho = false;
     bool _request_theta = false;
 
+    //! requested model-parameter Greeks: each "vega_<param>" indicator adds <param>
+    //! here (alpha, kappa, jump_vol, ...). Computed book-level by bumping that model
+    //! parameter on every underlying whose vol surface exposes it.
+    vector<string> _param_greek_list;
+
     //! computed book-level results (book currency)
     double _premium = 0;
     double _delta = 0; //!< dPremium / dSpot
@@ -72,6 +83,9 @@ class Pricer : public Task
     double _vega = 0;  //!< premium change per 1 vol point (0.01 of vol)
     double _rho = 0;   //!< premium change per 1% (0.01) parallel rate move
     double _theta = 0; //!< premium change over one calendar day (usually < 0)
+
+    //! vega_<param> results, keyed by parameter name (book currency, per unit param)
+    map<string, double> _param_greeks;
 
     //! dates & underlyings
     set<date> GetFixingDates();
@@ -112,6 +126,11 @@ class Pricer : public Task
     virtual void ComputeGreeks();
     void ApplyVolShift( double Shift );  //!< parallel vol shift on every underlying
     void ApplyRateShift( double Shift ); //!< parallel shift on every currency's curve
+
+    //! model-parameter Greeks (vega_<param>): book-level bump-and-revalue of each
+    //! requested parameter, shared by every engine (called from Execute after the
+    //! standard Greeks). Skips a parameter no underlying's vol surface exposes.
+    void ComputeParamGreeks();
 
     //! add a priced contract's premium/delta/gamma to the book (FX-converted to
     //! the book currency). Shared by every engine's Execute().

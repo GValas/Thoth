@@ -34,6 +34,12 @@ class SabrVolatility : public Volatility
                            const double Forward,
                            const date& MaturityDate ) override;
 
+    //! SABR model parameters exposed to the vega_<param> Greeks
+    bool HasParam( const string& Name ) const override
+    {
+        return Name == "alpha" || Name == "beta" || Name == "rho" || Name == "nu";
+    }
+
     //! mcl node
     MonteCarloNode* GetNode( NodeCollector& NC ) override;
 

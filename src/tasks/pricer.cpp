@@ -47,6 +47,18 @@ void Pricer::SetIndicatorRequestList( const vector<string>& IndicatorRequestList
     _request_vega = requested( "vega" );
     _request_rho = requested( "rho" );
     _request_theta = requested( "theta" );
+
+    //! model-parameter Greeks: any "vega_<param>" indicator (vega_alpha, vega_v0,
+    //! vega_jump_vol, ...) requests a bump of that named parameter. "vega" alone is
+    //! the standard parallel-vol vega handled above, not a parameter bump.
+    _param_greek_list.clear();
+    for ( const string& ind : _indicator_request_list )
+    {
+        if ( ind.rfind( "vega_", 0 ) == 0 && ind.size() > 5 )
+        {
+            _param_greek_list.push_back( ind.substr( 5 ) );
+        }
+    }
 }
 
 // setter
@@ -82,7 +94,63 @@ void Pricer::Execute()
         ComputeGreeks();
     }
 
+    //! model-parameter Greeks (vega_<param>) — book-level bump-and-revalue, shared
+    //! by every engine (the standard per-contract Greeks above stay engine-specific)
+    if ( !_param_greek_list.empty() )
+    {
+        ComputeParamGreeks();
+    }
+
     _exec_time = ExecTime( t0 );
+}
+
+//! model-parameter Greeks: for each requested vega_<param>, bump that parameter on
+//! every underlying whose vol surface exposes it, reprice the whole book, and take
+//! the one-sided finite difference (per unit of the parameter). Skips a parameter
+//! no surface in the book has (e.g. vega_alpha on a Heston book). Book-level, so it
+//! works the same for MCL (re-diffuses with common random numbers) and ANA / PDE.
+void Pricer::ComputeParamGreeks()
+{
+    _quiet_pricing = true;
+    const double p0 = _premium;
+
+    //! snapshot the surfaces once: PriceBook -> InitPricing rebuilds _single_set,
+    //! but the Single / Volatility objects themselves persist across re-prices.
+    const vector<Single*> singles( _single_set.begin(), _single_set.end() );
+
+    for ( const string& param : _param_greek_list )
+    {
+        vector<Volatility*> vols;
+        for ( Single* s : singles )
+        {
+            Volatility* v = s->GetVolatility();
+            if ( v->HasParam( param ) )
+            {
+                vols.push_back( v );
+            }
+        }
+        if ( vols.empty() )
+        {
+            continue; //!< no surface in this book has the parameter — skip silently
+        }
+
+        for ( Volatility* v : vols )
+        {
+            v->SetParamShift( param, GREEK_PARAM_BUMP );
+        }
+        PriceBook();
+        const double pu = _book->GetPremium();
+        for ( Volatility* v : vols )
+        {
+            v->SetParamShift( param, 0 ); //!< restore
+        }
+        _param_greeks[param] = ( pu - p0 ) / GREEK_PARAM_BUMP;
+    }
+
+    //! restore the book to the base scenario so the premium output is unbumped
+    PriceBook();
+    _premium = _book->GetPremium();
+    _quiet_pricing = false;
 }
 
 //! parallel vol shift applied to every underlying's volatility
@@ -406,6 +474,10 @@ void Pricer::WriteResults()
     {
         greeks += ", theta = " + ToString( _theta );
     }
+    for ( const auto& [param, value] : _param_greeks )
+    {
+        greeks += ", vega_" + param + " = " + ToString( value );
+    }
     LOG( "BPR",
          "book price = " + ToString( _premium ) + ", " +
              "book trust = " + ToString( _book->GetPremiumTrust() ) + greeks + ", " +
@@ -436,6 +508,11 @@ void Pricer::WriteResults()
     if ( _request_theta )
     {
         _cfg->SetDouble( _result + ".theta", _theta );
+    }
+    //! model-parameter Greeks (book level), keyed vega_<param>
+    for ( const auto& [param, value] : _param_greeks )
+    {
+        _cfg->SetDouble( _result + ".vega_" + param, value );
     }
 
     //! per-contract premium (and, for the per-contract engines, per-contract
