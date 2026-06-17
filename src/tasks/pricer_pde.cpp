@@ -2,7 +2,6 @@
 #include "pricer_pde.hpp"
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
-#include "heston_volatility.hpp"
 #include "variance_swap.hpp"
 
 PricerPDE::PricerPDE( const string& ObjectName,
@@ -51,10 +50,12 @@ void PricerPDE::PriceBook()
 void PricerPDE::PriceContract( Contract* Ctr )
 {
 
-    //! variance swap : expected-accumulated-variance grid solve (sets premium)
-    if ( dynamic_cast<VarianceSwap*>( Ctr ) )
+    //! variance swap : expected-accumulated-variance grid solve (sets premium).
+    //! The polymorphic predicate guarantees the contract is a VarianceSwap, so the
+    //! solve can take it as the concrete type (no RTTI capability test).
+    if ( Ctr->PDE_IsAccruedVariance() )
     {
-        SolveVarianceSwap( Ctr );
+        SolveVarianceSwap( static_cast<VarianceSwap*>( Ctr ) );
         return;
     }
 
@@ -409,7 +410,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 //! sigma^2 here is the (flat / ATM) diffusion variance, so for a flat surface the
 //! grid reproduces sigma^2 exactly; a Dupire-local-variance source is future work.
 //! Reuses the transformed grid + Crank-Nicolson solve, with C() = 0 (_variance_mode).
-void PricerPDE::SolveVarianceSwap( Contract* Ctr )
+void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 {
     InitGrid( Ctr, false ); //!< transformed grid, v (ATM vol), r, T_max, ...
     _variance_mode = true;  //!< drop the reaction term: C() = 0
@@ -456,10 +457,9 @@ void PricerPDE::SolveVarianceSwap( Contract* Ctr )
     const double fair_var = ( T_max > 0 ) ? GetGridPrice( x_0, U_0 ) / T_max : var;
     _variance_mode = false;
 
-    VarianceSwap* vs = dynamic_cast<VarianceSwap*>( Ctr );
-    const double k_var = vs->GetVolatilityStrike() * vs->GetVolatilityStrike();
+    const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
     const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( maturity );
-    Ctr->SetPremium( vs->GetNotional() * df * ( fair_var - k_var ) );
+    Ctr->SetPremium( Ctr->GetNotional() * df * ( fair_var - k_var ) );
     Ctr->SetDelta( 0 );
     Ctr->SetGamma( 0 );
 }
@@ -594,7 +594,7 @@ void Thomas( vector<double>& a, vector<double>& d, vector<double>& c, vector<dou
 PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
 {
     Single* single = *Ctr->GetUnderlying()->GetSingleSet().begin();
-    HestonVolatility* hv = dynamic_cast<HestonVolatility*>( single->GetVolatility() );
+    const StochasticVolParams hv = single->GetVolatility()->StochasticParams();
 
     const date mat = Ctr->GetMaturityDate();
     const double T = YearFraction( _today, mat );
@@ -602,20 +602,20 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double F = Ctr->GetUnderlying()->GetForward( mat, Ctr->GetPremiumCurrency() );
     const double rd = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( mat );
     const double b = ( T > 0 ) ? log( F / S0 ) / T : 0.0;
-    const double v0 = hv->GetV0();
-    const double kap = hv->GetKappa();
-    const double th = hv->GetTheta();
-    const double xi = hv->GetXi();
-    const double rho = hv->GetRho();
+    const double v0 = hv.v0;
+    const double kap = hv.kappa;
+    const double th = hv.theta;
+    const double xi = hv.xi;
+    const double rho = hv.rho;
     const bool american = Ctr->PDE_IsAmerican();
 
     //! Bates jumps (lambda = 0 -> pure Heston): lognormal jump size e^Z, Z~N(muJ,
     //! sigJ^2), mean relative jump kbar = e^{muJ+0.5 sigJ^2}-1. The PIDE adds an
     //! explicit jump integral lambda*E_J[V(S e^Z) - V] and a -lambda*kbar*S V_S
     //! compensator drift (folded into the diffusion drift bdrift, kept implicit).
-    const double lambda = hv->GetJumpIntensity();
-    const double muJ = hv->GetJumpMean();
-    const double sigJ = hv->GetJumpVol();
+    const double lambda = hv.jump_intensity;
+    const double muJ = hv.jump_mean;
+    const double sigJ = hv.jump_vol;
     const bool bates = lambda > 0.0;
     const double kbar = bates ? ( exp( muJ + 0.5 * sigJ * sigJ ) - 1.0 ) : 0.0;
     const double bdrift = b - lambda * kbar; //!< == b for pure Heston

@@ -21,6 +21,10 @@ class Mono : public Underlying
     CurrencySet GetCurrencySet() override;
     double GetSpot() override;
 
+    //! a single-asset underlying: griddable and the canonical mono shape
+    bool IsGriddable() const override { return true; }
+    bool IsMono() const override { return true; }
+
     //! setter
     void SetSingle( Single& Single );
 

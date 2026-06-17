@@ -80,18 +80,14 @@ void VarianceSwap::ANA_EvalPrice()
 //! closed form for equity-like underlyings (flat or smile-ATM vol surface)
 bool VarianceSwap::ANA_HasSolution()
 {
-    return ( _underlying->GetKind() == KIND_EQUITY ||
-             _underlying->GetKind() == KIND_COMPOSITE ||
-             _underlying->GetKind() == KIND_BASKET );
+    return _underlying->IsGriddable();
 }
 
 //! priced on the spot grid via the expected-accumulated-variance PDE (the pricer
 //! routes a variance swap to SolveVarianceGrid). Same underlyings as the analytic.
 bool VarianceSwap::PDE_HasSolution()
 {
-    return ( _underlying->GetKind() == KIND_EQUITY ||
-             _underlying->GetKind() == KIND_COMPOSITE ||
-             _underlying->GetKind() == KIND_BASKET );
+    return _underlying->IsGriddable();
 }
 
 //! the variance PDE has a zero terminal condition and its own (remaining-variance)

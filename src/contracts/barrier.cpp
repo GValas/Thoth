@@ -71,9 +71,7 @@ double Barrier::PDE_EvalFlow( const double spot )
 //! knocked region at the scheduled dates (knock-in by in/out parity).
 bool Barrier::PDE_HasSolution()
 {
-    return ( _underlying->GetKind() == KIND_EQUITY ||
-             _underlying->GetKind() == KIND_COMPOSITE ||
-             _underlying->GetKind() == KIND_BASKET );
+    return _underlying->IsGriddable();
 }
 
 bool Barrier::PDE_IsBarrier()
@@ -101,9 +99,7 @@ double Barrier::PDE_BarrierLevel()
 bool Barrier::ANA_HasSolution()
 {
     return ( _barrier_monitoring_type == BarrierMonitoring::Continuous ) &&
-           ( _underlying->GetKind() == KIND_EQUITY ||
-             _underlying->GetKind() == KIND_COMPOSITE ||
-             _underlying->GetKind() == KIND_BASKET );
+           _underlying->IsGriddable();
 }
 
 //! Reiner-Rubinstein closed-form barrier price for a single spot value.

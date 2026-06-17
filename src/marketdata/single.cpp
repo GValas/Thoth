@@ -1,6 +1,5 @@
 #include "thoth.hpp"
 #include "single.hpp"
-#include "heston_volatility.hpp"
 
 //! constructor
 Single::Single( const string& ObjectName,
@@ -61,24 +60,24 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
     //! for the spot's independent Gaussian and "#vol_white_noise" for the variance.
     if ( _volatility->IsStochastic() )
     {
-        HestonVolatility* h = dynamic_cast<HestonVolatility*>( _volatility );
+        const StochasticVolParams h = _volatility->StochasticParams();
         MonteCarloNode* var = NC.GetOrCreate<HestonVarianceNode>(
             _name + "#variance",
             [&]( HestonVarianceNode* V )
             {
-                V->SetParameters( h->GetV0(), h->GetKappa(), h->GetTheta(), h->GetXi() );
+                V->SetParameters( h.v0, h.kappa, h.theta, h.xi );
                 V->SetNoiseNode( NC.GetNode( _name + "#vol_white_noise" ) );
             } );
         return NC.GetOrCreate<HestonSpotNode>(
             _name + "#spot",
             [&]( HestonSpotNode* S )
             {
-                S->SetParameters( h->GetKappa(), h->GetTheta(), h->GetXi(), h->GetRho() );
+                S->SetParameters( h.kappa, h.theta, h.xi, h.rho );
                 S->SetVarianceNode( var );
                 S->SetDriftNode( GetDriftNode( NC ) );
                 S->SetNoiseNode( NC.GetNode( _name + "#white_noise" ) );
-                //! Bates : wire the jump source if this Heston vol carries jumps
-                if ( h->HasJumps() )
+                //! Bates : wire the jump source if this stochastic vol carries jumps
+                if ( h.has_jumps() )
                 {
                     S->SetJumpNode( NC.GetNode( _name + "#jump_noise" ) );
                 }

@@ -37,6 +37,7 @@ class VarianceSwap : public Contract
     bool PDE_HasSolution() override;
     double PDE_EvalFlow( const double spot ) override;
     bool PDE_IsAmerican() override;
+    bool PDE_IsAccruedVariance() override { return true; }
 
     //! analytical (flat-vol fair variance)
     bool ANA_HasSolution() override;

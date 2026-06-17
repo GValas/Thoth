@@ -1,6 +1,8 @@
 #pragma once
 #include "pricer.hpp"
 
+class VarianceSwap;
+
 /*
 || V(X,t) : V_t = A(X).V_X + B(X).V_XX + C(X).V
 ||          with V(X_min,t) = BC_min(t), V(X_max,t) = BC_max(t), V(X,T) = FC(T)
@@ -136,7 +138,7 @@ class PricerPDE : public Pricer
     //! local-variance source, no discount), then PV = notional * DF * (fair - strike).
     //! _variance_mode drops the reaction term (C = 0) while reusing the grid solve.
     bool _variance_mode = false;
-    void SolveVarianceSwap( Contract* Ctr );
+    void SolveVarianceSwap( VarianceSwap* Ctr );
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -35,6 +35,19 @@ class Underlying : public Asset
     // Currency * GetCurrency();
     Correlation* GetCorrelation();
 
+    //! capability predicates (replace engine/contract RTTI & kind-string tests
+    //! with polymorphism). Defaults below; concrete underlyings override.
+
+    //! the underlying collapses to a single spatial dimension, so a 1-D PDE grid
+    //! and the moment-matched closed form apply (equity, composite, basket). Not
+    //! a rainbow (its payoff orders the assets, needing their joint law) nor a
+    //! bare FX leg.
+    virtual bool IsGriddable() const { return false; }
+
+    //! a plain single-name underlying (a mono): the only shape the MCL single-tree
+    //! Greeks can isolate a per-contract spot bump within a shared path.
+    virtual bool IsMono() const { return false; }
+
     //! mcl node
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
     virtual MonteCarloNode* GetVolNode( NodeCollector& NC ) = 0;

@@ -23,6 +23,9 @@ class Composite : public Underlying
     SingleSet GetSingleSet() override;
     CurrencySet GetCurrencySet() override;
 
+    //! a single (quanto'd) asset: collapses to one spatial dimension
+    bool IsGriddable() const override { return true; }
+
     //! mcl node
     MonteCarloNode* GetNode( NodeCollector& NC ) override;
     MonteCarloNode* GetVolNode( NodeCollector& NC ) override;

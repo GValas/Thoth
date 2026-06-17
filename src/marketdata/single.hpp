@@ -27,6 +27,10 @@ class Single : public Asset
                            const date& MaturityDate );
     virtual double GetForward( const date& MaturityDate ) = 0;
 
+    //! an FX leg (rather than an equity name): the MCL correlation/Cholesky split
+    //! groups FX singles separately. Default false; Forex overrides.
+    virtual bool IsForex() const { return false; }
+
     //! mcl node
     virtual MonteCarloNode* GetDriftNode( NodeCollector& NC ) = 0;
     virtual MonteCarloNode* GetNode( NodeCollector& NC );

@@ -19,6 +19,7 @@ class Forex : public Single
     void SetBaseCurrency( Currency& BaseCurrency );
 
     //! getter
+    bool IsForex() const override { return true; }
     Currency* GetBaseCurrency();
     Currency* GetUnderlyingCurrency();
     double GetForward( const date& MaturityDate ) override;

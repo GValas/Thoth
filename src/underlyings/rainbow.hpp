@@ -16,6 +16,10 @@ class Rainbow : public Basket
     //! setter
     void SetType( RainbowType Type );
 
+    //! a max/min payoff is not single-lognormal: no 1-D grid / closed form
+    //! (overrides Basket, which is griddable). MCL-only.
+    bool IsGriddable() const override { return false; }
+
     //! mcl node
     MonteCarloNode* GetNode( NodeCollector& NC ) override;
     MonteCarloNode* GetVolNode( NodeCollector& NC ) override;

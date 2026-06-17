@@ -115,6 +115,15 @@ class Contract : public Object
         return 0;
     }
 
+    //! priced on the spot grid as the expected accumulated variance (a backward
+    //! PDE with a local-variance source) rather than a terminal-payoff solve.
+    //! Only the variance swap overrides this; it routes the PDE pricer to the
+    //! dedicated accumulated-variance solve.
+    virtual bool PDE_IsAccruedVariance()
+    {
+        return false;
+    }
+
     //! analytical
     virtual bool ANA_HasSolution() = 0;
     virtual void ANA_EvalPrice() = 0;

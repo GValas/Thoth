@@ -34,6 +34,11 @@ class Basket : public Underlying
     SingleSet GetSingleSet() override;
     CurrencySet GetCurrencySet() override;
 
+    //! a (weighted) basket collapses to one effective asset via moment matching,
+    //! so the 1-D grid / closed form apply. Rainbow overrides this back to false:
+    //! its best/worst-of payoff orders the components and needs their joint law.
+    bool IsGriddable() const override { return true; }
+
     //! constructor, destructor
     Basket( const string& ObjectName,
             const string& ObjectKind );

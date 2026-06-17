@@ -56,6 +56,16 @@ class HestonVolatility : public Volatility
 
     bool IsStochastic() const override { return true; }
 
+    //! polymorphic parameter bundle for the engines (shift-aware via the getters)
+    StochasticVolParams StochasticParams() const override
+    {
+        return { GetV0(), GetKappa(), GetTheta(), GetXi(), GetRho(),
+                 GetJumpIntensity(), GetJumpMean(), GetJumpVol() };
+    }
+
+    //! the spot/variance correlation is resolved from the global matrix at pricing
+    void SetStochasticRho( double Rho ) override { SetRho( Rho ); }
+
     //! Heston / Bates model parameters exposed to the vega_<param> Greeks
     bool HasParam( const string& Name ) const override
     {

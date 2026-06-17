@@ -3,6 +3,18 @@
 #include "node_collector.hpp"
 #include <map>
 
+//! The stochastic-vol (Heston / Bates) parameters an engine needs to price the
+//! model, exposed polymorphically so the engines never name a concrete vol class
+//! (no dynamic_cast<HestonVolatility*>). All-zero for a deterministic surface.
+//! Carries the *current* values, including any vega / vega_<param> bump shifts, so
+//! bump-and-revalue Greeks keep working.
+struct StochasticVolParams
+{
+    double v0 = 0, kappa = 0, theta = 0, xi = 0, rho = 0;   //!< Heston
+    double jump_intensity = 0, jump_mean = 0, jump_vol = 0; //!< Bates (0 -> pure Heston)
+    bool has_jumps() const { return jump_intensity > 0; }
+};
+
 //! Abstract volatility surface: returns the implied vol at a (strike, forward,
 //! maturity) and the Dupire local vol derived from it; concrete kinds are
 //! bs_volatility (flat), sabr_volatility (Hagan) and heston_volatility.
@@ -51,6 +63,15 @@ class Volatility : public MarketData
     //! builds a dedicated variance + spot diffusion instead of the constant-vol
     //! SpotDiffusionNode. Deterministic vols (bs / sabr) return false.
     virtual bool IsStochastic() const { return false; }
+
+    //! stochastic-vol (Heston / Bates) parameters for the engines; default empty.
+    //! Override in a stochastic-vol surface; every engine reads this instead of
+    //! down-casting to the concrete model.
+    virtual StochasticVolParams StochasticParams() const { return {}; }
+
+    //! inject the spot/variance correlation (resolved from the global correlation
+    //! matrix) onto a stochastic-vol surface; no-op for deterministic surfaces.
+    virtual void SetStochasticRho( double /*Rho*/ ) {}
 
     // local & implicit vols. Forward is the underlying's forward to MaturityDate:
     // SABR (a forward-measure model) evaluates Hagan's formula at it; the flat

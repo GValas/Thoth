@@ -1,6 +1,5 @@
 #include "thoth.hpp"
 #include "pricer.hpp"
-#include "heston_volatility.hpp"
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
 
@@ -660,16 +659,13 @@ void Pricer::InitPricing()
         //! read hv->GetRho() unchanged.
         if ( ( *s )->GetVolatility()->IsStochastic() )
         {
-            HestonVolatility* hv = dynamic_cast<HestonVolatility*>( ( *s )->GetVolatility() );
-            if ( hv )
+            if ( !_correlation )
             {
-                if ( !_correlation )
-                {
-                    ERR( "book pricing '" + _name + "': Heston underlying '" + ( *s )->GetName() +
-                         "' needs a correlation matrix for its spot/variance correlation" );
-                }
-                hv->SetRho( _correlation->GetValue( ( *s )->GetName(), ( *s )->GetName() + "_var" ) );
+                ERR( "book pricing '" + _name + "': stochastic-vol underlying '" + ( *s )->GetName() +
+                     "' needs a correlation matrix for its spot/variance correlation" );
             }
+            ( *s )->GetVolatility()->SetStochasticRho(
+                _correlation->GetValue( ( *s )->GetName(), ( *s )->GetName() + "_var" ) );
         }
     }
 }

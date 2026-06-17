@@ -2,9 +2,7 @@
 #include "pricer_mcl.hpp"
 #include "cancellation.hpp"
 #include "contract.hpp"
-#include "heston_volatility.hpp"
 #include "mcl_gpu.hpp"
-#include "mono.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
 #include "maths.hpp"
@@ -165,7 +163,7 @@ bool PricerMCL::CanSingleTreeGreeks() const
 {
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( !dynamic_cast<Mono*>( c->GetUnderlying() ) )
+        if ( !c->GetUnderlying()->IsMono() )
         {
             return false;
         }
@@ -423,15 +421,13 @@ void PricerMCL::CreateBrownianNodes()
             VN->SetRandomGenerator( &_rng );
 
             //! Bates : an independent compound-Poisson jump source (only created
-            //! when the Heston vol carries jumps; pure Heston has no jump node)
-            if ( auto* h = dynamic_cast<HestonVolatility*>( ( *u )->GetVolatility() ) )
+            //! when the stochastic vol carries jumps; pure Heston has no jump node)
+            const StochasticVolParams h = ( *u )->GetVolatility()->StochasticParams();
+            if ( h.has_jumps() )
             {
-                if ( h->HasJumps() )
-                {
-                    JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + "#jump_noise" );
-                    JN->SetRandomGenerator( &_rng );
-                    JN->SetJumpParameters( h->GetJumpIntensity(), h->GetJumpMean(), h->GetJumpVol() );
-                }
+                JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + "#jump_noise" );
+                JN->SetRandomGenerator( &_rng );
+                JN->SetJumpParameters( h.jump_intensity, h.jump_mean, h.jump_vol );
             }
         }
     }
@@ -482,7 +478,7 @@ void PricerMCL::ComputeCholeskyMatrix()
           s != _single_set.end();
           s++ )
     {
-        if ( ( *s )->GetKind() == KIND_FOREX )
+        if ( ( *s )->IsForex() )
         {
             fx_name_list.push_back( ( *s )->GetName() );
         }
