@@ -61,8 +61,8 @@ ctest --test-dir build --output-on-failure    # doctest suite (tests/)
   it before committing. The style lives in `.clang-format` (Allman braces,
   `ColumnLimit 0`). `clang-format` is preinstalled in the devcontainer.
 
-A GPU (CUDA) build is opt-in and off by default; see `docs/gpu.md` /
-`docs/gpu.md`. A Debug build goes to `build-debug/` via the VS Code F5 task and
+A GPU (CUDA) build is opt-in and off by default; see `docs/gpu.md`. A Debug build
+goes to `build-debug/` via the VS Code F5 task and
 leaves the Release `build/` untouched.
 
 Always build, test and format before you consider a change done.
@@ -83,7 +83,7 @@ src/             C++ engine, instruments, market data, IO
   helpers/       linalg (la_*), maths, distributions, statistics, rng, progress_bar, raii
   fixings/       fixing data
 tests/           doctest regression suite
-samples/         runnable YAML books (simple_call, heston_call, bates_call, sabr_call, matrix, ...)
+samples/         runnable YAML books (simple_call, matrix)
 docs/            design notes & guides (this file lives here)
 CMakeLists.txt   build
 format.sh        clang-format wrapper (--check is the CI gate)

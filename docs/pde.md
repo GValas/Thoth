@@ -258,7 +258,7 @@ pde_cfg: !pde_configuration
   # custom_sigma_factor: 5.0   # X_max/X_min = spot*exp(+/- factor*v*sqrt(T))
 ```
 
-(`samples/matrix.yaml` and `samples/heston_call.yaml` exercise the full matrix:
+(`samples/matrix.yaml` and `samples/matrix.yaml` exercise the full matrix:
 European/American vanillas, continuous/discrete barriers, quanto/compo and a
 Heston vanilla.)
 

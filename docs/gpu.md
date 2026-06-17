@@ -135,20 +135,18 @@ docker run --rm --gpus all -p 8080:8080 thoth-gpu
 
 ### Sample
 
-`samples/gpu_call.yaml` is a 1y ATM call (spot 100, strike 100, rate 8%, vol 30%,
-1M paths, `method: mcl` with `allow_gpu: true`), Black-Scholes reference ≈ 15.71:
+`samples/matrix.yaml` carries the GPU cells `vanilla_mono_eu_call_mcl_gpu` and
+`vanilla_mono_eu_put_mcl_gpu` — `method: mcl` with `allow_gpu: true` — alongside
+their plain `mcl` / `ana` / `pde` siblings, so the same product is priced on the
+device and on the CPU side by side and the prices agree:
 
 ```bash
 ./run_docker_server.sh --gpu
-./build/thoth -client http://localhost:8080 samples/gpu_call.yaml
+./run_local_client_matrix.sh samples/matrix.yaml --port 8080   # MCL_GPU rows in the table
 ```
 
-`samples/matrix_gpu.yaml` is the same shape across ANA / CPU-MCL / `allow_gpu`-MCL
-for an ATM put; post it with `run_local_client_matrix.sh samples/matrix_gpu.yaml`
-to see the three engines side by side.
-
-On a CPU-only build the same sample runs on the CPU MCL engine and produces
-identical results.
+On a CPU-only build (or a host with no GPU) those cells run on the CPU MCL engine
+and produce identical results.
 
 ## How the kernel works
 

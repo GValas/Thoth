@@ -129,8 +129,8 @@ American). The three agree to ~0.3% across moneyness, and the degenerate
 (compound-Poisson) jumps — `jump_intensity` (λ per year), `jump_mean`, `jump_vol`
 — turns it into the **Bates** model: priced by **MCL** (an independent jump node
 on the QE spot) and **ANA** (the closed-form jump characteristic function
-multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). See
-`samples/bates_call.yaml`.
+multiplies the Heston CF); the PDE grid stays pure Heston (no jump term). The
+Heston, Bates and SABR cases are exercised by the cells in `samples/matrix.yaml`.
 
 **Analytics objects**
 - `pricer`.
@@ -200,7 +200,7 @@ in-container directly:
 
 ```bash
 cmake -B build-gpu -DTHOTH_ENABLE_CUDA=ON && cmake --build build-gpu -j
-./build-gpu/thoth -batch samples/gpu_call.yaml /tmp/out.yaml   # runs on the GPU
+./build-gpu/thoth -batch samples/matrix.yaml /tmp/out.yaml   # the allow_gpu cells run on the GPU
 ```
 
 On a host with no GPU the devcontainer still opens (CPU-only, an `allow_gpu` book
@@ -414,19 +414,12 @@ Conventions: volatilities and curve values are in **percent** (`30` -> 0.30,
 matrices are flat number lists. Output YAML is emitted with fields in
 alphabetical order (stable, diff-friendly).
 
-`samples/` holds runnable books: `simple_call.yaml` (the 1y ATM call above,
-Black-Scholes ~15.71, with the node-graph debug switch enabled),
-`heston_call.yaml` (a Heston call priced by all three engines),
-`bates_call.yaml` (a Bates — Heston + jumps — call priced by MCL, dumping its
-node DAG to Graphviz), `sabr_call.yaml` (a realistic SABR equity surface priced
-by ANA and by the Dupire local-vol MCL — the two agree, repricing the smile,
-including a skewed OTM put), `gpu_call.yaml` (a call priced by the `mcl` engine
-with `allow_gpu: true`, running on the CPU off a GPU) and `matrix.yaml` — a `!sequence` running
-the full pricer/product matrix (vanilla european/american, quanto, composite,
-basket / best-of / worst-of, continuous / discrete / knock-in barriers, variance
-swap, Heston, Bates, SABR local-vol, across PDE / MCL / ANA) in one process, and
-`matrix_gpu.yaml` (an ATM European put priced by ANA / CPU-MCL / `allow_gpu`-MCL —
-the three agree, the GPU row running on the device on a CUDA build, else the CPU).
+`samples/` holds two runnable books: `simple_call.yaml` (the 1y ATM call above,
+Black-Scholes ~15.71, with the node-graph debug switch enabled) and `matrix.yaml`
+— a `!sequence` running the full pricer/product matrix (vanilla european/american,
+quanto, composite, basket / best-of / worst-of, continuous / discrete / knock-in
+barriers, variance swap, Heston, Bates, SABR local-vol, GPU `allow_gpu` cells, and
+the model-parameter `vega_<param>` Greeks, across PDE / MCL / ANA) in one process.
 
 ---
 

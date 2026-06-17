@@ -138,7 +138,7 @@ wait for the spot at date `k − 1`.
   ANA/PDE quanto correction uses).
 
 **Dupire repricing property.** A local-vol MC built from an implied surface
-reproduces the implied-vol prices it was derived from. `samples/sabr_call.yaml`
+reproduces the implied-vol prices it was derived from. `samples/matrix.yaml`
 demonstrates this: the same book is priced by ANA (Black at the SABR implied vol
 of each strike) and MCL (Dupire local vol from that SABR surface) and the two
 **agree within Monte-Carlo error**. The PDE leg is deliberately not run there
@@ -188,11 +188,11 @@ heston_vol: !heston_volatility
 
 `rho` is **not** a field on the vol object: the spot/variance correlation lives
 in the global `!correlation_matrix`, between the equity `eq` and its variance
-pseudo-underlying `eq_var` (see `samples/heston_call.yaml`, `matrix: [1, -0.7,
+pseudo-underlying `eq_var` (see `samples/matrix.yaml`, `matrix: [1, -0.7,
 -0.7, 1]`). The vega bump shifts both `v0` and `theta` by `(sqrt(v) + shift)²` so
 bump-and-revalue vega works for Heston too (`HestonVolatility::Shifted`).
 
-Engine support (cross-check `samples/heston_call.yaml`, all three agree):
+Engine support (cross-check `samples/matrix.yaml`, all three agree):
 - **MCL** — `Single::GetNode` builds a `HestonVarianceNode` (CIR variance) and a
   `HestonSpotNode` driven by it, discretised with the **Andersen QE**
   (quadratic-exponential) scheme — far less biased on `sqrt(v)` than Euler. The
@@ -204,7 +204,7 @@ Engine support (cross-check `samples/heston_call.yaml`, all three agree):
 
 `GetImplicitVol` returns only a coarse `sqrt(v0)` proxy for incidental callers
 (PDE grid bounds, quanto fallback); the engines that understand Heston read the
-parameters directly. See `samples/heston_call.yaml` for a complete book.
+parameters directly. See `samples/matrix.yaml` for a complete book.
 
 ---
 
@@ -232,7 +232,7 @@ heston_vol_bates: !heston_volatility
   (`Single::GetNode` wires `SetJumpNode` when `HasJumps()`).
 - **ANA** — a closed-form lognormal jump factor multiplies the Heston
   characteristic function.
-- **PDE** — **not supported** (it would need a PIDE); the `samples/heston_call.yaml`
+- **PDE** — **not supported** (it would need a PIDE); the `samples/matrix.yaml`
   book runs Bates only through ANA and MCL, which agree, and the jumps lift the
   premium above pure Heston.
 

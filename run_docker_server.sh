@@ -32,7 +32,7 @@
 #
 # Once up:
 #     curl http://localhost:8080/health
-#     curl -X POST --data-binary @samples/heston_call.yaml http://localhost:8080/price
+#     curl -X POST --data-binary @samples/simple_call.yaml http://localhost:8080/price
 # ---------------------------------------------------------------------------
 set -euo pipefail
 

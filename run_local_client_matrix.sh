@@ -23,7 +23,7 @@
 # Examples:
 #     ./run_local_client_matrix.sh samples/matrix.yaml
 #     ./run_local_client_matrix.sh samples/matrix.yaml --port 7777
-#     ./run_local_client_matrix.sh samples/matrix_gpu.yaml --raw /tmp/matrix.out.yaml
+#     ./run_local_client_matrix.sh samples/matrix.yaml --raw /tmp/matrix.out.yaml
 # ---------------------------------------------------------------------------
 set -euo pipefail
 

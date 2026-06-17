@@ -65,7 +65,7 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 POST `input.yaml` to a running `thoth` server and print the result to stdout.
 
 ```bash
-./build/thoth -client http://localhost:8080 samples/heston_call.yaml
+./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 ```
 
 ### `-cluster <port> <slave-url> [slave-url ...]`
@@ -121,8 +121,8 @@ read-only, the output directory read-write, and `--user` maps the container to
 the invoking host user so the result is owned by you (not root).
 
 ```bash
-./run_docker_batch.sh samples/heston_call.yaml          # -> samples/heston_call.out.yaml
-./run_docker_batch.sh samples/sabr_call.yaml /tmp/sabr.yaml
+./run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
+./run_docker_batch.sh samples/simple_call.yaml /tmp/out.yaml
 ```
 
 ### Posting to a running server
@@ -136,7 +136,7 @@ default form content type is capped by the HTTP library at 8 KB).
 ```bash
 # with a server (or cluster) already up on 8080:
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
-./build/thoth -client http://localhost:8080 samples/heston_call.yaml --exec-name heston_pricing
+./build/thoth -client http://localhost:8080 samples/simple_call.yaml --exec-name simple_call_pricing
 ./run_local_client_matrix.sh samples/matrix.yaml --port 7777
 ```
 
@@ -149,7 +149,7 @@ cmake -B build && cmake --build build -j
 
 # 2) Dockerised server + client
 ./run_docker_server.sh --port 8080 &                  # leave it running
-./build/thoth -client http://localhost:8080 samples/heston_call.yaml
+./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 
 # 3) Dockerised cluster: split an MCL book across 2 slaves
 ./run_docker_server.sh --port 8090 --slaves 2 &

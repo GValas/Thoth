@@ -12,8 +12,8 @@
 # The output argument is optional; it defaults to <input>.out.yaml next to the input.
 #
 # Examples:
-#     ./run_docker_batch.sh samples/heston_call.yaml         # -> samples/heston_call.out.yaml
-#     ./run_docker_batch.sh samples/heston_call.yaml /tmp/r.yaml
+#     ./run_docker_batch.sh samples/simple_call.yaml         # -> samples/simple_call.out.yaml
+#     ./run_docker_batch.sh samples/simple_call.yaml /tmp/r.yaml
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
