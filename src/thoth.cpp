@@ -288,30 +288,38 @@ static string ClusterPrice( const string& Body,
         return ClusterPriceSequence( Body, exec, Slaves );
     }
 
-    //! only an MCL single-pricer can be path-split
+    //! only a plain (CPU) MCL single-pricer is path-split across the slaves
     bool splittable = req.GetTag( exec ) == "pricer";
     string cfg, mcl;
+    bool allow_gpu = false;
     if ( splittable )
     {
         cfg = req.GetString( exec + ".configuration" );
-        splittable = req.GetString( cfg + ".method" ) == "mcl" &&
-                     req.IsString( cfg + ".mcl_configuration" );
+        if ( req.GetString( cfg + ".method" ) == "mcl" && req.IsString( cfg + ".mcl_configuration" ) )
+        {
+            mcl = req.GetString( cfg + ".mcl_configuration" );
+            //! a GPU cell (allow_gpu) is already massively data-parallel on one
+            //! device, so it is NOT split — the master prices it whole on its own
+            //! GPU rather than fanning a fraction of the paths out to each slave.
+            allow_gpu = req.GetBoolean( mcl + ".allow_gpu", false );
+            splittable = !allow_gpu;
+        }
+        else
+        {
+            splittable = false;
+        }
     }
     if ( !splittable )
     {
-        //! nothing to distribute (non-MCL engine, or an MCL pricer with no path
-        //! config) : the master computes it itself rather than offloading a whole,
-        //! unsplit job onto one slave. Runs under the master's price_mutex, so it
-        //! stays serialised with the rest of the cluster pricing.
-        LOG( "CLU", "request is not a splittable MCL pricer : computing on the master" );
+        //! computed on the master rather than offloading a whole, unsplit job onto
+        //! one slave (non-MCL engine, an MCL pricer with no path config, or a GPU
+        //! cell which runs on the master's device). Under the master's price_mutex,
+        //! so it stays serialised with the rest of the cluster pricing.
+        LOG( allow_gpu ? "GPU" : "CLU",
+             allow_gpu ? "GPU pricer : computing on the master device (not path-split)"
+                       : "request is not a splittable MCL pricer : computing on the master" );
         return ExecuteYaml( Body, ExecName );
     }
-    mcl = req.GetString( cfg + ".mcl_configuration" );
-
-    //! GPU-enabled cell (allow_gpu): the slaves run their path block on the device,
-    //! so tag the master's dispatch / progress lines GPU rather than CLU.
-    const bool allow_gpu = req.GetBoolean( mcl + ".allow_gpu", false );
-    const string tag = allow_gpu ? "GPU" : "CLU";
 
     const long total = req.GetLong( mcl + ".paths" );
     const string result = req.GetString( exec + ".result" );
@@ -346,8 +354,8 @@ static string ClusterPrice( const string& Body,
     }
 
     //! dispatch concurrently
-    LOG( tag, "dispatching " + std::to_string( total ) + " paths across " +
-                  std::to_string( N ) + " slave(s)" + ( allow_gpu ? " (allow_gpu)" : "" ) );
+    LOG( "CLU", "dispatching " + std::to_string( total ) + " paths across " +
+                    std::to_string( N ) + " slave(s)" );
     vector<string> responses( N );
     vector<std::exception_ptr> errs( N );
     vector<std::thread> threads;
@@ -366,7 +374,7 @@ static string ClusterPrice( const string& Body,
     std::atomic<bool> dispatching{ true };
     std::thread poller( [&]()
                         {
-        ProgressBar bar( tag, 100 ); //!< driven in whole percent (GPU when allow_gpu)
+        ProgressBar bar( "CLU", 100 ); //!< driven in whole percent
         while ( dispatching.load() )
         {
             long sum_cur = 0, sum_tot = 0;
