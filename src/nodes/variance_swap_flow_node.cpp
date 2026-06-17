@@ -16,7 +16,13 @@ void VarianceSwapFlowNode::ComputeValue( size_t DateIndex )
         return;
     }
 
-    //! annualized realized variance over the simulated path
+    //! Annualized realized variance = the discretised quadratic variation over the
+    //! whole simulated path: squared log-returns at EVERY diffusion step, / T. This
+    //! is a continuously-observed variance swap (no intermediate fixing schedule —
+    //! GetFixingDates() is just the maturity), so summing all steps is the correct
+    //! estimator and it converges to / agrees with the continuous ANA replication
+    //! and PDE accumulated-variance fair value. A discretely-observed swap would
+    //! instead sum only over its fixing dates.
     double sum2 = 0;
     double prev = _spot_node->GetValue( 0 );
     for ( size_t j = 1; j <= _flow_date_index; j++ )

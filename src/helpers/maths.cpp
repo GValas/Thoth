@@ -556,12 +556,16 @@ void SolveTridiagonal( const la_vector* Diag, const la_vector* Super,
 //! (X^T X) beta = X^T y, solved by Cholesky. X is n x p with p small and full
 //! column rank (the Longstaff-Schwartz {1, m, m^2} basis). Returns beta (size p).
 //! Replaces gsl_multifit_linear (only the coefficients are needed, not cov/chisq).
+//! Ordinary least squares via the normal equations (X^T X) beta = X^T y, solved by
+//! Cholesky. Returns an EMPTY vector when X^T X is numerically singular (e.g. a
+//! degenerate regression design) so the caller can fall back instead of dividing
+//! by a zero pivot and propagating NaNs.
 vector<double> LeastSquares( const la_matrix* X, const la_vector* y )
 {
     const size_t n = X->size1;
     const size_t p = X->size2;
-    la_matrix* A = la_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD)
-    vector<double> g( p, 0.0 );             //!< right-hand side X^T y
+    LaMatrix A = la_matrix_alloc( p, p ); //!< normal matrix X^T X (SPD), RAII-freed
+    vector<double> g( p, 0.0 );           //!< right-hand side X^T y
     for ( size_t a = 0; a < p; a++ )
     {
         for ( size_t b = 0; b <= a; b++ )
@@ -581,8 +585,12 @@ vector<double> LeastSquares( const la_matrix* X, const la_vector* y )
         }
         g[a] = sg;
     }
-    //! A = L L^T, then solve L z = g (forward) and L^T beta = z (back)
-    CholeskyDecomposeLower( A );
+    //! A = L L^T, then solve L z = g (forward) and L^T beta = z (back). A singular
+    //! normal matrix has no factorisation -> signal failure with an empty result.
+    if ( !CholeskyDecomposeLower( A ) )
+    {
+        return {};
+    }
     vector<double> z( p ), beta( p );
     for ( size_t i = 0; i < p; i++ )
     {
@@ -602,8 +610,7 @@ vector<double> LeastSquares( const la_matrix* X, const la_vector* y )
         }
         beta[i] = s / la_matrix_get( A, i, i );
     }
-    la_matrix_free( A );
-    return beta;
+    return beta; //!< A is RAII-freed at scope exit
 }
 
 //! sum elments of vector

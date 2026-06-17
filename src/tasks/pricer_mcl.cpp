@@ -920,8 +920,8 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
 
         //! regress discounted continuation cashflow on { 1, m, m^2 }
         size_t ni = itm.size();
-        la_matrix* X = la_matrix_alloc( ni, 3 );
-        la_vector* y = la_vector_alloc( ni );
+        LaMatrix X = la_matrix_alloc( ni, 3 ); //!< RAII: freed on every exit (incl. throw)
+        LaVector y = la_vector_alloc( ni );
         for ( size_t k = 0; k < ni; k++ )
         {
             double m = la_matrix_get( Paths, itm[k], t ) / pol.s0;
@@ -931,6 +931,10 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
             la_vector_set( y, k, cf[itm[k]] );
         }
         vector<double> beta = LeastSquares( X, y );
+        if ( beta.empty() )
+        {
+            continue; //!< singular regression at this date -> hold (has_fit stays false)
+        }
         pol.b0[t] = beta[0];
         pol.b1[t] = beta[1];
         pol.b2[t] = beta[2];
@@ -948,9 +952,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
                 cf[p] = intrinsic;
             }
         }
-
-        la_matrix_free( X );
-        la_vector_free( y );
+        //! X, y are RAII-freed at scope exit
     }
 
     return pol;
