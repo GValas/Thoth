@@ -75,8 +75,10 @@ function flush() {
     else if (n ~ /_mcl_gpu$/)       { method="mcl_gpu";    prod=substr(n, 1, length(n)-8) }
     else if (n ~ /_(ana|mcl|pde)$/) { method=substr(n, length(n)-2);  prod=substr(n, 1, length(n)-4) }
     else                            { method="-";          prod=n }
-    rows[nr] = sprintf("%-40s %-11s %10s %12s %10s %10s %10s %10s %10s",
-                       prod, method, fmt_time(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
+    row = sprintf("%-40s %-11s %10s %12s %10s %10s %10s %10s %10s",
+                  prod, toupper(method), fmt_time(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
+    if (pg != "") row = row "   " pg   #!< model-parameter Greeks (vega_<param>), variable per model
+    rows[nr] = row
     #! sort key: product then method. SUBSEP (\034) sorts below '_' and letters, so
     #! a plain product groups before its longer "<product>_<variant>" siblings.
     keys[nr] = prod SUBSEP method
@@ -104,13 +106,13 @@ function fmt_time(v,   a, m, s) {
     if (a >= 1e-6) return tnum(v * 1e6) "µs"
     return tnum(v * 1e9) "ns"
 }
-function reset() { t=prem=de=ga=ve=rh=th=""; is_pricer=0 }
+function reset() { t=prem=de=ga=ve=rh=th=pg=""; is_pricer=0 }
 BEGIN {
     nr = 0   #!< numeric from the start: rows[nr] must index 0,1,2... not the string ""
-    printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s\n",
-           "PRODUCT", "METHOD", "TIME", "PREMIUM", "DELTA", "GAMMA", "VEGA", "RHO", "THETA"
-    printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s\n",
-           "-------", "------", "----", "-------", "-----", "-----", "----", "---", "-----"
+    printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s   %s\n",
+           "PRODUCT", "METHOD", "TIME", "PREMIUM", "DELTA", "GAMMA", "VEGA", "RHO", "THETA", "MODEL GREEKS (vega_<param>)"
+    printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s   %s\n",
+           "-------", "------", "----", "-------", "-----", "-----", "----", "---", "-----", "--------------------------"
 }
 # a top-level result block header: "<name>_result:" with no leading space
 /^[A-Za-z0-9_]+_result:[[:space:]]*$/ {
@@ -130,6 +132,12 @@ name != "" && /^  gamma:/     { ga=$2 }
 name != "" && /^  vega:/      { ve=$2 }
 name != "" && /^  rho:/       { rh=$2 }
 name != "" && /^  theta:/     { th=$2 }
+#! model-parameter Greeks (vega_alpha, vega_v0, vega_kappa, ...) — model-specific,
+#! so collected into one trailing free-form field rather than fixed columns
+name != "" && /^  vega_[a-z0-9_]+:/ {
+    key = $1; sub(/:$/, "", key); sub(/^vega_/, "", key)
+    pg = pg (pg == "" ? "" : " ") key "=" fmt($2)
+}
 END {
     flush()
     #! insertion sort of the row indices by their (product, method) key (n ~ 60,
