@@ -130,23 +130,19 @@ string LogTimestamp()
     return oss.str();
 }
 
-//! log
+//! log : colour the whole line by context when stdout is a terminal — SEQ (the
+//! sequence orchestration) in white, every other context dimmed grey — otherwise
+//! emit it plain so captured / redirected logs carry no escape codes.
 void LOG( const string& Context,
           const string& LogMsg )
 {
-    LOG( Context, LogMsg, "" );
-}
-
-//! coloured log : wrap the whole line in AnsiColor when stdout is a terminal,
-//! otherwise emit it plain so captured/redirected logs carry no escape codes.
-void LOG( const string& Context,
-          const string& LogMsg,
-          const string& AnsiColor )
-{
-    string line = LogTimestamp() + " " + ( Context == "" ? "LOG" : Context ) + "> " + LogMsg;
-    if ( !AnsiColor.empty() && isatty( STDOUT_FILENO ) )
+    const string ctx = ( Context == "" ? "LOG" : Context );
+    const string line = LogTimestamp() + " " + ctx + "> " + LogMsg;
+    if ( isatty( STDOUT_FILENO ) )
     {
-        cout << AnsiColor + line + "\033[0m" << endl;
+        const char* color = ( ctx == "SEQ" ) ? "\033[97m"  //!< bright white
+                                             : "\033[90m"; //!< grey (bright black)
+        cout << color << line << "\033[0m" << endl;
     }
     else
     {

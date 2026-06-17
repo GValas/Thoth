@@ -19,16 +19,11 @@ vector<string> NULL_STRING_VECTOR();
 [[noreturn]] void ERR( const string& ErrMsg );
 string LogTimestamp(); //!< current local time "YYYY-MM-DD HH:MM:SS" (LOG line prefix)
 void LOG( const string& LogMsg );
+//! coloured log line, by context: SEQ lines are white, every other context is a
+//! dimmed grey — but only when stdout is a terminal (captured / redirected logs
+//! stay free of escape codes).
 void LOG( const string& Context,
           const string& LogMsg );
-//! coloured log line: the whole line is wrapped in AnsiColor, but only when
-//! stdout is a terminal (captured/redirected logs stay free of escape codes).
-void LOG( const string& Context,
-          const string& LogMsg,
-          const string& AnsiColor );
-
-//! ANSI colour codes for LOG (see the 3-arg LOG overload)
-inline constexpr char LOG_COLOR_CYAN[] = "\033[36m";
 
 void CheckDateList( const vector<date>& DateList );
 //! monotonic wall-clock time in seconds (steady_clock); use as the start stamp

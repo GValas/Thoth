@@ -23,8 +23,7 @@ void Sequence::Execute()
     double t0 = WallClockSeconds();
     for ( size_t i = 0; i < _tasks.size(); i++ )
     {
-        LOG( "SEQ", "task " + ToString( i + 1 ) + "/" + ToString( _tasks.size() ) + " : " + _task_names[i],
-             LOG_COLOR_CYAN );
+        LOG( "SEQ", "task " + ToString( i + 1 ) + "/" + ToString( _tasks.size() ) + " : " + _task_names[i] );
         _tasks[i]->Execute();
         _tasks[i]->WriteResults();
     }
