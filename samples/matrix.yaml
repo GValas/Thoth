@@ -24,7 +24,7 @@ root: matrix
 #   vanilla mono eu call (gpu)              mcl         (allow_gpu: true; device on a CUDA build, else CPU)
 #   vanilla mono eu put                     ana   mcl   pde
 #   vanilla mono eu put (gpu)               mcl         (allow_gpu: true; device on a CUDA build, else CPU)
-#   vanilla mono eu call bates (hes+jumps)  ana   mcl   (ANA jump CF / MCL compound Poisson)
+#   vanilla mono eu call bates (hes+jumps)  ana   mcl   pde (ANA jump CF / MCL Poisson / PDE PIDE)
 #   vanilla mono eu call compo (EUR->USD)   ana   mcl   pde
 #   vanilla mono eu call compo sabr         ana   mcl   (local vol; ANA implied vs MCL Dupire)
 #   vanilla mono eu call heston (stoch vol) ana   mcl   pde
@@ -35,7 +35,7 @@ root: matrix
 #   vanilla multi eu call basket sabr       mcl         (per-component local vol; MCL-only)
 #   vanilla multi eu call best-of           mcl         (max of 2 assets; MCL-only)
 #   vanilla multi eu call worst-of          mcl         (min of 2 assets; MCL-only)
-#   variance swap mono                      ana   mcl
+#   variance swap mono                      ana   mcl   pde (ANA replication / MCL realized / PDE accumulated-variance)
 #
 # The SABR cases exercise the Dupire local-vol Monte-Carlo (the SABR implied surface
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
@@ -81,6 +81,7 @@ matrix: !sequence
     - vanilla_mono_eu_call_pde
     - vanilla_mono_eu_call_bates_ana
     - vanilla_mono_eu_call_bates_mcl
+    - vanilla_mono_eu_call_bates_pde
     - vanilla_mono_eu_call_compo_ana
     - vanilla_mono_eu_call_compo_mcl
     - vanilla_mono_eu_call_compo_pde
@@ -99,6 +100,7 @@ matrix: !sequence
     - vanilla_multi_eu_call_worst_of_mcl
     - variance_swap_mono_ana
     - variance_swap_mono_mcl
+    - variance_swap_mono_pde
     #! local-vol (SABR) — ANA at the strike implied vol vs MCL on the Dupire surface
     - vanilla_mono_eu_call_sabr_ana
     - vanilla_mono_eu_call_sabr_mcl
@@ -166,7 +168,7 @@ vanilla_mono_eu_call_quanto_pde: !pricer
   book: book_van_eu_q
   currency: usd
   configuration: cfg_pde
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_quanto_pde_result
 vanilla_mono_eu_call_quanto_mcl: !pricer
@@ -174,7 +176,7 @@ vanilla_mono_eu_call_quanto_mcl: !pricer
   book: book_van_eu_q
   currency: usd
   configuration: cfg_mcl
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_quanto_mcl_result
 vanilla_mono_eu_call_quanto_ana: !pricer
@@ -182,7 +184,7 @@ vanilla_mono_eu_call_quanto_ana: !pricer
   book: book_van_eu_q
   currency: usd
   configuration: cfg_ana
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_quanto_ana_result
 
@@ -212,7 +214,7 @@ vanilla_mono_am_put_quanto_pde: !pricer
   book: book_van_am_q
   currency: usd
   configuration: cfg_pde
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_quanto_pde_result
 vanilla_mono_am_put_quanto_mcl: !pricer
@@ -220,7 +222,7 @@ vanilla_mono_am_put_quanto_mcl: !pricer
   book: book_van_am_q
   currency: usd
   configuration: cfg_mcl
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_quanto_mcl_result
 
@@ -277,7 +279,7 @@ vanilla_mono_eu_call_compo_pde: !pricer
   book: book_compo
   currency: usd
   configuration: cfg_pde
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_pde_result
 vanilla_mono_eu_call_compo_mcl: !pricer
@@ -285,7 +287,7 @@ vanilla_mono_eu_call_compo_mcl: !pricer
   book: book_compo
   currency: usd
   configuration: cfg_mcl
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_mcl_result
 vanilla_mono_eu_call_compo_ana: !pricer
@@ -293,7 +295,7 @@ vanilla_mono_eu_call_compo_ana: !pricer
   book: book_compo
   currency: usd
   configuration: cfg_ana
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_ana_result
 
@@ -305,7 +307,7 @@ vanilla_mono_us_put_compo_pde: !pricer
   book: book_compo_am
   currency: usd
   configuration: cfg_pde
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_us_put_compo_pde_result
 vanilla_mono_us_put_compo_mcl: !pricer
@@ -313,7 +315,7 @@ vanilla_mono_us_put_compo_mcl: !pricer
   book: book_compo_am
   currency: usd
   configuration: cfg_mcl
-  correlation: correl_q
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_us_put_compo_mcl_result
 
@@ -326,7 +328,7 @@ vanilla_multi_eu_call_best_of_mcl: !pricer
   book: book_rb_best
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_rb
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_best_of_mcl_result
 vanilla_multi_eu_call_worst_of_mcl: !pricer
@@ -334,7 +336,7 @@ vanilla_multi_eu_call_worst_of_mcl: !pricer
   book: book_rb_worst
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_rb
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_worst_of_mcl_result
 
@@ -346,7 +348,7 @@ vanilla_multi_eu_call_basket_ana: !pricer
   book: book_basket
   currency: eur
   configuration: cfg_ana
-  correlation: correl_rb
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_basket_ana_result
 vanilla_multi_eu_call_basket_mcl: !pricer
@@ -354,7 +356,7 @@ vanilla_multi_eu_call_basket_mcl: !pricer
   book: book_basket
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_rb
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_basket_mcl_result
 vanilla_multi_eu_call_basket_pde: !pricer
@@ -362,7 +364,7 @@ vanilla_multi_eu_call_basket_pde: !pricer
   book: book_basket
   currency: eur
   configuration: cfg_pde
-  correlation: correl_rb
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_basket_pde_result
 
@@ -373,7 +375,7 @@ vanilla_mono_eu_call_heston_pde: !pricer
   book: book_heston
   currency: eur
   configuration: cfg_pde
-  correlation: correl_h
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_heston_pde_result
 vanilla_mono_eu_call_heston_mcl: !pricer
@@ -381,7 +383,7 @@ vanilla_mono_eu_call_heston_mcl: !pricer
   book: book_heston
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_h
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_heston_mcl_result
 vanilla_mono_eu_call_heston_ana: !pricer
@@ -389,19 +391,20 @@ vanilla_mono_eu_call_heston_ana: !pricer
   book: book_heston
   currency: eur
   configuration: cfg_ana
-  correlation: correl_h
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta, vega_v0, vega_kappa, vega_theta, vega_xi, vega_rho]
   result: vanilla_mono_eu_call_heston_ana_result
 
 # bates = heston + lognormal jumps (crash-like). ANA adds a closed-form jump
-# factor to the char function; MCL adds a compound-Poisson jump to the QE spot.
-# They agree and price above pure Heston. PDE is not supported (PIDE).
+# factor to the char function; MCL adds a compound-Poisson jump to the QE spot;
+# PDE solves the Bates PIDE (Heston ADI + an explicit jump integral, IMEX). All
+# three agree and price above pure Heston.
 vanilla_mono_eu_call_bates_ana: !pricer
   today: 2000-01-01
   book: book_bates
   currency: eur
   configuration: cfg_ana
-  correlation: correl_b
+  correlation: correl
   indicators: [premium, vega_v0, vega_kappa, vega_theta, vega_xi, vega_rho, vega_jump_intensity, vega_jump_mean, vega_jump_vol]
   result: vanilla_mono_eu_call_bates_ana_result
 vanilla_mono_eu_call_bates_mcl: !pricer
@@ -409,9 +412,17 @@ vanilla_mono_eu_call_bates_mcl: !pricer
   book: book_bates
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_b
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_bates_mcl_result
+vanilla_mono_eu_call_bates_pde: !pricer
+  today: 2000-01-01
+  book: book_bates
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_bates_pde_result
 
 # variance swap
 variance_swap_mono_mcl: !pricer
@@ -430,6 +441,14 @@ variance_swap_mono_ana: !pricer
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: variance_swap_mono_ana_result
+variance_swap_mono_pde: !pricer
+  today: 2000-01-01
+  book: book_vswap
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: variance_swap_mono_pde_result
 
 # SABR local-vol ATM call: ANA prices Black-Scholes at the strike's SABR implied
 # vol; MCL diffuses the Dupire local vol built from the surface. They agree
@@ -439,7 +458,7 @@ vanilla_mono_eu_call_sabr_ana: !pricer
   book: book_sabr
   currency: eur
   configuration: cfg_ana
-  correlation: correl_sabr
+  correlation: correl
   indicators: [premium, vega_alpha, vega_beta, vega_rho, vega_nu]
   result: vanilla_mono_eu_call_sabr_ana_result
 vanilla_mono_eu_call_sabr_mcl: !pricer
@@ -447,7 +466,7 @@ vanilla_mono_eu_call_sabr_mcl: !pricer
   book: book_sabr
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_sabr
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_sabr_mcl_result
 
@@ -459,7 +478,7 @@ vanilla_mono_eu_call_compo_sabr_ana: !pricer
   book: book_compo_sabr
   currency: usd
   configuration: cfg_ana
-  correlation: correl_compo_sabr
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_sabr_ana_result
 vanilla_mono_eu_call_compo_sabr_mcl: !pricer
@@ -467,7 +486,7 @@ vanilla_mono_eu_call_compo_sabr_mcl: !pricer
   book: book_compo_sabr
   currency: usd
   configuration: cfg_mcl
-  correlation: correl_compo_sabr
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_compo_sabr_mcl_result
 
@@ -478,7 +497,7 @@ vanilla_multi_eu_call_basket_sabr_mcl: !pricer
   book: book_basket_sabr
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_basket_sabr
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_multi_eu_call_basket_sabr_mcl_result
 
@@ -654,7 +673,7 @@ vanilla_mono_am_put_heston_mcl: !pricer
   book: book_heston_am
   currency: eur
   configuration: cfg_mcl
-  correlation: correl_h
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_heston_mcl_result
 vanilla_mono_am_put_heston_pde: !pricer
@@ -662,7 +681,7 @@ vanilla_mono_am_put_heston_pde: !pricer
   book: book_heston_am
   currency: eur
   configuration: cfg_pde
-  correlation: correl_h
+  correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_am_put_heston_pde_result
 
@@ -1015,7 +1034,7 @@ eq: !equity
   spot: 100
   volatility: vol
   currency: eur
-# composite view of eq: the EUR asset settled in USD (uses eur/usd + correl_q)
+# composite view of eq: the EUR asset settled in USD (uses eur/usd + the shared correl)
 comp: !composite
   equity: eq
   composite_currency: usd
@@ -1093,20 +1112,25 @@ eur: !currency
 eur_rate: !yield_curve
   dates: [2000-01-01, 2010-01-01]
   values: [8, 8]
+# One correlation matrix for the whole book: every underlying (and the eur/usd FX)
+# in one symmetric, positive-definite matrix. Each pricer extracts the sub-block it
+# needs by name. Known pairs are filled, all other pairs are 0:
+#   eq/eq2 = 0.5 (basket, rainbow)          eq/eur-usd = 0.5 (quanto)
+#   eq_h/eq_h_var = -0.7, eq_b/eq_b_var = -0.7 (Heston/Bates spot-variance rho)
+#   eq_sabr/eq2_sabr = 0.5 (SABR basket)    eq_sabr/eur-usd = 0.5 (SABR composite)
+# Row-major over [underlyings..., forexs...].
 correl: !correlation_matrix
-  underlyings: [eq]
-  matrix: [1]
-# two-asset correlation for the rainbow (eq, eq2) at 0.5
-correl_rb: !correlation_matrix
-  underlyings: [eq, eq2]
-  matrix: [1, 0.5, 0.5, 1]
-# heston / bates spot-variance correlation rho = -0.7 (eq_*, eq_*_var)
-correl_h: !correlation_matrix
-  underlyings: [eq_h, eq_h_var]
-  matrix: [1, -0.7, -0.7, 1]
-correl_b: !correlation_matrix
-  underlyings: [eq_b, eq_b_var]
-  matrix: [1, -0.7, -0.7, 1]
+  underlyings: [eq, eq2, eq_h, eq_h_var, eq_b, eq_b_var, eq_sabr, eq2_sabr]
+  forexs: [eur/usd]
+  matrix: [1, 0.5, 0, 0, 0, 0, 0, 0, 0.5,
+           0.5, 1, 0, 0, 0, 0, 0, 0, 0,
+           0, 0, 1, -0.7, 0, 0, 0, 0, 0,
+           0, 0, -0.7, 1, 0, 0, 0, 0, 0,
+           0, 0, 0, 0, 1, -0.7, 0, 0, 0,
+           0, 0, 0, 0, -0.7, 1, 0, 0, 0,
+           0, 0, 0, 0, 0, 0, 1, 0.5, 0.5,
+           0, 0, 0, 0, 0, 0, 0.5, 1, 0,
+           0.5, 0, 0, 0, 0, 0, 0.5, 0, 1]
 
 # USD leg + FX for the quanto cases (r_usd = 5%, eur/usd vol 15%, corr 0.5)
 usd: !currency
@@ -1121,18 +1145,5 @@ eur/usd: !forex
   volatility: eur/usd_vol
 eur/usd_vol: !bs_volatility
   volatility: 15
-correl_q: !correlation_matrix
-  underlyings: [eq]
-  forexs: [eur/usd]
-  matrix: [1, 0.5, 0.5, 1]
-# SABR local-vol correlations (mono, basket on eq_sabr/eq2_sabr at 0.5, composite)
-correl_sabr: !correlation_matrix
-  underlyings: [eq_sabr]
-  matrix: [1]
-correl_basket_sabr: !correlation_matrix
-  underlyings: [eq_sabr, eq2_sabr]
-  matrix: [1, 0.5, 0.5, 1]
-correl_compo_sabr: !correlation_matrix
-  underlyings: [eq_sabr]
-  forexs: [eur/usd]
-  matrix: [1, 0.5, 0.5, 1]
+#! the quanto / SABR / Heston / Bates correlations are all folded into the single
+#! `correl` matrix above; every pricer references it and extracts its own sub-block.
