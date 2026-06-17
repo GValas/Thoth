@@ -223,108 +223,133 @@ void Pricer::PriceBookByContract( const string& Label )
     bar.Done();
 }
 
+//! shared finite-difference bump-and-revalue engine (see the header for the
+//! contract). Inputs are restored as each Greek finishes; the premium is left at
+//! the last (theta) bump, so the caller does the final restore reprice itself.
+Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
+                                                 const vector<Single*>& Singles,
+                                                 const CurrencySet& Currencies,
+                                                 bool DoDelta,
+                                                 bool DoGamma,
+                                                 bool DoVega,
+                                                 bool DoRho,
+                                                 bool DoTheta,
+                                                 const std::function<double()>& Reprice,
+                                                 const std::function<void( const date& )>& RollToday,
+                                                 const std::function<void()>& Tick )
+{
+    BumpGreeks g;
+
+    //! delta / gamma : per-underlying relative spot bump, summed over the
+    //! underlyings (small bump for delta, wider one for gamma)
+    if ( DoDelta || DoGamma )
+    {
+        for ( Single* s : Singles )
+        {
+            const double spot = s->GetSpot();
+
+            if ( DoDelta ) //!< one-sided forward difference, reuses P0
+            {
+                const double h = GREEK_SPOT_BUMP * spot;
+                s->SetSpot( spot + h );
+                const double pu = Reprice();
+                Tick();
+                s->SetSpot( spot ); //!< restore
+                g.delta += ( pu - P0 ) / h;
+            }
+
+            if ( DoGamma )
+            {
+                const double h = GREEK_GAMMA_BUMP * spot;
+                s->SetSpot( spot + h );
+                const double pu = Reprice();
+                Tick();
+                s->SetSpot( spot - h );
+                const double pd = Reprice();
+                Tick();
+                s->SetSpot( spot ); //!< restore
+                g.gamma += ( pu - 2 * P0 + pd ) / ( h * h );
+            }
+        }
+    }
+
+    //! vega : one-sided parallel vol bump, per 1 vol point (0.01 of vol)
+    if ( DoVega )
+    {
+        for ( Single* s : Singles )
+        {
+            s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
+        }
+        const double pu = Reprice();
+        Tick();
+        for ( Single* s : Singles )
+        {
+            s->GetVolatility()->SetVolShift( 0 ); //!< restore
+        }
+        g.vega = ( pu - P0 ) / GREEK_VOL_BUMP * 0.01;
+    }
+
+    //! rho : one-sided parallel rate bump on every currency, per 1% (0.01)
+    if ( DoRho )
+    {
+        for ( Currency* c : Currencies )
+        {
+            c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
+        }
+        const double pu = Reprice();
+        Tick();
+        for ( Currency* c : Currencies )
+        {
+            c->GetRate()->SetCurveShift( 0 ); //!< restore
+        }
+        g.rho = ( pu - P0 ) / GREEK_RATE_BUMP * 0.01;
+    }
+
+    //! theta : roll one calendar day forward (spot held), per-day decay
+    if ( DoTheta )
+    {
+        const date base = _today;
+        RollToday( base + days( 1 ) );
+        const double p1 = Reprice();
+        Tick();
+        RollToday( base ); //!< restore the valuation date
+        g.theta = p1 - P0;
+    }
+
+    return g;
+}
+
 //! per-contract bump-and-revalue Greeks: bump only this contract's market and
-//! reprice just this contract. Mirrors the book-level ComputeGreeks bumps but
-//! scoped to one contract, storing the results on the contract. Restores the
-//! contract's base price on exit (so AggregateContract sees the unbumped premium).
+//! reprice just this contract (via the shared engine), storing the results on the
+//! contract. Restores the contract's base price on exit (so AggregateContract
+//! sees the unbumped premium).
 void Pricer::ComputeContractGreeks( Contract* Ctr )
 {
     const double p0 = Ctr->Result().premium;
-
-    double delta = 0;
-    double gamma = 0;
 
     //! for a multi-asset underlying on a grid engine (PDE), the basket "spot" is a
     //! fixed rebased 100 that a per-component bump can't move, so the bump would
     //! read zero — keep the grid's own dV/dS delta/gamma (set by PriceContract) instead.
     const bool grid_spot = GridSpotGreeks() && Ctr->GetSingleSet().size() > 1;
 
-    //! delta / gamma : per-underlying relative spot bump, summed over the
-    //! contract's underlyings (small bump for delta, wider one for gamma)
-    if ( ( _request_delta || _request_gamma ) && !grid_spot )
-    {
-        for ( Single* s : Ctr->GetSingleSet() )
-        {
-            const double spot = s->GetSpot();
+    //! the contract's own underlyings and the currencies it touches (premium
+    //! currency + the underlyings' currencies)
+    const SingleSet ss = Ctr->GetSingleSet();
+    const vector<Single*> singles( ss.begin(), ss.end() );
+    CurrencySet ccys = Ctr->GetUnderlying()->GetCurrencySet();
+    ccys.insert( Ctr->GetPremiumCurrency() );
 
-            if ( _request_delta ) //!< one-sided forward difference, reuses p0
-            {
-                const double h = GREEK_SPOT_BUMP * spot;
-                s->SetSpot( spot + h );
-                PriceContract( Ctr );
-                const double pu = Ctr->Result().premium;
-                s->SetSpot( spot ); //!< restore
-                delta += ( pu - p0 ) / h;
-            }
-
-            if ( _request_gamma )
-            {
-                const double h = GREEK_GAMMA_BUMP * spot;
-                s->SetSpot( spot + h );
-                PriceContract( Ctr );
-                const double pu = Ctr->Result().premium;
-                s->SetSpot( spot - h );
-                PriceContract( Ctr );
-                const double pd = Ctr->Result().premium;
-                s->SetSpot( spot ); //!< restore
-                gamma += ( pu - 2 * p0 + pd ) / ( h * h );
-            }
-        }
-    }
-
-    //! vega : one-sided parallel vol bump on the contract's underlyings, per vol point
-    double vega = 0;
-    if ( _request_vega )
-    {
-        const SingleSet singles = Ctr->GetSingleSet();
-        for ( Single* s : singles )
-        {
-            s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
-        }
-        PriceContract( Ctr );
-        const double pu = Ctr->Result().premium;
-        for ( Single* s : singles )
-        {
-            s->GetVolatility()->SetVolShift( 0 ); //!< restore
-        }
-        vega = ( pu - p0 ) / GREEK_VOL_BUMP * 0.01;
-    }
-
-    //! rho : one-sided parallel rate bump on every currency the contract touches
-    //! (premium currency + the underlyings' currencies, each shifted once), per 1%
-    double rho = 0;
-    if ( _request_rho )
-    {
-        CurrencySet ccys = Ctr->GetUnderlying()->GetCurrencySet();
-        ccys.insert( Ctr->GetPremiumCurrency() );
-        for ( Currency* c : ccys )
-        {
-            c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
-        }
-        PriceContract( Ctr );
-        const double pu = Ctr->Result().premium;
-        for ( Currency* c : ccys )
-        {
-            c->GetRate()->SetCurveShift( 0 ); //!< restore
-        }
-        rho = ( pu - p0 ) / GREEK_RATE_BUMP * 0.01;
-    }
-
-    //! theta : roll one calendar day forward (spot held), per-day decay. The PDE
-    //! grid keys its time axis off the pricer _today, while ANA reads the
-    //! contract's date, so roll both (and restore both).
-    double theta = 0;
-    if ( _request_theta )
-    {
-        const date base = _today;
-        _today = base + days( 1 );
-        Ctr->SetToday( _today );
-        PriceContract( Ctr );
-        const double p1 = Ctr->Result().premium;
-        _today = base; //!< restore
-        Ctr->SetToday( _today );
-        theta = p1 - p0;
-    }
+    //! the PDE grid keys its time axis off the pricer _today while ANA reads the
+    //! contract's date, so theta rolls both.
+    const BumpGreeks g = BumpAndRevalueGreeks(
+        p0, singles, ccys,
+        _request_delta && !grid_spot, _request_gamma && !grid_spot,
+        _request_vega, _request_rho, _request_theta,
+        [this, Ctr]
+        { PriceContract( Ctr ); return Ctr->Result().premium; },
+        [this, Ctr]( const date& d )
+        { _today = d; Ctr->SetToday( d ); },
+        [] {} );
 
     //! restore the contract to its base price BEFORE writing the Greeks: the
     //! restore reprice (PDE) sets delta/gamma from the grid, so set ours after —
@@ -332,12 +357,12 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
     PriceContract( Ctr );
     if ( !grid_spot )
     {
-        Ctr->Result().delta = delta;
-        Ctr->Result().gamma = gamma;
+        Ctr->Result().delta = g.delta;
+        Ctr->Result().gamma = g.gamma;
     }
-    Ctr->Result().vega = vega;
-    Ctr->Result().rho = rho;
-    Ctr->Result().theta = theta;
+    Ctr->Result().vega = g.vega;
+    Ctr->Result().rho = g.rho;
+    Ctr->Result().theta = g.theta;
 }
 
 //! bump-and-revalue Greeks. Every scenario re-runs PriceBook with one market
@@ -371,84 +396,27 @@ void Pricer::ComputeGreeks()
     ProgressBar greek_bar( "GRK", greek_total );
     long greek_done = 0;
 
-    //! delta / gamma : per-underlying relative spot bump (summed over underlyings),
-    //! with a small bump for delta and a wider one for gamma (see GREEK_*_BUMP).
     //! snapshot the singles first: PriceBook -> InitPricing rebuilds _single_set,
-    //! which would invalidate an iterator held over it here.
-    if ( _request_delta || _request_gamma )
-    {
-        const vector<Single*> singles( _single_set.begin(), _single_set.end() );
-        double delta = 0;
-        double gamma = 0;
-        for ( Single* s : singles )
-        {
-            const double spot = s->GetSpot();
+    //! which would invalidate an iterator held over it through the bumps.
+    const vector<Single*> singles( _single_set.begin(), _single_set.end() );
 
-            if ( _request_delta ) //!< one-sided forward difference, reuses p0
-            {
-                const double h = GREEK_SPOT_BUMP * spot;
-                s->SetSpot( spot + h );
-                PriceBook();
-                greek_bar.Update( ++greek_done );
-                const double pu = _book->GetPremium();
-                s->SetSpot( spot ); //!< restore
-                delta += ( pu - p0 ) / h;
-            }
+    //! whole-book bump-and-revalue: reprice the book, bump every underlying /
+    //! currency, roll only the pricer _today for theta.
+    const BumpGreeks g = BumpAndRevalueGreeks(
+        p0, singles, _currency_set,
+        _request_delta, _request_gamma, _request_vega, _request_rho, _request_theta,
+        [this]
+        { PriceBook(); return _book->GetPremium(); },
+        [this]( const date& d )
+        { _today = d; },
+        [&]
+        { greek_bar.Update( ++greek_done ); } );
 
-            if ( _request_gamma )
-            {
-                const double h = GREEK_GAMMA_BUMP * spot;
-                s->SetSpot( spot + h );
-                PriceBook();
-                greek_bar.Update( ++greek_done );
-                const double pu = _book->GetPremium();
-                s->SetSpot( spot - h );
-                PriceBook();
-                greek_bar.Update( ++greek_done );
-                const double pd = _book->GetPremium();
-                s->SetSpot( spot ); //!< restore
-                gamma += ( pu - 2 * p0 + pd ) / ( h * h );
-            }
-        }
-        _delta = delta;
-        _gamma = gamma;
-    }
-
-    //! vega : one-sided parallel vol bump, reported per 1 vol point (0.01 of vol)
-    if ( _request_vega )
-    {
-        ApplyVolShift( GREEK_VOL_BUMP );
-        PriceBook();
-        greek_bar.Update( ++greek_done );
-        const double pu = _book->GetPremium();
-
-        ApplyVolShift( 0 ); //!< restore
-        _vega = ( pu - p0 ) / GREEK_VOL_BUMP * 0.01;
-    }
-
-    //! rho : one-sided parallel rate bump, reported per 1% (0.01) rate move
-    if ( _request_rho )
-    {
-        ApplyRateShift( GREEK_RATE_BUMP );
-        PriceBook();
-        greek_bar.Update( ++greek_done );
-        const double pu = _book->GetPremium();
-
-        ApplyRateShift( 0 ); //!< restore
-        _rho = ( pu - p0 ) / GREEK_RATE_BUMP * 0.01;
-    }
-
-    //! theta : roll today forward one calendar day (spot held), per-day decay
-    if ( _request_theta )
-    {
-        const date base_today = _today;
-        _today = base_today + days( 1 );
-        PriceBook();
-        greek_bar.Update( ++greek_done );
-        const double p1 = _book->GetPremium();
-        _today = base_today; //!< restore
-        _theta = p1 - p0;
-    }
+    _delta = g.delta;
+    _gamma = g.gamma;
+    _vega = g.vega;
+    _rho = g.rho;
+    _theta = g.theta;
 
     //! restore the book to the base scenario so the premium output is unbumped
     PriceBook();

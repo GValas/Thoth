@@ -5,6 +5,7 @@
 #include "pricer_configuration.hpp"
 #include "single.hpp"
 #include "task.hpp"
+#include <functional>
 #include <map>
 
 //! constants
@@ -121,6 +122,39 @@ class Pricer : public Task
     //! computes its Greeks (when requested) by bumping only that contract's
     //! market, and advances a single progress bar over the contracts.
     void PriceBookByContract( const string& Label );
+
+    //! delta/gamma/vega/rho/theta produced by one bump-and-revalue sweep
+    struct BumpGreeks
+    {
+        double delta = 0;
+        double gamma = 0;
+        double vega = 0;
+        double rho = 0;
+        double theta = 0;
+    };
+
+    //! shared finite-difference bump-and-revalue engine behind both the book-level
+    //! ComputeGreeks and the per-contract ComputeContractGreeks. For each requested
+    //! Greek it bumps the market input (spot per underlying for delta/gamma, a
+    //! parallel vol bump on Singles for vega, a parallel rate bump on Currencies
+    //! for rho, a one-day roll for theta), calls Reprice() — which reprices the
+    //! current market and returns the premium to difference against P0 — restores
+    //! the input, and calls Tick() for the progress bar. RollToday sets the
+    //! valuation date (the book caller moves only _today; the contract caller also
+    //! rolls the contract). Market inputs are left at base on return; the premium
+    //! still reflects the last (theta) bump, so the caller does its own final
+    //! restore reprice before reading results.
+    BumpGreeks BumpAndRevalueGreeks( double P0,
+                                     const vector<Single*>& Singles,
+                                     const CurrencySet& Currencies,
+                                     bool DoDelta,
+                                     bool DoGamma,
+                                     bool DoVega,
+                                     bool DoRho,
+                                     bool DoTheta,
+                                     const std::function<double()>& Reprice,
+                                     const std::function<void( const date& )>& RollToday,
+                                     const std::function<void()>& Tick );
 
     //! bump-and-revalue Greeks for one contract (delta, gamma, vega, rho, theta),
     //! repricing only that contract; restores its base scenario when done.
