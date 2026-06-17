@@ -2,12 +2,11 @@
 # ---------------------------------------------------------------------------
 # run_docker_common.sh - shared helpers for the run_docker_*.sh wrappers.
 #
-# Sourced (not executed) by run_docker_server.sh / run_docker_batch.sh /
-# run_local_client.sh. Mutualises what they share: building the single Thoth
-# production image (Dockerfile) once, tagged "thoth" (the git commit is baked in
-# and printed in the banner so a stale image is obvious; Docker layer caching makes
-# rebuilds a no-op when src/ is unchanged), and the input/output path helpers the
-# batch and client wrappers both use.
+# Sourced (not executed) by run_docker_server.sh / run_docker_batch.sh.
+# Mutualises what they share: building the single Thoth production image
+# (Dockerfile) once, tagged "thoth" (the git commit is baked in and printed in the
+# banner so a stale image is obvious; Docker layer caching makes rebuilds a no-op
+# when src/ is unchanged), and the input/output path helpers the batch wrapper uses.
 #
 # Requires the caller to have set ROOT (the project directory).
 # ---------------------------------------------------------------------------

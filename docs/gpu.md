@@ -140,8 +140,12 @@ docker run --rm --gpus all -p 8080:8080 thoth-gpu
 
 ```bash
 ./run_docker_server.sh --gpu
-./run_local_client.sh samples/gpu_call.yaml
+./build/thoth -client http://localhost:8080 samples/gpu_call.yaml
 ```
+
+`samples/matrix_gpu.yaml` is the same shape across ANA / CPU-MCL / `allow_gpu`-MCL
+for an ATM put; post it with `run_local_client_matrix.sh samples/matrix_gpu.yaml`
+to see the three engines side by side.
 
 On a CPU-only build the same sample runs on the CPU MCL engine and produces
 identical results.

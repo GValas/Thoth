@@ -125,19 +125,19 @@ the invoking host user so the result is owned by you (not root).
 ./run_docker_batch.sh samples/sabr_call.yaml /tmp/sabr.yaml
 ```
 
-### `run_local_client.sh <input.yaml> [output.yaml] [--port <port>] [--exec-name <name>]`
+### Posting to a running server
 
-POST one YAML file to an already-running Thoth server's `/price` and write the
-response (default `<input>.out.yaml`). `--port` defaults to `8080`;
-`--exec-name` sets the `X-Exec-Name` header. The wrapper sends
-`Content-Type: application/x-yaml`, which is required for bodies over ~8 KB (the
+Use the built-in client (`thoth -client <url> <input.yaml>`) for a single book, or
+`run_local_client_matrix.sh <input.yaml> [--port N] [--raw out.yaml]` to post a
+`!sequence` book and print a per-product table (method, time, premium, Greeks).
+Both send `Content-Type: application/x-yaml`, required for bodies over ~8 KB (the
 default form content type is capped by the HTTP library at 8 KB).
 
 ```bash
 # with a server (or cluster) already up on 8080:
-./run_local_client.sh samples/simple_call.yaml              # -> samples/simple_call.out.yaml
-./run_local_client.sh samples/matrix.yaml /tmp/m.yaml --port 7777
-./run_local_client.sh samples/heston_call.yaml --exec-name heston_pricing
+./build/thoth -client http://localhost:8080 samples/simple_call.yaml
+./build/thoth -client http://localhost:8080 samples/heston_call.yaml --exec-name heston_pricing
+./run_local_client_matrix.sh samples/matrix.yaml --port 7777
 ```
 
 ## End-to-end examples
@@ -149,11 +149,11 @@ cmake -B build && cmake --build build -j
 
 # 2) Dockerised server + client
 ./run_docker_server.sh --port 8080 &                  # leave it running
-./run_local_client.sh samples/heston_call.yaml --port 8080
+./build/thoth -client http://localhost:8080 samples/heston_call.yaml
 
 # 3) Dockerised cluster: split an MCL book across 2 slaves
 ./run_docker_server.sh --port 8090 --slaves 2 &
-./run_local_client.sh samples/simple_call.yaml --port 8090
+./build/thoth -client http://localhost:8090 samples/simple_call.yaml
 
 # 4) Run the full pricer/product matrix in one process
 ./run_docker_batch.sh samples/matrix.yaml             # -> samples/matrix.out.yaml

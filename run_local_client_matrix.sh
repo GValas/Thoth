@@ -3,38 +3,35 @@
 # run_local_client_matrix.sh - Submit the pricer matrix to a Thoth server and
 #                              print a per-product results table.
 #
-# POSTs a matrix YAML (default samples/matrix.yaml) to a running Thoth server's
+# POSTs a matrix-style YAML (a !sequence of pricers) to a running Thoth server's
 # /price endpoint, then renders one row per priced cell with its method, the time
 # the engine spent on it, the premium and every Greek. The server must already be
 # running (see run_docker_server.sh or `thoth -server`).
 #
-# Each pricer in the matrix writes a <product>_<method>_result block; this script
-# reads those blocks back, splits the engine suffix (ana / mcl / pde / mcl_pseudo)
+# Each pricer writes a <product>_<method>_result block; this script reads those
+# blocks back, splits the engine suffix (ana / mcl / pde / mcl_pseudo / mcl_gpu)
 # off the product label, and tabulates premium + Greeks (a dash where a Greek was
-# not requested for that cell).
+# not requested for that cell). The input path is taken relative to the caller's
+# working directory.
 #
 # Usage:
-#     ./run_local_client_matrix.sh [input.yaml] [--port <port>] [--raw <out.yaml>]
+#     ./run_local_client_matrix.sh <input.yaml> [--port <port>] [--raw <out.yaml>]
 #
-# The input argument is optional and defaults to samples/matrix.yaml. --raw keeps
-# the full YAML response at the given path (otherwise it goes to a temp file).
+# <input.yaml> is required. --raw keeps the full YAML response at the given path
+# (otherwise it goes to a temp file).
 #
 # Examples:
-#     ./run_local_client_matrix.sh                         # samples/matrix.yaml, port 8080
-#     ./run_local_client_matrix.sh --port 7777             # other port
-#     ./run_local_client_matrix.sh samples/matrix.yaml --raw /tmp/matrix.out.yaml
+#     ./run_local_client_matrix.sh samples/matrix.yaml
+#     ./run_local_client_matrix.sh samples/matrix.yaml --port 7777
+#     ./run_local_client_matrix.sh samples/matrix_gpu.yaml --raw /tmp/matrix.out.yaml
 # ---------------------------------------------------------------------------
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# NB: do NOT cd into $ROOT — a caller-supplied input path is relative to the
-# caller's cwd. The default below is resolved against $ROOT explicitly instead.
 
 PORT=8080
 INPUT=""
 RAW=""        #!< optional path to keep the full YAML response
 
-usage() { echo "usage: $0 [input.yaml] [--port <port>] [--raw <out.yaml>]"; }
+usage() { echo "usage: $0 <input.yaml> [--port <port>] [--raw <out.yaml>]"; }
 
 # Flags may appear anywhere; the first non-flag token is the input YAML.
 while [[ $# -gt 0 ]]; do
@@ -53,7 +50,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -z "$INPUT" ]] && INPUT="$ROOT/samples/matrix.yaml" #!< default: the repo's matrix, not cwd-relative
+[[ -z "$INPUT" ]] && { echo "error: an input YAML file is required" >&2; usage >&2; exit 1; }
 [[ -f "$INPUT" ]] || { echo "error: input file '$INPUT' not found" >&2; usage >&2; exit 1; }
 
 if [[ -n "$RAW" ]]; then OUT="$RAW"; else OUT="$(mktemp -t thoth_matrix.XXXXXX.yaml)"; trap 'rm -f "$OUT"' EXIT; fi

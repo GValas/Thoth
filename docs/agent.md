@@ -87,7 +87,7 @@ samples/         runnable YAML books (simple_call, heston_call, bates_call, sabr
 docs/            design notes & guides (this file lives here)
 CMakeLists.txt   build
 format.sh        clang-format wrapper (--check is the CI gate)
-run_docker_*.sh  Docker batch/server wrappers; run_local_client.sh posts to a server
+run_docker_*.sh  Docker batch/server wrappers; run_local_client_matrix.sh posts a !sequence + tabulates
 ```
 
 See `README.md` *Repository layout* for the full wrapper-by-wrapper table.

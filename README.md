@@ -248,8 +248,8 @@ task that runs the full pricer/product matrix (vanilla european/american — cal
 put, quanto, composite, basket / best-of / worst-of, up/down & in/out, continuous &
 discrete barriers, American Heston, variance swap, Heston, Bates, and **SABR
 local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL) in one
-process — price it like any other book (`-batch`, or post it to a server with
-`run_local_client.sh`). `run_local_client_matrix.sh` posts it and prints a
+process — price it like any other book (`-batch`, or post it to a server with the
+built-in `-client`). `run_local_client_matrix.sh` posts it and prints a
 per-product table (method, time, premium and every Greek) — see below.
 
 ### HTTP pricing service
@@ -262,18 +262,16 @@ per-product table (method, time, premium and every Greek) — see below.
 curl --data-binary @samples/simple_call.yaml localhost:8080/price
 # the built-in client:
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
-# or the wrapper, which POSTs the input to a running server and writes the result
-# next to it as samples/<input>.out.yaml (these *.out.yaml files are gitignored):
-./run_local_client.sh samples/simple_call.yaml --port 8080
-# post the whole pricer matrix and print a per-product table (method, time spent,
-# premium and every Greek; defaults to samples/matrix.yaml, --raw keeps the YAML):
-./run_local_client_matrix.sh --port 8080
+# post a !sequence book (e.g. the matrix) and print a per-product table — method,
+# time spent, premium and every Greek (--raw keeps the full YAML response):
+./run_local_client_matrix.sh samples/matrix.yaml --port 8080
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
 `X-Exec-Name` header selects which object to run (default: the `root` object).
-Send `Content-Type: application/x-yaml` for bodies over ~8 KB (`run_local_client.sh`
-already does); the default form content type is capped by the HTTP library.
+Send `Content-Type: application/x-yaml` for bodies over ~8 KB (the built-in client
+and `run_local_client_matrix.sh` already do); the default form content type is
+capped by the HTTP library.
 
 Requests are serialised (the engine shares global progress/cancellation state): the server logs
 the client IP on arrival and again if a request has to wait. If a client
@@ -296,10 +294,10 @@ aggregate the results:
 # private network (Ctrl-C, or the master exiting, tears the whole cluster down):
 ./run_docker_server.sh --port 8090 --slaves 2
 # then POST a book to the master (single-MCL-pricer books get path-split):
-./run_local_client.sh samples/simple_call.yaml --port 8090
+./build/thoth -client http://localhost:8090 samples/simple_call.yaml
 # a !sequence (e.g. the matrix) is dispatched cell by cell — each MCL cell is
 # path-split across the slaves in turn, ANA/PDE cells compute on the master:
-./run_local_client_matrix.sh --port 8090
+./run_local_client_matrix.sh samples/matrix.yaml --port 8090
 ```
 
 The master splits `paths` as evenly as possible (capping the fan-out at `paths`
@@ -439,8 +437,7 @@ format.sh                 clang-format wrapper (--check for CI)
 run_docker_batch.sh       build the image and price one YAML in batch: <input.yaml> [output.yaml]
 run_docker_server.sh      build the image and serve over HTTP ([--gpu] CUDA/--gpus all; [--slaves N] master + N slave cluster)
 run_docker_common.sh      shared helpers (image build, input/output paths) — sourced, not run
-run_local_client.sh       POST one YAML to a running server: <input.yaml> [output.yaml] [--port N] [--exec-name X]
-run_local_client_matrix.sh POST the pricer matrix to a running server and tabulate it: [input.yaml] [--port N] [--raw out.yaml]
+run_local_client_matrix.sh POST a !sequence book to a running server and tabulate it: <input.yaml> [--port N] [--raw out.yaml]
 ```
 
 ---
