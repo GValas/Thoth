@@ -57,8 +57,16 @@ double Volatility::GetLocalVolatility( const double Strike,
     double D1 = 1 + K * d1 * dVdK * sT;
     double D = D1 * D1 + K * K * T * V * ( dVdK2 - d1 * dVdK * dVdK * sT );
 
-    // final result
-    return sqrt( N / D );
+    //! Dupire local variance. The implied surface is not guaranteed arbitrage-free
+    //! everywhere (Hagan's SABR expansion develops a small calendar/butterfly
+    //! arbitrage in the wings at long maturities), so N/D can turn slightly
+    //! negative there and sqrt would yield a NaN that poisons every path. Floor
+    //! the variance at a tiny positive value: it only bites in those degenerate
+    //! wing nodes (near-ATM paths are unaffected, so the Dupire repricing still
+    //! matches the analytic price) and keeps the diffusion real and finite.
+    const double local_var = N / D;
+    const double floor = 1e-8; //!< (0.01% vol)^2
+    return sqrt( local_var > floor ? local_var : floor );
 }
 
 //! setter
