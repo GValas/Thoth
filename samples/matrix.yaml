@@ -38,9 +38,10 @@ root: matrix
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
 #
-# Not in the matrix: the GPU engine (mcl_gpu). It is build-gated (-DTHOTH_ENABLE_CUDA=ON)
-# and on a CPU-only build it transparently falls back to the CPU mcl engine, so a row
-# would not exercise the CUDA kernel here — see samples/gpu_call.yaml and docs/gpu.md.
+# Not in the matrix: GPU acceleration (mcl with allow_gpu: true). It is build-gated
+# (-DTHOTH_ENABLE_CUDA=ON) and on a CPU-only build an allow_gpu book transparently
+# runs on the CPU mcl engine, so a row would not exercise the CUDA kernel here —
+# see samples/gpu_call.yaml and docs/gpu.md.
 #
 # Quanto european vanillas are priced by all three engines and agree: the quanto
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node

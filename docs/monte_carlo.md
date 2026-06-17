@@ -192,7 +192,7 @@ the underlyings' Brownian motions).
 ```yaml
 # pricer_configuration selects the method and points at an mcl_configuration
 my_pricer: !pricer_configuration
-  method: mcl                 # pde | mcl | mcl_gpu | ana
+  method: mcl                 # pde | mcl | ana  (mcl_gpu = deprecated alias for mcl + allow_gpu)
   mcl_configuration: my_mcl
 
 my_mcl: !mcl_configuration
@@ -201,6 +201,7 @@ my_mcl: !mcl_configuration
   paths: 100000
   vol_time_step: 0.01         # year fraction
   use_sobol: true
+  allow_gpu: false            # true -> CUDA GPU when present + book supported, else CPU
   seed: 0                     # cluster master overrides per slave
   sobol_skip: 0               # cluster master overrides per slave
 ```

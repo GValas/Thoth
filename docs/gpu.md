@@ -1,34 +1,37 @@
 # GPU (CUDA) acceleration
 
-Thoth ships an optional CUDA Monte-Carlo backend, exposed as the pricing method
-`mcl_gpu`. It runs single-asset European vanillas on an NVIDIA GPU and falls back
-to the CPU MCL engine for everything else — automatically, at runtime. This guide
-covers what the engine does, how it is built, how to run it, how the kernel works,
-and what is still missing.
+Thoth ships an optional CUDA Monte-Carlo backend, exposed as a capability of the
+`mcl` engine: set `allow_gpu: true` in the `mcl_configuration`. It runs single-asset
+European vanillas on an NVIDIA GPU and stays on the CPU MCL engine for everything
+else — automatically, at runtime. (The old `method: mcl_gpu` is a **deprecated
+alias** for `method: mcl` + `allow_gpu: true`, kept so existing books keep working.)
+This guide covers what the engine does, how it is built, how to run it, how the
+kernel works, and what is still missing.
 
 > The user + design guide for Thoth's CUDA Monte-Carlo backend.
 
 ## What the GPU engine is
 
-`mcl_gpu` is a specialised CUDA path engine, *not* a port of the generic CPU
+The GPU path is a specialised CUDA kernel, *not* a port of the generic CPU
 node-graph. The CPU MCL engine walks a dependency DAG one scalar path at a time
 (virtual dispatch, pointer chasing) — flexible, but the opposite of what SIMT
-hardware wants. So instead of porting that graph, the GPU engine implements a
-narrow, branch-free kernel for the hot model and routes anything else back to the
-CPU.
+hardware wants. So instead of porting that graph, the engine implements a narrow,
+branch-free kernel for the hot model and stays on the CPU for anything else.
 
-The class wiring (`src/tasks/pricer_mcl_gpu.{hpp,cpp}`):
+The wiring lives **inside `PricerMCL`** (`src/tasks/pricer_mcl.{hpp,cpp}`) — GPU is
+just a mode of the one MCL engine, not a separate pricer class:
 
-- `PricerMCLGpu` derives from `PricerMCL`. `PreCheck()` runs the same MCL checks,
-  then decides once whether to use the GPU (`_use_gpu = BookIsGpuSupported()`).
+- `PreCheck()` runs the usual MCL checks, then decides once whether to use the GPU:
+  `_use_gpu = _configuration->_mcl->_allow_gpu && BookIsGpuSupported()`. With
+  `allow_gpu` unset (the default) the GPU is never touched.
 - `BookIsGpuSupported()` is **all-or-nothing**: it returns true only if
   `gpu::Available()` *and* every contract in the book fills `GpuGbmParams` via
   `Contract::GPU_GbmParams`. A mixed book never produces a half-GPU/half-CPU
-  patchwork — it falls back wholesale to the CPU MCL engine.
+  patchwork — it runs wholesale on the CPU MCL engine.
 - In GPU mode, `PriceBook()` prices contract-by-contract (`PriceBookByContract`)
   with per-contract bump-and-revalue Greeks; book MC trust is combined in
-  quadrature (FX-scaled to book currency). In fallback mode it just calls
-  `PricerMCL::PriceBook()`.
+  quadrature (FX-scaled to book currency). Otherwise it runs the normal CPU
+  diffusion-tree path.
 
 ### What is supported on the GPU
 
@@ -53,10 +56,10 @@ agrees with ANA / MCL within Monte-Carlo error.
 `gpu::Available()` is the gate. In the CUDA build it returns true iff
 `cudaGetDeviceCount` finds a device (`src/tasks/mcl_gpu.cu`); in a CPU-only build
 the stub (`src/tasks/mcl_gpu_stub.cpp`) returns `false` unconditionally. Either
-way, `method: mcl_gpu` is **always valid** — on a CPU-only build, a GPU-less host,
-or an unsupported book it transparently prices on the CPU MCL engine with
-identical results, just no acceleration. `gpu::DeviceInfo()` logs the active
-device (or why the GPU is unavailable) at `PreCheck` time.
+way, `allow_gpu: true` is **always safe** — on a CPU-only build, a GPU-less host,
+or an unsupported book the engine simply prices on the CPU with identical results,
+just no acceleration. `gpu::DeviceInfo()` logs the active device (or why the GPU is
+unavailable) at `PreCheck` time, whenever `allow_gpu` is set.
 
 ## Build model
 
@@ -133,14 +136,14 @@ docker run --rm --gpus all -p 8080:8080 thoth-gpu
 ### Sample
 
 `samples/gpu_call.yaml` is a 1y ATM call (spot 100, strike 100, rate 8%, vol 30%,
-1M paths, `method: mcl_gpu`), Black-Scholes reference ≈ 15.71:
+1M paths, `method: mcl` with `allow_gpu: true`), Black-Scholes reference ≈ 15.71:
 
 ```bash
 ./run_docker_server.sh --gpu
 ./run_local_client.sh samples/gpu_call.yaml
 ```
 
-On a CPU-only build the same sample falls back to the CPU MCL engine and produces
+On a CPU-only build the same sample runs on the CPU MCL engine and produces
 identical results.
 
 ## How the kernel works
@@ -160,7 +163,7 @@ vol, df, is_call, paths, seed)`:
    `curandStatePhilox4_32_10_t` keyed by `(seed, tid)` — cheap, independent per
    thread, and *reproducible*: the same `(seed, grid)` yields identical draws.
    That is the common-random-numbers property the pricer relies on, reusing one
-   fixed seed for the base price and every bump (`PricerMCLGpu::PriceContract`) so
+   fixed seed for the base price and every bump (`PricerMCL::PriceContract`) so
    bump-and-revalue Greeks are smooth rather than swamped by MC noise.
 4. **Block reduction → atomic accumulate.** Each thread accumulates a local
    payoff sum and sum-of-squares; a shared-memory tree reduction per block
@@ -168,7 +171,7 @@ vol, df, is_call, paths, seed)`:
    global accumulators.
 5. **Premium + trust on the host.** From `mean` and `var` of the payoff,
    `premium = df * mean` and `trust = df * sqrt(var / paths)` (the variance is
-   floored at 0 against round-off). `PricerMCLGpu` sets these on the contract.
+   floored at 0 against round-off). `PricerMCL::PriceContract` sets these on the contract.
 
 ## Limitations and future work
 

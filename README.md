@@ -31,13 +31,16 @@ usable as a batch tool or as an HTTP service.
   exercise (backward induction `max(intrinsic, continuation)`).
 - **Analytic (`ana`)** — closed-form (Black-Scholes) for instruments that admit
   it.
-- **GPU Monte-Carlo (`mcl_gpu`)** — CUDA backend that simulates single-asset
-  European-vanilla GBM on an NVIDIA GPU (one thread per path, cuRAND, block-reduced
-  payoff), with per-contract bump-and-revalue Greeks under a fixed kernel seed
-  (common random numbers). Built only with `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only
-  build, a host with no GPU, or any book it does not yet support (American /
-  barrier / stochastic vol / multi-asset), it **falls back to the CPU `mcl` engine**
-  — so `method: mcl_gpu` is always valid. See [`docs/gpu.md`](docs/gpu.md).
+- **GPU acceleration (`mcl` + `allow_gpu`)** — the `mcl` engine offloads to a CUDA
+  backend when the `mcl_configuration` sets `allow_gpu: true`, a usable NVIDIA GPU
+  is present, and the whole book is GPU-supported (single-asset European-vanilla
+  GBM: one thread per path, cuRAND, block-reduced payoff, per-contract bump Greeks
+  under a fixed kernel seed for common random numbers). Built only with
+  `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only build, a host with no GPU, or any book it
+  does not yet support (American / barrier / stochastic vol / multi-asset) it
+  **runs on the CPU `mcl` engine** instead — so `allow_gpu` is always safe to set.
+  (The old `method: mcl_gpu` still works as a deprecated alias.) See
+  [`docs/gpu.md`](docs/gpu.md).
 
 Long runs show a `│███░░░│` progress bar with the running price/trust. On a
 terminal it redraws in place as a single updating line; when stdout is not a TTY
@@ -157,8 +160,8 @@ external `dot` render.
 
 #### GPU (CUDA) build
 
-The `mcl_gpu` engine is off by default. On a machine with the CUDA toolkit
-(`nvcc`) and an NVIDIA GPU, enable it with:
+The CUDA backend is off at build time by default. On a machine with the CUDA
+toolkit (`nvcc`) and an NVIDIA GPU, enable it with:
 
 ```bash
 cmake -B build -DTHOTH_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89   # 89 = Ada / RTX 40-series
@@ -170,8 +173,8 @@ NVIDIA Container Toolkit). The CPU and GPU images come from the **same**
 parameterised `Dockerfile`, and the same `run_docker_server.sh` wrapper runs
 both: `--gpu` swaps in the `nvidia/cuda` base images and `ENABLE_CUDA=ON` through
 `--build-arg` and attaches the host GPU with `--gpus all` (`--arch` sets the
-compute capability, default 89). Without CUDA the engine still builds and falls
-back to the CPU `mcl` engine at run time.
+compute capability, default 89). Without CUDA the `mcl` engine still builds and an
+`allow_gpu` book simply runs on the CPU at run time.
 
 The **devcontainer** ships the CUDA toolkit (`nvcc`, installed in its Dockerfile) and
 requests the host GPU (`hostRequirements.gpu: optional`, needs the NVIDIA
@@ -183,7 +186,8 @@ cmake -B build-gpu -DTHOTH_ENABLE_CUDA=ON && cmake --build build-gpu -j
 ./build-gpu/thoth -batch samples/gpu_call.yaml /tmp/out.yaml   # runs on the GPU
 ```
 
-On a host with no GPU the devcontainer still opens (CPU-only, `mcl_gpu` falls back).
+On a host with no GPU the devcontainer still opens (CPU-only, an `allow_gpu` book
+runs on the CPU).
 
 ### Tests
 
@@ -284,7 +288,7 @@ aggregate the results:
 # then POST a book to the master (single-MCL-pricer books get path-split):
 ./run_local_client.sh samples/simple_call.yaml --port 8090
 # a !sequence (e.g. the matrix) is dispatched cell by cell — each MCL cell is
-# path-split across the slaves in turn, ANA/PDE/mcl_gpu compute on the master:
+# path-split across the slaves in turn, ANA/PDE cells compute on the master:
 ./run_local_client_matrix.sh --port 8090
 ```
 
@@ -342,7 +346,7 @@ my_pricing: !pricer
 # pricer_configuration selects the method and points at an mcl_configuration
 # and/or pde_configuration sub-object.
 my_config: !pricer_configuration
-  method: pde   # pde | mcl | mcl_gpu | ana
+  method: pde   # pde | mcl | ana  (mcl_gpu = deprecated alias for mcl + allow_gpu)
   mcl_configuration: my_mcl
   pde_configuration: my_pde
 my_mcl: !mcl_configuration
@@ -351,6 +355,7 @@ my_mcl: !mcl_configuration
   paths: 50000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
   vol_time_step: 0.01
   use_sobol: true
+  allow_gpu: false       # true -> run on a CUDA GPU when present + book supported, else CPU
 my_pde: !pde_configuration
   vanilla_precision: high
 
@@ -400,8 +405,8 @@ Black-Scholes ~15.71, with the node-graph debug switch enabled),
 `bates_call.yaml` (a Bates — Heston + jumps — call priced by MCL, dumping its
 node DAG to Graphviz), `sabr_call.yaml` (a realistic SABR equity surface priced
 by ANA and by the Dupire local-vol MCL — the two agree, repricing the smile,
-including a skewed OTM put), `gpu_call.yaml` (a call priced by the GPU `mcl_gpu`
-engine, falling back to CPU off a GPU) and `matrix.yaml` — a `!sequence` running
+including a skewed OTM put), `gpu_call.yaml` (a call priced by the `mcl` engine
+with `allow_gpu: true`, running on the CPU off a GPU) and `matrix.yaml` — a `!sequence` running
 the full pricer/product matrix (vanilla european/american, quanto, composite,
 basket / best-of / worst-of, continuous / discrete / knock-in barriers, variance
 swap, Heston, Bates, SABR local-vol, across PDE / MCL / ANA) in one process.
@@ -448,7 +453,7 @@ run_local_client_matrix.sh POST the pricer matrix to a running server and tabula
   The **ANA** engine uses the implied vol at the option's strike, while the
   **PDE** engine still uses a single ATM vol (no local-vol grid). `bs_volatility`
   (flat) is exact in every engine.
-- GPU (CUDA) acceleration (`mcl_gpu`) currently covers **single-asset European
-  vanillas under GBM** only; American / barrier / stochastic-vol / multi-asset
-  books fall back to the CPU `mcl` engine. Extending the kernel to Heston-QE and
-  multi-asset is future work — see [`docs/gpu.md`](docs/gpu.md).
+- GPU (CUDA) acceleration (`mcl` + `allow_gpu`) currently covers **single-asset
+  European vanillas under GBM** only; American / barrier / stochastic-vol /
+  multi-asset books run on the CPU `mcl` engine. Extending the kernel to Heston-QE
+  and multi-asset is future work — see [`docs/gpu.md`](docs/gpu.md).

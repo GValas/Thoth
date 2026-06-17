@@ -1,12 +1,14 @@
 root: gpu_call_pricing
 
-# 1y ATM call (spot 100, strike 100, rate 8%, vol 30%) priced by the GPU
-# Monte-Carlo engine (method: mcl_gpu). On a CUDA build with an NVIDIA GPU the
-# single-asset European vanilla is simulated on the device (forward-measure GBM,
-# one thread per path); Greeks are per-contract bump-and-revalue with a fixed
-# kernel seed (common random numbers). On a CPU-only build, or a host without a
-# GPU, it transparently falls back to the CPU MCL engine -> identical results.
-# Black-Scholes reference premium ~15.71.
+# 1y ATM call (spot 100, strike 100, rate 8%, vol 30%) priced by the MCL engine
+# with GPU acceleration requested (method: mcl, allow_gpu: true). On a CUDA build
+# with an NVIDIA GPU the single-asset European vanilla is simulated on the device
+# (forward-measure GBM, one thread per path); Greeks are per-contract bump-and-
+# revalue with a fixed kernel seed (common random numbers). On a CPU-only build,
+# or a host without a GPU, it transparently runs on the CPU MCL engine -> identical
+# results. Black-Scholes reference premium ~15.71.
+#
+# (The old `method: mcl_gpu` still works as a deprecated alias for this pair.)
 #
 #   ./run_docker_server.sh --gpu                    # GPU server (needs an NVIDIA GPU)
 #   ./run_local_client.sh samples/gpu_call.yaml
@@ -21,7 +23,7 @@ gpu_call_pricing: !pricer
   result: gpu_call_result
 
 config: !pricer_configuration
-  method: mcl_gpu
+  method: mcl
   mcl_configuration: mcl_config
   log_path: "samples/"
 
@@ -31,6 +33,7 @@ mcl_config: !mcl_configuration
   paths: 1000000
   vol_time_step: 0.01
   use_sobol: true
+  allow_gpu: true
 
 book: !book
   options: [gpu_call]

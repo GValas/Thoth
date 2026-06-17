@@ -50,6 +50,13 @@ class PricerMCL : public Pricer
     bool CanSingleTreeGreeks() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)
     void BuildGreekScenarios();       //!< build the delta/gamma/vega/rho bump sub-trees
 
+    //! GPU (CUDA) acceleration, opt-in via the mcl_configuration's allow_gpu flag.
+    //! Decided once in PreCheck: true iff allow_gpu AND a device is present AND the
+    //! whole book is GPU-supported (single-asset European vanillas under GBM). When
+    //! false the engine runs entirely on the CPU (the diffusion-tree path below).
+    bool _use_gpu = false;
+    bool BookIsGpuSupported(); //!< gpu::Available() && every contract GPU_GbmParams
+
     //! tree
     void Tree_Init();
     void Tree_Run();
@@ -102,11 +109,15 @@ class PricerMCL : public Pricer
                                 double& Trust );
 
   protected:
-    void PreCheck() override; //!< require an mcl_configuration and a correlation
-    void PriceBook() override;
+    void PreCheck() override;  //!< require an mcl_configuration + correlation; decide GPU vs CPU
+    void PriceBook() override; //!< CPU diffusion tree, or the GPU per-contract loop when _use_gpu
     //! single-tree Greeks (delta/gamma/vega/rho in one path sweep); theta stays
     //! bump-and-revalue. Falls back to Pricer::ComputeGreeks when !CanSingleTreeGreeks.
     void ComputeGreeks() override;
+    //! GPU mode prices contract by contract (per-contract bump Greeks, common
+    //! random numbers); the CPU path keeps MCL's book-level single-tree Greeks.
+    bool GreeksPerContract() const override;      //!< true iff _use_gpu
+    void PriceContract( Contract* Ctr ) override; //!< one contract on the device (GPU mode)
 
   public:
     //! constructor, destructor

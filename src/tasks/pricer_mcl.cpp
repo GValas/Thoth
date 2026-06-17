@@ -1,12 +1,15 @@
 #include "thoth.hpp"
 #include "pricer_mcl.hpp"
 #include "cancellation.hpp"
+#include "contract.hpp"
 #include "heston_volatility.hpp"
+#include "mcl_gpu.hpp"
 #include "mono.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
 #include "maths.hpp"
 #include <algorithm>
+#include <cmath>
 
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
@@ -50,6 +53,61 @@ void PricerMCL::PreCheck()
     {
         ERR( "book pricing '" + _name + "' requires a correlation matrix" );
     }
+
+    //! GPU acceleration is opt-in (allow_gpu) and falls back to the CPU path when a
+    //! device is absent or the book is not GPU-supported — decided once, here.
+    _use_gpu = _configuration->_mcl->_allow_gpu && BookIsGpuSupported();
+    if ( _configuration->_mcl->_allow_gpu )
+    {
+        LOG( "GPU", _use_gpu ? ( "device Monte-Carlo enabled: " + gpu::DeviceInfo() )
+                             : ( "allow_gpu set but GPU pricing is unavailable or unsupported for "
+                                 "this book — running on the CPU MCL engine (" +
+                                 gpu::DeviceInfo() + ")" ) );
+    }
+}
+
+//! GPU-priceable iff a device is present and every contract is a GPU-supported
+//! European vanilla under GBM. All-or-nothing: a mixed book runs on the CPU so the
+//! result is never a half-GPU/half-CPU patchwork.
+bool PricerMCL::BookIsGpuSupported()
+{
+    if ( !gpu::Available() )
+    {
+        return false;
+    }
+    for ( Contract* c : _book->GetOptionList() )
+    {
+        GpuGbmParams p;
+        if ( !c->GPU_GbmParams( p ) )
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool PricerMCL::GreeksPerContract() const
+{
+    return _use_gpu;
+}
+
+void PricerMCL::PriceContract( Contract* Ctr )
+{
+    GpuGbmParams p;
+    if ( !Ctr->GPU_GbmParams( p ) )
+    {
+        //! BookIsGpuSupported guarantees every contract is supported in GPU mode
+        ERR( "gpu pricing '" + _name + "': contract '" + Ctr->GetName() + "' is not GPU-supported" );
+    }
+
+    const long paths = _configuration->_mcl->_paths;
+    //! one fixed seed for the base price and every bump -> common random numbers
+    const unsigned long seed = (unsigned long)_configuration->_mcl->_seed;
+
+    const gpu::GbmResult r = gpu::PriceEuropeanGbm( p.forward, p.strike, p.t, p.vol,
+                                                    p.df, p.is_call, paths, seed );
+    Ctr->SetPremium( r.premium );
+    Ctr->SetPremiumTrust( r.trust );
 }
 
 //! price the whole book by Monte-Carlo. Re-runnable: the node tree is rebuilt
@@ -57,6 +115,24 @@ void PricerMCL::PreCheck()
 //! bumps share common random numbers with the base scenario (stable bumps).
 void PricerMCL::PriceBook()
 {
+    //! GPU mode: price contract by contract on the device (per-contract bump
+    //! Greeks via the shared PriceBookByContract machinery), then combine the
+    //! per-contract Monte-Carlo errors in quadrature (FX-scaled to book currency)
+    //! since AggregateContract sums premia but not the trust.
+    if ( _use_gpu )
+    {
+        Pricer::InitPricing();
+        PriceBookByContract( "GPU" );
+        double var = 0;
+        for ( Contract* c : _book->GetOptionList() )
+        {
+            const double t = c->GetPremiumTrust() * FxToBook( c );
+            var += t * t;
+        }
+        _book->SetPremiumTrust( std::sqrt( var ) );
+        return;
+    }
+
     Pricer::InitPricing();
 
     //! reset to a clean tree and a fixed RNG seed for reproducible, common-random

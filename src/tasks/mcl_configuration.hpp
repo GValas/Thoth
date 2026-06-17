@@ -23,6 +23,12 @@ class MclConfiguration : public Object
     //! uneven split (set by the cluster master). Default 0 (single-process).
     long _sobol_skip = 0;
 
+    //! opt in to GPU (CUDA) acceleration: when true AND a usable device is present
+    //! AND the whole book is GPU-supported (single-asset European vanillas under
+    //! GBM), the MCL engine prices on the device; otherwise it transparently runs
+    //! on the CPU. Default false. Auto-enabled by the legacy method "mcl_gpu".
+    bool _allow_gpu = false;
+
     //!
     MclConfiguration( const string& ObjectName );
     ~MclConfiguration() override;

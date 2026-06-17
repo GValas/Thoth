@@ -11,7 +11,6 @@
 #include "pricer.hpp"
 #include "pricer_ana.hpp"
 #include "pricer_mcl.hpp"
-#include "pricer_mcl_gpu.hpp"
 #include "pricer_pde.hpp"
 #include "pricer_configuration.hpp"
 #include "debug_configuration.hpp"
@@ -86,7 +85,16 @@ map<string, ObjectManager::Factory> MakeRegistry()
         }
         else if ( PC->_method == PRICING_METHOD_MCL_GPU )
         {
-            p = std::make_unique<PricerMCLGpu>( n, m.cfg() );
+            //! legacy alias: GPU is now an MCL capability gated by the
+            //! mcl_configuration's allow_gpu flag. "mcl_gpu" forces that flag on,
+            //! so old books keep accelerating; prefer `method: mcl` + `allow_gpu`.
+            if ( PC->_mcl )
+            {
+                PC->_mcl->_allow_gpu = true;
+            }
+            LOG( "INI", "method 'mcl_gpu' is deprecated: use 'mcl' with 'allow_gpu: true' "
+                        "in the mcl_configuration (treating it as that now)" );
+            p = std::make_unique<PricerMCL>( n, m.cfg() );
         }
         else if ( PC->_method == PRICING_METHOD_PDE )
         {
@@ -413,6 +421,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
         M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
         M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
         M->_sobol_skip = m.cfg().GetLong( n + ".sobol_skip", 0 );
+        M->_allow_gpu = m.cfg().GetBoolean( n + ".allow_gpu", false );
         //! guard against degenerate grids: paths <= 0 -> NaN premium, and
         //! max_time_step <= 0 -> a zero-day diffusion step that never advances
         if ( M->_paths <= 0 )
