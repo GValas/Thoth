@@ -659,6 +659,11 @@ long PricerMCL::AmericanLsmSteps() const
 //! before every label site below.
 string PricerMCL::LogLabel() const
 {
+    //! GPU when the book is pricing on the device, else AMC (American LSM) / MCL
+    if ( _use_gpu )
+    {
+        return "GPU";
+    }
     return _collector.IsRecording() ? "AMC" : "MCL";
 }
 
