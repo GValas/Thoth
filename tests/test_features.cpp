@@ -82,7 +82,7 @@ TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
       << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
       << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
       << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
-      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 50000,"
+      << "m: !mcl_configuration {max_time_step: 30, min_time_step: -1, paths: 100000,"
       << " vol_time_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [6, 6]}\n"
