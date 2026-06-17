@@ -3,7 +3,7 @@ root: matrix
 # Full pricer/product matrix, run in one process by the !sequence task. Every
 # priceable (product, method) combination below is launched one after another;
 # each writes its own <name>_result block. run_pricers.sh prints the premiums
-# as a table. All cases share the same 1y, spot-100, flat-30%-vol, flat-8%-rate
+# as a table. All cases share the same 5y, spot-100, flat-30%-vol, flat-8%-rate
 # market so the numbers are directly comparable across engines.
 #
 #   product (mono/multi, call/put; sorted alphabetically)   method(s)
@@ -50,8 +50,8 @@ root: matrix
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
 # graph, in ANA's quanto forward (Mono::GetForward) and in the PDE carry. A
 # quanto pays the EUR-asset payoff in USD; here corr(asset, eur/usd) extraction
-# gives a +0.0225 carry bump, so the quanto call sits just below the EUR call
-# discounted at the USD rate.
+# gives a +0.1125 carry bump at the 5y maturity (rho*sigma_S*sigma_X*t), so the
+# quanto call sits just below the EUR call discounted at the USD rate.
 
 matrix: !sequence
   result: matrix_result
@@ -791,7 +791,7 @@ c_van_eu: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 
@@ -799,7 +799,7 @@ c_van_am: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   exercise: american
 
@@ -807,7 +807,7 @@ c_barr_cont: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: up&out
   barrier_monitoring_type: continuous_monitoring
@@ -817,7 +817,7 @@ c_barr_disc: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: up&out
   barrier_monitoring_type: discrete_monitoring
@@ -827,7 +827,7 @@ c_barr_disc: !barrier
 c_vswap: !variance_swap
   underlying: eq
   premium_currency: eur
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   volatility_strike: 20
   notional: 10000
 
@@ -836,14 +836,14 @@ c_van_eu_q: !vanilla
   underlying: eq
   premium_currency: usd
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_van_am_q: !vanilla
   underlying: eq
   premium_currency: usd
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   exercise: american
 
@@ -853,7 +853,7 @@ c_compo: !vanilla
   underlying: comp
   premium_currency: usd
   strike: 150
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 # american composite put (so early exercise carries value), same ATM strike
@@ -861,7 +861,7 @@ c_compo_am: !vanilla
   underlying: comp
   premium_currency: usd
   strike: 150
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   exercise: american
 
@@ -870,14 +870,14 @@ c_rb_best: !vanilla
   underlying: rb_best
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_rb_worst: !vanilla
   underlying: rb_worst
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 
@@ -886,21 +886,21 @@ c_heston: !vanilla
   underlying: eq_h
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_bates: !vanilla
   underlying: eq_b
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_basket: !vanilla
   underlying: bskt
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 
@@ -909,21 +909,21 @@ c_sabr: !vanilla
   underlying: eq_sabr
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_compo_sabr: !vanilla
   underlying: comp_sabr
   premium_currency: usd
   strike: 150
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 c_basket_sabr: !vanilla
   underlying: bskt_sabr
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: european
 
@@ -932,7 +932,7 @@ c_barr_cont_in: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: up&in
   barrier_monitoring_type: continuous_monitoring
@@ -944,7 +944,7 @@ c_barr_cont_do: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: down&out
   barrier_monitoring_type: continuous_monitoring
@@ -953,7 +953,7 @@ c_barr_cont_di: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: down&in
   barrier_monitoring_type: continuous_monitoring
@@ -962,7 +962,7 @@ c_barr_cont_put: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   barrier_type: up&out
   barrier_monitoring_type: continuous_monitoring
@@ -971,7 +971,7 @@ c_barr_disc_in: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   barrier_type: up&in
   barrier_monitoring_type: discrete_monitoring
@@ -983,21 +983,21 @@ c_van_eu_put: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   exercise: european
 c_van_am_call: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: call
   exercise: american
 c_heston_am: !vanilla
   underlying: eq_h
   premium_currency: eur
   strike: 100
-  maturity: 2000-12-31
+  maturity: 2004-12-31
   type: put
   exercise: american
 
@@ -1036,7 +1036,7 @@ eq2_sabr: !equity
   volatility: sabr_vol
   currency: eur
 sabr_vol: !sabr_volatility
-  maturities: [1.0]
+  maturities: [5.0]
   alpha: [0.30]
   beta: [1.0]
   rho: [-0.3]
