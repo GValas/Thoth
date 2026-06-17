@@ -122,6 +122,12 @@ class YamlConfig
     //! remove path
     void Remove( const string& Path );
 
+    //! deep-copy the top-level node named Key from another config into this one.
+    //! The cluster master uses it to gather each sequence sub-task's result block
+    //! (a top-level <name>_result map) into a single aggregated response document.
+    void CopyTopLevel( const string& Key,
+                       YamlConfig& Source );
+
     //! objects byt kind
     vector<string> GetObjectsByKind( const string& kind );
 

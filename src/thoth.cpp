@@ -264,14 +264,29 @@ static bool PollSlaveProgress( const string& Url, long& Current, long& Total, bo
     return true;
 }
 
-//! split a single-pricer MCL request across the slaves and aggregate; anything
-//! else (non-MCL, or a non-pricer root) is forwarded whole to the first slave.
+//! forward declaration : a !sequence is dispatched per sub-task (mutual recursion
+//! with ClusterPrice, which a sub-task re-enters as an individual pricer).
+static string ClusterPriceSequence( const string& Body,
+                                    const string& Exec,
+                                    const vector<string>& Slaves );
+
+//! split a single-pricer MCL request across the slaves and aggregate. A !sequence
+//! root is dispatched task by task (each MCL cell path-split in turn); anything
+//! else (non-MCL engine, an MCL pricer with no path config) is computed on the
+//! master rather than offloading a whole, unsplit job onto one slave.
 static string ClusterPrice( const string& Body,
                             const string& ExecName,
                             const vector<string>& Slaves )
 {
     YamlConfig req( YamlConfig::from_string_t{}, Body );
     const string exec = ( ExecName == ROOT_NODE ) ? req.GetString( "root" ) : ExecName;
+
+    //! a sequence (e.g. the full pricer matrix) : apply the cluster logic to each
+    //! sub-pricer in turn, so its MCL cells are path-split across the slaves too.
+    if ( req.GetTag( exec ) == "sequence" )
+    {
+        return ClusterPriceSequence( Body, exec, Slaves );
+    }
 
     //! only an MCL single-pricer can be path-split
     bool splittable = req.GetTag( exec ) == "pricer";
@@ -284,8 +299,7 @@ static string ClusterPrice( const string& Body,
     }
     if ( !splittable )
     {
-        //! nothing to distribute (non-MCL engine, a non-pricer root such as a
-        //! !sequence, or an MCL pricer with no path
+        //! nothing to distribute (non-MCL engine, or an MCL pricer with no path
         //! config) : the master computes it itself rather than offloading a whole,
         //! unsplit job onto one slave. Runs under the master's price_mutex, so it
         //! stays serialised with the rest of the cluster pricing.
@@ -423,6 +437,47 @@ static string ClusterPrice( const string& Body,
     out.SetString( "system_information.cluster",
                    "aggregated " + std::to_string( total ) + " paths over " +
                        std::to_string( N ) + " slaves" );
+    return out.Dump();
+}
+
+//! price a !sequence under the cluster master : run every sub-task through the
+//! per-pricer dispatch (each MCL cell path-split across the slaves in turn, ANA /
+//! PDE / mcl_gpu computed on the master), then gather every sub-task's result
+//! block into one response — so the matrix gets the slaves applied cell by cell.
+//! Sub-tasks run one after another (not concurrently): each MCL cell already uses
+//! the whole slave pool, and serial execution keeps each cell's aggregate progress
+//! bar coherent. Each call re-prices from the original Body, so sub-pricers sharing
+//! a book stay independent (no carried-over state between cells).
+static string ClusterPriceSequence( const string& Body,
+                                    const string& Exec,
+                                    const vector<string>& Slaves )
+{
+    YamlConfig out( YamlConfig::from_string_t{}, Body ); //!< accumulator = input doc
+    const vector<string> tasks = out.GetStringList( Exec + ".tasks" );
+    LOG( "CLU", "sequence '" + Exec + "' : dispatching " + std::to_string( tasks.size() ) +
+                    " task(s) across the cluster" );
+
+    const double t0 = WallClockSeconds();
+    for ( size_t i = 0; i < tasks.size(); i++ )
+    {
+        LOG( "CLU", "sequence task " + std::to_string( i + 1 ) + "/" +
+                        std::to_string( tasks.size() ) + " : " + tasks[i] );
+        const string resp = ClusterPrice( Body, tasks[i], Slaves );
+        YamlConfig r( YamlConfig::from_string_t{}, resp );
+        out.CopyTopLevel( out.GetString( tasks[i] + ".result" ), r );
+    }
+
+    //! sequence summary block, mirroring Sequence::WriteResults
+    const string seq_result = out.GetString( Exec + ".result", "" );
+    if ( !seq_result.empty() )
+    {
+        out.SetString( seq_result + ".kind", "sequence_result" );
+        out.SetDouble( seq_result + ".exec_time", ExecTime( t0 ) );
+        out.SetStringList( seq_result + ".tasks", tasks );
+    }
+    out.SetString( "system_information.cluster",
+                   "sequence of " + std::to_string( tasks.size() ) +
+                       " task(s) dispatched over " + std::to_string( Slaves.size() ) + " slave(s)" );
     return out.Dump();
 }
 

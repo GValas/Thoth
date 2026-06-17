@@ -283,6 +283,9 @@ aggregate the results:
 ./run_docker_server.sh --port 8090 --slaves 2
 # then POST a book to the master (single-MCL-pricer books get path-split):
 ./run_local_client.sh samples/simple_call.yaml --port 8090
+# a !sequence (e.g. the matrix) is dispatched cell by cell — each MCL cell is
+# path-split across the slaves in turn, ANA/PDE/mcl_gpu compute on the master:
+./run_local_client_matrix.sh --port 8090
 ```
 
 The master splits `paths` as evenly as possible (capping the fan-out at `paths`
@@ -292,9 +295,12 @@ slaves before it), so the slaves draw **disjoint, independent** blocks even when
 the split is uneven. It pools the premium path-weighted and combines the
 per-slave variances for the trust. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
-precision. Only an MCL single-pricer is split; any other root (a non-MCL engine,
-a `!sequence`, ...) is computed by the **master itself**
-rather than offloaded whole onto a slave.
+precision. A **`!sequence`** root is dispatched task by task: each MCL cell is
+path-split across the slaves in turn (ANA/PDE and other non-splittable cells are
+computed by the master), and every cell's result block is gathered into one
+response — so the full matrix gets the cluster applied cell by cell. Any other
+non-splittable root (a non-MCL engine, an MCL pricer with no path config) is
+computed by the **master itself** rather than offloaded whole onto a slave.
 
 While the slaves run, the master draws an **approximate global progress bar** by
 polling each slave's `GET /progress` (the in-flight pricing's path count) and

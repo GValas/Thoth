@@ -644,6 +644,14 @@ void YamlConfig::Remove( const string& Path )
     }
 }
 
+void YamlConfig::CopyTopLevel( const string& Key,
+                               YamlConfig& Source )
+{
+    //! YAML::Clone deep-copies the subtree so the destination owns its own nodes
+    //! (yaml-cpp node assignment is otherwise a shared reference into Source).
+    _root[Key] = YAML::Clone( Source._root[Key] );
+}
+
 //! local tag of a node, without the leading '!' ("" if missing / untagged)
 string YamlConfig::GetTag( const string& Path )
 {
