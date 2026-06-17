@@ -77,18 +77,41 @@ function flush() {
     else if (n ~ /_(ana|mcl|pde)$/) { method=substr(n, length(n)-2);  prod=substr(n, 1, length(n)-4) }
     else                        { method="-";          prod=n }
     rows[nr] = sprintf("%-40s %-11s %10s %12s %10s %10s %10s %10s %10s",
-                       prod, method, fmt(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
+                       prod, method, fmt_time(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
+    #! sort key: product then method. SUBSEP (\034) sorts below '_' and letters, so
+    #! a plain product groups before its longer "<product>_<variant>" siblings.
+    keys[nr] = prod SUBSEP method
     nr++
     name=""
 }
 function fmt(v) { return (v == "") ? "-" : sprintf("%.6g", v+0) }
+# ~3 significant figures, fixed-point (no scientific), for a unit-scaled value
+function tnum(x,   a) {
+    a = (x < 0 ? -x : x)
+    if (a >= 100) return sprintf("%.0f", x)
+    if (a >= 10)  return sprintf("%.1f", x)
+    return sprintf("%.2f", x)
+}
+# a duration in seconds -> human-readable (6.0µs, 5.0ms, 12.2s, 1m2s)
+function fmt_time(v,   a, m, s) {
+    if (v == "") return "-"
+    v = v + 0
+    a = (v < 0 ? -v : v)
+    if (a == 0)    return "0s"
+    if (a >= 60)   { m = int(v / 60); s = v - m * 60
+                     return (s >= 0.5) ? sprintf("%dm%ds", m, int(s + 0.5)) : sprintf("%dm", m) }
+    if (a >= 1)    return tnum(v) "s"
+    if (a >= 1e-3) return tnum(v * 1e3) "ms"
+    if (a >= 1e-6) return tnum(v * 1e6) "µs"
+    return tnum(v * 1e9) "ns"
+}
 function reset() { t=prem=de=ga=ve=rh=th=""; is_pricer=0 }
 BEGIN {
     nr = 0   #!< numeric from the start: rows[nr] must index 0,1,2... not the string ""
     printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s\n",
-           "PRODUCT", "METHOD", "TIME(s)", "PREMIUM", "DELTA", "GAMMA", "VEGA", "RHO", "THETA"
+           "PRODUCT", "METHOD", "TIME", "PREMIUM", "DELTA", "GAMMA", "VEGA", "RHO", "THETA"
     printf "%-40s %-11s %10s %12s %10s %10s %10s %10s %10s\n",
-           "-------", "------", "-------", "-------", "-----", "-----", "----", "---", "-----"
+           "-------", "------", "----", "-------", "-----", "-----", "----", "---", "-----"
 }
 # a top-level result block header: "<name>_result:" with no leading space
 /^[A-Za-z0-9_]+_result:[[:space:]]*$/ {
@@ -110,7 +133,15 @@ name != "" && /^  rho:/       { rh=$2 }
 name != "" && /^  theta:/     { th=$2 }
 END {
     flush()
-    for (i = 0; i < nr; i++) print rows[i]
+    #! insertion sort of the row indices by their (product, method) key (n ~ 60,
+    #! so a simple O(n^2) sort is fine and keeps us in portable POSIX awk)
+    for (i = 0; i < nr; i++) ord[i] = i
+    for (i = 1; i < nr; i++) {
+        k = ord[i]; j = i - 1
+        while (j >= 0 && keys[ord[j]] > keys[k]) { ord[j + 1] = ord[j]; j-- }
+        ord[j + 1] = k
+    }
+    for (i = 0; i < nr; i++) print rows[ord[i]]
     printf "\n%d priced cell(s).\n", nr
 }
 ' "$OUT"
