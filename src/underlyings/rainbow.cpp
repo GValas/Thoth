@@ -30,10 +30,12 @@ MonteCarloNode* Rainbow::GetNode( NodeCollector& NC )
         [&]( RainbowNode* R )
         {
             R->SetBest( _type == RainbowType::BestOf );
-            for ( Underlying* u : _underlying_list )
+            for ( size_t i = 0; i < _underlying_list.size(); i++ )
             {
-                R->PushUnderlying( u->GetNode( NC ) );
-                R->PushWeight( 100.0 / u->GetSpot() ); //!< rebase S_i -> 100 * S_i/S_i0
+                R->PushUnderlying( _underlying_list[i]->GetNode( NC ) );
+                //! rebase S_i -> 100 * S_i / S_i0 against the FIXED reference S_i0,
+                //! so a delta/gamma spot bump on S_i is not cancelled by it.
+                R->PushWeight( 100.0 / RefSpot( i ) );
             }
         } );
 }

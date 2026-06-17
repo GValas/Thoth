@@ -73,6 +73,13 @@ rate move, theta per calendar day. On a 1y ATM call the three engines agree and
 sit close to Black-Scholes (delta ≈0.67, gamma ≈0.012, vega ≈0.37, rho ≈0.50,
 theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·ε).
 
+For **basket / rainbow** underlyings (each component rebased to 100 at inception),
+the spot bump scales the component against its *fixed* inception level `S_i0`, so
+delta/gamma respond instead of cancelling — ANA and MCL agree (e.g. a 5y ATM basket
+call: delta ≈0.836 on both). The PDE prices a basket on a 1-D grid in basket-spot
+space, so it reports the grid's own `dV/dS` delta (matches ANA/MCL); its grid
+*gamma* there is second-difference-noisy (use ANA/MCL for an accurate basket gamma).
+
 **Model-parameter Greeks** — for the stochastic / local-vol surfaces you can also
 request `vega_<param>` indicators that bump one model parameter and revalue (per
 unit parameter): SABR `vega_alpha` / `vega_beta` / `vega_rho` / `vega_nu`, Heston
@@ -360,7 +367,7 @@ my_config: !pricer_configuration
 my_mcl: !mcl_configuration
   max_time_step: 1
   min_time_step: -1
-  paths: 50000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
+  paths: 100000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
   vol_time_step: 0.01
   use_sobol: true
   allow_gpu: false       # true -> run on a CUDA GPU when present + book supported, else CPU

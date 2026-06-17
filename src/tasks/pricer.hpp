@@ -111,6 +111,12 @@ class Pricer : public Task
     //! not isolate a single contract), so it keeps ComputeGreeks.
     virtual bool GreeksPerContract() const { return false; }
 
+    //! true for an engine whose PriceContract already yields spot delta/gamma from
+    //! its grid (PDE). For a multi-asset underlying, whose basket "spot" is fixed
+    //! (a rebased 100, independent of the component spots), a per-component spot
+    //! bump can't move it, so we keep the grid's delta/gamma instead of the bump.
+    virtual bool GridSpotGreeks() const { return false; }
+
     //! shared contract loop for the per-contract engines: prices each contract,
     //! computes its Greeks (when requested) by bumping only that contract's
     //! market, and advances a single progress bar over the contracts.

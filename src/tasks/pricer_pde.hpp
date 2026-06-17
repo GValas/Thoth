@@ -138,6 +138,7 @@ class PricerPDE : public Pricer
     //! price one contract (vanilla, knock-out, or knock-in via in/out parity)
     void PriceContract( Contract* Ctr ) override; //!< single-contract grid solve
     bool GreeksPerContract() const override { return true; }
+    bool GridSpotGreeks() const override { return true; } //!< grid yields dV/dS directly
 
   public:
     //! constructor, destructor

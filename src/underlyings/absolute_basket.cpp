@@ -41,7 +41,7 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
     for ( size_t i = 0; i < n; i++ )
     {
         Underlying* u = _underlying_list[i];
-        la_vector_set( fwds, i, u->GetForward( MaturityDate, _currency ) / u->GetSpot() * _weight_list->data[i] );
+        la_vector_set( fwds, i, u->GetForward( MaturityDate, _currency ) / RefSpot( i ) * _weight_list->data[i] );
         la_vector_set( vols, i, u->GetImplicitVol( k, MaturityDate ) * sqrt( dt ) );
         udl_list.push_back( u->GetName() );
     }
@@ -83,7 +83,7 @@ double AbsoluteBasket::GetForward( const date& MaturityDate,
     for ( size_t i = 0; i < n; i++ )
     {
         Underlying* u = _underlying_list[i];
-        f += u->GetForward( MaturityDate, QuantoCurrency ) / u->GetSpot() * la_vector_get( _weight_list, i );
+        f += u->GetForward( MaturityDate, QuantoCurrency ) / RefSpot( i ) * la_vector_get( _weight_list, i );
     }
     return 100 * f;
 }
@@ -99,7 +99,7 @@ MonteCarloNode* AbsoluteBasket::GetNode( NodeCollector& NC )
             for ( size_t i = 0; i < _underlying_list.size(); i++ )
             {
                 E->PushUnderlying( _underlying_list[i]->GetNode( NC ) );
-                E->PushWeight( 100 * la_vector_get( _weight_list, i ) / _underlying_list[i]->GetSpot() );
+                E->PushWeight( 100 * la_vector_get( _weight_list, i ) / RefSpot( i ) );
             }
         } );
 }

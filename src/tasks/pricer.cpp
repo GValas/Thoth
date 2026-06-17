@@ -232,9 +232,14 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
     double delta = 0;
     double gamma = 0;
 
+    //! for a multi-asset underlying on a grid engine (PDE), the basket "spot" is a
+    //! fixed rebased 100 that a per-component bump can't move, so the bump would
+    //! read zero — keep the grid's own dV/dS delta/gamma (set by PriceContract) instead.
+    const bool grid_spot = GridSpotGreeks() && Ctr->GetSingleSet().size() > 1;
+
     //! delta / gamma : per-underlying relative spot bump, summed over the
     //! contract's underlyings (small bump for delta, wider one for gamma)
-    if ( _request_delta || _request_gamma )
+    if ( ( _request_delta || _request_gamma ) && !grid_spot )
     {
         for ( Single* s : Ctr->GetSingleSet() )
         {
@@ -320,10 +325,14 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
     }
 
     //! restore the contract to its base price BEFORE writing the Greeks: the
-    //! restore reprice (PDE) overwrites delta/gamma from the grid, so set ours after.
+    //! restore reprice (PDE) sets delta/gamma from the grid, so set ours after —
+    //! except in grid_spot mode, where we deliberately keep the grid's delta/gamma.
     PriceContract( Ctr );
-    Ctr->SetDelta( delta );
-    Ctr->SetGamma( gamma );
+    if ( !grid_spot )
+    {
+        Ctr->SetDelta( delta );
+        Ctr->SetGamma( gamma );
+    }
     Ctr->SetVega( vega );
     Ctr->SetRho( rho );
     Ctr->SetTheta( theta );

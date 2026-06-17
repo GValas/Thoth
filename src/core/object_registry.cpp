@@ -206,6 +206,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
         AbsoluteBasket* B = m.collector().Add( std::make_unique<AbsoluteBasket>( n ) );
         B->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
         B->SetWeightList( m.cfg().GetLaVector( n + ".weights" ) );
+        B->CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
         return B;
     };
 
@@ -214,6 +215,7 @@ map<string, ObjectManager::Factory> MakeRegistry()
         Rainbow* R = m.collector().Add( std::make_unique<Rainbow>( n ) );
         R->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
         R->SetType( ParseRainbowType( m.cfg().GetString( n + ".type" ) ) );
+        R->CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
         return R;
     };
 
