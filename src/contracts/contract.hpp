@@ -1,21 +1,12 @@
 #pragma once
 #include "underlying.hpp"
 #include "valuation.hpp"
+#include "pricing_facets.hpp"
 
-//! GPU Monte-Carlo (mcl_gpu) parameters for a European vanilla under geometric
-//! Brownian motion — the forward-measure scalars (the same ones the analytic BS
-//! pricer uses). Filled by Contract::GPU_GbmParams for GPU-supported contracts.
-struct GpuGbmParams
-{
-    double forward = 0; //!< carries the carry / dividend / quanto drift
-    double strike = 0;
-    double t = 0;   //!< year fraction today -> maturity
-    double vol = 0; //!< implied vol at (strike, maturity)
-    double df = 0;  //!< discount factor to maturity
-    bool is_call = true;
-};
-
-class Contract : public Object
+//! A contract: its trade definition + native Monte-Carlo node graph, plus the
+//! optional PDE / analytic / GPU pricing facets (see pricing_facets.hpp). The
+//! engines write the priced result into Result().
+class Contract : public Object, public PdePriceable, public AnaPriceable, public GpuPriceable
 {
 
   protected:
@@ -50,67 +41,27 @@ class Contract : public Object
     Valuation& Result() { return _valuation; }
     const Valuation& Result() const { return _valuation; }
 
-    //! mcl nodes
+    //! mcl nodes (the contract's canonical definition)
     MonteCarloNode* GetNode( NodeCollector& NC );
     MonteCarloNode* GetUnderlyingNode( NodeCollector& NC );
     virtual MonteCarloNode* GetFlowNode( NodeCollector& NC, const date& AsOfDate ) = 0;
 
     virtual date GetMaturityDate() = 0;
 
-    //! pde flow evaluation
-    virtual bool PDE_HasSolution() = 0;
-    virtual double PDE_EvalFlow( const double spot ) = 0;
-    virtual bool PDE_IsAmerican() = 0;
-
-    //! pde knock-out / knock-in barrier (continuous monitoring).
-    //! Non-barrier contracts keep the defaults below.
-    virtual bool PDE_IsBarrier()
-    {
-        return false;
-    }
-    virtual bool PDE_IsKnockIn()
-    {
-        return false;
-    }
-    virtual bool PDE_IsUpBarrier()
-    {
-        return false;
-    }
-    virtual bool PDE_IsDiscreteBarrier()
-    {
-        return false;
-    }
-    virtual double PDE_BarrierLevel()
-    {
-        return 0;
-    }
-
-    //! priced on the spot grid as the expected accumulated variance (a backward
-    //! PDE with a local-variance source) rather than a terminal-payoff solve.
-    //! Only the variance swap overrides this; it routes the PDE pricer to the
-    //! dedicated accumulated-variance solve.
-    virtual bool PDE_IsAccruedVariance()
-    {
-        return false;
-    }
-
-    //! analytical
-    virtual bool ANA_HasSolution() = 0;
-    virtual void ANA_EvalPrice() = 0;
-
-    //! GPU Monte-Carlo (mcl_gpu): fill Out and return true iff this contract is a
-    //! GPU-supported European vanilla under (deterministic-vol) GBM; false for
-    //! American / barrier / stochastic-vol / multi-asset, so PricerMCLGpu falls
-    //! back to the CPU MCL engine. Default: unsupported.
-    virtual bool GPU_GbmParams( GpuGbmParams& /*Out*/ )
-    {
-        return false;
-    }
+    //! trade properties shared across engines (PDE boundary + MCL American LSM):
+    //! the intrinsic (exercise) payoff at a given spot, and the exercise style.
+    virtual double Intrinsic( const double spot ) = 0;
+    virtual bool IsAmerican() = 0;
 
     //! fixing dates
     virtual set<date> GetFixingDates() = 0;
     virtual set<date> GetFlowDates() = 0;
     virtual set<date> GetAmericanExerciseDates() = 0;
+
+    //! PDE / analytic / GPU pricing facets are inherited from pricing_facets.hpp:
+    //!   PdePriceable : PDE_HasSolution + barrier / accrued-variance flags
+    //!   AnaPriceable : ANA_HasSolution / ANA_EvalPrice
+    //!   GpuPriceable : GPU_GbmParams
 
     //! constructor
     Contract( const string& ObjectName,

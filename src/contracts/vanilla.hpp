@@ -27,10 +27,12 @@ class Vanilla : public Contract
     MonteCarloNode* GetFlowNode( NodeCollector& NC,
                                  const date& AsOfDate ) override;
 
+    //! trade properties (intrinsic payoff + exercise style)
+    double Intrinsic( const double spot ) override;
+    bool IsAmerican() override;
+
     //! pde
     bool PDE_HasSolution() override;
-    double PDE_EvalFlow( const double spot ) override;
-    bool PDE_IsAmerican() override;
 
     //! analytical
     bool ANA_HasSolution() override;

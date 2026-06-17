@@ -92,12 +92,12 @@ bool VarianceSwap::PDE_HasSolution()
 
 //! the variance PDE has a zero terminal condition and its own (remaining-variance)
 //! boundaries — there is no terminal spot payoff here, so this is just 0.
-double VarianceSwap::PDE_EvalFlow( const double /*Spot*/ )
+double VarianceSwap::Intrinsic( const double /*Spot*/ )
 {
     return 0.0;
 }
 
-bool VarianceSwap::PDE_IsAmerican()
+bool VarianceSwap::IsAmerican()
 {
     return false;
 }

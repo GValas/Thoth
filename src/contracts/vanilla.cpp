@@ -76,7 +76,7 @@ set<date> Vanilla::GetAmericanExerciseDates()
 }
 
 //!
-double Vanilla::PDE_EvalFlow( const double Spot )
+double Vanilla::Intrinsic( const double Spot )
 {
     return payoff_vanilla( Spot, _strike, _type, false, 0, true, 0 );
 }
@@ -169,7 +169,7 @@ bool Vanilla::GPU_GbmParams( GpuGbmParams& Out )
 }
 
 //
-bool Vanilla::PDE_IsAmerican()
+bool Vanilla::IsAmerican()
 {
     return _exercise_mode == ExerciseMode::American;
 }

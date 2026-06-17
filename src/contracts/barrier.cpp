@@ -61,7 +61,7 @@ set<date> Barrier::GetAmericanExerciseDates()
 
 //! terminal payoff is the vanilla one; the knock-out is enforced by the grid
 //! boundary (continuous monitoring), so no special handling is needed here.
-double Barrier::PDE_EvalFlow( const double spot )
+double Barrier::Intrinsic( const double spot )
 {
     return payoff_vanilla( spot, _strike, _type, false, 0, true, 0 );
 }

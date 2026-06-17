@@ -635,7 +635,7 @@ long PricerMCL::AmericanLsmSteps() const
     long steps = 0;
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( !c->PDE_IsAmerican() )
+        if ( !c->IsAmerican() )
         {
             continue;
         }
@@ -679,7 +679,7 @@ void PricerMCL::SetupAmericanRecording()
     size_t n = (size_t)_configuration->_mcl->_paths;
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( !c->PDE_IsAmerican() )
+        if ( !c->IsAmerican() )
         {
             continue;
         }
@@ -723,7 +723,7 @@ void PricerMCL::LogRecordings()
     }
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( !c->PDE_IsAmerican() )
+        if ( !c->IsAmerican() )
         {
             continue;
         }
@@ -772,7 +772,7 @@ void PricerMCL::PriceAmerican()
 
     for ( Contract* c : _book->GetOptionList() )
     {
-        if ( !c->PDE_IsAmerican() )
+        if ( !c->IsAmerican() )
         {
             continue;
         }
@@ -881,7 +881,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
     vector<double> cf( N );
     for ( size_t p = 0; p < N; p++ )
     {
-        cf[p] = Contract->PDE_EvalFlow( la_matrix_get( Paths, p, M - 1 ) ); //!< at maturity
+        cf[p] = Contract->Intrinsic( la_matrix_get( Paths, p, M - 1 ) ); //!< at maturity
     }
 
     //! backward induction over the interior exercise dates
@@ -904,7 +904,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
         vector<size_t> itm;
         for ( size_t p = 0; p < N; p++ )
         {
-            if ( Contract->PDE_EvalFlow( la_matrix_get( Paths, p, t ) ) > 0 )
+            if ( Contract->Intrinsic( la_matrix_get( Paths, p, t ) ) > 0 )
             {
                 itm.push_back( p );
             }
@@ -942,7 +942,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
             double s = la_matrix_get( Paths, p, t );
             double m = s / pol.s0;
             double continuation = pol.b0[t] + pol.b1[t] * m + pol.b2[t] * m * m;
-            double intrinsic = Contract->PDE_EvalFlow( s );
+            double intrinsic = Contract->Intrinsic( s );
             if ( intrinsic >= continuation )
             {
                 cf[p] = intrinsic;
@@ -983,7 +983,7 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
         for ( size_t t = 1; t < M; t++ )
         {
             double s = la_matrix_get( Paths, p, t );
-            double intrinsic = Contract->PDE_EvalFlow( s );
+            double intrinsic = Contract->Intrinsic( s );
 
             if ( t == M - 1 ) //!< maturity : forced exercise (take the payoff)
             {
@@ -1013,7 +1013,7 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
     //! American value = max( continuation today, immediate exercise at the
     //! path-set's initial spot ) — for bumped paths this is the bumped spot
     double s0_set = la_matrix_get( Paths, 0, 0 );
-    return std::max( mean, Contract->PDE_EvalFlow( s0_set ) );
+    return std::max( mean, Contract->Intrinsic( s0_set ) );
 }
 
 void PricerMCL::Tree_Read()

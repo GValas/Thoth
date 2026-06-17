@@ -196,7 +196,7 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     X_min = s * exp( -_configuration->_pde->_custom_sigma_factor * v * sqrt( T_max ) );
     N = _configuration->_pde->_custom_n_t;
     J = _configuration->_pde->_custom_n_s;
-    is_american = Ctr->PDE_IsAmerican();
+    is_american = Ctr->IsAmerican();
 
     //! barrier handling
     if ( ApplyBarrier && Ctr->PDE_IsBarrier() )
@@ -210,12 +210,12 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             if ( is_up )
             {
                 V_up = 0;
-                V_dw = Ctr->PDE_EvalFlow( X_min );
+                V_dw = Ctr->Intrinsic( X_min );
             }
             else
             {
                 V_dw = 0;
-                V_up = Ctr->PDE_EvalFlow( X_max );
+                V_up = Ctr->Intrinsic( X_max );
             }
         }
         else
@@ -226,20 +226,20 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             {
                 X_max = H;
                 V_up = 0;
-                V_dw = Ctr->PDE_EvalFlow( X_min );
+                V_dw = Ctr->Intrinsic( X_min );
             }
             else
             {
                 X_min = H;
                 V_dw = 0;
-                V_up = Ctr->PDE_EvalFlow( X_max );
+                V_up = Ctr->Intrinsic( X_max );
             }
         }
     }
     else
     {
-        V_up = Ctr->PDE_EvalFlow( X_max );
-        V_dw = Ctr->PDE_EvalFlow( X_min );
+        V_up = Ctr->Intrinsic( X_max );
+        V_dw = Ctr->Intrinsic( X_min );
     }
 
     // transformation settings -> more points around X_0
@@ -305,7 +305,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
     for ( int i = 0; i < J + 1; i++ )
     {
-        la_vector_set( U_1, i, Ctr->PDE_EvalFlow( Phi( i * h ) ) );
+        la_vector_set( U_1, i, Ctr->Intrinsic( Phi( i * h ) ) );
     }
 
     //! discrete barrier observed at maturity (terminal step N)
@@ -354,7 +354,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         {
             for ( int k = 0; k < J + 1; k++ )
             {
-                U_0->data[k] = max( U_0->data[k], Ctr->PDE_EvalFlow( Phi( k * h ) ) );
+                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( Phi( k * h ) ) );
             }
         }
 
@@ -607,7 +607,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double th = hv.theta;
     const double xi = hv.xi;
     const double rho = hv.rho;
-    const bool american = Ctr->PDE_IsAmerican();
+    const bool american = Ctr->IsAmerican();
 
     //! Bates jumps (lambda = 0 -> pure Heston): lognormal jump size e^Z, Z~N(muJ,
     //! sigJ^2), mean relative jump kbar = e^{muJ+0.5 sigJ^2}-1. The PIDE adds an
@@ -643,13 +643,13 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     //! terminal payoff
     for ( int i = 0; i <= NS; i++ )
     {
-        double payoff = Ctr->PDE_EvalFlow( S( i ) );
+        double payoff = Ctr->Intrinsic( S( i ) );
         for ( int j = 0; j <= Nv; j++ )
         {
             U[IX( i, j )] = payoff;
         }
     }
-    const double intrinsic0 = Ctr->PDE_EvalFlow( 0.0 ); //!< payoff at S=0 (0 call, K put)
+    const double intrinsic0 = Ctr->Intrinsic( 0.0 ); //!< payoff at S=0 (0 call, K put)
 
     //! Bates jump integral. Discretise the jump size Z ~ N(muJ, sigJ^2) on a grid
     //! out to +/-6 sigma (re-normalised for truncation), and read V at the jumped
@@ -835,7 +835,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         {
             for ( int i = 0; i <= NS; i++ )
             {
-                double ev = Ctr->PDE_EvalFlow( S( i ) );
+                double ev = Ctr->Intrinsic( S( i ) );
                 for ( int j = 0; j <= Nv; j++ )
                 {
                     U[IX( i, j )] = std::max( U[IX( i, j )], ev );

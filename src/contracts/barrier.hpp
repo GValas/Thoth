@@ -32,13 +32,15 @@ class Barrier : public Contract
     //! getter
     date GetMaturityDate() override;
 
-    //! pde flow evaluation
-    bool PDE_HasSolution() override;
-    double PDE_EvalFlow( const double Spot ) override;
-    bool PDE_IsAmerican() override
+    //! trade properties (intrinsic payoff + exercise style)
+    double Intrinsic( const double Spot ) override;
+    bool IsAmerican() override
     {
         return false;
     }
+
+    //! pde
+    bool PDE_HasSolution() override;
 
     //! pde barrier (continuous monitoring, single knock-out / knock-in)
     bool PDE_IsBarrier() override;
