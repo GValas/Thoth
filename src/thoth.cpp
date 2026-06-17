@@ -308,6 +308,11 @@ static string ClusterPrice( const string& Body,
     }
     mcl = req.GetString( cfg + ".mcl_configuration" );
 
+    //! GPU-enabled cell (allow_gpu): the slaves run their path block on the device,
+    //! so tag the master's dispatch / progress lines GPU rather than CLU.
+    const bool allow_gpu = req.GetBoolean( mcl + ".allow_gpu", false );
+    const string tag = allow_gpu ? "GPU" : "CLU";
+
     const long total = req.GetLong( mcl + ".paths" );
     const string result = req.GetString( exec + ".result" );
     const vector<string> contracts = req.GetStringList( req.GetString( exec + ".book" ) + ".options" );
@@ -341,8 +346,8 @@ static string ClusterPrice( const string& Body,
     }
 
     //! dispatch concurrently
-    LOG( "CLU", "dispatching " + std::to_string( total ) + " paths across " +
-                    std::to_string( N ) + " slave(s)" );
+    LOG( tag, "dispatching " + std::to_string( total ) + " paths across " +
+                  std::to_string( N ) + " slave(s)" + ( allow_gpu ? " (allow_gpu)" : "" ) );
     vector<string> responses( N );
     vector<std::exception_ptr> errs( N );
     vector<std::thread> threads;
@@ -361,7 +366,7 @@ static string ClusterPrice( const string& Body,
     std::atomic<bool> dispatching{ true };
     std::thread poller( [&]()
                         {
-        ProgressBar bar( "CLU", 100 ); //!< driven in whole percent
+        ProgressBar bar( tag, 100 ); //!< driven in whole percent (GPU when allow_gpu)
         while ( dispatching.load() )
         {
             long sum_cur = 0, sum_tot = 0;
