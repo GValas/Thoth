@@ -79,7 +79,7 @@ function flush() {
                   prod, toupper(method), fmt_time(t), fmt(prem), fmt(de), fmt(ga), fmt(ve), fmt(rh), fmt(th))
     if (pg != "") row = row "   " pg   #!< model-parameter Greeks (vega_<param>), variable per model
     rows[nr] = row
-    #! sort key: product then method. SUBSEP (\034) sorts below '_' and letters, so
+    #! sort key: product then method. SUBSEP (\034) sorts below underscore/letters, so
     #! a plain product groups before its longer "<product>_<variant>" siblings.
     keys[nr] = prod SUBSEP method
     nr++
@@ -148,8 +148,8 @@ END {
         while (j >= 0 && keys[ord[j]] > keys[k]) { ord[j + 1] = ord[j]; j-- }
         ord[j + 1] = k
     }
-    #! print sorted, with a blank separator between products so each product's
-    #! engine rows (ana / mcl / pde / ...) read as one block
+    #! print sorted, with a blank separator between products so each product block
+    #! of engine rows (ana / mcl / pde / ...) reads as one group
     prev = ""
     for (i = 0; i < nr; i++) {
         split(keys[ord[i]], kp, SUBSEP)   #!< kp[1] = product label
