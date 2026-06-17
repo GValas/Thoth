@@ -1,5 +1,6 @@
 #pragma once
 #include "underlying.hpp"
+#include "valuation.hpp"
 
 //! GPU Monte-Carlo (mcl_gpu) parameters for a European vanilla under geometric
 //! Brownian motion — the forward-measure scalars (the same ones the analytic BS
@@ -18,25 +19,8 @@ class Contract : public Object
 {
 
   protected:
-    //! premium
-    double _premium = 0;
-    double _premium_trust = 0;
-
-    //! greeks
-    double _delta = 0;
-    double _gamma = 0;
-    double _vega_bs = 0;
-    double _volga_bs = 0;
-
-    //! bump-and-revalue Greeks (per contract), filled by the PDE/ANA engines so
-    //! the book totals can be attributed back to each contract. _delta/_gamma
-    //! above double as the bump spot Greeks; these add the rest.
-    double _vega = 0;  //!< premium change per 1 vol point (0.01 of vol)
-    double _rho = 0;   //!< premium change per 1% (0.01) parallel rate move
-    double _theta = 0; //!< premium change over one calendar day
-
-    //! for relative outputs
-    double RelativeFactor();
+    //! the priced result (premium + Greeks); engines write it via Result()
+    Valuation _valuation;
 
     //! attributes
     Underlying* _underlying = nullptr;
@@ -53,13 +37,6 @@ class Contract : public Object
     //! setter
     void SetUnderlying( Underlying& underlying );
     void SetPremiumCurrency( Currency& premium_currency );
-    void SetPremium( double Premium );
-    void SetPremiumTrust( double PremiumTrust );
-    void SetDelta( double Delta );
-    void SetGamma( double Delta );
-    void SetVega( double Vega );
-    void SetRho( double Rho );
-    void SetTheta( double Theta );
     void SetToday( const date& Today ) override;
     void SetCorrelation( Correlation* Correlation );
 
@@ -69,16 +46,9 @@ class Contract : public Object
 
     SingleSet GetSingleSet();
 
-    double GetPremium();
-    double GetPremiumTrust();
-    double GetRelativePremium();
-    double GetDelta();
-    double GetGamma();
-    double GetVega();
-    double GetRho();
-    double GetTheta();
-    double GetVegaBS();
-    double GetVolgaBS();
+    //! the priced result (premium + Greeks): engines fill it, aggregation reads it
+    Valuation& Result() { return _valuation; }
+    const Valuation& Result() const { return _valuation; }
 
     //! mcl nodes
     MonteCarloNode* GetNode( NodeCollector& NC );

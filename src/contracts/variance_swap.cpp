@@ -71,10 +71,10 @@ void VarianceSwap::ANA_EvalPrice()
     double k_fair = ( t > 0 ) ? ( 2.0 / ( t * df ) ) * integral : 0;
     double k_var = _volatility_strike * _volatility_strike;
 
-    _premium = _notional * df * ( k_fair - k_var );
-    _vega_bs = _notional * df * 2.0 * sqrt( ( k_fair > 0 ) ? k_fair : 0.0 ); //!< dPV/dvol
-    _delta = 0;
-    _gamma = 0;
+    _valuation.premium = _notional * df * ( k_fair - k_var );
+    _valuation.vega_bs = _notional * df * 2.0 * sqrt( ( k_fair > 0 ) ? k_fair : 0.0 ); //!< dPV/dvol
+    _valuation.delta = 0;
+    _valuation.gamma = 0;
 }
 
 //! closed form for equity-like underlyings (flat or smile-ATM vol surface)

@@ -21,48 +21,6 @@ void Contract::SetPremiumCurrency( Currency& PremiumCurrency )
 }
 
 //! setter
-void Contract::SetPremium( double Premium )
-{
-    _premium = Premium;
-}
-
-//! setter
-void Contract::SetPremiumTrust( double PremiumTrust )
-{
-    _premium_trust = PremiumTrust;
-}
-
-//! setter
-void Contract::SetDelta( double Delta )
-{
-    _delta = Delta;
-}
-
-//! setter
-void Contract::SetGamma( double Gamma )
-{
-    _gamma = Gamma;
-}
-
-//! setter
-void Contract::SetVega( double Vega )
-{
-    _vega = Vega;
-}
-
-//! setter
-void Contract::SetRho( double Rho )
-{
-    _rho = Rho;
-}
-
-//! setter
-void Contract::SetTheta( double Theta )
-{
-    _theta = Theta;
-}
-
-//! setter
 void Contract::SetToday( const date& Today )
 {
     _premium_currency->SetToday( Today );
@@ -80,73 +38,6 @@ Underlying* Contract::GetUnderlying()
 Currency* Contract::GetPremiumCurrency()
 {
     return _premium_currency;
-}
-
-//! getter
-double Contract::GetPremium()
-{
-    return _premium;
-}
-
-//! getter
-double Contract::GetPremiumTrust()
-{
-    return _premium_trust;
-}
-
-//! getter
-double Contract::GetDelta()
-{
-    return _delta;
-}
-
-//! getter
-double Contract::GetGamma()
-{
-    return _gamma;
-}
-
-//! getter
-double Contract::GetVega()
-{
-    return _vega;
-}
-
-//! getter
-double Contract::GetRho()
-{
-    return _rho;
-}
-
-//! getter
-double Contract::GetTheta()
-{
-    return _theta;
-}
-
-//! getter
-double Contract::GetVegaBS()
-{
-    return _vega_bs;
-}
-
-//! getter
-double Contract::GetVolgaBS()
-{
-    return _volga_bs;
-}
-
-//! relative factor
-double Contract::RelativeFactor()
-{
-    double s = _underlying->GetSpot();
-    double fx = 1;
-    if ( _underlying->GetCurrency() != _premium_currency )
-    {
-        fx = _underlying->GetCorrelation()->GetFxSpot( _underlying->GetCurrency()->GetName(),
-                                                       _premium_currency->GetName() );
-    }
-    return 100 / ( s * fx );
 }
 
 //! setter

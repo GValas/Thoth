@@ -212,11 +212,11 @@ void Pricer::PriceBookByContract( const string& Label )
         //! book-currency Greek totals (delta/gamma already folded into the book
         //! by AggregateContract; vega/rho/theta live at pricer level)
         const double fx = FxToBook( c );
-        _delta += c->GetDelta() * fx;
-        _gamma += c->GetGamma() * fx;
-        _vega += c->GetVega() * fx;
-        _rho += c->GetRho() * fx;
-        _theta += c->GetTheta() * fx;
+        _delta += c->Result().delta * fx;
+        _gamma += c->Result().gamma * fx;
+        _vega += c->Result().vega * fx;
+        _rho += c->Result().rho * fx;
+        _theta += c->Result().theta * fx;
 
         bar.Update( ++done );
     }
@@ -229,7 +229,7 @@ void Pricer::PriceBookByContract( const string& Label )
 //! contract's base price on exit (so AggregateContract sees the unbumped premium).
 void Pricer::ComputeContractGreeks( Contract* Ctr )
 {
-    const double p0 = Ctr->GetPremium();
+    const double p0 = Ctr->Result().premium;
 
     double delta = 0;
     double gamma = 0;
@@ -252,7 +252,7 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceContract( Ctr );
-                const double pu = Ctr->GetPremium();
+                const double pu = Ctr->Result().premium;
                 s->SetSpot( spot ); //!< restore
                 delta += ( pu - p0 ) / h;
             }
@@ -262,10 +262,10 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
                 PriceContract( Ctr );
-                const double pu = Ctr->GetPremium();
+                const double pu = Ctr->Result().premium;
                 s->SetSpot( spot - h );
                 PriceContract( Ctr );
-                const double pd = Ctr->GetPremium();
+                const double pd = Ctr->Result().premium;
                 s->SetSpot( spot ); //!< restore
                 gamma += ( pu - 2 * p0 + pd ) / ( h * h );
             }
@@ -282,7 +282,7 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
             s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
         }
         PriceContract( Ctr );
-        const double pu = Ctr->GetPremium();
+        const double pu = Ctr->Result().premium;
         for ( Single* s : singles )
         {
             s->GetVolatility()->SetVolShift( 0 ); //!< restore
@@ -302,7 +302,7 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
             c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
         }
         PriceContract( Ctr );
-        const double pu = Ctr->GetPremium();
+        const double pu = Ctr->Result().premium;
         for ( Currency* c : ccys )
         {
             c->GetRate()->SetCurveShift( 0 ); //!< restore
@@ -320,7 +320,7 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
         _today = base + days( 1 );
         Ctr->SetToday( _today );
         PriceContract( Ctr );
-        const double p1 = Ctr->GetPremium();
+        const double p1 = Ctr->Result().premium;
         _today = base; //!< restore
         Ctr->SetToday( _today );
         theta = p1 - p0;
@@ -332,12 +332,12 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
     PriceContract( Ctr );
     if ( !grid_spot )
     {
-        Ctr->SetDelta( delta );
-        Ctr->SetGamma( gamma );
+        Ctr->Result().delta = delta;
+        Ctr->Result().gamma = gamma;
     }
-    Ctr->SetVega( vega );
-    Ctr->SetRho( rho );
-    Ctr->SetTheta( theta );
+    Ctr->Result().vega = vega;
+    Ctr->Result().rho = rho;
+    Ctr->Result().theta = theta;
 }
 
 //! bump-and-revalue Greeks. Every scenario re-runs PriceBook with one market
@@ -532,30 +532,30 @@ void Pricer::WriteResults()
     for ( Contract* c : _book->GetOptionList() )
     {
         const string p = _result + "." + c->GetName();
-        _cfg->SetDouble( p + "_premium", c->GetPremium() );
-        _cfg->SetDouble( p + "_premium_trust", c->GetPremiumTrust() );
+        _cfg->SetDouble( p + "_premium", c->Result().premium );
+        _cfg->SetDouble( p + "_premium_trust", c->Result().premium_trust );
 
         if ( per_contract_greeks )
         {
             if ( _request_delta )
             {
-                _cfg->SetDouble( p + "_delta", c->GetDelta() );
+                _cfg->SetDouble( p + "_delta", c->Result().delta );
             }
             if ( _request_gamma )
             {
-                _cfg->SetDouble( p + "_gamma", c->GetGamma() );
+                _cfg->SetDouble( p + "_gamma", c->Result().gamma );
             }
             if ( _request_vega )
             {
-                _cfg->SetDouble( p + "_vega", c->GetVega() );
+                _cfg->SetDouble( p + "_vega", c->Result().vega );
             }
             if ( _request_rho )
             {
-                _cfg->SetDouble( p + "_rho", c->GetRho() );
+                _cfg->SetDouble( p + "_rho", c->Result().rho );
             }
             if ( _request_theta )
             {
-                _cfg->SetDouble( p + "_theta", c->GetTheta() );
+                _cfg->SetDouble( p + "_theta", c->Result().theta );
             }
         }
     }
@@ -589,9 +589,9 @@ double Pricer::FxToBook( Contract* Ctr )
 void Pricer::AggregateContract( Contract* Ctr )
 {
     double fx = FxToBook( Ctr );
-    _book->SetPremium( _book->GetPremium() + Ctr->GetPremium() * fx );
-    _book->SetDelta( _book->GetDelta() + Ctr->GetDelta() * fx );
-    _book->SetGamma( _book->GetGamma() + Ctr->GetGamma() * fx );
+    _book->SetPremium( _book->GetPremium() + Ctr->Result().premium * fx );
+    _book->SetDelta( _book->GetDelta() + Ctr->Result().delta * fx );
+    _book->SetGamma( _book->GetGamma() + Ctr->Result().gamma * fx );
 }
 
 //! verify every contract in the book supports the engine's pricing method
@@ -632,13 +632,13 @@ void Pricer::InitPricing()
     {
         ( *c )->SetCorrelation( _correlation );
         ( *c )->GetUnderlying()->SetCorrelation( _correlation );
-        ( *c )->SetPremium( 0 );
-        ( *c )->SetPremiumTrust( 0 );
-        ( *c )->SetDelta( 0 );
-        ( *c )->SetGamma( 0 );
-        ( *c )->SetVega( 0 );
-        ( *c )->SetRho( 0 );
-        ( *c )->SetTheta( 0 );
+        ( *c )->Result().premium = 0;
+        ( *c )->Result().premium_trust = 0;
+        ( *c )->Result().delta = 0;
+        ( *c )->Result().gamma = 0;
+        ( *c )->Result().vega = 0;
+        ( *c )->Result().rho = 0;
+        ( *c )->Result().theta = 0;
     }
 
     // underlying lists
@@ -655,8 +655,8 @@ void Pricer::InitPricing()
 
         //! Heston: the spot/variance correlation rho lives in the global
         //! correlation matrix (variance keyed "<underlying>_var"), not on the
-        //! heston_volatility object. Resolve it onto the vol so every engine can
-        //! read hv->GetRho() unchanged.
+        //! stochastic-vol object. Resolve it onto the vol (SetStochasticRho) so
+        //! every engine reads it back via StochasticParams() unchanged.
         if ( ( *s )->GetVolatility()->IsStochastic() )
         {
             if ( !_correlation )

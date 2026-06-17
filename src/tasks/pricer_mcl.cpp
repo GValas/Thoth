@@ -104,8 +104,8 @@ void PricerMCL::PriceContract( Contract* Ctr )
 
     const gpu::GbmResult r = gpu::PriceEuropeanGbm( p.forward, p.strike, p.t, p.vol,
                                                     p.df, p.is_call, paths, seed );
-    Ctr->SetPremium( r.premium );
-    Ctr->SetPremiumTrust( r.trust );
+    Ctr->Result().premium = r.premium;
+    Ctr->Result().premium_trust = r.trust;
 }
 
 //! price the whole book by Monte-Carlo. Re-runnable: the node tree is rebuilt
@@ -124,7 +124,7 @@ void PricerMCL::PriceBook()
         double var = 0;
         for ( Contract* c : _book->GetOptionList() )
         {
-            const double t = c->GetPremiumTrust() * FxToBook( c );
+            const double t = c->Result().premium_trust * FxToBook( c );
             var += t * t;
         }
         _book->SetPremiumTrust( std::sqrt( var ) );
@@ -302,8 +302,8 @@ void PricerMCL::ComputeGreeks()
         vector<double> contract_trust;
         for ( Contract* c : _book->GetOptionList() )
         {
-            contract_premium.push_back( c->GetPremium() );
-            contract_trust.push_back( c->GetPremiumTrust() );
+            contract_premium.push_back( c->Result().premium );
+            contract_trust.push_back( c->Result().premium_trust );
         }
 
         _quiet_pricing = true; //!< suppress the status lines / node-graph dump...
@@ -325,8 +325,8 @@ void PricerMCL::ComputeGreeks()
         size_t i = 0;
         for ( Contract* c : _book->GetOptionList() )
         {
-            c->SetPremium( contract_premium[i] );
-            c->SetPremiumTrust( contract_trust[i] );
+            c->Result().premium = contract_premium[i];
+            c->Result().premium_trust = contract_trust[i];
             i++;
         }
 
@@ -788,8 +788,8 @@ void PricerMCL::PriceAmerican()
         //! base premium = apply the frozen policy to the base paths
         double trust = 0;
         double premium = ApplyAmericanPolicy( c, S0, tau, r, policy, trust );
-        c->SetPremium( premium );
-        c->SetPremiumTrust( trust );
+        c->Result().premium = premium;
+        c->Result().premium_trust = trust;
         std::ostringstream oss;
         oss << "american '" << c->GetName() << "' (LSM, frozen boundary) premium = " << premium;
         LOG( LogLabel(), oss.str() );
@@ -833,7 +833,7 @@ void PricerMCL::PriceAmerican()
     double book_premium = 0;
     for ( Contract* c : _book->GetOptionList() )
     {
-        book_premium += c->GetPremium() * fx_of( c );
+        book_premium += c->Result().premium * fx_of( c );
     }
     _book->SetPremium( book_premium );
 
@@ -1029,8 +1029,8 @@ void PricerMCL::Tree_Read()
           C++ )
     {
         N = _collector.GetNode( ( *C )->GetName() );
-        ( *C )->SetPremium( N->GetIndicatorValue( 0 ) );
-        ( *C )->SetPremiumTrust( N->GetIndicatorTrust( 0 ) );
+        ( *C )->Result().premium = N->GetIndicatorValue( 0 );
+        ( *C )->Result().premium_trust = N->GetIndicatorTrust( 0 );
     }
 
     //! per-bump book premium (single-tree Greeks): read each scenario root's

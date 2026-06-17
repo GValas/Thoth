@@ -63,9 +63,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
     if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston( Ctr ) )
     {
         GridResult r = SolveHestonGrid( Ctr );
-        Ctr->SetPremium( r.premium );
-        Ctr->SetDelta( r.delta );
-        Ctr->SetGamma( r.gamma );
+        Ctr->Result().premium = r.premium;
+        Ctr->Result().delta = r.delta;
+        Ctr->Result().gamma = r.gamma;
         return;
     }
 
@@ -74,9 +74,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
     {
         InitGrid( Ctr, false );
         GridResult r = SolveGrid( Ctr );
-        Ctr->SetPremium( r.premium );
-        Ctr->SetDelta( r.delta );
-        Ctr->SetGamma( r.gamma );
+        Ctr->Result().premium = r.premium;
+        Ctr->Result().delta = r.delta;
+        Ctr->Result().gamma = r.gamma;
         return;
     }
 
@@ -102,9 +102,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
             res = ko;
         }
 
-        Ctr->SetPremium( res.premium );
-        Ctr->SetDelta( res.delta );
-        Ctr->SetGamma( res.gamma );
+        Ctr->Result().premium = res.premium;
+        Ctr->Result().delta = res.delta;
+        Ctr->Result().gamma = res.gamma;
         return;
     }
 
@@ -144,9 +144,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
         }
     }
 
-    Ctr->SetPremium( res.premium );
-    Ctr->SetDelta( res.delta );
-    Ctr->SetGamma( res.gamma );
+    Ctr->Result().premium = res.premium;
+    Ctr->Result().delta = res.delta;
+    Ctr->Result().gamma = res.gamma;
 }
 
 //! init grid
@@ -459,9 +459,9 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
     const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( maturity );
-    Ctr->SetPremium( Ctr->GetNotional() * df * ( fair_var - k_var ) );
-    Ctr->SetDelta( 0 );
-    Ctr->SetGamma( 0 );
+    Ctr->Result().premium = Ctr->GetNotional() * df * ( fair_var - k_var );
+    Ctr->Result().delta = 0;
+    Ctr->Result().gamma = 0;
 }
 
 inline double PricerPDE::Phi( double x )

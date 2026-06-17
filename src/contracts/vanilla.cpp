@@ -112,32 +112,32 @@ void Vanilla::ANA_EvalPrice()
     if ( mvol && mvol->IsStochastic() )
     {
         const StochasticVolParams h = mvol->StochasticParams();
-        _premium = ( _type == OptionType::Call )
-                       ? Heston_Call_Price( f, k, t, df, h.v0, h.kappa, h.theta, h.xi, h.rho,
-                                            h.jump_intensity, h.jump_mean, h.jump_vol )
-                       : Heston_Put_Price( f, k, t, df, h.v0, h.kappa, h.theta, h.xi, h.rho,
-                                           h.jump_intensity, h.jump_mean, h.jump_vol );
-        _delta = _gamma = _vega_bs = _volga_bs = 0;
+        _valuation.premium = ( _type == OptionType::Call )
+                                 ? Heston_Call_Price( f, k, t, df, h.v0, h.kappa, h.theta, h.xi, h.rho,
+                                                      h.jump_intensity, h.jump_mean, h.jump_vol )
+                                 : Heston_Put_Price( f, k, t, df, h.v0, h.kappa, h.theta, h.xi, h.rho,
+                                                     h.jump_intensity, h.jump_mean, h.jump_vol );
+        _valuation.delta = _valuation.gamma = _valuation.vega_bs = _valuation.volga_bs = 0;
         return;
     }
 
     //! call
     if ( _type == OptionType::Call )
     {
-        _premium = BS_Call_Price( f, k, t, v, df );
-        _delta = BS_Call_Delta( f, k, t, v, df );
+        _valuation.premium = BS_Call_Price( f, k, t, v, df );
+        _valuation.delta = BS_Call_Delta( f, k, t, v, df );
     }
     //! put
     else
     {
-        _premium = BS_Put_Price( f, k, t, v, df );
-        _delta = BS_Put_Delta( f, k, t, v, df );
+        _valuation.premium = BS_Put_Price( f, k, t, v, df );
+        _valuation.delta = BS_Put_Delta( f, k, t, v, df );
     }
 
     //! common greeks
-    _gamma = BS_Gamma( f, k, t, v, df );
-    _vega_bs = BS_Vega( f, k, t, v, df );
-    _volga_bs = BS_Volga( f, k, t, v, df );
+    _valuation.gamma = BS_Gamma( f, k, t, v, df );
+    _valuation.vega_bs = BS_Vega( f, k, t, v, df );
+    _valuation.volga_bs = BS_Volga( f, k, t, v, df );
 }
 
 //! gpu monte-carlo (mcl_gpu): genuine single-asset GBM only — a European equity
