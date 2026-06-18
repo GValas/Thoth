@@ -126,26 +126,6 @@ string ToString( size_t i )
     return ss.str();
 }
 
-// change each element of the string to upper case
-string ToUpperString( string strToConvert )
-{
-    for ( unsigned int i = 0; i < strToConvert.length(); i++ )
-    {
-        strToConvert[i] = toupper( strToConvert[i] );
-    }
-    return strToConvert;
-}
-
-// change each element of the string to lower case
-string ToLowerString( string strToConvert )
-{
-    for ( unsigned int i = 0; i < strToConvert.length(); i++ )
-    {
-        strToConvert[i] = tolower( strToConvert[i] );
-    }
-    return strToConvert;
-}
-
 //!
 string ReplaceString( const string& source,
                       const string& find,
@@ -158,13 +138,6 @@ string ReplaceString( const string& source,
         s.replace( j, find.length(), replace );
     }
     return s;
-}
-
-//!
-vector<string> NULL_STRING_VECTOR()
-{
-    vector<string> v;
-    return v;
 }
 
 //! error

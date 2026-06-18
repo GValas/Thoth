@@ -14,8 +14,6 @@ string ReplaceString( const string& source,
                       const string& find,
                       const string& replace );
 
-vector<string> NULL_STRING_VECTOR();
-
 [[noreturn]] void ERR( const string& ErrMsg );
 string LogTimestamp(); //!< current local time "YYYY-MM-DD HH:MM:SS" (LOG line prefix)
 void LOG( const string& LogMsg );

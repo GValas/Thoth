@@ -1,9 +1,9 @@
 #pragma once
 // misc
-const double NB_OF_DAYS_A_YEAR = 365;
-const double NB_OF_BUSINESS_DAYS_A_YEAR = 260;
+inline constexpr double NB_OF_DAYS_A_YEAR = 365;
+inline constexpr double NB_OF_BUSINESS_DAYS_A_YEAR = 260;
 
-const int DECIMAL_PRECISION = 9;
+inline constexpr int DECIMAL_PRECISION = 9;
 inline constexpr char ROOT_NODE[] = "root";
 
 //! the relative spot bump for delta/gamma (1%). One canonical value, used two
@@ -14,7 +14,7 @@ inline constexpr char ROOT_NODE[] = "root";
 inline constexpr double GREEK_SPOT_BUMP = 0.01;
 
 // pricer_configuration - mcl
-const double NON_WORKING_DAYS_WEIGHT = 1.;
+inline constexpr double NON_WORKING_DAYS_WEIGHT = 1.;
 
 //! contracts
 inline constexpr char TYPE_CALL[] = "call";

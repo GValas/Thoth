@@ -40,12 +40,9 @@ void Book::SetGamma( double Gamma )
 //! setter
 void Book::SetToday( const date& Today )
 {
-    vector<Contract*>::iterator c;
-    for ( c = _option_list.begin();
-          c != _option_list.end();
-          c++ )
+    for ( Contract* c : _option_list )
     {
-        ( *c )->SetToday( Today );
+        c->SetToday( Today );
     }
 }
 
@@ -95,10 +92,9 @@ double Book::GetVolgaBS() const
 set<date> Book::GetFixingDates()
 {
     set<date> set_dates;
-    vector<Contract*>::iterator c;
-    for ( c = _option_list.begin(); c != _option_list.end(); c++ )
+    for ( Contract* c : _option_list )
     {
-        set<date> s = ( *c )->GetFixingDates();
+        set<date> s = c->GetFixingDates();
         set_dates.insert( s.begin(), s.end() );
     }
     return set_dates;
@@ -108,10 +104,9 @@ set<date> Book::GetFixingDates()
 set<date> Book::GetAmericanExerciseDates()
 {
     set<date> set_dates;
-    vector<Contract*>::iterator c;
-    for ( c = _option_list.begin(); c != _option_list.end(); c++ )
+    for ( Contract* c : _option_list )
     {
-        set<date> s = ( *c )->GetAmericanExerciseDates();
+        set<date> s = c->GetAmericanExerciseDates();
         set_dates.insert( s.begin(), s.end() );
     }
     return set_dates;
@@ -121,12 +116,9 @@ set<date> Book::GetAmericanExerciseDates()
 SingleSet Book::GetSingleSet()
 {
     SingleSet s;
-    vector<Contract*>::iterator c;
-    for ( c = _option_list.begin();
-          c < _option_list.end();
-          c++ )
+    for ( Contract* c : _option_list )
     {
-        SingleSet s_ = ( *c )->GetSingleSet();
+        SingleSet s_ = c->GetSingleSet();
         s.insert( s_.begin(), s_.end() );
     }
     return s;
@@ -136,13 +128,10 @@ SingleSet Book::GetSingleSet()
 CurrencySet Book::GetCurrencySet()
 {
     CurrencySet s;
-    vector<Contract*>::iterator c;
-    for ( c = _option_list.begin();
-          c < _option_list.end();
-          c++ )
+    for ( Contract* c : _option_list )
     {
-        CurrencySet s_ = ( *c )->GetUnderlying()->GetCurrencySet();
-        s.insert( ( *c )->GetPremiumCurrency() );
+        CurrencySet s_ = c->GetUnderlying()->GetCurrencySet();
+        s.insert( c->GetPremiumCurrency() );
         s.insert( s_.begin(), s_.end() );
     }
     return s;

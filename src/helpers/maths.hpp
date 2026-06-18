@@ -79,15 +79,6 @@ void ext_la_matrix_to_symmetric( la_matrix* m );
 
 double ext_la_vector_sum( la_vector* v );
 
-double ext_stats_wcovariance_m( const double w[],
-                                const double data1[],
-                                const size_t stride1,
-                                const double data2[],
-                                const size_t stride2,
-                                const size_t n,
-                                const double wmean1,
-                                const double wmean2 );
-
 double ext_stats_wcorrelation_m_v( const double w[],
                                    const double data1[],
                                    const size_t stride1,

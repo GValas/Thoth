@@ -10,15 +10,15 @@
 
 //! constants
 //! grid sizes per Precision level (see PricerConfiguration.h)
-const int PDE_VANILLA_PRECISION_LOW_N_S = 501;
-const int PDE_VANILLA_PRECISION_LOW_N_T = 301;
-const int PDE_VANILLA_PRECISION_MEDIUM_N_S = 1001;
-const int PDE_VANILLA_PRECISION_MEDIUM_N_T = 601;
-const int PDE_VANILLA_PRECISION_HIGH_N_S = 1501;
-const int PDE_VANILLA_PRECISION_HIGH_N_T = 1301;
-const double PDE_SIGMA_FACTOR = 5.0;
-const double PDE_THETA = 0.5;
-const bool MC_USE_SOBOL = true;
+inline constexpr int PDE_VANILLA_PRECISION_LOW_N_S = 501;
+inline constexpr int PDE_VANILLA_PRECISION_LOW_N_T = 301;
+inline constexpr int PDE_VANILLA_PRECISION_MEDIUM_N_S = 1001;
+inline constexpr int PDE_VANILLA_PRECISION_MEDIUM_N_T = 601;
+inline constexpr int PDE_VANILLA_PRECISION_HIGH_N_S = 1501;
+inline constexpr int PDE_VANILLA_PRECISION_HIGH_N_T = 1301;
+inline constexpr double PDE_SIGMA_FACTOR = 5.0;
+inline constexpr double PDE_THETA = 0.5;
+inline constexpr bool MC_USE_SOBOL = true;
 
 //! pricing method selectors (config field "method")
 inline constexpr char PRICING_METHOD_PDE[] = "pde";         //!< finite-difference PDE grid solving
@@ -31,17 +31,17 @@ inline constexpr char MCL_NODE_PATH[] = "";
 //! finite-difference bump sizes for the bump-and-revalue Greeks. The spot bump
 //! (GREEK_SPOT_BUMP, for delta/gamma) is the canonical one in constants.hpp, so
 //! the contracts share it; the rest are pricer-local.
-const double GREEK_GAMMA_BUMP = 0.10;  //!< wider relative spot bump (10%) for gamma:
-                                       //!< a small second difference is swamped by the
-                                       //!< PDE grid's per-spot re-centering noise, so
-                                       //!< gamma needs the curvature signal to dominate
-const double GREEK_VOL_BUMP = 0.01;    //!< absolute vol bump (1 vol point) for vega
-const double GREEK_RATE_BUMP = 0.0001; //!< absolute rate bump (1 bp) for rho
-const double GREEK_PARAM_BUMP = 0.01;  //!< absolute bump on a model parameter for the
-                                       //!< vega_<param> Greeks (SABR / Heston / Bates),
-                                       //!< reported per unit parameter. Sized like the vega
-                                       //!< bump (one point) so the signal clears the MC /
-                                       //!< PDE-grid / local-vol-resampling noise floor
+inline constexpr double GREEK_GAMMA_BUMP = 0.10;  //!< wider relative spot bump (10%) for gamma:
+                                                  //!< a small second difference is swamped by the
+                                                  //!< PDE grid's per-spot re-centering noise, so
+                                                  //!< gamma needs the curvature signal to dominate
+inline constexpr double GREEK_VOL_BUMP = 0.01;    //!< absolute vol bump (1 vol point) for vega
+inline constexpr double GREEK_RATE_BUMP = 0.0001; //!< absolute rate bump (1 bp) for rho
+inline constexpr double GREEK_PARAM_BUMP = 0.01;  //!< absolute bump on a model parameter for the
+                                                  //!< vega_<param> Greeks (SABR / Heston / Bates),
+                                                  //!< reported per unit parameter. Sized like the vega
+                                                  //!< bump (one point) so the signal clears the MC /
+                                                  //!< PDE-grid / local-vol-resampling noise floor
 
 class Pricer : public Task
 {

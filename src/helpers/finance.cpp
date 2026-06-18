@@ -54,7 +54,7 @@ double payoff_digital( const double spot,
     }
     else
     {
-        ERR( "ERR> unknown barrier type '" + barrier_type + "'" );
+        ERR( "unknown barrier type '" + barrier_type + "'" ); //!< ERR already prefixes "ERR> "
     }
     return digital;
 }
