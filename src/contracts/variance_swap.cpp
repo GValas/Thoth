@@ -39,7 +39,8 @@ date VarianceSwap::GetMaturityDate() const
 //! reproduces sigma^2.
 //! static-replication strike strip (Demeterfi-Derman-Kamal-Zou): how many ATM
 //! standard deviations the OTM-option grid spans around the forward, and how many
-//! trapezoid points discretise it.
+//! trapezoid points discretise it. The grid is built here and handed to
+//! VarSwap_FairVariance (finance.cpp), which integrates the strip.
 static constexpr double VARSWAP_STRIP_SIGMA_SPAN = 6.0;
 static constexpr int VARSWAP_STRIP_POINTS = 800;
 
@@ -49,36 +50,34 @@ void VarianceSwap::ANA_EvalPrice()
     double df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
     double fwd = _underlying->GetForward( _maturity_date, _premium_currency );
 
-    //! strike grid : +/- span ATM std devs around the forward, trapezoidal rule
+    //! build the strike grid (+/- span ATM std devs around the forward) and sample
+    //! the implied-vol surface at each strike, then integrate the strip in finance.cpp
     double sigma_atm = _underlying->GetImplicitVol( fwd, _maturity_date );
     double span = VARSWAP_STRIP_SIGMA_SPAN * sigma_atm * sqrt( t );
     double k_lo = fwd * exp( -span );
     double k_hi = fwd * exp( span );
-    const int n = VARSWAP_STRIP_POINTS;
-    double dk = ( k_hi - k_lo ) / n;
+    double dk = ( k_hi - k_lo ) / VARSWAP_STRIP_POINTS;
 
-    double integral = 0;
-    for ( int i = 0; i <= n; i++ )
+    vector<double> strikes;
+    vector<double> vols;
+    strikes.reserve( VARSWAP_STRIP_POINTS + 1 );
+    vols.reserve( VARSWAP_STRIP_POINTS + 1 );
+    for ( int i = 0; i <= VARSWAP_STRIP_POINTS; i++ )
     {
         double k = k_lo + i * dk;
         if ( k <= 0 )
         {
             continue;
         }
-        double vol = _underlying->GetImplicitVol( k, _maturity_date );
-        //! out-of-the-money leg: puts below the forward, calls above (prices are
-        //! discounted, so e^{rT} = 1/df is applied to the whole integral below)
-        double price = ( k < fwd ) ? BS_Put_Price( fwd, k, t, vol, df )
-                                   : BS_Call_Price( fwd, k, t, vol, df );
-        double weight = ( i == 0 || i == n ) ? 0.5 : 1.0; //!< trapezoid endpoints
-        integral += weight * price / ( k * k ) * dk;
+        strikes.push_back( k );
+        vols.push_back( _underlying->GetImplicitVol( k, _maturity_date ) );
     }
 
-    double k_fair = ( t > 0 ) ? ( 2.0 / ( t * df ) ) * integral : 0;
+    double k_fair = VarSwap_FairVariance( fwd, t, df, strikes, vols );
     double k_var = _volatility_strike * _volatility_strike;
 
-    _valuation.premium = _notional * df * ( k_fair - k_var );
-    _valuation.vega_bs = _notional * df * 2.0 * sqrt( ( k_fair > 0 ) ? k_fair : 0.0 ); //!< dPV/dvol
+    _valuation.premium = VarSwap_Price( _notional, df, k_fair, k_var );
+    _valuation.vega_bs = VarSwap_Vega( _notional, df, k_fair );
     _valuation.delta = 0;
     _valuation.gamma = 0;
 }

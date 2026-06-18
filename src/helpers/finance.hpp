@@ -63,6 +63,29 @@ double BS_Volga( const double Forward,
                  const double Volatility,
                  const double DiscountFactor );
 
+//! Variance swap, analytic (static replication). Fair (annualised) variance by the
+//! Demeterfi-Derman-Kamal-Zou out-of-the-money option strip:
+//!   K_fair = (2 / (T * df)) * integral OTM(K) / K^2 dK   (puts below F, calls above)
+//! integrated by the trapezoidal rule over the caller-supplied strike grid and its
+//! matching per-strike implied vols (ascending strikes > 0; the grid may be
+//! non-uniform). The caller (variance_swap.cpp) builds the grid from the surface.
+double VarSwap_FairVariance( const double Forward,
+                             const double TimeToMaturity,
+                             const double DiscountFactor,
+                             const vector<double>& Strikes,
+                             const vector<double>& Vols );
+
+//! variance-swap present value: notional * df * (fair_var - strike_var)
+double VarSwap_Price( const double Notional,
+                      const double DiscountFactor,
+                      const double FairVariance,
+                      const double StrikeVariance );
+
+//! variance-swap BS vega (dPV/dvol): notional * df * 2 * sqrt(fair_var)
+double VarSwap_Vega( const double Notional,
+                     const double DiscountFactor,
+                     const double FairVariance );
+
 //! Heston European call/put via the characteristic function (forward measure,
 //! "Little Heston Trap" branch-stable form, GSL adaptive integration). Forward
 //! F already carries the carry/quanto drift; df discounts in the payoff currency.

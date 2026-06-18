@@ -187,6 +187,58 @@ double BS_Volga( const double Forward,
     }
 }
 
+//! fair (annualised) variance: trapezoidal integral of the OTM-option strip
+//! g(K) = OTM(K)/K^2 over the caller-supplied strike grid (puts below the forward,
+//! calls above), scaled by 2/(T*df). The grid may be non-uniform.
+double VarSwap_FairVariance( const double Forward,
+                             const double TimeToMaturity,
+                             const double DiscountFactor,
+                             const vector<double>& Strikes,
+                             const vector<double>& Vols )
+{
+    if ( TimeToMaturity <= 0 || Strikes.size() < 2 || Strikes.size() != Vols.size() )
+    {
+        return 0;
+    }
+
+    //! integrand g(K) = OTM(K) / K^2 at each strike (the prices are discounted, so
+    //! e^{rT} = 1/df is applied via the 2/(T*df) factor below)
+    vector<double> g( Strikes.size() );
+    for ( size_t i = 0; i < Strikes.size(); i++ )
+    {
+        const double k = Strikes[i];
+        const double price = ( k < Forward ) ? BS_Put_Price( Forward, k, TimeToMaturity, Vols[i], DiscountFactor )
+                                             : BS_Call_Price( Forward, k, TimeToMaturity, Vols[i], DiscountFactor );
+        g[i] = price / ( k * k );
+    }
+
+    //! trapezoidal rule over the (possibly non-uniform) strike grid
+    double integral = 0;
+    for ( size_t i = 0; i + 1 < Strikes.size(); i++ )
+    {
+        integral += 0.5 * ( g[i] + g[i + 1] ) * ( Strikes[i + 1] - Strikes[i] );
+    }
+
+    return ( 2.0 / ( TimeToMaturity * DiscountFactor ) ) * integral;
+}
+
+//! variance-swap present value
+double VarSwap_Price( const double Notional,
+                      const double DiscountFactor,
+                      const double FairVariance,
+                      const double StrikeVariance )
+{
+    return Notional * DiscountFactor * ( FairVariance - StrikeVariance );
+}
+
+//! variance-swap BS vega (dPV/dvol)
+double VarSwap_Vega( const double Notional,
+                     const double DiscountFactor,
+                     const double FairVariance )
+{
+    return Notional * DiscountFactor * 2.0 * sqrt( ( FairVariance > 0 ) ? FairVariance : 0.0 );
+}
+
 // implicit vol
 double BS_Call_ImplicitVol( const double Forward,
                             const double Strike,
