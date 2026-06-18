@@ -91,7 +91,10 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
         {
             S->SetBrownianNode( NC.GetNode( _name + node_name::BROWNIAN ) );
             S->SetDriftNode( GetDriftNode( NC ) );
-            S->SetSpot( GetDiffusionSpot( NC.GetDateList().back() ) );
+            //! discrete dividends (if any) are escrowed inside the diffusion via the
+            //! dividend node, so the diffusion starts from the full spot
+            S->SetSpot( _spot );
+            S->SetDividendNode( GetDividendNode( NC ) );
             //! local-vol surface (e.g. SABR): sample the Dupire surface onto a
             //! per-date log-spot grid the diffusion reads along its own path.
             //! Flat surface (bs): one constant-vol node.

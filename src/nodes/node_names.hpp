@@ -20,6 +20,7 @@ inline constexpr char JUMP_NOISE[] = "#jump_noise";           //!< Bates compoun
 inline constexpr char NOISE[] = "#noise";                     //!< generic noise source
 inline constexpr char VARIANCE[] = "#variance";               //!< Heston variance process
 inline constexpr char DRIFT[] = "#drift";                     //!< risk-neutral drift
+inline constexpr char DIVIDEND[] = "#dividend";               //!< discrete-dividend future-PV (escrow)
 inline constexpr char VOL[] = "#vol";                         //!< scalar (constant) vol
 inline constexpr char ATM_VOL[] = "#atmvol";                  //!< representative ATM vol (local-vol surfaces)
 inline constexpr char LOCAL_VOL[] = "#localvol";              //!< Dupire local-vol grid

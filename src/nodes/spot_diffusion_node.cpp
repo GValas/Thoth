@@ -18,7 +18,13 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
     //! diffusion value
     if ( DateIndex > 0 )
     {
-        double s0 = _value_list[DateIndex - 1];
+        //! escrowed-dividend model: the published value is the observed spot
+        //! (clean process + future-dividend PV). Recover the clean escrowed value
+        //! of the previous step by stripping its future-dividend PV before the GBM
+        //! step, then re-add this step's PV. No dividend node -> both PVs are 0 and
+        //! this is the plain GBM step.
+        double div_prev = _dividend_node ? _dividend_node->GetValue( DateIndex - 1 ) : 0;
+        double s0 = _value_list[DateIndex - 1] - div_prev;
         double w1 = _brownian_node->GetValue( DateIndex );
         double w0 = _brownian_node->GetValue( DateIndex - 1 );
         double dw = w1 - w0;
@@ -38,9 +44,10 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
             expo += 0.5 * v * dv_dlns * ( dw * dw - dt );
         }
 
-        _value_list[DateIndex] = s0 * exp( expo );
+        double div_now = _dividend_node ? _dividend_node->GetValue( DateIndex ) : 0;
+        _value_list[DateIndex] = s0 * exp( expo ) + div_now;
     }
-    //! spot
+    //! spot (observed spot at today = clean escrowed spot + total future-dividend PV)
     else if ( DateIndex == 0 )
     {
         _value_list[DateIndex] = _spot;
@@ -70,6 +77,11 @@ void SpotDiffusionNode::SetDriftNode( MonteCarloNode* N )
 void SpotDiffusionNode::SetBrownianNode( MonteCarloNode* N )
 {
     _brownian_node = N;
+}
+
+void SpotDiffusionNode::SetDividendNode( MonteCarloNode* N )
+{
+    _dividend_node = N;
 }
 
 void SpotDiffusionNode::SetSpot( double Spot )
@@ -114,5 +126,14 @@ void SpotDiffusionNode::GetDateDependencies( size_t DateIndex,
         DateList.push_back( DateIndex - 1 );
         NodeList.push_back( this );
         DateList.push_back( DateIndex - 1 );
+        //! the observed-spot step reads the future-dividend PV at this and the
+        //! previous date (to strip / re-add the escrow)
+        if ( _dividend_node )
+        {
+            NodeList.push_back( _dividend_node );
+            DateList.push_back( DateIndex );
+            NodeList.push_back( _dividend_node );
+            DateList.push_back( DateIndex - 1 );
+        }
     }
 }

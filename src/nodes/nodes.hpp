@@ -9,6 +9,7 @@
 #include "constant_node.hpp"
 #include "contract_node.hpp"
 #include "correlated_noise_node.hpp"
+#include "dividend_node.hpp"
 #include "drift_node.hpp"
 #include "heston_variance_node.hpp"
 #include "heston_spot_node.hpp"

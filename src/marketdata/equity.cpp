@@ -160,3 +160,42 @@ MonteCarloNode* Equity::GetDriftNode( NodeCollector& NC )
     }
     return NC.GetOrCreate<DriftNode>( _name + node_name::DRIFT, init );
 }
+
+//! discrete-dividend escrow node: the future-dividend PV at each diffusion date,
+//! precomputed from the schedule and this equity's discount curve. Null when the
+//! equity carries no discrete dividends.
+MonteCarloNode* Equity::GetDividendNode( NodeCollector& NC )
+{
+    if ( !_discrete_dividends )
+    {
+        return nullptr;
+    }
+    auto init = [&]( DividendNode* D )
+    {
+        const vector<date>& schedule = _discrete_dividends->GetDates();
+        const vector<double>& amounts = _discrete_dividends->GetAmounts();
+        YieldCurve* rate = Asset::_currency->GetRate();
+        //! future-dividend PV as of each diffusion date t: sum over ex-dates after t
+        //! of amount * DF(ex) / DF(t) (DF on this equity's curve; DF(today) = 1)
+        for ( const date& t : NC.GetDateList() )
+        {
+            const double df_t = rate->GetDiscountFactor( t );
+            double pv = 0;
+            for ( size_t j = 0; j < schedule.size() && j < amounts.size(); j++ )
+            {
+                if ( schedule[j] > t )
+                {
+                    pv += amounts[j] * rate->GetDiscountFactor( schedule[j] );
+                }
+            }
+            D->PushFuturePv( ( df_t > 0 ) ? pv / df_t : pv );
+        }
+    };
+    //! depends on the discount curve (rho) only: shared with the base tree unless
+    //! the scenario bumps rates
+    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    {
+        return NC.GetOrCreateShared<DividendNode>( _name + node_name::DIVIDEND, init );
+    }
+    return NC.GetOrCreate<DividendNode>( _name + node_name::DIVIDEND, init );
+}

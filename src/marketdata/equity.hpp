@@ -52,6 +52,7 @@ class Equity : public Single
     //! mcl node
     MonteCarloNode* GetNode( NodeCollector& NC ) override;
     MonteCarloNode* GetDriftNode( NodeCollector& NC ) override;
+    MonteCarloNode* GetDividendNode( NodeCollector& NC ) override; //!< escrow node when discrete divs present
 
     // constructor
     Equity( const string& ObjectName );

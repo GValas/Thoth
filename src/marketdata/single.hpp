@@ -39,6 +39,12 @@ class Single : public Asset
 
     //! mcl node
     virtual MonteCarloNode* GetDriftNode( NodeCollector& NC ) = 0;
+
+    //! optional discrete-dividend (escrow) node wired into the spot diffusion;
+    //! null by default (no dividends). An equity with a discrete-dividend schedule
+    //! overrides it.
+    virtual MonteCarloNode* GetDividendNode( NodeCollector& /*NC*/ ) { return nullptr; }
+
     virtual MonteCarloNode* GetNode( NodeCollector& NC );
     MonteCarloNode* GetVolNode( NodeCollector& NC );
 

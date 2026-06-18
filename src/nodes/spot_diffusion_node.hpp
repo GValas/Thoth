@@ -19,6 +19,11 @@ class SpotDiffusionNode : public MonteCarloNode
     //! node's state-derivative (zero for a constant vol, so only set for local vol)
     LocalVolatilityNode* _milstein_lv = nullptr;
 
+    //! optional discrete-dividend (escrow) node: future-dividend PV per date. When
+    //! set, the node diffuses the clean escrowed process and publishes the observed
+    //! spot (clean + future-dividend PV). Null -> no dividends (plain GBM).
+    MonteCarloNode* _dividend_node = nullptr;
+
   public:
     bool IsConstant( size_t DateIndex ) override;
     void ComputeValue( size_t DateIndex ) override;
@@ -35,6 +40,7 @@ class SpotDiffusionNode : public MonteCarloNode
     void SetLocalVolNode( MonteCarloNode* N );
     void SetDriftNode( MonteCarloNode* N );
     void SetBrownianNode( MonteCarloNode* N );
+    void SetDividendNode( MonteCarloNode* N ); //!< optional discrete-dividend escrow
     void SetSpot( double Spot );
 
     //! turn on the Milstein step, reading d(vol)/d(log spot) from the local-vol node
