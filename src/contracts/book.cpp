@@ -49,8 +49,8 @@ void Book::SetToday( const date& Today )
     }
 }
 
-//! getter
-vector<Contract*> Book::GetOptionList() const
+//! getter (the stored list, by const reference: it is iterated in hot Greek loops)
+const vector<Contract*>& Book::GetOptionList() const
 {
     return _option_list;
 }

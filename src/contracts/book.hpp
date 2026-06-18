@@ -38,7 +38,7 @@ class Book : public Object
     void SetToday( const date& Today ) override;
 
     //! getter
-    vector<Contract*> GetOptionList() const;
+    const vector<Contract*>& GetOptionList() const;
     double GetPremium() const;
     double GetPremiumTrust() const;
     double GetDelta() const;
