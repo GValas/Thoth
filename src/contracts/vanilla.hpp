@@ -20,7 +20,7 @@ class Vanilla : public Contract
     void SetType( OptionType Type );
 
     //! getter
-    double GetStrike();
+    [[nodiscard]] double GetStrike() const;
     date GetMaturityDate() override;
 
     //! mcl node

@@ -12,7 +12,7 @@ struct StochasticVolParams
 {
     double v0 = 0, kappa = 0, theta = 0, xi = 0, rho = 0;   //!< Heston
     double jump_intensity = 0, jump_mean = 0, jump_vol = 0; //!< Bates (0 -> pure Heston)
-    bool has_jumps() const { return jump_intensity > 0; }
+    [[nodiscard]] bool has_jumps() const { return jump_intensity > 0; }
 };
 
 //! Abstract volatility surface: returns the implied vol at a (strike, forward,
@@ -50,7 +50,7 @@ class Volatility : public MarketData
 
     //! does this surface expose a model parameter of this name (alpha, kappa, ...)?
     //! Default: none. Stochastic / local-vol surfaces override to list theirs.
-    virtual bool HasParam( const string& /*Name*/ ) const { return false; }
+    [[nodiscard]] virtual bool HasParam( const string& /*Name*/ ) const { return false; }
 
     //! additive bump on a named model parameter (the vega_<param> Greeks); 0
     //! restores it. Reading is via ParamShift in the derived accessors.
@@ -62,7 +62,7 @@ class Volatility : public MarketData
     //! true for a genuine stochastic-volatility model (Heston): the MCL engine
     //! builds a dedicated variance + spot diffusion instead of the constant-vol
     //! SpotDiffusionNode. Deterministic vols (bs / sabr) return false.
-    virtual bool IsStochastic() const { return false; }
+    [[nodiscard]] virtual bool IsStochastic() const { return false; }
 
     //! stochastic-vol (Heston / Bates) parameters for the engines; default empty.
     //! Override in a stochastic-vol surface; every engine reads this instead of

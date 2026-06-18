@@ -42,11 +42,11 @@ class Underlying : public Asset
     //! and the moment-matched closed form apply (equity, composite, basket). Not
     //! a rainbow (its payoff orders the assets, needing their joint law) nor a
     //! bare FX leg.
-    virtual bool IsGriddable() const { return false; }
+    [[nodiscard]] virtual bool IsGriddable() const { return false; }
 
     //! a plain single-name underlying (a mono): the only shape the MCL single-tree
     //! Greeks can isolate a per-contract spot bump within a shared path.
-    virtual bool IsMono() const { return false; }
+    [[nodiscard]] virtual bool IsMono() const { return false; }
 
     //! mcl node
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;

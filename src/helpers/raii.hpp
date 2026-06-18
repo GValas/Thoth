@@ -55,8 +55,9 @@ class LaOwner
     T* get() const { return _p; }
     explicit operator bool() const { return _p != nullptr; }
 
-    //! relinquish ownership, returning the raw handle (caller must free it)
-    T* release()
+    //! relinquish ownership, returning the raw handle (caller must free it).
+    //! [[nodiscard]]: dropping the returned handle leaks the resource.
+    [[nodiscard]] T* release()
     {
         T* p = _p;
         _p = nullptr;

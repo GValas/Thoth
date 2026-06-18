@@ -61,15 +61,15 @@ void LN_to_M4( la_vector* Fwds,
 la_matrix* ext_la_vector_to_matrix( const la_vector* v,
                                     size_t row_size );
 //! in-place lower-triangular Cholesky (A = L L^T); false if not positive-definite
-bool CholeskyDecomposeLower( la_matrix* A );
+[[nodiscard]] bool CholeskyDecomposeLower( la_matrix* A );
 //! solve a tridiagonal system M X = B (Thomas algorithm)
 void SolveTridiagonal( const la_vector* Diag, const la_vector* Super,
                        const la_vector* Sub, const la_vector* B, la_vector* X );
 //! ordinary least squares (normal equations + Cholesky); returns beta (size X cols)
-vector<double> LeastSquares( const la_matrix* X, const la_vector* y );
-bool ext_la_matrix_is_positive( const la_matrix* m );
-bool ext_la_matrix_is_square( const la_matrix* m );
-bool ext_la_matrix_is_symmetric( const la_matrix* m );
+[[nodiscard]] vector<double> LeastSquares( const la_matrix* X, const la_vector* y );
+[[nodiscard]] bool ext_la_matrix_is_positive( const la_matrix* m );
+[[nodiscard]] bool ext_la_matrix_is_square( const la_matrix* m );
+[[nodiscard]] bool ext_la_matrix_is_symmetric( const la_matrix* m );
 void ext_la_matrix_to_near_positive( la_matrix* m,
                                      double& eps );
 void ext_la_matrix_shift_to_epsilon( la_matrix* m,

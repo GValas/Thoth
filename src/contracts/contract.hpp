@@ -32,8 +32,8 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     void SetCorrelation( Correlation* Correlation );
 
     //! getter
-    Underlying* GetUnderlying();
-    Currency* GetPremiumCurrency();
+    [[nodiscard]] Underlying* GetUnderlying() const;
+    [[nodiscard]] Currency* GetPremiumCurrency() const;
 
     SingleSet GetSingleSet();
 

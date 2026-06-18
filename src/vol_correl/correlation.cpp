@@ -346,7 +346,12 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
         ERR( _name + " is not SDP" );
     }
 
-    CholeskyDecomposeLower( _cholesky_matrix );
+    //! factorise in place (already verified SPD just above, so this should not
+    //! fail; check defensively rather than silently proceeding on a bad factor)
+    if ( !CholeskyDecomposeLower( _cholesky_matrix ) )
+    {
+        ERR( _name + " : Cholesky factorisation failed (matrix not positive-definite)" );
+    }
     _cholesky_key = key; //!< mark the sub-set this factor is now valid for
 }
 

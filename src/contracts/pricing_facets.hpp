@@ -33,18 +33,18 @@ struct GpuGbmParams
 struct PdePriceable
 {
     //! a grid solve is possible for this contract on its underlying
-    virtual bool PDE_HasSolution() = 0;
+    [[nodiscard]] virtual bool PDE_HasSolution() = 0;
 
     //! knock-out / knock-in barrier (continuous or discrete monitoring)
-    virtual bool PDE_IsBarrier() { return false; }
-    virtual bool PDE_IsKnockIn() { return false; }
-    virtual bool PDE_IsUpBarrier() { return false; }
-    virtual bool PDE_IsDiscreteBarrier() { return false; }
-    virtual double PDE_BarrierLevel() { return 0; }
+    [[nodiscard]] virtual bool PDE_IsBarrier() { return false; }
+    [[nodiscard]] virtual bool PDE_IsKnockIn() { return false; }
+    [[nodiscard]] virtual bool PDE_IsUpBarrier() { return false; }
+    [[nodiscard]] virtual bool PDE_IsDiscreteBarrier() { return false; }
+    [[nodiscard]] virtual double PDE_BarrierLevel() { return 0; }
 
     //! priced on the spot grid as the expected accumulated variance (a backward
     //! PDE with a local-variance source) rather than a terminal-payoff solve.
-    virtual bool PDE_IsAccruedVariance() { return false; }
+    [[nodiscard]] virtual bool PDE_IsAccruedVariance() { return false; }
 
     virtual ~PdePriceable() = default;
 };
@@ -52,7 +52,7 @@ struct PdePriceable
 //! Analytic (closed-form) pricing view.
 struct AnaPriceable
 {
-    virtual bool ANA_HasSolution() = 0;
+    [[nodiscard]] virtual bool ANA_HasSolution() = 0;
     virtual void ANA_EvalPrice() = 0;
 
     virtual ~AnaPriceable() = default;
@@ -63,7 +63,7 @@ struct AnaPriceable
 //! so the MCL engine falls back to the CPU path. Default: unsupported.
 struct GpuPriceable
 {
-    virtual bool GPU_GbmParams( GpuGbmParams& /*Out*/ ) { return false; }
+    [[nodiscard]] virtual bool GPU_GbmParams( GpuGbmParams& /*Out*/ ) { return false; }
 
     virtual ~GpuPriceable() = default;
 };

@@ -43,7 +43,7 @@ void Vanilla::SetType( OptionType Type )
 }
 
 //! getter
-double Vanilla::GetStrike()
+double Vanilla::GetStrike() const
 {
     return _strike;
 }

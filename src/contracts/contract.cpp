@@ -29,13 +29,13 @@ void Contract::SetToday( const date& Today )
 }
 
 //! getter
-Underlying* Contract::GetUnderlying()
+Underlying* Contract::GetUnderlying() const
 {
     return _underlying;
 }
 
 //! getter
-Currency* Contract::GetPremiumCurrency()
+Currency* Contract::GetPremiumCurrency() const
 {
     return _premium_currency;
 }
