@@ -788,6 +788,7 @@ shared_mcl: !mcl_configuration
   paths: 100000
   vol_year_step: 0.01
   use_sobol: true
+  allow_gpu: true #!< GPU-accelerate where supported (single-asset GBM); CPU fallback otherwise
 # same as shared_mcl but pseudo-random (no Sobol), for the convergence-comparison row
 cfg_mcl_pseudo: !pricer_configuration
   method: mcl
@@ -799,6 +800,7 @@ shared_mcl_pseudo: !mcl_configuration
   paths: 100000
   vol_year_step: 0.01
   use_sobol: false
+  allow_gpu: true #!< GPU where supported, CPU fallback otherwise
 # same as shared_mcl but with GPU acceleration requested (allow_gpu): runs on the
 # device on a CUDA build, transparently on the CPU otherwise
 cfg_mcl_gpu: !pricer_configuration
