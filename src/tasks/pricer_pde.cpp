@@ -383,7 +383,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     }
 
     // delta, gamma : central differences around X_0 with spot half-bump h = X_0 * SHIFT/2
-    const double h = X_0 * GREEK_SPOT_SHIFT / 2;
+    const double h = X_0 * GREEK_SPOT_BUMP / 2;
     double delta_price_sup, delta_price_inf;
     if ( _request_delta || _request_gamma )
     {
@@ -860,9 +860,9 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         return ( 1 - ws ) * pi + ws * pi1;
     };
 
-    //! delta / gamma by a central spot bump of GREEK_SPOT_SHIFT (consistent with the
+    //! delta / gamma by a central spot bump of GREEK_SPOT_BUMP (consistent with the
     //! 1-D PDE and the bump-and-revalue baseline), not the coarse raw grid step dS.
-    const double hb = S0 * GREEK_SPOT_SHIFT / 2;
+    const double hb = S0 * GREEK_SPOT_BUMP / 2;
     GridResult res;
     res.premium = price_at_spot( S0 );
     res.delta = ( price_at_spot( S0 + hb ) - price_at_spot( S0 - hb ) ) / ( 2 * hb );

@@ -202,13 +202,13 @@ void Barrier::ANA_EvalPrice()
     _valuation.premium = ANA_BarrierPrice( s, r, b, v, t, df );
 
     //! delta & gamma by central finite difference on the spot
-    double s_up = s * ( 1 + GREEK_SPOT_SHIFT / 2 );
-    double s_dw = s * ( 1 - GREEK_SPOT_SHIFT / 2 );
+    double s_up = s * ( 1 + GREEK_SPOT_BUMP / 2 );
+    double s_dw = s * ( 1 - GREEK_SPOT_BUMP / 2 );
     double p_up = ANA_BarrierPrice( s_up, r, b, v, t, df );
     double p_dw = ANA_BarrierPrice( s_dw, r, b, v, t, df );
-    _valuation.delta = ( p_up - p_dw ) / ( s * GREEK_SPOT_SHIFT );
+    _valuation.delta = ( p_up - p_dw ) / ( s * GREEK_SPOT_BUMP );
     _valuation.gamma = ( p_up + p_dw - 2 * _valuation.premium ) /
-                       ( s * GREEK_SPOT_SHIFT / 2 * s * GREEK_SPOT_SHIFT / 2 );
+                       ( s * GREEK_SPOT_BUMP / 2 * s * GREEK_SPOT_BUMP / 2 );
 }
 
 MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,

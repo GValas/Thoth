@@ -28,8 +28,9 @@ inline constexpr char PRICING_METHOD_MCL_GPU[] = "mcl_gpu"; //!< deprecated alia
 
 inline constexpr char MCL_NODE_PATH[] = "";
 
-//! finite-difference bump sizes for the bump-and-revalue Greeks
-const double GREEK_SPOT_BUMP = 0.01;   //!< relative spot bump (1%) for delta
+//! finite-difference bump sizes for the bump-and-revalue Greeks. The spot bump
+//! (GREEK_SPOT_BUMP, for delta/gamma) is the canonical one in constants.hpp, so
+//! the contracts share it; the rest are pricer-local.
 const double GREEK_GAMMA_BUMP = 0.10;  //!< wider relative spot bump (10%) for gamma:
                                        //!< a small second difference is swamped by the
                                        //!< PDE grid's per-spot re-centering noise, so

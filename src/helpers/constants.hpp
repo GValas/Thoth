@@ -5,7 +5,13 @@ const double NB_OF_BUSINESS_DAYS_A_YEAR = 260;
 
 const int DECIMAL_PRECISION = 9;
 inline constexpr char ROOT_NODE[] = "root";
-const double GREEK_SPOT_SHIFT = 0.01;
+
+//! the relative spot bump for delta/gamma (1%). One canonical value, used two
+//! ways: the bump-and-revalue engine (Pricer::BumpAndRevalueGreeks) applies it
+//! one-sided (S -> S*(1+bump)); the PDE grid-read delta and the analytic barrier
+//! finite-difference apply it as a central half-bump (S*(1 +/- bump/2)). Lives in
+//! constants.hpp (not pricer.hpp) so the contracts can use it too.
+inline constexpr double GREEK_SPOT_BUMP = 0.01;
 
 // pricer_configuration - mcl
 const double NON_WORKING_DAYS_WEIGHT = 1.;
