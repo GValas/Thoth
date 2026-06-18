@@ -44,12 +44,12 @@ TEST_CASE( "asinh inverts sinh" )
 
 TEST_CASE( "InterpolateWithSpline passes through its sample points" )
 {
-    // periodic cubic spline (endpoints equal); it still interpolates the nodes
-    // exactly. NB: InterpolateWithSpline frees its x vector, so allocate fresh.
+    // natural cubic spline interpolates its nodes exactly. x / y are RAII
+    // LaVector (InterpolateWithSpline only reads them; it frees nothing).
     auto interp = []( double q )
     {
-        la_vector* x = la_vector_alloc( 5 );
-        la_vector* y = la_vector_alloc( 5 );
+        LaVector x = la_vector_alloc( 5 );
+        LaVector y = la_vector_alloc( 5 );
         double xs[5] = { 0, 1, 2, 3, 4 };
         double ys[5] = { 0, 1, 0, 1, 0 };
         for ( int i = 0; i < 5; i++ )
@@ -57,9 +57,7 @@ TEST_CASE( "InterpolateWithSpline passes through its sample points" )
             la_vector_set( x, i, xs[i] );
             la_vector_set( y, i, ys[i] );
         }
-        double r = InterpolateWithSpline( x, y, q );
-        la_vector_free( y );
-        return r;
+        return InterpolateWithSpline( x, y, q );
     };
 
     CHECK( interp( 1.0 ) == Approx( 1.0 ) );

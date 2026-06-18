@@ -32,13 +32,40 @@ jobs:
             libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DTHOTH_WERROR=ON
 
       - name: Build
         run: cmake --build build -j
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    name: Sanitizers (ASan + UBSan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libboost-all-dev libyaml-cpp-dev libcpp-httplib-dev
+
+      # Debug build instrumented with AddressSanitizer + UndefinedBehaviorSanitizer
+      # to catch memory / UB bugs the Release build hides.
+      - name: Configure
+        run: cmake -B build-san -DCMAKE_BUILD_TYPE=Debug -DTHOTH_SANITIZE=ON
+
+      - name: Build
+        run: cmake --build build-san -j
+
+      - name: Test (sanitized)
+        env:
+          ASAN_OPTIONS: halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-san --output-on-failure
 
   format:
     name: clang-format gate

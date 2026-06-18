@@ -46,6 +46,20 @@ if(THOTH_ENABLE_CUDA)
     endif()
 endif()
 
+# --- CI hardening (off by default) -----------------------------------------
+# -Werror: turn the -Wall -Wextra warnings fatal on the first-party targets
+# (wired into THOTH_WARNING_FLAGS below). Sanitizers: an AddressSanitizer +
+# UndefinedBehaviorSanitizer instrumented build to catch memory / UB bugs the
+# Release build hides. Both are enabled only in CI (see .github/workflows/ci.yml)
+# so a plain local build stays fast and tolerant.
+option(THOTH_WERROR "Treat compiler warnings as errors (CI gate)" OFF)
+option(THOTH_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(THOTH_SANITIZE)
+    # applied to every target defined below (compile + link must match)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
 # --- Dependencies ----------------------------------------------------------
 # Boost: date_time is linked; Boost.Math (header-only) provides the gamma CDF
 # and the Gauss-Kronrod quadrature used by the analytics.
@@ -92,12 +106,16 @@ target_link_libraries(thoth_core PUBLIC
 )
 
 # Warnings: -Wall -Wextra catches the uninitialised-member / unused-result
-# classes of bug. Kept non-fatal (no -Werror) so the build still succeeds even
-# on a newer compiler. GSL deprecations are silenced as they are noise. Applied
-# to every first-party target (the engine library and the executable); the test
-# target adds them in tests/CMakeLists.txt.
+# classes of bug. Non-fatal locally so the build still succeeds on a newer
+# compiler; CI turns them fatal with -DTHOTH_WERROR=ON (see above). GSL
+# deprecations are silenced as they are noise. Applied to every first-party target
+# (the engine library and the executable); the test target adds them in
+# tests/CMakeLists.txt.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(THOTH_WARNING_FLAGS -Wall -Wextra -Wno-deprecated-declarations)
+    if(THOTH_WERROR)
+        list(APPEND THOTH_WARNING_FLAGS -Werror)
+    endif()
     # CXX only: nvcc must not receive the host -W flags directly (it would choke).
     target_compile_options(thoth_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${THOTH_WARNING_FLAGS}>)
 endif()

@@ -243,11 +243,17 @@ to `main` and mirrors the local checks above on `ubuntu-24.04`:
 
 - **build-test** — `cmake -B build` → `cmake --build build -j` → `ctest` (g++,
   Release, the same Debian/Ubuntu deps; doctest's header is fetched by the test
-  CMake when absent);
+  CMake when absent). Built with `-DTHOTH_WERROR=ON`, so the `-Wall -Wextra`
+  warnings are fatal in CI (they stay non-fatal locally);
+- **sanitizers** — a Debug build with `-DTHOTH_SANITIZE=ON`
+  (AddressSanitizer + UndefinedBehaviorSanitizer) running the full `ctest`, to
+  catch memory / UB bugs the Release build hides;
 - **format** — `./format.sh --check` with `clang-format-18` (the version that
   produced `.clang-format`).
 
-The status badge at the top of this README reflects the latest `main` run.
+Both hardening switches are off by default in `CMakeLists.txt`, so a plain local
+build stays fast and tolerant. The status badge at the top of this README
+reflects the latest `main` run.
 
 ### Debugging (VS Code)
 
