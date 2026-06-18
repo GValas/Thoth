@@ -3,9 +3,8 @@ root: matrix
 # Full pricer/product matrix, run in one process by the !sequence task. Every
 # priceable (product, method) combination below is launched one after another;
 # each writes its own <name>_result block. run_local_client_matrix.sh prints the
-# premiums + Greeks as a table. All cases share the same 5y, spot-100, flat-30%-vol,
-# flat-8%-rate
-# market so the numbers are directly comparable across engines.
+# premiums + Greeks as a table. All cases share the same 1y, spot-100, flat-30%-vol,
+# flat-8%-rate market so the numbers are directly comparable across engines.
 #
 #   product (mono/multi, call/put; sorted alphabetically)   method(s)
 #   barrier mono continuous call            ana   mcl   pde
@@ -43,13 +42,12 @@ root: matrix
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
 #
-# Model-parameter Greeks (vega_<param>): the SABR (vega_alpha/beta/rho/nu), Heston
-# (vega_v0/kappa/theta/xi/rho) and Bates (+ vega_jump_intensity/jump_mean/jump_vol)
-# cells request these on the ANA engine, where the closed-form (Hagan / characteristic
-# function) reprice gives them exactly. They are computed by bump-and-revalue, so the
-# engine that prices the model reads the bumped parameter; the same indicators work on
-# MCL too (with Monte-Carlo noise) but are shown here on ANA only — the PDE grid and
-# the SABR Dupire-local-vol diffusion do not give reliable parameter sensitivities.
+# Model-parameter Greeks (vega_<param>): the Heston (vega_v0/kappa/theta/xi/rho)
+# cell requests these on the ANA engine, where the closed-form characteristic-function
+# reprice gives them exactly. They are computed by bump-and-revalue, so the engine that
+# prices the model reads the bumped parameter; the same indicators work on MCL too
+# (with Monte-Carlo noise) but are shown here on ANA only — the PDE grid does not give
+# reliable parameter sensitivities. (The SABR and Bates cells price premium only.)
 #
 # The "(gpu)" rows ask for GPU acceleration (mcl with allow_gpu: true). It is
 # build-gated (-DTHOTH_ENABLE_CUDA=ON): on a CUDA build with a device the single-
@@ -61,8 +59,8 @@ root: matrix
 # drift correction F *= exp(-rho(S,FX)*sigma_S*sigma_X*t) lives in the MCL node
 # graph, in ANA's quanto forward (Mono::GetForward) and in the PDE carry. A
 # quanto pays the EUR-asset payoff in USD; here corr(asset, eur/usd) extraction
-# gives a +0.1125 carry bump at the 5y maturity (rho*sigma_S*sigma_X*t), so the
-# quanto call sits just below the EUR call discounted at the USD rate.
+# gives a +0.0225 carry bump, so the quanto call sits just below the EUR call
+# discounted at the USD rate.
 
 matrix: !sequence
   result: matrix_result
@@ -171,7 +169,7 @@ vanilla_mono_eu_call_ana: !pricer
   result: vanilla_mono_eu_call_ana_result
 
 # discrete cash dividends (escrowed-dividend model): the same EUR equity but with
-# an annual 3.0 cash dividend over the 5y life (underlying eq_div -> divs schedule).
+# a 3.0 cash dividend mid-life (underlying eq_div -> divs schedule, plus a repo).
 # EU call priced ana/mcl/pde, US (american) put priced mcl/pde — all three engines
 # share the one escrowed forward, so they agree.
 vanilla_mono_eu_call_div_ana: !pricer
@@ -458,7 +456,7 @@ vanilla_mono_eu_call_bates_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium, vega_v0, vega_kappa, vega_theta, vega_xi, vega_rho, vega_jump_intensity, vega_jump_mean, vega_jump_vol]
+  indicators: [premium]
   result: vanilla_mono_eu_call_bates_ana_result
 vanilla_mono_eu_call_bates_mcl: !pricer
   today: 2000-01-01
@@ -466,7 +464,7 @@ vanilla_mono_eu_call_bates_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_mono_eu_call_bates_mcl_result
 vanilla_mono_eu_call_bates_pde: !pricer
   today: 2000-01-01
@@ -474,7 +472,7 @@ vanilla_mono_eu_call_bates_pde: !pricer
   currency: eur
   configuration: cfg_pde
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_mono_eu_call_bates_pde_result
 
 # variance swap
@@ -512,7 +510,7 @@ vanilla_mono_eu_call_sabr_ana: !pricer
   currency: eur
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium, vega_alpha, vega_beta, vega_rho, vega_nu]
+  indicators: [premium]
   result: vanilla_mono_eu_call_sabr_ana_result
 vanilla_mono_eu_call_sabr_mcl: !pricer
   today: 2000-01-01
@@ -520,7 +518,7 @@ vanilla_mono_eu_call_sabr_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_mono_eu_call_sabr_mcl_result
 
 # SABR composite (EUR asset settled in USD): the inner spot diffuses on the full
@@ -532,7 +530,7 @@ vanilla_mono_eu_call_compo_sabr_ana: !pricer
   currency: usd
   configuration: cfg_ana
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_mono_eu_call_compo_sabr_ana_result
 vanilla_mono_eu_call_compo_sabr_mcl: !pricer
   today: 2000-01-01
@@ -540,7 +538,7 @@ vanilla_mono_eu_call_compo_sabr_mcl: !pricer
   currency: usd
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_mono_eu_call_compo_sabr_mcl_result
 
 # SABR basket: each component diffuses on its own Dupire local vol. MCL-only (the
@@ -551,7 +549,7 @@ vanilla_multi_eu_call_basket_sabr_mcl: !pricer
   currency: eur
   configuration: cfg_mcl
   correlation: correl
-  indicators: [premium, delta, gamma, vega, rho, theta]
+  indicators: [premium]
   result: vanilla_multi_eu_call_basket_sabr_mcl_result
 
 # continuous up-and-in barrier call (knock-in): pays the vanilla payoff only if the
@@ -876,7 +874,7 @@ c_van_eu: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 
@@ -884,21 +882,21 @@ c_van_am: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: american
 c_van_eu_div: !vanilla
   underlying: eq_div
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_van_am_div: !vanilla
   underlying: eq_div
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: american
 
@@ -906,7 +904,7 @@ c_barr_cont: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: up&out
   barrier_monitoring_type: continuous_monitoring
@@ -916,7 +914,7 @@ c_barr_disc: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: up&out
   barrier_monitoring_type: discrete_monitoring
@@ -926,7 +924,7 @@ c_barr_disc: !barrier
 c_vswap: !variance_swap
   underlying: eq
   premium_currency: eur
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   volatility_strike: 20
   notional: 10000
 
@@ -935,14 +933,14 @@ c_van_eu_q: !vanilla
   underlying: eq
   premium_currency: usd
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_van_am_q: !vanilla
   underlying: eq
   premium_currency: usd
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: american
 
@@ -952,7 +950,7 @@ c_compo: !vanilla
   underlying: comp
   premium_currency: usd
   strike: 150
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 # american composite put (so early exercise carries value), same ATM strike
@@ -960,7 +958,7 @@ c_compo_am: !vanilla
   underlying: comp
   premium_currency: usd
   strike: 150
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: american
 
@@ -969,14 +967,14 @@ c_rb_best: !vanilla
   underlying: rb_best
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_rb_worst: !vanilla
   underlying: rb_worst
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 
@@ -985,21 +983,21 @@ c_heston: !vanilla
   underlying: eq_h
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_bates: !vanilla
   underlying: eq_b
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_basket: !vanilla
   underlying: bskt
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 
@@ -1008,21 +1006,21 @@ c_sabr: !vanilla
   underlying: eq_sabr
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_compo_sabr: !vanilla
   underlying: comp_sabr
   premium_currency: usd
   strike: 150
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 c_basket_sabr: !vanilla
   underlying: bskt_sabr
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: european
 
@@ -1031,7 +1029,7 @@ c_barr_cont_in: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: up&in
   barrier_monitoring_type: continuous_monitoring
@@ -1043,7 +1041,7 @@ c_barr_cont_do: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: down&out
   barrier_monitoring_type: continuous_monitoring
@@ -1052,7 +1050,7 @@ c_barr_cont_di: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: down&in
   barrier_monitoring_type: continuous_monitoring
@@ -1061,7 +1059,7 @@ c_barr_cont_put: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   barrier_type: up&out
   barrier_monitoring_type: continuous_monitoring
@@ -1070,7 +1068,7 @@ c_barr_disc_in: !barrier
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   barrier_type: up&in
   barrier_monitoring_type: discrete_monitoring
@@ -1082,21 +1080,21 @@ c_van_eu_put: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: european
 c_van_am_call: !vanilla
   underlying: eq
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: call
   exercise: american
 c_heston_am: !vanilla
   underlying: eq_h
   premium_currency: eur
   strike: 100
-  maturity: 2004-12-31
+  maturity: 2000-12-31
   type: put
   exercise: american
 
@@ -1105,7 +1103,7 @@ eq: !equity
   spot: 100
   volatility: vol
   currency: eur
-# the same EUR equity carrying an annual 3.0 cash dividend (escrowed-dividend model)
+# the same EUR equity carrying a 3.0 cash dividend mid-life (escrowed-dividend model)
 eq_div: !equity
   spot: 100
   volatility: vol
@@ -1113,8 +1111,8 @@ eq_div: !equity
   discrete_dividends: divs
   repo: repo_div
 divs: !discrete_dividends
-  dates: [2000-12-31, 2001-12-31, 2002-12-31, 2003-12-31, 2004-12-31]
-  amounts: [3.0, 3.0, 3.0, 3.0, 3.0]
+  dates: [2000-06-30]
+  amounts: [3.0]
 # 1% repo spread (a continuous carry yield); the MCL drift node subtracts the repo
 # node, the ANA forward and the PDE carry subtract the same yield -> engines agree
 repo_div: !repo_curve
@@ -1150,7 +1148,7 @@ eq2_sabr: !equity
   volatility: sabr_vol
   currency: eur
 sabr_vol: !sabr_volatility
-  maturities: [5.0]
+  maturities: [1.0]
   alpha: [0.30]
   beta: [1.0]
   rho: [-0.3]

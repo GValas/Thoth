@@ -84,8 +84,8 @@ theta ≈−0.026 — delta carries the small one-sided-bump bias ½·gamma·S·
 
 For **basket / rainbow** underlyings (each component rebased to 100 at inception),
 the spot bump scales the component against its *fixed* inception level `S_i0`, so
-delta/gamma respond instead of cancelling — ANA and MCL agree (e.g. a 5y ATM basket
-call: delta ≈0.836 on both). The PDE prices a basket on a 1-D grid in basket-spot
+delta/gamma respond instead of cancelling — ANA and MCL agree (e.g. a 1y ATM basket
+call: delta ≈0.673 on both). The PDE prices a basket on a 1-D grid in basket-spot
 space, so it reports the grid's own `dV/dS` delta (matches ANA/MCL); its grid
 *gamma* there is second-difference-noisy (use ANA/MCL for an accurate basket gamma).
 
@@ -97,7 +97,8 @@ unit parameter): SABR `vega_alpha` / `vega_beta` / `vega_rho` / `vega_nu`, Hesto
 that prices the model, but only the **ANA** engine (Hagan / characteristic-function
 reprice) gives them reliably — the PDE grid and the SABR Dupire-local-vol diffusion
 don't yield clean parameter sensitivities, so `samples/matrix.yaml` requests them on
-the ANA cells. A parameter no underlying's surface exposes is silently skipped.
+the Heston ANA cell (its SABR and Bates cells price premium only). A parameter no
+underlying's surface exposes is silently skipped.
 
 **Instruments**
 - `vanilla` — call / put, **european** or **american**, absolute or
@@ -112,8 +113,8 @@ the ANA cells. A parameter no underlying's surface exposes is silently skipped.
   priced by **Monte-Carlo** (realized variance of the simulated path),
   **analytically** by static replication (the 1/K²-weighted option strip, so a
   smile feeds in), or by **PDE** (the fair variance as a backward
-  expected-accumulated-variance grid solve). The three agree (5y, 30% flat,
-  ~336).
+  expected-accumulated-variance grid solve). The three agree (1y, 30% flat,
+  ~461).
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
