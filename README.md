@@ -292,6 +292,12 @@ process — price it like any other book (`-batch`, or post it to a server with 
 built-in `-client`). `run_local_client_matrix.sh` posts it and prints a
 per-product table (method, time, premium and every Greek) — see below.
 
+`samples/big_option.yaml` is a single feature-dense option (an American, USD-quanto
+put on a EUR equity with a SABR local-vol surface, continuous dividends, a repo
+spread and discrete cash dividends) priced by MCL with the node-graph dump on
+(`debug_configuration.generate_nodes_graph`) — `-batch` it and open the resulting
+`/tmp/big_option_nodes.dot` to see the full Monte-Carlo node graph.
+
 ### HTTP pricing service
 
 ```bash

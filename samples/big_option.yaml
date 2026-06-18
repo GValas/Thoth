@@ -1,0 +1,108 @@
+# big_option.yaml — one option exercising as many features as possible at once, so
+# the Monte-Carlo node graph is rich. Priced by MCL with the node-graph dump on
+# (debug_configuration.generate_nodes_graph -> <log_path>big_option_nodes.dot).
+#
+# The trade: an AMERICAN put (Longstaff-Schwartz), settled in USD on a EUR equity
+# (QUANTO / composite), where the equity carries a SABR local-vol surface, a
+# continuous-dividend yield, a repo spread AND a discrete cash-dividend schedule.
+# That activates, in one graph: correlated Brownian + white-noise + Cholesky, the
+# spot diffusion with a local-vol (Dupire) node + Milstein, the drift node
+# (rate - div - repo), the discrete-dividend escrow node, the quanto-adjustment
+# node with its FX correlation + FX vol nodes, the contract flow + book nodes, and
+# the rate/discount nodes.
+root: big_option
+
+big_option: !pricer
+  today: 2000-01-01
+  book: book
+  currency: usd
+  configuration: cfg
+  correlation: correl
+  debug_configuration: dbg
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: big_option_result
+
+cfg: !pricer_configuration
+  method: mcl
+  mcl_configuration: mcl
+  log_path: "/tmp/"
+mcl: !mcl_configuration
+  max_day_step: 30
+  min_day_step: -1
+  paths: 60000
+  vol_year_step: 0.01
+  use_sobol: true
+
+dbg: !debug_configuration
+  generate_nodes_graph: true
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+# currencies (EUR asset, USD payoff -> quanto)
+eur: !currency
+  rate: eur_rate
+eur_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [8, 8]
+usd: !currency
+  rate: usd_rate
+usd_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [5, 5]
+eur/usd: !forex
+  base_currency: usd
+  underlying_currency: eur
+  spot: 1.5
+  volatility: eur/usd_vol
+eur/usd_vol: !bs_volatility
+  volatility: 10
+  calendar: calendar
+
+# SABR local-vol surface
+sabr_vol: !sabr_volatility
+  maturities: [5.0]
+  alpha: [0.30]
+  beta: [1.0]
+  rho: [-0.3]
+  nu: [0.4]
+  calendar: calendar
+
+# carry curves + discrete cash dividends, all on the one equity
+repo: !repo_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [0.5, 0.5]
+cont_div: !continuous_dividends_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [1.0, 1.0]
+divs: !discrete_dividends
+  dates: [2000-12-31, 2001-12-31, 2002-12-31, 2003-12-31, 2004-12-31]
+  amounts: [2.0, 2.0, 2.0, 2.0, 2.0]
+
+# the feature-rich equity, and its USD-settled composite (quanto) view
+eq_big: !equity
+  spot: 100
+  volatility: sabr_vol
+  currency: eur
+  continuous_dividends: cont_div
+  repo: repo
+  discrete_dividends: divs
+comp_big: !composite
+  equity: eq_big
+  composite_currency: usd
+
+# eq_big (EUR asset) vs eur/usd FX correlation drives the quanto adjustment
+correl: !correlation_matrix
+  underlyings: [eq_big]
+  forexs: [eur/usd]
+  matrix: [1, 0.5, 0.5, 1]
+
+book: !book
+  options: [opt]
+opt: !vanilla
+  underlying: comp_big
+  premium_currency: usd
+  strike: 100
+  maturity: 2004-12-31
+  type: put
+  exercise: american
