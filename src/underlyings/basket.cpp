@@ -27,7 +27,7 @@ void Basket::CaptureReferenceSpots()
 }
 
 //! captured reference spot of component i, or its live spot if not captured
-double Basket::RefSpot( size_t i )
+double Basket::RefSpot( size_t i ) const
 {
     return ( i < _ref_spots.size() ) ? _ref_spots[i] : _underlying_list[i]->GetSpot();
 }
@@ -59,30 +59,24 @@ void Basket::SetCorrelation( Correlation* Correlation )
 }
 
 //! list of singles
-SingleSet Basket::GetSingleSet()
+SingleSet Basket::GetSingleSet() const
 {
     SingleSet s;
-    vector<Underlying*>::iterator u;
-    for ( u = _underlying_list.begin();
-          u != _underlying_list.end();
-          u++ )
+    for ( Underlying* u : _underlying_list )
     {
-        SingleSet s_ = ( *u )->GetSingleSet();
+        SingleSet s_ = u->GetSingleSet();
         s.insert( s_.begin(), s_.end() );
     }
     return s;
 }
 
 //! list of singles
-CurrencySet Basket::GetCurrencySet()
+CurrencySet Basket::GetCurrencySet() const
 {
     CurrencySet s;
-    vector<Underlying*>::iterator u;
-    for ( u = _underlying_list.begin();
-          u != _underlying_list.end();
-          u++ )
+    for ( Underlying* u : _underlying_list )
     {
-        CurrencySet s_ = ( *u )->GetCurrencySet();
+        CurrencySet s_ = u->GetCurrencySet();
         s.insert( s_.begin(), s_.end() );
     }
     s.insert( _currency );

@@ -28,12 +28,12 @@ class Underlying : public Asset
     //! singles & ccys
     // virtual set<string> GetSingleNameList() = 0;
     // virtual set<string> GetCurrencyNameList() = 0;
-    virtual SingleSet GetSingleSet() = 0;
-    virtual CurrencySet GetCurrencySet() = 0;
+    virtual SingleSet GetSingleSet() const = 0;
+    virtual CurrencySet GetCurrencySet() const = 0;
 
     //! getter
     // Currency * GetCurrency();
-    Correlation* GetCorrelation();
+    Correlation* GetCorrelation() const;
 
     //! capability predicates (replace engine/contract RTTI & kind-string tests
     //! with polymorphism). Defaults below; concrete underlyings override.

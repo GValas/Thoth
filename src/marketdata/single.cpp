@@ -31,13 +31,13 @@ void Single::SetSpot( double Spot )
 }
 
 //! getter
-Volatility* Single::GetVolatility()
+Volatility* Single::GetVolatility() const
 {
     return _volatility;
 }
 
 //! getter
-double Single::GetSpot()
+double Single::GetSpot() const
 {
     return _spot;
 }

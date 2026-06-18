@@ -35,7 +35,7 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     [[nodiscard]] Underlying* GetUnderlying() const;
     [[nodiscard]] Currency* GetPremiumCurrency() const;
 
-    SingleSet GetSingleSet();
+    SingleSet GetSingleSet() const;
 
     //! the priced result (premium + Greeks): engines fill it, aggregation reads it
     Valuation& Result() { return _valuation; }

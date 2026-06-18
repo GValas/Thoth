@@ -22,7 +22,7 @@ class Equity : public Single
     //! getter
     RepoCurve* GetRepo();
     ContinuousDividendsCurve* GetContinuousDividends();
-    double GetSpot() override;
+    double GetSpot() const override;
 
     //! local vol
     bool UseLocalVol();
@@ -30,7 +30,7 @@ class Equity : public Single
     // discrete_dividends
 
     //! forward
-    double GetForward( const date& MaturityDate ) override;
+    double GetForward( const date& MaturityDate ) const override;
 
     //! implicit vol
     double GetImplicitVol( const double Strike,

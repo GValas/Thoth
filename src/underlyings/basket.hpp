@@ -22,7 +22,7 @@ class Basket : public Underlying
 
     //! the captured reference spot of component i (falls back to the live spot if
     //! capture has not run, so behaviour is unchanged when unused).
-    double RefSpot( size_t i );
+    double RefSpot( size_t i ) const;
 
     //! setter
     void SetUnderlyingList( const vector<Underlying*>& UnderlyingList );
@@ -30,9 +30,9 @@ class Basket : public Underlying
     void SetCorrelation( Correlation* Correlation ) override;
 
     //!
-    vector<Underlying*> GetUnderlyingList();
-    SingleSet GetSingleSet() override;
-    CurrencySet GetCurrencySet() override;
+    vector<Underlying*> GetUnderlyingList() const;
+    SingleSet GetSingleSet() const override;
+    CurrencySet GetCurrencySet() const override;
 
     //! a (weighted) basket collapses to one effective asset via moment matching,
     //! so the 1-D grid / closed form apply. Rainbow overrides this back to false:

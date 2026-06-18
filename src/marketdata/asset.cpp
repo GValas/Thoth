@@ -24,7 +24,7 @@ void Asset::SetToday( const date& Today )
 }
 
 //! getter
-Currency* Asset::GetCurrency()
+Currency* Asset::GetCurrency() const
 {
     return _currency;
 }

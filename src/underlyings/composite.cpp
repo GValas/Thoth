@@ -23,19 +23,19 @@ void Composite::SetUnderlying( Underlying& Underlying )
 }
 
 //! getter
-Underlying* Composite::GetUnderlying()
+Underlying* Composite::GetUnderlying() const
 {
     return _underlying;
 }
 
 //! getter
-Currency* Composite::GetCompositeCurrency()
+Currency* Composite::GetCompositeCurrency() const
 {
     return _currency;
 }
 
 //!
-double Composite::GetSpot()
+double Composite::GetSpot() const
 {
     double eq_spot = _underlying->GetSpot();
     double fx_spot = _correlation->GetFxSpot( _underlying->GetCurrency()->GetName(),
@@ -82,7 +82,7 @@ double Composite::GetForward( const date& MaturityDate,
 }
 
 //! list of singles
-SingleSet Composite::GetSingleSet()
+SingleSet Composite::GetSingleSet() const
 {
     SingleSet s1 = _underlying->GetSingleSet();
     ForexSet s2 = _correlation->GetForexSet( _underlying->GetCurrency()->GetName(), _currency->GetName() );
@@ -93,7 +93,7 @@ SingleSet Composite::GetSingleSet()
 }
 
 //! list of singles
-CurrencySet Composite::GetCurrencySet()
+CurrencySet Composite::GetCurrencySet() const
 {
     CurrencySet s;
     s.insert( _currency );

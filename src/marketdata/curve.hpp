@@ -30,7 +30,7 @@ class Curve : public MarketData
     MonteCarloNode* GetNode( NodeCollector& NC );
 
     //! curve interpolated value
-    double GetCurveValue( const date& Maturity );
+    double GetCurveValue( const date& Maturity ) const;
 
     //! constructor, destructor
     Curve( const string& ObjectName,

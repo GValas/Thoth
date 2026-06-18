@@ -15,7 +15,7 @@ class Currency : public Object
     void SetToday( const date& Today ) override;
 
     //! getter
-    YieldCurve* GetRate();
+    YieldCurve* GetRate() const;
 
     //! mcl node
     MonteCarloNode* GetDiscFactorNode( NodeCollector& NC );

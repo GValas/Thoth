@@ -17,7 +17,7 @@ void Rainbow::SetType( RainbowType Type )
 }
 
 //! at t0 every rebased performance is 1, so max/min = 1 and the spot is 100
-double Rainbow::GetSpot()
+double Rainbow::GetSpot() const
 {
     return 100;
 }

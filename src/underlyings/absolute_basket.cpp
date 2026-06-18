@@ -16,7 +16,7 @@ void AbsoluteBasket::SetWeightList( la_vector* WeightList )
 }
 
 //!
-double AbsoluteBasket::GetSpot()
+double AbsoluteBasket::GetSpot() const
 {
     return 100 * ext_la_vector_sum( _weight_list );
 }

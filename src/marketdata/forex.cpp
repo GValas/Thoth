@@ -21,13 +21,13 @@ void Forex::SetBaseCurrency( Currency& BaseCurrency )
 }
 
 //! getter
-Currency* Forex::GetBaseCurrency()
+Currency* Forex::GetBaseCurrency() const
 {
     return GetCurrency();
 }
 
 //! getter
-Currency* Forex::GetUnderlyingCurrency()
+Currency* Forex::GetUnderlyingCurrency() const
 {
 
     return _underlying_currency;
@@ -40,7 +40,7 @@ double Forex::GetConstantVol() const
     return _volatility->GetImplicitVol( 0, 0, date( 0 ) );
 }
 
-double Forex::GetForward( const date& /*MaturityDate*/ )
+double Forex::GetForward( const date& /*MaturityDate*/ ) const
 {
     //! FX forward is not implemented; fail loudly rather than returning 0
     ERR( "forex '" + _name + "' : GetForward not implemented" );

@@ -7,7 +7,7 @@ YieldCurve::YieldCurve( const string& ObjectName ) : Curve( ObjectName, KIND_YIE
 
 YieldCurve::~YieldCurve() = default;
 
-double YieldCurve::GetDiscountFactor( const date& MaturityDate )
+double YieldCurve::GetDiscountFactor( const date& MaturityDate ) const
 {
     double r = GetCurveValue( MaturityDate );
     double dt = YearFraction( _today, MaturityDate );

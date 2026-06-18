@@ -53,8 +53,8 @@ class Book : public Object
     set<date> GetFixingDates();
     set<date> GetAmericanExerciseDates(); //! for american exercise
 
-    SingleSet GetSingleSet();
-    CurrencySet GetCurrencySet();
+    SingleSet GetSingleSet() const;
+    CurrencySet GetCurrencySet() const;
 
     // ! destructeur, constructeur
     Book( const string& ObjectName );

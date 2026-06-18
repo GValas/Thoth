@@ -22,7 +22,7 @@ void Currency::SetToday( const date& Today )
 }
 
 //! getter
-YieldCurve* Currency::GetRate()
+YieldCurve* Currency::GetRate() const
 {
     return _rate;
 }

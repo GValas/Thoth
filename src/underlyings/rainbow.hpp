@@ -28,7 +28,7 @@ class Rainbow : public Basket
                                    const string& BaseCurrency ) override;
 
     //! fwd & vol (MCL-only : ANA/PDE not supported for a max/min payoff)
-    double GetSpot() override;
+    double GetSpot() const override;
     double GetForward( const date& MaturityDate,
                        Currency* QuantoCurrency ) override;
     double GetImplicitVol( const double Strike,

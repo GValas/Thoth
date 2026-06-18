@@ -89,7 +89,7 @@ MonteCarloNode* Contract::GetUnderlyingNode( NodeCollector& NC )
         } );
 }
 
-SingleSet Contract::GetSingleSet()
+SingleSet Contract::GetSingleSet() const
 {
     return _underlying->GetSingleSet();
 }

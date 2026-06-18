@@ -35,7 +35,7 @@ ContinuousDividendsCurve* Equity::GetContinuousDividends()
 }
 
 //! getter
-double Equity::GetSpot()
+double Equity::GetSpot() const
 {
     return Single::GetSpot();
 }
@@ -47,7 +47,7 @@ bool Equity::UseLocalVol()
 }
 
 //!
-double Equity::GetForward( const date& MaturityDate )
+double Equity::GetForward( const date& MaturityDate ) const
 {
     double dt = YearFraction( Object::_today, MaturityDate );
     double df = Asset::_currency->GetRate()->GetDiscountFactor( MaturityDate );

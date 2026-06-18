@@ -19,13 +19,13 @@ class Single : public Asset
     void SetToday( const date& Today ) override;
 
     //! getter
-    double GetSpot() override;
-    Volatility* GetVolatility(); //<<< a virer
+    double GetSpot() const override;
+    Volatility* GetVolatility() const;
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;
     double GetImplicitVol( const double Strike,
                            const date& MaturityDate );
-    virtual double GetForward( const date& MaturityDate ) = 0;
+    virtual double GetForward( const date& MaturityDate ) const = 0;
 
     //! an FX leg (rather than an equity name): the MCL correlation/Cholesky split
     //! groups FX singles separately. Default false; Forex overrides.

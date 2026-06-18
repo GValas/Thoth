@@ -8,7 +8,7 @@ class YieldCurve : public Curve
 
   public:
     //!
-    double GetDiscountFactor( const date& MaturityDate );
+    double GetDiscountFactor( const date& MaturityDate ) const;
 
     //! contructor, destructor
     YieldCurve( const string& ObjectName );

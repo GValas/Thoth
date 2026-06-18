@@ -113,7 +113,7 @@ set<date> Book::GetAmericanExerciseDates()
 }
 
 //! list of single names
-SingleSet Book::GetSingleSet()
+SingleSet Book::GetSingleSet() const
 {
     SingleSet s;
     for ( Contract* c : _option_list )
@@ -125,7 +125,7 @@ SingleSet Book::GetSingleSet()
 }
 
 //! list of currency names
-CurrencySet Book::GetCurrencySet()
+CurrencySet Book::GetCurrencySet() const
 {
     CurrencySet s;
     for ( Contract* c : _option_list )

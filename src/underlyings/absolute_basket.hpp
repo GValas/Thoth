@@ -22,7 +22,7 @@ class AbsoluteBasket : public Basket
                                    const string& BaseCurrency ) override;
 
     //! fwd & vol
-    double GetSpot() override;
+    double GetSpot() const override;
     double GetForward( const date& MaturityDate,
                        Currency* QuantoCurrency ) override;
     double GetImplicitVol( const double Strike,

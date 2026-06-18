@@ -28,7 +28,7 @@ void Curve::SetValueList( la_vector* ValueList )
 //! rate between the bracketing pillars (ACT/365 weight), flat extrapolation beyond
 //! the first/last pillar. A flat input curve (equal pillar values) returns that
 //! constant. The additive _curve_shift (rho bump) is applied last.
-double Curve::GetCurveValue( const date& MaturityDate )
+double Curve::GetCurveValue( const date& MaturityDate ) const
 {
     const size_t n = _date_list.size();
 

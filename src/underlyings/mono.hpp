@@ -17,9 +17,9 @@ class Mono : public Underlying
                            const date& MaturityDate ) override;
 
     // getter
-    SingleSet GetSingleSet() override;
-    CurrencySet GetCurrencySet() override;
-    double GetSpot() override;
+    SingleSet GetSingleSet() const override;
+    CurrencySet GetCurrencySet() const override;
+    double GetSpot() const override;
 
     //! a single-asset underlying: griddable and the canonical mono shape
     bool IsGriddable() const override { return true; }

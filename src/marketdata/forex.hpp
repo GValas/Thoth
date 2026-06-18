@@ -20,9 +20,9 @@ class Forex : public Single
 
     //! getter
     bool IsForex() const override { return true; }
-    Currency* GetBaseCurrency();
-    Currency* GetUnderlyingCurrency();
-    double GetForward( const date& MaturityDate ) override;
+    Currency* GetBaseCurrency() const;
+    Currency* GetUnderlyingCurrency() const;
+    double GetForward( const date& MaturityDate ) const override;
     double GetConstantVol() const;
     double GetLocalVolatility( const double Strike,
                                const date& MaturityDate ) override;

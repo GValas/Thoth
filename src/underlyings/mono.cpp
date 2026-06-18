@@ -25,7 +25,7 @@ Mono::~Mono() = default;
 // }
 
 //! list of singles
-SingleSet Mono::GetSingleSet()
+SingleSet Mono::GetSingleSet() const
 {
     SingleSet s;
     s.insert( _single );
@@ -38,12 +38,12 @@ void Mono::SetSingle( Single& Single )
     _currency = _single->GetCurrency();
 }
 
-double Mono::GetSpot()
+double Mono::GetSpot() const
 {
     return _single->GetSpot();
 }
 
-CurrencySet Mono::GetCurrencySet()
+CurrencySet Mono::GetCurrencySet() const
 {
     CurrencySet s;
     s.insert( _single->GetCurrency() );

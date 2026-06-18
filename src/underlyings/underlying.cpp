@@ -32,7 +32,7 @@ void Underlying::SetCorrelation( Correlation* Correlation )
 // }
 
 //! getter
-Correlation* Underlying::GetCorrelation()
+Correlation* Underlying::GetCorrelation() const
 {
     return _correlation;
 }

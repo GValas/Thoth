@@ -18,10 +18,10 @@ class Composite : public Underlying
     void SetCorrelation( Correlation* Correlation ) override;
 
     //! getter
-    Underlying* GetUnderlying();
-    Currency* GetCompositeCurrency();
-    SingleSet GetSingleSet() override;
-    CurrencySet GetCurrencySet() override;
+    Underlying* GetUnderlying() const;
+    Currency* GetCompositeCurrency() const;
+    SingleSet GetSingleSet() const override;
+    CurrencySet GetCurrencySet() const override;
 
     //! a single (quanto'd) asset: collapses to one spatial dimension
     bool IsGriddable() const override { return true; }
@@ -34,7 +34,7 @@ class Composite : public Underlying
                                    const string& BaseCurrency ) override;
 
     //! fwd & vol
-    double GetSpot() override;
+    double GetSpot() const override;
     double GetForward( const date& MaturityDate,
                        Currency* QuantoCurrency ) override;
     double GetImplicitVol( const double Strike,

@@ -17,10 +17,10 @@ class Asset : public Object
     void SetToday( const date& Today ) override;
 
     //! getter
-    Currency* GetCurrency();
+    Currency* GetCurrency() const;
 
     //! spot
-    virtual double GetSpot() = 0;
+    virtual double GetSpot() const = 0;
 
     //! constructor & destructor
     Asset( const string& ObjectName,
