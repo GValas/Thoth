@@ -76,7 +76,16 @@ find_package(Threads REQUIRED)
 # --- Core library ----------------------------------------------------------
 # Everything except the main entry point, so tests can link the engine.
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/thoth.cpp")
+# The application entry point and the per-mode run TUs live in the executable, not
+# the engine library (so the test binary does not link the HTTP server / cluster).
+set(THOTH_APP_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/thoth.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_batch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_server.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_cluster.cpp"
+)
+list(REMOVE_ITEM CORE_SOURCES ${THOTH_APP_SOURCES})
 
 # GPU backend: the CUDA kernel (mcl_gpu.cu) replaces the CPU stub when CUDA is on.
 # The .cu is not picked up by the *.cpp glob, so it is only ever built here.
@@ -128,7 +137,7 @@ if(THOTH_ENABLE_CUDA)
 endif()
 
 # --- Executable ------------------------------------------------------------
-add_executable(thoth "${CMAKE_CURRENT_SOURCE_DIR}/src/thoth.cpp")
+add_executable(thoth ${THOTH_APP_SOURCES})
 target_link_libraries(thoth PRIVATE thoth_core)
 target_compile_options(thoth PRIVATE ${THOTH_WARNING_FLAGS})
 
