@@ -467,6 +467,13 @@ void Pricer::WriteResults()
     _cfg->SetDouble( _result + ".premium", _premium );
     _cfg->SetDouble( _result + ".premium_trust", _book->GetPremiumTrust() );
 
+    //! debug node graph : one Graphviz .dot per MC tree (base + Greek scenarios),
+    //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph)
+    for ( const auto& [tree, dot] : _tree_graphs )
+    {
+        _cfg->SetString( _result + "." + tree + "_mcl_graph", dot );
+    }
+
     //! requested Greeks (book level), computed by bump-and-revalue
     if ( _request_delta )
     {

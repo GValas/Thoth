@@ -441,7 +441,7 @@
       "title": "!debug_configuration",
       "additionalProperties": false,
       "properties": {
-        "generate_nodes_graph": { "type": "boolean", "description": "Dump the Monte-Carlo node graph as Graphviz .dot into log_path." }
+        "generate_nodes_graph": { "type": "boolean", "description": "Return each MCL tree's Monte-Carlo node graph as Graphviz .dot in the result block (<tree>_mcl_graph)." }
       }
     },
 

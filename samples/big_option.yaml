@@ -1,6 +1,7 @@
 # big_option.yaml — one option exercising as many features as possible at once, so
 # the Monte-Carlo node graph is rich. Priced by MCL with the node-graph dump on
-# (debug_configuration.generate_nodes_graph -> <log_path>big_option_nodes.dot).
+# (debug_configuration.generate_nodes_graph): each MCL tree's Graphviz .dot is
+# returned in the result block as <tree>_mcl_graph (e.g. premium_mcl_graph).
 #
 # The trade: an AMERICAN put (Longstaff-Schwartz), settled in USD on a EUR equity
 # (QUANTO / composite), where the equity carries a SABR local-vol surface, a

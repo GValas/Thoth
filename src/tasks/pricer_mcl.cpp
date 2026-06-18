@@ -9,6 +9,37 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+//! readable result-field key for a node-graph tree, from the internal scenario tag
+//! ("@D+:<s>" delta bump, "@G+:/@G-:<s>" gamma up/down, "@V+" vega, "@R+" rho). The
+//! base tree is keyed "premium" by the caller. Output -> "<key>_mcl_graph".
+string GraphTreeKey( const string& Tag )
+{
+    if ( Tag.rfind( "@D+:", 0 ) == 0 )
+    {
+        return "delta_" + Tag.substr( 4 );
+    }
+    if ( Tag.rfind( "@G+:", 0 ) == 0 )
+    {
+        return "gamma_up_" + Tag.substr( 4 );
+    }
+    if ( Tag.rfind( "@G-:", 0 ) == 0 )
+    {
+        return "gamma_down_" + Tag.substr( 4 );
+    }
+    if ( Tag == "@V+" )
+    {
+        return "vega";
+    }
+    if ( Tag == "@R+" )
+    {
+        return "rho";
+    }
+    return Tag;
+}
+} // namespace
+
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
@@ -525,12 +556,18 @@ void PricerMCL::Tree_Init()
     //! sort nodes
     _collector.SortNodes( roots );
 
-    //! debug : dump the built node graph (once, on the visible base build)
+    //! debug node graph : capture one Graphviz .dot per built tree (the base
+    //! "premium" tree and each Greek-bump scenario tree) into the result block as
+    //! <tree>_mcl_graph, so it returns to the client over HTTP / in the batch
+    //! output — no server-side file. Only on the visible base build.
     if ( _debug && _debug->_generate_nodes_graph && !_quiet_pricing )
     {
-        const string path = _configuration->_log_path + _name + "_nodes.dot";
-        _collector.ExportGraph( path );
-        LOG( LogLabel(), "node graph written to " + path );
+        _tree_graphs["premium"] = _collector.GraphDot( _root );
+        for ( const auto& tagged : _scenario_roots )
+        {
+            _tree_graphs[GraphTreeKey( tagged.first )] = _collector.GraphDot( tagged.second );
+        }
+        LOG( LogLabel(), "captured " + std::to_string( _tree_graphs.size() ) + " node graph(s) -> result.<tree>_mcl_graph" );
     }
 
     //! status (only on the visible base build; the bump-and-revalue Greek

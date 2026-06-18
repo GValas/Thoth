@@ -55,6 +55,13 @@ class Pricer : public Task
     vector<string> _indicator_request_list;
     Currency* _currency = nullptr;
 
+    //! Graphviz .dot of each MC tree built by the MCL engine, keyed by the tree it
+    //! prices ("premium" for the base tree, "delta"/"gamma"/"vega"/"rho" for the
+    //! Greek-bump scenario trees). Filled when debug generate_nodes_graph is on;
+    //! written into the result block as <key>_mcl_graph by WriteResults. Empty
+    //! otherwise.
+    map<string, string> _tree_graphs;
+
     SingleSet _single_set;
     CurrencySet _currency_set;
 

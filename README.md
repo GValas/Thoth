@@ -51,8 +51,12 @@ Long runs show a `│███░░░│` progress bar with the running price/
 terminal it redraws in place as a single updating line; when stdout is not a TTY
 (output redirected, or captured via `docker logs`) it falls back to one bar line
 every 10% so logs stay readable instead of piling up the redraw frames. A pricer
-can attach a `debug_configuration` with `generate_nodes_graph: true` to dump the
-Monte-Carlo node graph as a Graphviz `.dot` file for inspection.
+can attach a `debug_configuration` with `generate_nodes_graph: true`: each MCL tree
+then returns its Monte-Carlo node graph as Graphviz `.dot` text in the result block
+— `<tree>_mcl_graph` (the base `premium_mcl_graph` plus one per Greek-bump scenario
+tree, e.g. `delta_<udl>_mcl_graph`, `vega_mcl_graph`). It travels back in the result
+(HTTP response / batch output / through the cluster), so there is no server-side
+file to retrieve.
 
 **Greeks** — list any of `delta`, `gamma`, `vega`, `rho`, `theta` in a pricer's
 `indicators` (alongside `premium`). All three engines use bump-and-revalue. The
@@ -184,8 +188,8 @@ cmake --build build -j        # -> ./build/thoth
 A devcontainer (`.devcontainer/`) and a production `Dockerfile` (multi-stage,
 lean runtime image) are provided. The devcontainer preinstalls the C++ toolchain
 extensions plus **Graphviz Interactive Preview** (`tintinweb.graphviz-interactive-preview`),
-so the `generate_nodes_graph` `.dot` dumps can be previewed in-editor without an
-external `dot` render.
+so a `generate_nodes_graph` `.dot` (extracted from the result's `*_mcl_graph`
+field) can be previewed in-editor without an external `dot` render.
 
 #### GPU (CUDA) build
 
@@ -295,8 +299,9 @@ per-product table (method, time, premium and every Greek) — see below.
 `samples/big_option.yaml` is a single feature-dense option (an American, USD-quanto
 put on a EUR equity with a SABR local-vol surface, continuous dividends, a repo
 spread and discrete cash dividends) priced by MCL with the node-graph dump on
-(`debug_configuration.generate_nodes_graph`) — `-batch` it and open the resulting
-`/tmp/big_option_nodes.dot` to see the full Monte-Carlo node graph.
+(`debug_configuration.generate_nodes_graph`) — `-batch` it and read the
+`premium_mcl_graph` field in the output YAML (the Graphviz `.dot` of the node
+graph); pipe it to `dot -Tpng` to view it.
 
 ### HTTP pricing service
 
@@ -414,8 +419,9 @@ my_pde: !pde_configuration
   vanilla_precision: high
 
 # optional debug switches (referenced from the pricer via debug_configuration).
-# generate_nodes_graph dumps the Monte-Carlo node DAG to <log_path><pricer>_nodes.dot
-# (Graphviz), e.g. render with: dot -Tpng my_pricing_nodes.dot -o nodes.png
+# generate_nodes_graph returns each MCL tree's Monte-Carlo node DAG as Graphviz
+# .dot text in the result block (<tree>_mcl_graph), e.g. extract premium_mcl_graph
+# and render with: dot -Tpng -o nodes.png
 my_debug: !debug_configuration
   generate_nodes_graph: true
 

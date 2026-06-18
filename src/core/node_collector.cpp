@@ -202,45 +202,53 @@ void NodeCollector::PriceNodes()
     // cout << " ------------------------- " << endl;
 }
 
-//! debug : write the node graph as Graphviz dot. One node per built node, one
-//! edge per (parent -> child) dependency (deduped across diffusion dates; self
-//! dependencies omitted).
-void NodeCollector::ExportGraph( const string& Path ) const
+//! debug : the node graph reachable from Root as Graphviz dot text. One node per
+//! reachable node, one edge per (parent -> child) dependency (deduped across
+//! diffusion dates; self dependencies omitted). Returned as a string so the pricer
+//! can put it in the result block, travelling back to the client over HTTP / batch.
+string NodeCollector::GraphDot( MonteCarloNode* Root ) const
 {
-    std::ofstream f( Path );
-    if ( !f )
+    //! collect the nodes reachable from Root (the tree priced from that root),
+    //! then index name -> child names so the emitted graph is deterministic.
+    set<MonteCarloNode*> seen;
+    vector<MonteCarloNode*> todo{ Root };
+    map<string, set<string>> edges; //!< node name -> child names
+    while ( !todo.empty() )
     {
-        ERR( "debug: cannot open node-graph file '" + Path + "'" );
-    }
-
-    f << "digraph nodes {\n";
-    f << "  rankdir=LR;\n";
-    f << "  node [shape=box, fontsize=10];\n";
-
-    for ( const auto& kv : _node_map )
-    {
-        MonteCarloNode* n = kv.second.get();
-        f << "  \"" << n->GetName() << "\";\n";
-
-        //! union of child node names over every diffusion date
-        set<string> child_names;
+        MonteCarloNode* n = todo.back();
+        todo.pop_back();
+        if ( n == nullptr || !seen.insert( n ).second )
+        {
+            continue;
+        }
+        set<string>& children = edges[n->GetName()];
         for ( size_t d = 0; d < _date_list.size(); d++ )
         {
             for ( const node& c : n->GetChildNodes( d ) )
             {
                 if ( c.first != n ) //!< skip the diffusion self-dependency
                 {
-                    child_names.insert( c.first->GetName() );
+                    children.insert( c.first->GetName() );
+                    todo.push_back( c.first );
                 }
             }
         }
-        for ( const string& c : child_names )
-        {
-            f << "  \"" << n->GetName() << "\" -> \"" << c << "\";\n";
-        }
     }
 
+    std::ostringstream f;
+    f << "digraph nodes {\n";
+    f << "  rankdir=LR;\n";
+    f << "  node [shape=box, fontsize=10];\n";
+    for ( const auto& [name, children] : edges )
+    {
+        f << "  \"" << name << "\";\n";
+        for ( const string& c : children )
+        {
+            f << "  \"" << name << "\" -> \"" << c << "\";\n";
+        }
+    }
     f << "}\n";
+    return f.str();
 }
 
 void NodeCollector::SortNodes( MonteCarloNode& RootNode )

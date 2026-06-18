@@ -15,6 +15,7 @@ string ReplaceString( const string& source,
                       const string& replace );
 
 [[noreturn]] void ERR( const string& ErrMsg );
+
 string LogTimestamp(); //!< current local time "YYYY-MM-DD HH:MM:SS" (LOG line prefix)
 void LOG( const string& LogMsg );
 //! coloured log line, by context: SEQ lines are white, every other context is a

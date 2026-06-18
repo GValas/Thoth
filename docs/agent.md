@@ -115,8 +115,8 @@ Match these — don't reformat or rename surrounding code to a different style.
   contract/flow nodes — that share expensive path nodes across base + Greek-bump
   sub-trees and price them in a single path sweep. The graph and factors are
   name-ordered so results are deterministic across platforms/builds. A pricer
-  can dump the DAG to Graphviz via a `debug_configuration` with
-  `generate_nodes_graph: true`.
+  can return each MC tree's DAG as Graphviz `.dot` in the result block
+  (`<tree>_mcl_graph`) via a `debug_configuration` with `generate_nodes_graph: true`.
 - **RAII linalg wrappers (`la_*`).** `src/helpers/linalg.hpp` provides
   `la_vector` / `la_matrix` with a GSL-style heap-alloc/free C API
   (`la_vector_alloc`, `la_matrix_free`, ...). They are the in-repo replacement

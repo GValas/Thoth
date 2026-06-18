@@ -146,10 +146,11 @@ class NodeCollector
     //!
     date PreviousDiffusionDate( const date& AsOfDate );
 
-    //! debug : dump the built node graph (every node and its child edges) to a
-    //! Graphviz .dot file. Self-edges (a diffusion node reading its own previous
-    //! value) are omitted. Edges are deduped across diffusion dates.
-    void ExportGraph( const string& Path ) const;
+    //! debug : the node graph reachable from Root (the nodes priced for one tree)
+    //! as Graphviz .dot text. Self-edges (a diffusion node reading its own previous
+    //! value) are omitted; edges are deduped across diffusion dates; nodes/edges are
+    //! emitted in name order so the output is deterministic.
+    string GraphDot( MonteCarloNode* Root ) const;
 
     //! pricing
     void SortNodes( MonteCarloNode& RootNode );
