@@ -414,25 +414,25 @@ map<string, ObjectManager::Factory> MakeRegistry()
     r[KIND_MCL_CONFIGURATION] = []( ObjectManager& m, const string& n ) -> Object*
     {
         MclConfiguration* M = m.collector().Add( std::make_unique<MclConfiguration>( n ) );
-        M->_max_time_step = m.cfg().GetInteger( n + ".max_time_step" );
-        M->_min_time_step = m.cfg().GetInteger( n + ".min_time_step" );
+        M->_max_day_step = m.cfg().GetInteger( n + ".max_day_step" );
+        M->_min_day_step = m.cfg().GetInteger( n + ".min_day_step" );
         M->_paths = m.cfg().GetLong( n + ".paths" );
         //! year-fraction sub-step, so it is a double (0.01, not 0)
-        M->_vol_time_step = m.cfg().GetDouble( n + ".vol_time_step" );
+        M->_vol_year_step = m.cfg().GetDouble( n + ".vol_year_step" );
         M->_node_file = m.cfg().GetString( n + ".node_file", MCL_NODE_PATH );
         M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
         M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
         M->_sobol_skip = m.cfg().GetLong( n + ".sobol_skip", 0 );
         M->_allow_gpu = m.cfg().GetBoolean( n + ".allow_gpu", false );
         //! guard against degenerate grids: paths <= 0 -> NaN premium, and
-        //! max_time_step <= 0 -> a zero-day diffusion step that never advances
+        //! max_day_step <= 0 -> a zero-day diffusion step that never advances
         if ( M->_paths <= 0 )
         {
             ERR( "mcl_configuration '" + n + "': paths must be > 0" );
         }
-        if ( M->_max_time_step <= 0 )
+        if ( M->_max_day_step <= 0 )
         {
-            ERR( "mcl_configuration '" + n + "': max_time_step must be > 0 (days)" );
+            ERR( "mcl_configuration '" + n + "': max_day_step must be > 0 (days)" );
         }
         return M;
     };

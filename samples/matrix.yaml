@@ -732,10 +732,10 @@ cfg_ana: !pricer_configuration
 shared_pde: !pde_configuration
   vanilla_precision: high
 shared_mcl: !mcl_configuration
-  max_time_step: 1
-  min_time_step: -1
+  max_day_step: 1
+  min_day_step: -1
   paths: 100000
-  vol_time_step: 0.01
+  vol_year_step: 0.01
   use_sobol: true
 # same as shared_mcl but pseudo-random (no Sobol), for the convergence-comparison row
 cfg_mcl_pseudo: !pricer_configuration
@@ -743,10 +743,10 @@ cfg_mcl_pseudo: !pricer_configuration
   mcl_configuration: shared_mcl_pseudo
   log_path: "/tmp/"
 shared_mcl_pseudo: !mcl_configuration
-  max_time_step: 1
-  min_time_step: -1
+  max_day_step: 1
+  min_day_step: -1
   paths: 100000
-  vol_time_step: 0.01
+  vol_year_step: 0.01
   use_sobol: false
 # same as shared_mcl but with GPU acceleration requested (allow_gpu): runs on the
 # device on a CUDA build, transparently on the CPU otherwise
@@ -755,10 +755,10 @@ cfg_mcl_gpu: !pricer_configuration
   mcl_configuration: shared_mcl_gpu
   log_path: "/tmp/"
 shared_mcl_gpu: !mcl_configuration
-  max_time_step: 1
-  min_time_step: -1
+  max_day_step: 1
+  min_day_step: -1
   paths: 100000
-  vol_time_step: 0.01
+  vol_year_step: 0.01
   use_sobol: true
   allow_gpu: true
 

@@ -25,10 +25,10 @@ debug: !debug_configuration
   generate_nodes_graph: true
 
 mcl_config: !mcl_configuration
-  max_time_step: 1
-  min_time_step: -1
+  max_day_step: 1
+  min_day_step: -1
   paths: 10000000
-  vol_time_step: 0.01
+  vol_year_step: 0.01
   use_sobol: true
   generate_nodes_graph: true
 

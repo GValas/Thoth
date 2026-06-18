@@ -48,10 +48,10 @@ and standard error, so the premium and its trust are available at any point.
 ### The diffusion-date schedule
 
 `PricerMCL::InitDates` builds `_diffusion_dates` as the union of the book's fixing
-dates and a regular grid stepped by `max_time_step` calendar days from today to
+dates and a regular grid stepped by `max_day_step` calendar days from today to
 the last fixing. `NodeCollector::SetDiffusionDates` stores the ascending date list
 (`[0]` is today), the index map, and each date's previous-date link. Nodes read
-`dt_i` / `sqrt(dt_i)` from this schedule. `vol_time_step` is a finer *variance*
+`dt_i` / `sqrt(dt_i)` from this schedule. `vol_year_step` is a finer *variance*
 sub-step (year fraction) used inside the vol models, independent of the spot grid.
 
 ## 2. Random numbers
@@ -177,10 +177,10 @@ referenced from a `pricer_configuration` via its `mcl_configuration` field:
 
 | Field            | Type   | Meaning |
 |------------------|--------|---------|
-| `max_time_step`  | int    | Coarsest spot diffusion step, in **calendar days**; the grid is the union of this and the book's fixing dates. |
-| `min_time_step`  | int    | Lower bound on the diffusion step (calendar days). |
+| `max_day_step`  | int    | Coarsest spot diffusion step, in **calendar days**; the grid is the union of this and the book's fixing dates. |
+| `min_day_step`  | int    | Lower bound on the diffusion step (calendar days). |
 | `paths`          | long   | Number of simulated paths (64-bit, so it can exceed 2³¹). |
-| `vol_time_step`  | double | Variance sub-step as a **year fraction** (e.g. `0.01`), used by the vol models. |
+| `vol_year_step`  | double | Variance sub-step as a **year fraction** (e.g. `0.01`), used by the vol models. |
 | `use_sobol`      | bool   | Use Sobol + Brownian bridge instead of pseudo-random. |
 | `seed`           | int    | Seed for the xoshiro256++ stream (default 0; set per slave by the cluster master). |
 | `sobol_skip`     | long   | Leading Sobol points to skip (default 0; set per slave so blocks stay disjoint). |
@@ -196,10 +196,10 @@ my_pricer: !pricer_configuration
   mcl_configuration: my_mcl
 
 my_mcl: !mcl_configuration
-  max_time_step: 30           # calendar days
-  min_time_step: 1
+  max_day_step: 30           # calendar days
+  min_day_step: 1
   paths: 100000
-  vol_time_step: 0.01         # year fraction
+  vol_year_step: 0.01         # year fraction
   use_sobol: true
   allow_gpu: false            # true -> CUDA GPU when present + book supported, else CPU
   seed: 0                     # cluster master overrides per slave

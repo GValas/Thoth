@@ -24,7 +24,7 @@ void PricerMCL::InitDates()
     //! diffusion dates = fixing_dates + mcl dates + without today
     set<date> fixing_dates = _book->GetFixingDates();
     date last_date = *( --( fixing_dates.end() ) );
-    days days_step( _configuration->_mcl->_max_time_step );
+    days days_step( _configuration->_mcl->_max_day_step );
     for ( date d = _today;
           d < last_date;
           d += days_step )
@@ -554,8 +554,8 @@ void PricerMCL::Tree_Init()
         {
             std::ostringstream oss;
             oss << "drawings = " << _configuration->_mcl->_paths << ", "
-                << "max time step = " << _configuration->_mcl->_max_time_step << ", "
-                << "vol time step = " << _configuration->_mcl->_vol_time_step;
+                << "max day step = " << _configuration->_mcl->_max_day_step << ", "
+                << "vol year step = " << _configuration->_mcl->_vol_year_step;
             LOG( LogLabel(), oss.str() );
         }
     }

@@ -7,10 +7,10 @@
 class MclConfiguration : public Object
 {
   public:
-    int _max_time_step;
-    int _min_time_step;
+    int _max_day_step;
+    int _min_day_step;
     long _paths;           //!< path count — 64-bit so it can exceed 2^31 (e.g. billions on GPU)
-    double _vol_time_step; //!< variance sub-step (year fraction, e.g. 0.01) — a double
+    double _vol_year_step; //!< variance sub-step (year fraction, e.g. 0.01) — a double
     string _node_file;
     bool _use_sobol;
 

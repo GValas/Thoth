@@ -394,10 +394,10 @@ my_config: !pricer_configuration
   mcl_configuration: my_mcl
   pde_configuration: my_pde
 my_mcl: !mcl_configuration
-  max_time_step: 1
-  min_time_step: -1
+  max_day_step: 1
+  min_day_step: -1
   paths: 100000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
-  vol_time_step: 0.01
+  vol_year_step: 0.01
   use_sobol: true
   allow_gpu: false       # true -> run on a CUDA GPU when present + book supported, else CPU
 my_pde: !pde_configuration

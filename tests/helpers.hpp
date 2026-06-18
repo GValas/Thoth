@@ -147,15 +147,15 @@ inline std::string PrecisionLevel( int p ) { return p <= 3 ? "low" : ( p == 4 ? 
 //! the pricing-configuration trio (a pricer_configuration plus its referenced
 //! mcl_configuration / pde_configuration sub-objects). Named cfg / cfg_mcl /
 //! cfg_pde so a pricer can reference them as configuration: cfg.
-inline std::string CfgBlock( const std::string& method, int draws, int max_time_step,
+inline std::string CfgBlock( const std::string& method, int draws, int max_day_step,
                              int pde_precision )
 {
     std::ostringstream o;
     o << "cfg: !pricer_configuration {method: " << method
       << ", mcl_configuration: cfg_mcl, pde_configuration: cfg_pde, log_path: \"/tmp/\"}\n"
-      << "cfg_mcl: !mcl_configuration {max_time_step: " << max_time_step
-      << ", min_time_step: -1, paths: " << draws
-      << ", vol_time_step: 0.01, use_sobol: false}\n"
+      << "cfg_mcl: !mcl_configuration {max_day_step: " << max_day_step
+      << ", min_day_step: -1, paths: " << draws
+      << ", vol_year_step: 0.01, use_sobol: false}\n"
       << "cfg_pde: !pde_configuration {vanilla_precision: " << PrecisionLevel( pde_precision )
       << "}\n";
     return o.str();
