@@ -37,18 +37,24 @@ date VarianceSwap::GetMaturityDate() const
 //! and PV = notional * DF * (K_fair - K_var). This is model-free in the vols: it
 //! integrates the implied surface, so a smile (SABR) feeds in; for a flat vol it
 //! reproduces sigma^2.
+//! static-replication strike strip (Demeterfi-Derman-Kamal-Zou): how many ATM
+//! standard deviations the OTM-option grid spans around the forward, and how many
+//! trapezoid points discretise it.
+static constexpr double VARSWAP_STRIP_SIGMA_SPAN = 6.0;
+static constexpr int VARSWAP_STRIP_POINTS = 800;
+
 void VarianceSwap::ANA_EvalPrice()
 {
     double t = YearFraction( _today, _maturity_date );
     double df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
     double fwd = _underlying->GetForward( _maturity_date, _premium_currency );
 
-    //! strike grid : +/- 6 ATM std devs around the forward, trapezoidal rule
+    //! strike grid : +/- span ATM std devs around the forward, trapezoidal rule
     double sigma_atm = _underlying->GetImplicitVol( fwd, _maturity_date );
-    double span = 6.0 * sigma_atm * sqrt( t );
+    double span = VARSWAP_STRIP_SIGMA_SPAN * sigma_atm * sqrt( t );
     double k_lo = fwd * exp( -span );
     double k_hi = fwd * exp( span );
-    const int n = 800;
+    const int n = VARSWAP_STRIP_POINTS;
     double dk = ( k_hi - k_lo ) / n;
 
     double integral = 0;

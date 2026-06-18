@@ -265,6 +265,11 @@ double heston_integrand( double phi, void* params )
 }
 
 //! P_j = 1/2 + 1/pi * integral_0^inf integrand dphi
+//! Heston/Bates characteristic-function probability integral (Gauss-Kronrod).
+constexpr double HESTON_CF_LOWER_BOUND = 1e-8; //!< lower limit (integrand regular at 0)
+constexpr double HESTON_CF_TOLERANCE = 1e-8;   //!< absolute convergence tolerance
+constexpr unsigned HESTON_CF_MAX_DEPTH = 15;   //!< adaptive-refinement depth
+
 double heston_probability( HestonParams h, int j )
 {
     h.j = j;
@@ -273,7 +278,7 @@ double heston_probability( HestonParams h, int j )
     auto integrand = [&h]( double phi )
     { return heston_integrand( phi, &h ); };
     const double result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(
-        integrand, 1e-8, std::numeric_limits<double>::infinity(), 15, 1e-8 );
+        integrand, HESTON_CF_LOWER_BOUND, std::numeric_limits<double>::infinity(), HESTON_CF_MAX_DEPTH, HESTON_CF_TOLERANCE );
     return 0.5 + result / M_PI;
 }
 } // namespace

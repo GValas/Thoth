@@ -4,6 +4,17 @@
 #include "progress_bar.hpp"
 #include "variance_swap.hpp"
 
+//! Heston / Bates 2-D (S, v) ADI grid parameters (see SolveHestonGrid). Fixed
+//! grid for now (does not yet follow vanilla_precision).
+static constexpr int HESTON_GRID_NS = 120;              //!< spot nodes
+static constexpr int HESTON_GRID_NV = 60;               //!< variance nodes
+static constexpr int HESTON_GRID_NT = 120;              //!< time steps
+static constexpr double HESTON_VMAX_FACTOR = 6.0;       //!< variance domain = max(1, factor * max(v0, theta))
+static constexpr double HESTON_SMAX_MIN_FACTOR = 3.0;   //!< spot domain is at least factor * S0 ...
+static constexpr double HESTON_SMAX_SIGMA_FACTOR = 5.0; //!< ... or S0 * exp(factor * sqrt(var * T)), whichever is larger
+static constexpr int BATES_JUMP_QUAD_POINTS = 40;       //!< trapezoid points for the jump-size integral
+static constexpr double BATES_JUMP_SIGMA_SPAN = 6.0;    //!< jump-size grid spans muJ +/- span * sigJ
+
 PricerPDE::PricerPDE( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
@@ -621,11 +632,11 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double bdrift = b - lambda * kbar; //!< == b for pure Heston
 
     //! grid extents
-    const double vmax = std::max( 1.0, 6.0 * std::max( v0, th ) );
-    const double smax = std::max( 3.0 * S0, S0 * exp( 5.0 * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
-    const int NS = 120;
-    const int Nv = 60;
-    const int Nt = 120;
+    const double vmax = std::max( 1.0, HESTON_VMAX_FACTOR * std::max( v0, th ) );
+    const double smax = std::max( HESTON_SMAX_MIN_FACTOR * S0, S0 * exp( HESTON_SMAX_SIGMA_FACTOR * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
+    const int NS = HESTON_GRID_NS;
+    const int Nv = HESTON_GRID_NV;
+    const int Nt = HESTON_GRID_NT;
     const double dS = smax / NS;
     const double dv = vmax / Nv;
     const double dt = T / Nt;
@@ -654,12 +665,12 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     //! Bates jump integral. Discretise the jump size Z ~ N(muJ, sigJ^2) on a grid
     //! out to +/-6 sigma (re-normalised for truncation), and read V at the jumped
     //! spot S*e^Z by linear interpolation in S (linear extrapolation past Smax).
-    const int NJ = 40;
+    const int NJ = BATES_JUMP_QUAD_POINTS;
     vector<double> zval, zwt;
     if ( bates )
     {
         const double sg = std::max( sigJ, 1e-8 );
-        const double zlo = muJ - 6 * sg, zhi = muJ + 6 * sg, dz = ( zhi - zlo ) / NJ;
+        const double zlo = muJ - BATES_JUMP_SIGMA_SPAN * sg, zhi = muJ + BATES_JUMP_SIGMA_SPAN * sg, dz = ( zhi - zlo ) / NJ;
         double wsum = 0;
         for ( int m = 0; m <= NJ; m++ )
         {
