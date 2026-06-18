@@ -25,7 +25,7 @@ void VarianceSwap::SetNotional( double Notional )
 }
 
 //! getter
-date VarianceSwap::GetMaturityDate()
+date VarianceSwap::GetMaturityDate() const
 {
     return _maturity_date;
 }

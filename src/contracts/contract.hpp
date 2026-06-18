@@ -46,7 +46,7 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     MonteCarloNode* GetUnderlyingNode( NodeCollector& NC );
     virtual MonteCarloNode* GetFlowNode( NodeCollector& NC, const date& AsOfDate ) = 0;
 
-    virtual date GetMaturityDate() = 0;
+    virtual date GetMaturityDate() const = 0;
 
     //! trade properties shared across engines (PDE boundary + MCL American LSM):
     //! the intrinsic (exercise) payoff at a given spot, and the exercise style.

@@ -9,7 +9,7 @@ Barrier::Barrier( const string& ObjectName ) : Contract( ObjectName, KIND_BARRIE
 Barrier::~Barrier() = default;
 
 //! getter
-date Barrier::GetMaturityDate()
+date Barrier::GetMaturityDate() const
 {
     return _maturity_date;
 }

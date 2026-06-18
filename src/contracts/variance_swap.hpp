@@ -23,7 +23,7 @@ class VarianceSwap : public Contract
     void SetNotional( double Notional );
 
     //! getter
-    date GetMaturityDate() override;
+    date GetMaturityDate() const override;
     double GetVolatilityStrike() const { return _volatility_strike; }
     double GetNotional() const { return _notional; }
 

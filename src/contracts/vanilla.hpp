@@ -21,7 +21,7 @@ class Vanilla : public Contract
 
     //! getter
     [[nodiscard]] double GetStrike() const;
-    date GetMaturityDate() override;
+    date GetMaturityDate() const override;
 
     //! mcl node
     MonteCarloNode* GetFlowNode( NodeCollector& NC,

@@ -56,7 +56,7 @@ vector<string> SplitDots( const string& Path )
 //! column 0), so the emitted YAML reads like the hand-written sample files.
 //! The very first block keeps no leading blank line.
 //! yaml-cpp emits local tags verbatim as "!<!equity>"; rewrite to "!equity"
-string ShortenTags( const string& Yaml )
+static string ShortenTags( const string& Yaml )
 {
     static const std::regex verbose( R"(!<!([A-Za-z0-9_]+)>)" );
     return std::regex_replace( Yaml, verbose, "!$1" );
@@ -106,7 +106,7 @@ YAML::Node SortKeysAlpha( const YAML::Node& Node )
     return Node; //!< scalar (tag/style preserved by copy)
 }
 
-string SpaceTopLevelBlocks( const string& Yaml )
+static string SpaceTopLevelBlocks( const string& Yaml )
 {
     string out;
     out.reserve( Yaml.size() + Yaml.size() / 16 );

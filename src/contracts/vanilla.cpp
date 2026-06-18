@@ -49,7 +49,7 @@ double Vanilla::GetStrike() const
 }
 
 //! getter
-date Vanilla::GetMaturityDate()
+date Vanilla::GetMaturityDate() const
 {
     return _maturity_date;
 }

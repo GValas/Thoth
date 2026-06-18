@@ -30,7 +30,7 @@ class Barrier : public Contract
                                  const date& AsOfDate ) override;
 
     //! getter
-    date GetMaturityDate() override;
+    date GetMaturityDate() const override;
 
     //! trade properties (intrinsic payoff + exercise style)
     double Intrinsic( const double Spot ) override;
