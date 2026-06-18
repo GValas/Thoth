@@ -68,6 +68,43 @@ inline double BsPut( double S, double K, double r, double sig, double T )
     return BsCall( S, K, r, sig, T ) - S + K * std::exp( -r * T ); //!< put-call parity
 }
 
+//! Black-Scholes Greeks (no dividend), maturity in years. Vega / rho are per UNIT
+//! vol / rate; the engine reports them per 1 vol point / per 1% (i.e. * 0.01).
+inline double NormPdf( double x )
+{
+    return std::exp( -0.5 * x * x ) / std::sqrt( 2.0 * std::acos( -1.0 ) );
+}
+inline double BsD1( double S, double K, double r, double sig, double T )
+{
+    return ( std::log( S / K ) + ( r + sig * sig / 2 ) * T ) / ( sig * std::sqrt( T ) );
+}
+inline double BsCallDelta( double S, double K, double r, double sig, double T )
+{
+    return NormCdf( BsD1( S, K, r, sig, T ) );
+}
+inline double BsPutDelta( double S, double K, double r, double sig, double T )
+{
+    return BsCallDelta( S, K, r, sig, T ) - 1.0;
+}
+inline double BsGamma( double S, double K, double r, double sig, double T )
+{
+    return NormPdf( BsD1( S, K, r, sig, T ) ) / ( S * sig * std::sqrt( T ) );
+}
+inline double BsVega( double S, double K, double r, double sig, double T )
+{
+    return S * NormPdf( BsD1( S, K, r, sig, T ) ) * std::sqrt( T ); //!< per unit vol
+}
+inline double BsCallRho( double S, double K, double r, double sig, double T )
+{
+    double d2 = BsD1( S, K, r, sig, T ) - sig * std::sqrt( T );
+    return K * T * std::exp( -r * T ) * NormCdf( d2 ); //!< per unit rate
+}
+inline double BsPutRho( double S, double K, double r, double sig, double T )
+{
+    double d2 = BsD1( S, K, r, sig, T ) - sig * std::sqrt( T );
+    return -K * T * std::exp( -r * T ) * NormCdf( -d2 ); //!< per unit rate
+}
+
 //! closed-form quanto call: foreign asset (drift r_for, vol sig) paid in the
 //! domestic currency (discount r_dom). The quanto carry is
 //! b = r_for - corr(asset, FX) * sig * sig_fx, and the price is the BS forward

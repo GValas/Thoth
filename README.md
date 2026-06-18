@@ -218,9 +218,11 @@ runs on the CPU).
 
 A doctest suite (`tests/`) covers European/American vanillas, barriers,
 dividends, multi-asset consistency, engine-vs-engine agreement (incl. quanto),
-variance swaps, baskets, composites, the SABR surface, Sobol QMC, the `!sequence`
-task, determinism and config parsing
-(~71% line coverage). It is built alongside the binary:
+variance swaps (analytic vs the accumulated-variance PDE), baskets, composites,
+the SABR surface, Sobol QMC, the `!sequence` task, the bump-and-revalue Greeks
+(delta/gamma/vega/rho/theta vs Black-Scholes) and the model-parameter
+`vega_<param>` Greeks (Heston / SABR), book aggregation, determinism and config
+parsing. It is built alongside the binary:
 
 ```bash
 cmake --build build -j           # builds thoth + thoth_tests
