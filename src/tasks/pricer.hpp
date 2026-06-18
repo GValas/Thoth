@@ -72,6 +72,14 @@ class Pricer : public Task
     //! loop that already covers each contract's Greeks, so they never set this.
     bool _quiet_pricing = false;
 
+    //! while a bump-and-revalue Greek reprices the book (a quiet inner price), this
+    //! names the tree being built ("delta"/"gamma"/"vega"/"rho"/"theta") so the MCL
+    //! engine captures that reprice's node graph under <tag>_mcl_graph too — not just
+    //! the base "premium" tree. Empty outside a Greek reprice (the base build keys
+    //! "premium"). Composite / basket books (bump-and-revalue) get one graph per
+    //! Greek this way; Mono books capture their single-tree scenario graphs directly.
+    string _graph_tree_tag;
+
     //! requested indicators
     bool _request_premium = false;
     bool _request_delta = false;

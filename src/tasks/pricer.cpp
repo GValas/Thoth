@@ -252,7 +252,9 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
+                _graph_tree_tag = "delta"; //!< capture this reprice's node graph
                 const double pu = Reprice();
+                _graph_tree_tag.clear();
                 Tick();
                 s->SetSpot( spot ); //!< restore
                 g.delta += ( pu - P0 ) / h;
@@ -262,7 +264,9 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
+                _graph_tree_tag = "gamma"; //!< one graph for gamma (the up bump)
                 const double pu = Reprice();
+                _graph_tree_tag.clear();
                 Tick();
                 s->SetSpot( spot - h );
                 const double pd = Reprice();
@@ -280,7 +284,9 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         {
             s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
         }
+        _graph_tree_tag = "vega";
         const double pu = Reprice();
+        _graph_tree_tag.clear();
         Tick();
         for ( Single* s : Singles )
         {
@@ -296,7 +302,9 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         {
             c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
         }
+        _graph_tree_tag = "rho";
         const double pu = Reprice();
+        _graph_tree_tag.clear();
         Tick();
         for ( Currency* c : Currencies )
         {
@@ -310,7 +318,9 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
     {
         const date base = _today;
         RollToday( base + days( 1 ) );
+        _graph_tree_tag = "theta";
         const double p1 = Reprice();
+        _graph_tree_tag.clear();
         Tick();
         RollToday( base ); //!< restore the valuation date
         g.theta = p1 - P0;
@@ -468,7 +478,9 @@ void Pricer::WriteResults()
     _cfg->SetDouble( _result + ".premium_trust", _book->GetPremiumTrust() );
 
     //! debug node graph : one Graphviz .dot per MC tree (base + Greek scenarios),
-    //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph)
+    //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph). The
+    //! Dump() emitter renders multi-line scalars as literal blocks, so the .dot text
+    //! stays readable (no \n / \" escapes).
     for ( const auto& [tree, dot] : _tree_graphs )
     {
         _cfg->SetString( _result + "." + tree + "_mcl_graph", dot );

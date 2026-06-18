@@ -136,6 +136,94 @@ static string SpaceTopLevelBlocks( const string& Yaml )
     }
     return out;
 }
+
+//! emit any multi-line double-quoted scalar (e.g. a node-graph .dot) as a YAML
+//! literal block, so the value stays human-readable instead of one long
+//! \n / \"-escaped line. yaml-cpp's node emitter has no literal-block style, so
+//! this rewrites the already-emitted text: a line
+//!   <indent>key: "....\n...."
+//! becomes
+//!   <indent>key: |-
+//!   <indent>  <unescaped line 1>
+//!   <indent>  <unescaped line 2>
+static string BlockifyMultilineScalars( const string& Yaml )
+{
+    //! <indent>key: "<value containing an escaped newline>"
+    static const std::regex multiline( R"RE(^( *)([A-Za-z0-9_.\-]+): "(.*\\n.*)" *$)RE" );
+
+    string out;
+    out.reserve( Yaml.size() );
+    size_t start = 0;
+    bool first = true;
+    while ( start <= Yaml.size() )
+    {
+        size_t nl = Yaml.find( '\n', start );
+        size_t end = ( nl == string::npos ) ? Yaml.size() : nl;
+        const string line = Yaml.substr( start, end - start );
+
+        if ( !first )
+        {
+            out += '\n';
+        }
+        first = false;
+
+        std::smatch m;
+        if ( !std::regex_match( line, m, multiline ) )
+        {
+            out += line;
+        }
+        else
+        {
+            const string indent = m[1].str();
+            const string key = m[2].str();
+            const string raw = m[3].str();
+
+            //! unescape the double-quoted scalar (\n \t \" \\) into real characters
+            string text;
+            text.reserve( raw.size() );
+            for ( size_t i = 0; i < raw.size(); i++ )
+            {
+                if ( raw[i] == '\\' && i + 1 < raw.size() )
+                {
+                    const char c = raw[++i];
+                    text += ( c == 'n' ) ? '\n' : ( c == 't' ) ? '\t'
+                                                               : c; //!< \" \\ -> the char itself
+                }
+                else
+                {
+                    text += raw[i];
+                }
+            }
+            while ( !text.empty() && text.back() == '\n' )
+            {
+                text.pop_back(); //!< |- strips the trailing newline anyway
+            }
+
+            //! key: |-  then each content line indented two spaces under the key
+            out += indent + key + ": |-";
+            const string child = indent + "  ";
+            size_t pos = 0;
+            while ( true )
+            {
+                size_t lnl = text.find( '\n', pos );
+                size_t lend = ( lnl == string::npos ) ? text.size() : lnl;
+                out += "\n" + child + text.substr( pos, lend - pos );
+                if ( lnl == string::npos )
+                {
+                    break;
+                }
+                pos = lnl + 1;
+            }
+        }
+
+        if ( nl == string::npos )
+        {
+            break;
+        }
+        start = nl + 1;
+    }
+    return out;
+}
 } // namespace
 
 //! contructor
@@ -196,7 +284,7 @@ string YamlConfig::Dump()
 
     YAML::Emitter emitter;
     emitter << root;
-    return SpaceTopLevelBlocks( ShortenTags( emitter.c_str() ) );
+    return SpaceTopLevelBlocks( BlockifyMultilineScalars( ShortenTags( emitter.c_str() ) ) );
 }
 
 //! write the config tree to the output file (file mode only). Explicit, so I/O

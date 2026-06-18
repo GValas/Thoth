@@ -53,10 +53,13 @@ terminal it redraws in place as a single updating line; when stdout is not a TTY
 every 10% so logs stay readable instead of piling up the redraw frames. A pricer
 can attach a `debug_configuration` with `generate_nodes_graph: true`: each MCL tree
 then returns its Monte-Carlo node graph as Graphviz `.dot` text in the result block
-— `<tree>_mcl_graph` (the base `premium_mcl_graph` plus one per Greek-bump scenario
-tree, e.g. `delta_<udl>_mcl_graph`, `vega_mcl_graph`). It travels back in the result
-(HTTP response / batch output / through the cluster), so there is no server-side
-file to retrieve.
+— `<tree>_mcl_graph`, the base `premium_mcl_graph` plus one graph for every Greek
+tree built (`delta_mcl_graph` / `gamma_mcl_graph` / `vega_mcl_graph` /
+`rho_mcl_graph` / `theta_mcl_graph` on a bump-and-revalue book; the single-tree
+Greek scenarios on a Mono book key theirs `delta_<udl>` / `gamma_up_<udl>` / … ).
+The `.dot` is emitted as a YAML literal block (readable, not a `\n`-escaped line)
+and travels back in the result (HTTP response / batch output / through the cluster),
+so there is no `.dot` or `.png` file written to disk.
 
 **Greeks** — list any of `delta`, `gamma`, `vega`, `rho`, `theta` in a pricer's
 `indicators` (alongside `premium`). All three engines use bump-and-revalue. The

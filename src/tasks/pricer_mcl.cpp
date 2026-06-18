@@ -341,7 +341,9 @@ void PricerMCL::ComputeGreeks()
         _theta_pass = true;    //!< ...but still show a labelled "<engine> theta" bar
         _suppress_scenarios = true;
         _today = base_today + days( 1 );
-        PriceBook(); //!< the single extra graph
+        _graph_tree_tag = "theta"; //!< capture the rolled tree's node graph
+        PriceBook();               //!< the single extra graph
+        _graph_tree_tag.clear();
         const double p1 = _book->GetPremium();
         _today = base_today;
         _suppress_scenarios = false;
@@ -556,18 +558,27 @@ void PricerMCL::Tree_Init()
     //! sort nodes
     _collector.SortNodes( roots );
 
-    //! debug node graph : capture one Graphviz .dot per built tree (the base
-    //! "premium" tree and each Greek-bump scenario tree) into the result block as
-    //! <tree>_mcl_graph, so it returns to the client over HTTP / in the batch
-    //! output — no server-side file. Only on the visible base build.
-    if ( _debug && _debug->_generate_nodes_graph && !_quiet_pricing )
+    //! debug node graph : capture one Graphviz .dot per built tree into the result
+    //! block as <tree>_mcl_graph, so it returns to the client over HTTP / in the
+    //! batch output — no server-side file. The visible base build captures the
+    //! "premium" tree plus any single-tree Greek scenario trees; a quiet Greek
+    //! reprice (bump-and-revalue, e.g. composite / basket / American books) captures
+    //! its own tree under the tag the bump engine set (delta/gamma/vega/rho/theta).
+    if ( _debug && _debug->_generate_nodes_graph )
     {
-        _tree_graphs["premium"] = _collector.GraphDot( _root );
-        for ( const auto& tagged : _scenario_roots )
+        if ( !_quiet_pricing )
         {
-            _tree_graphs[GraphTreeKey( tagged.first )] = _collector.GraphDot( tagged.second );
+            _tree_graphs["premium"] = _collector.GraphDot( _root );
+            for ( const auto& tagged : _scenario_roots )
+            {
+                _tree_graphs[GraphTreeKey( tagged.first )] = _collector.GraphDot( tagged.second );
+            }
+            LOG( LogLabel(), "captured " + std::to_string( _tree_graphs.size() ) + " node graph(s) -> result.<tree>_mcl_graph" );
         }
-        LOG( LogLabel(), "captured " + std::to_string( _tree_graphs.size() ) + " node graph(s) -> result.<tree>_mcl_graph" );
+        else if ( !_graph_tree_tag.empty() )
+        {
+            _tree_graphs[_graph_tree_tag] = _collector.GraphDot( _root );
+        }
     }
 
     //! status (only on the visible base build; the bump-and-revalue Greek
