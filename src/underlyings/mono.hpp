@@ -20,6 +20,7 @@ class Mono : public Underlying
     SingleSet GetSingleSet() const override;
     CurrencySet GetCurrencySet() const override;
     double GetSpot() const override;
+    double GetDiffusionSpot( const date& LastDate ) const override; //!< escrowed spot of the wrapped single
 
     //! a single-asset underlying: griddable and the canonical mono shape
     bool IsGriddable() const override { return true; }

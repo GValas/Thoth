@@ -81,7 +81,7 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
                 {
                     S->SetJumpNode( NC.GetNode( _name + node_name::JUMP_NOISE ) );
                 }
-                S->SetSpot( _spot );
+                S->SetSpot( GetDiffusionSpot( NC.GetDateList().back() ) );
             } );
     }
 
@@ -91,7 +91,7 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
         {
             S->SetBrownianNode( NC.GetNode( _name + node_name::BROWNIAN ) );
             S->SetDriftNode( GetDriftNode( NC ) );
-            S->SetSpot( _spot );
+            S->SetSpot( GetDiffusionSpot( NC.GetDateList().back() ) );
             //! local-vol surface (e.g. SABR): sample the Dupire surface onto a
             //! per-date log-spot grid the diffusion reads along its own path.
             //! Flat surface (bs): one constant-vol node.

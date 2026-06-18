@@ -57,6 +57,7 @@
         { "$ref": "#/$defs/yield_curve" },
         { "$ref": "#/$defs/repo_curve" },
         { "$ref": "#/$defs/continuous_dividends_curve" },
+        { "$ref": "#/$defs/discrete_dividends" },
         { "$ref": "#/$defs/bs_volatility" },
         { "$ref": "#/$defs/heston_volatility" },
         { "$ref": "#/$defs/sabr_volatility" },
@@ -205,6 +206,7 @@
         "volatility": { "$ref": "#/$defs/ref", "description": "Name of a volatility object (bs / sabr / heston)." },
         "currency": { "$ref": "#/$defs/ref" },
         "continuous_dividends": { "$ref": "#/$defs/ref" },
+        "discrete_dividends": { "$ref": "#/$defs/ref", "description": "Name of a discrete_dividends schedule (escrowed-dividend model)." },
         "repo": { "$ref": "#/$defs/ref" }
       }
     },
@@ -298,6 +300,18 @@
       "properties": {
         "dates": { "$ref": "#/$defs/dateList" },
         "values": { "$ref": "#/$defs/numberList" }
+      }
+    },
+
+    "discrete_dividends": {
+      "type": "object",
+      "title": "!discrete_dividends",
+      "description": "Schedule of discrete cash dividends (escrowed-dividend model).",
+      "additionalProperties": false,
+      "required": ["dates", "amounts"],
+      "properties": {
+        "dates": { "$ref": "#/$defs/dateList", "description": "Ex-dividend dates." },
+        "amounts": { "$ref": "#/$defs/numberList", "description": "Cash amount paid at each ex-date (equity currency)." }
       }
     },
 

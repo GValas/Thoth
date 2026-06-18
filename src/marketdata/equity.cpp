@@ -22,6 +22,12 @@ void Equity::SetContinuousDividends( ContinuousDividendsCurve* ContinuousDividen
     _continuous_dividends = ContinuousDividends;
 }
 
+//! setter
+void Equity::SetDiscreteDividends( DiscreteDividends* DiscreteDividends )
+{
+    _discrete_dividends = DiscreteDividends;
+}
+
 //! getter
 RepoCurve* Equity::GetRepo()
 {
@@ -32,6 +38,36 @@ RepoCurve* Equity::GetRepo()
 ContinuousDividendsCurve* Equity::GetContinuousDividends()
 {
     return _continuous_dividends;
+}
+
+//! escrowed-dividend model: PV of the discrete cash dividends with ex-date in
+//! (today, UpTo], discounted on this equity's currency curve.
+double Equity::DiscreteDividendsPv( const date& UpTo ) const
+{
+    if ( !_discrete_dividends )
+    {
+        return 0;
+    }
+    const vector<date>& dates = _discrete_dividends->GetDates();
+    const vector<double>& amounts = _discrete_dividends->GetAmounts();
+    YieldCurve* rate = Asset::_currency->GetRate();
+
+    double pv = 0;
+    for ( size_t i = 0; i < dates.size() && i < amounts.size(); i++ )
+    {
+        if ( dates[i] > Object::_today && dates[i] <= UpTo )
+        {
+            pv += amounts[i] * rate->GetDiscountFactor( dates[i] );
+        }
+    }
+    return pv;
+}
+
+//! escrowed spot for the MCL diffusion (spot minus the PV of dividends up to the
+//! last diffusion date)
+double Equity::GetDiffusionSpot( const date& LastDate ) const
+{
+    return _spot - DiscreteDividendsPv( LastDate );
 }
 
 //! getter
@@ -71,7 +107,11 @@ double Equity::GetForward( const date& MaturityDate ) const
     }
     */
 
-    return _spot * exp( -dt * ( div + qto ) ) / df;
+    //! escrowed-dividend model: net the PV of discrete cash dividends due before
+    //! maturity off the spot, then grow at the continuous carry
+    double spot = _spot - DiscreteDividendsPv( MaturityDate );
+
+    return spot * exp( -dt * ( div + qto ) ) / df;
 }
 
 //! implicit vol

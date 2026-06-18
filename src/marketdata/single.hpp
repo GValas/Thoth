@@ -20,6 +20,12 @@ class Single : public Asset
 
     //! getter
     double GetSpot() const override;
+
+    //! the spot the MCL diffusion starts from. Defaults to the plain spot; an
+    //! equity with discrete dividends overrides it with the escrowed spot (so the
+    //! diffused path matches the escrowed forward up to the last diffusion date).
+    virtual double GetDiffusionSpot( const date& /*LastDate*/ ) const { return _spot; }
+
     Volatility* GetVolatility() const;
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;

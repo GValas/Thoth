@@ -8,6 +8,7 @@ inline constexpr char KIND_BOOK[] = "book";
 inline constexpr char KIND_PRICER[] = "pricer";
 inline constexpr char KIND_BS_VOLATILITY[] = "bs_volatility";
 inline constexpr char KIND_CONTINUOUS_DIVIDENDS_CURVE[] = "continuous_dividends_curve";
+inline constexpr char KIND_DISCRETE_DIVIDENDS[] = "discrete_dividends";
 inline constexpr char KIND_CORRELATION_MATRIX[] = "correlation_matrix";
 inline constexpr char KIND_DEBUG_CONFIGURATION[] = "debug_configuration";
 inline constexpr char KIND_CURRENCY[] = "currency";

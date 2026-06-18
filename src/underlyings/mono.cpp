@@ -43,6 +43,11 @@ double Mono::GetSpot() const
     return _single->GetSpot();
 }
 
+double Mono::GetDiffusionSpot( const date& LastDate ) const
+{
+    return _single->GetDiffusionSpot( LastDate );
+}
+
 CurrencySet Mono::GetCurrencySet() const
 {
     CurrencySet s;

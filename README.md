@@ -117,10 +117,14 @@ the ANA cells. A parameter no underlying's surface exposes is silently skipped.
 
 **Market data**
 - `yield_curve`, `repo_curve`, `continuous_dividends_curve`,
-  `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
+  `discrete_dividends`, `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
   read by **linear interpolation on the (continuously-compounded) rate** between
   pillars (ACT/365 weight), held flat beyond the first/last pillar. A
   `correlation_matrix` must be symmetric positive-definite (validated at load).
+  `discrete_dividends` is an (ex-`dates`, cash `amounts`) schedule on an equity,
+  priced by the **escrowed-dividend model**: the forward (and the MCL diffusion
+  spot) net the present value of the dividends due before maturity off the spot,
+  so the ANA, PDE and MCL engines all price the same escrowed forward.
 - Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).

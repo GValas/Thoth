@@ -35,6 +35,7 @@
 #include "yield_curve.hpp"
 #include "repo_curve.hpp"
 #include "continuous_dividends_curve.hpp"
+#include "discrete_dividends.hpp"
 #include "bs_volatility.hpp"
 #include "sabr_volatility.hpp"
 #include "heston_volatility.hpp"
@@ -190,6 +191,10 @@ map<string, ObjectManager::Factory> MakeRegistry()
         {
             E->SetContinuousDividends( m.Get<ContinuousDividendsCurve>( m.cfg().GetString( n + ".continuous_dividends" ) ) );
         }
+        if ( m.cfg().IsString( n + ".discrete_dividends" ) )
+        {
+            E->SetDiscreteDividends( m.Get<DiscreteDividends>( m.cfg().GetString( n + ".discrete_dividends" ) ) );
+        }
         if ( m.cfg().IsString( n + ".repo" ) )
         {
             E->SetRepo( m.Get<RepoCurve>( m.cfg().GetString( n + ".repo" ) ) );
@@ -273,6 +278,14 @@ map<string, ObjectManager::Factory> MakeRegistry()
         Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
         Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
         return Y;
+    };
+
+    r[KIND_DISCRETE_DIVIDENDS] = []( ObjectManager& m, const string& n ) -> Object*
+    {
+        DiscreteDividends* D = m.collector().Add( std::make_unique<DiscreteDividends>( n ) );
+        D->SetDates( m.cfg().GetDateList( n + ".dates" ) );
+        D->SetAmounts( m.cfg().GetDoubleList( n + ".amounts" ) );
+        return D;
     };
 
     r[KIND_BS_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*

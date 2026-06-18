@@ -174,7 +174,10 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
 
     // market data : carry r (drift, underlying ccy) and discount r_disc (premium
     // ccy). They coincide for a non-quanto contract (same currency).
-    s = Ctr->GetUnderlying()->GetSpot();
+    //! escrowed spot (== plain spot unless the underlying carries discrete
+    //! dividends): nets the PV of dividends due before maturity, so the grid prices
+    //! the same escrowed forward as the analytic and MCL engines.
+    s = Ctr->GetUnderlying()->GetDiffusionSpot( maturity );
     v = Ctr->GetUnderlying()->GetImplicitVol( 0, maturity );
     r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( maturity );
     r_disc = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( maturity );

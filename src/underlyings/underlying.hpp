@@ -48,6 +48,12 @@ class Underlying : public Asset
     //! Greeks can isolate a per-contract spot bump within a shared path.
     [[nodiscard]] virtual bool IsMono() const { return false; }
 
+    //! the spot the deterministic engines (PDE) and the MCL diffusion start from.
+    //! Defaults to the plain spot; a mono equity with discrete dividends returns the
+    //! escrowed spot (spot minus the PV of dividends due up to LastDate), so all
+    //! engines price the same escrowed forward. See Single/Equity::GetDiffusionSpot.
+    [[nodiscard]] virtual double GetDiffusionSpot( const date& /*LastDate*/ ) const { return GetSpot(); }
+
     //! mcl node
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
     virtual MonteCarloNode* GetVolNode( NodeCollector& NC ) = 0;
