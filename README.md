@@ -310,6 +310,13 @@ spread and discrete cash dividends) priced by MCL with the node-graph dump on
 `premium_mcl_graph` field in the output YAML (the Graphviz `.dot` of the node
 graph); pipe it to `dot -Tpng` to view it.
 
+`samples/random_vanillas.yaml` is a stress book: 1000 random European vanillas
+(random strike / type / maturity, seed 42) on one equity, priced in a single MCL
+sweep with all Greeks. Its `mcl_configuration` sets `allow_gpu`, so the whole book
+runs on the GPU GBM kernel on a CUDA build (CPU fallback otherwise). The helper
+`build_run.sh [--gpu] [input.yaml]` builds (with `-DTHOTH_ENABLE_CUDA=ON` when
+`--gpu` is passed) and prices it.
+
 ### HTTP pricing service
 
 ```bash
