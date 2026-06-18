@@ -36,6 +36,9 @@ class Equity : public Single
     //! the same (escrowed) forward the analytic / PDE engines use.
     double GetDiffusionSpot( const date& LastDate ) const override;
 
+    //! continuous dividend yield + repo spread (the carry yield)
+    double DividendRepoYield( const date& MaturityDate ) const override;
+
     //! local vol
     bool UseLocalVol();
 

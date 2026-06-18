@@ -82,12 +82,24 @@ bool Equity::UseLocalVol()
     return _volatility->_is_local;
 }
 
+//! continuous carry yield (dividend yield + repo spread) subtracted from the rate
+//! in the drift. One source for all engines: the ANA forward uses it, the PDE
+//! carry subtracts it, and the MCL drift node sums the same div/repo curve nodes.
+double Equity::DividendRepoYield( const date& MaturityDate ) const
+{
+    double y = ( _continuous_dividends ? _continuous_dividends->GetCurveValue( MaturityDate ) : 0 );
+    y += ( _repo ? _repo->GetCurveValue( MaturityDate ) : 0 );
+    return y;
+}
+
 //!
 double Equity::GetForward( const date& MaturityDate ) const
 {
     double dt = YearFraction( Object::_today, MaturityDate );
     double df = Asset::_currency->GetRate()->GetDiscountFactor( MaturityDate );
-    double div = ( _continuous_dividends ? _continuous_dividends->GetCurveValue( MaturityDate ) : 0 );
+    //! continuous carry yield: dividend yield + repo (the same quantity the MCL
+    //! drift node and the PDE carry subtract, so the three engines agree)
+    double div = DividendRepoYield( MaturityDate );
 
     //! quanto adjustment
     double qto = 0;

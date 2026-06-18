@@ -54,6 +54,10 @@ class Underlying : public Asset
     //! engines price the same escrowed forward. See Single/Equity::GetDiffusionSpot.
     [[nodiscard]] virtual double GetDiffusionSpot( const date& /*LastDate*/ ) const { return GetSpot(); }
 
+    //! continuous carry yield (dividend yield + repo) the PDE subtracts from the
+    //! rate; 0 by default, a mono equity returns its single's div+repo.
+    [[nodiscard]] virtual double DividendRepoYield( const date& /*MaturityDate*/ ) const { return 0; }
+
     //! mcl node
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
     virtual MonteCarloNode* GetVolNode( NodeCollector& NC ) = 0;

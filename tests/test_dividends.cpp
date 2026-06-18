@@ -4,9 +4,10 @@
 using namespace test;
 using doctest::Approx;
 
-// Continuous dividends enter the engine forward (F = S e^{(r-q)T}); repo does
-// not (it only shifts local vol, which is flat here). Only the analytic engine
-// carries q correctly, so these checks use method: ana.
+// Continuous dividends enter the engine forward (F = S e^{(r-q)T}). These checks
+// use method: ana for a clean closed form; the carry yield (dividend + repo) is
+// now consistent across ana / pde / mcl (see test_repo.cpp for the cross-engine
+// check).
 
 namespace
 {

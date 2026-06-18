@@ -26,6 +26,11 @@ class Single : public Asset
     //! diffused path matches the escrowed forward up to the last diffusion date).
     virtual double GetDiffusionSpot( const date& /*LastDate*/ ) const { return _spot; }
 
+    //! continuous carry yield (dividend yield + repo) subtracted from the rate in
+    //! the drift. 0 by default; an equity overrides it. Lets the deterministic
+    //! engines (ANA/PDE) subtract the same div+repo the MCL drift node does.
+    virtual double DividendRepoYield( const date& /*MaturityDate*/ ) const { return 0; }
+
     Volatility* GetVolatility() const;
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;

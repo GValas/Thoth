@@ -179,7 +179,10 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! the same escrowed forward as the analytic and MCL engines.
     s = Ctr->GetUnderlying()->GetDiffusionSpot( maturity );
     v = Ctr->GetUnderlying()->GetImplicitVol( 0, maturity );
-    r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( maturity );
+    //! carry = rate - continuous yield (dividend yield + repo), matching the ANA
+    //! forward and the MCL drift node so the three engines agree
+    r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( maturity ) -
+        Ctr->GetUnderlying()->DividendRepoYield( maturity );
     r_disc = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( maturity );
 
     //! quanto drift correction (payoff currency != underlying currency): the

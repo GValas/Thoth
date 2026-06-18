@@ -48,6 +48,11 @@ double Mono::GetDiffusionSpot( const date& LastDate ) const
     return _single->GetDiffusionSpot( LastDate );
 }
 
+double Mono::DividendRepoYield( const date& MaturityDate ) const
+{
+    return _single->DividendRepoYield( MaturityDate );
+}
+
 CurrencySet Mono::GetCurrencySet() const
 {
     CurrencySet s;
