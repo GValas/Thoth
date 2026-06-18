@@ -1,8 +1,68 @@
 #include "misc.hpp"
+#include <cctype>
 #include <chrono>
+#include <stdexcept>
 #include <unistd.h>
 
-time_t ref_time;
+namespace
+{
+//! strict numeric parse: unlike atof/atoi (which silently return 0 on garbage),
+//! these reject a token that does not fully convert and fail loudly with the
+//! offending text. Trailing whitespace is tolerated; anything else is an error.
+double ParseDouble( const string& tok )
+{
+    size_t pos = 0;
+    double v = 0;
+    try
+    {
+        v = std::stod( tok, &pos );
+    }
+    catch ( const std::invalid_argument& )
+    {
+        ERR( "invalid number '" + tok + "'" );
+    }
+    catch ( const std::out_of_range& )
+    {
+        ERR( "number out of range '" + tok + "'" );
+    }
+    while ( pos < tok.size() && std::isspace( (unsigned char)tok[pos] ) )
+    {
+        pos++;
+    }
+    if ( pos != tok.size() )
+    {
+        ERR( "invalid number '" + tok + "'" );
+    }
+    return v;
+}
+
+int ParseInt( const string& tok )
+{
+    size_t pos = 0;
+    int v = 0;
+    try
+    {
+        v = std::stoi( tok, &pos );
+    }
+    catch ( const std::invalid_argument& )
+    {
+        ERR( "invalid integer '" + tok + "'" );
+    }
+    catch ( const std::out_of_range& )
+    {
+        ERR( "integer out of range '" + tok + "'" );
+    }
+    while ( pos < tok.size() && std::isspace( (unsigned char)tok[pos] ) )
+    {
+        pos++;
+    }
+    if ( pos != tok.size() )
+    {
+        ERR( "invalid integer '" + tok + "'" );
+    }
+    return v;
+}
+} // namespace
 
 vector<string> SplitToString( const string& str,
                               const string& sep )
@@ -28,11 +88,11 @@ vector<double> SplitToDouble( const string& str,
     i = str.find( sep, i );
     while ( i != string::npos )
     {
-        vSplit.push_back( atof( str.substr( j, i - j ).c_str() ) );
+        vSplit.push_back( ParseDouble( str.substr( j, i - j ) ) );
         j = i + 1;
         i = str.find( sep, i + 1 );
     }
-    vSplit.push_back( atof( str.substr( j, str.length() - j ).c_str() ) );
+    vSplit.push_back( ParseDouble( str.substr( j, str.length() - j ) ) );
     return vSplit;
 }
 
@@ -44,11 +104,11 @@ vector<int> SplitToInt( const string& str,
     i = str.find( sep, i );
     while ( i != string::npos )
     {
-        vSplit.push_back( atoi( str.substr( j, i - j ).c_str() ) );
+        vSplit.push_back( ParseInt( str.substr( j, i - j ) ) );
         j = i + 1;
         i = str.find( sep, i + 1 );
     }
-    vSplit.push_back( atoi( str.substr( j, str.length() - j ).c_str() ) );
+    vSplit.push_back( ParseInt( str.substr( j, str.length() - j ) ) );
     return vSplit;
 }
 
@@ -218,13 +278,13 @@ string GetSysInfoVersion()
 string GetSysInfoLastUpdate()
 {
     time_t rawtime;
-    struct tm* timeinfo;
+    struct tm timeinfo;
     char buffer[80];
 
     time( &rawtime );
-    timeinfo = localtime( &rawtime );
+    localtime_r( &rawtime, &timeinfo ); //!< thread-safe (the server prices on worker threads)
 
-    strftime( buffer, 80, "%a, %d-%b-%Y %H:%M:%S", timeinfo );
+    strftime( buffer, 80, "%a, %d-%b-%Y %H:%M:%S", &timeinfo );
     return buffer;
 }
 
