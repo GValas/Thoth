@@ -56,7 +56,7 @@ double Forex::GetLocalVolatility( const double /*Strike*/,
 MonteCarloNode* Forex::GetDriftNode( NodeCollector& NC )
 {
     return NC.GetOrCreate<DriftNode>(
-        _name + "#drift",
+        _name + node_name::DRIFT,
         [&]( DriftNode* D )
         {
             D->SetDomesticRateNode( _currency->GetRateNode( NC ) );

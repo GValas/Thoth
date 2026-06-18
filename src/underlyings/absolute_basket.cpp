@@ -93,7 +93,7 @@ MonteCarloNode* AbsoluteBasket::GetNode( NodeCollector& NC )
 {
     //! sum-product node over the basket underlyings
     return NC.GetOrCreate<AbsoluteBasketNode>(
-        _name + "#spot",
+        _name + node_name::SPOT,
         [&]( AbsoluteBasketNode* E )
         {
             for ( size_t i = 0; i < _underlying_list.size(); i++ )

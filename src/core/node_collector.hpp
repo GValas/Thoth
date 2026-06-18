@@ -131,6 +131,15 @@ class NodeCollector
     MonteCarloNode* GetNode( const string& Name );
     BrownianNode* GetBrownianNode( const string& Name );
 
+    //! typed lookup: the node named Name as a T*, or nullptr if absent / another
+    //! type. Confines the heterogeneous-graph downcast to one place instead of a
+    //! raw dynamic_cast at each call site.
+    template <class T>
+    T* GetTypedNode( const string& Name )
+    {
+        return dynamic_cast<T*>( GetNode( Name ) );
+    }
+
     //! log
     size_t GetNodeNumber();
 

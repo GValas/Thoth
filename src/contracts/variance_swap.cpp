@@ -106,7 +106,7 @@ bool VarianceSwap::IsAmerican()
 MonteCarloNode* VarianceSwap::GetFlowNode( NodeCollector& NC,
                                            const date& /*AsOfDate*/ )
 {
-    return NC.GetOrCreate<VarianceSwapFlowNode>( _name + "#flow",
+    return NC.GetOrCreate<VarianceSwapFlowNode>( _name + node_name::FLOW,
                                                  [&]( VarianceSwapFlowNode* V )
                                                  {
                                                      V->SetSpotNode( GetUnderlyingNode( NC ) );

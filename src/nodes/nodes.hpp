@@ -1,5 +1,6 @@
 #pragma once
 //! aggregates every Monte-Carlo node type
+#include "node_names.hpp"
 #include "barrier_flow_node.hpp"
 #include "book_node.hpp"
 #include "brownian_node.hpp"

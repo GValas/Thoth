@@ -114,7 +114,7 @@ MonteCarloNode* Composite::GetCorrelNode( NodeCollector& NC,
                                           const string& BaseCurrency )
 {
     string node_name = _underlying->GetName() + "_compo_" + _currency->GetName() +
-                       "#" + UnderlyingCurrency + "_" + BaseCurrency + "#correl";
+                       "#" + UnderlyingCurrency + "_" + BaseCurrency + node_name::CORREL;
     return NC.GetOrCreate<CompositeCorrelNode>(
         node_name,
         [&]( CompositeCorrelNode* C )
@@ -139,7 +139,7 @@ MonteCarloNode* Composite::GetCorrelNode( NodeCollector& NC,
 //! mcl node
 MonteCarloNode* Composite::GetVolNode( NodeCollector& NC )
 {
-    string node_name = _underlying->GetName() + "_compo_" + _currency->GetName() + "#vol";
+    string node_name = _underlying->GetName() + "_compo_" + _currency->GetName() + node_name::VOL;
     return NC.GetOrCreate<CompositeVolNode>(
         node_name,
         [&]( CompositeVolNode* V )
@@ -163,7 +163,7 @@ MonteCarloNode* Composite::GetNode( NodeCollector& NC )
     string eq = _underlying->GetName();
     string eq_ccy = _underlying->GetCurrency()->GetName();
     string cpo_ccy = _currency->GetName();
-    string node_name = eq + "_compo_" + cpo_ccy + "#spot";
+    string node_name = eq + "_compo_" + cpo_ccy + node_name::SPOT;
 
     if ( !( N = NC.GetNode( node_name ) ) )
     {

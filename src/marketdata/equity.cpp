@@ -116,7 +116,7 @@ MonteCarloNode* Equity::GetDriftNode( NodeCollector& NC )
     //! mutualised with the base tree unless the scenario bumps rates (rho)
     if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
     {
-        return NC.GetOrCreateShared<DriftNode>( _name + "#drift", init );
+        return NC.GetOrCreateShared<DriftNode>( _name + node_name::DRIFT, init );
     }
-    return NC.GetOrCreate<DriftNode>( _name + "#drift", init );
+    return NC.GetOrCreate<DriftNode>( _name + node_name::DRIFT, init );
 }

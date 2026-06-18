@@ -40,7 +40,7 @@ MonteCarloNode* Currency::GetRateNode( NodeCollector& NC )
     //! mutualise with the base tree unless the current Greek scenario bumps rates
     if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
     {
-        return NC.GetOrCreateShared<ConstantNode>( _name + "#rate", init );
+        return NC.GetOrCreateShared<ConstantNode>( _name + node_name::RATE, init );
     }
-    return NC.GetOrCreate<ConstantNode>( _name + "#rate", init );
+    return NC.GetOrCreate<ConstantNode>( _name + node_name::RATE, init );
 }

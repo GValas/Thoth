@@ -66,8 +66,8 @@ MonteCarloNode* Contract::GetUnderlyingNode( NodeCollector& NC )
     //! misc
     string udl_ccy = _underlying->GetCurrency()->GetName();
     string ctr_ccy = _premium_currency->GetName();
-    string node_name = _underlying->GetName() + "#spot";
-    node_name += ( udl_ccy != ctr_ccy ) ? "#quanto_" + ctr_ccy : "";
+    string node_name = _underlying->GetName() + node_name::SPOT;
+    node_name += ( udl_ccy != ctr_ccy ) ? node_name::QUANTO_PREFIX + ctr_ccy : "";
 
     //! non-quanto : the bare spot node
     if ( udl_ccy == ctr_ccy )

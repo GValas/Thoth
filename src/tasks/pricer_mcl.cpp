@@ -353,11 +353,11 @@ void PricerMCL::CorrelateBrownianNodes()
         {
 
             //! brownian exist at this date, for this underlying
-            if ( BrownianNode* B = _collector.GetBrownianNode( ( *u )->GetName() + "#brownian" ) )
+            if ( BrownianNode* B = _collector.GetBrownianNode( ( *u )->GetName() + node_name::BROWNIAN ) )
             {
 
                 //! noise = sum product correl/white_noise
-                string node_name = ( *u )->GetName() + "#noise";
+                string node_name = ( *u )->GetName() + node_name::NOISE;
                 CorrelatedNoiseNode* correlated_noise_node = _collector.NewNode<CorrelatedNoiseNode>( node_name );
 
                 //! link to other white_noises
@@ -369,7 +369,7 @@ void PricerMCL::CorrelateBrownianNodes()
                     double x = _correlation->GetCholeskyValue( ( *u )->GetName(), ( *v )->GetName() );
                     if ( x != 0 )
                     {
-                        MonteCarloNode* n = _collector.GetNode( ( *v )->GetName() + "#white_noise" );
+                        MonteCarloNode* n = _collector.GetNode( ( *v )->GetName() + node_name::WHITE_NOISE );
                         MonteCarloNode* c = _correlation->GetCholeskyNode( _collector,
                                                                            ( *u )->GetName(),
                                                                            ( *v )->GetName() ); // constant correlation
@@ -399,7 +399,7 @@ void PricerMCL::CreateBrownianNodes()
           u++ )
     {
         //! noise
-        string node_name = ( *u )->GetName() + "#white_noise";
+        string node_name = ( *u )->GetName() + node_name::WHITE_NOISE;
         NoiseNode* N = _collector.NewNode<NoiseNode>( node_name );
         N->SetRandomGenerator( &_rng );
 
@@ -408,7 +408,7 @@ void PricerMCL::CreateBrownianNodes()
         //! underlying would leave it orphaned (unused node, dead in the DAG/graph).
         if ( !( *u )->GetVolatility()->IsStochastic() )
         {
-            node_name = ( *u )->GetName() + "#brownian";
+            node_name = ( *u )->GetName() + node_name::BROWNIAN;
             BrownianNode* B = _collector.NewBrownianNode( node_name );
             B->SetNoiseNode( N );
         }
@@ -417,7 +417,7 @@ void PricerMCL::CreateBrownianNodes()
         //! for the variance process (pseudo-random; Sobol stays on the spot noise)
         if ( ( *u )->GetVolatility()->IsStochastic() )
         {
-            NoiseNode* VN = _collector.NewNode<NoiseNode>( ( *u )->GetName() + "#vol_white_noise" );
+            NoiseNode* VN = _collector.NewNode<NoiseNode>( ( *u )->GetName() + node_name::VOL_WHITE_NOISE );
             VN->SetRandomGenerator( &_rng );
 
             //! Bates : an independent compound-Poisson jump source (only created
@@ -425,7 +425,7 @@ void PricerMCL::CreateBrownianNodes()
             const StochasticVolParams h = ( *u )->GetVolatility()->StochasticParams();
             if ( h.has_jumps() )
             {
-                JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + "#jump_noise" );
+                JumpNode* JN = _collector.NewNode<JumpNode>( ( *u )->GetName() + node_name::JUMP_NOISE );
                 JN->SetRandomGenerator( &_rng );
                 JN->SetJumpParameters( h.jump_intensity, h.jump_mean, h.jump_vol );
             }
@@ -461,7 +461,7 @@ void PricerMCL::SetupQuasiRandom()
     int f = 0;
     for ( Single* s : _single_set )
     {
-        if ( NoiseNode* nn = dynamic_cast<NoiseNode*>( _collector.GetNode( s->GetName() + "#white_noise" ) ) )
+        if ( NoiseNode* nn = _collector.GetTypedNode<NoiseNode>( s->GetName() + node_name::WHITE_NOISE ) )
         {
             nn->SetNoiseBuffer( _path_generator->Buffer( f ) );
         }

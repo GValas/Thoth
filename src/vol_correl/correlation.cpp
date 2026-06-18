@@ -498,7 +498,7 @@ MonteCarloNode* Correlation::GetCorrelNode( NodeCollector& NC,
                                             const string& Underlying )
 {
     return NC.GetOrCreate<ConstantNode>(
-        UnderlyingCurrency + "_" + BaseCurrency + "#" + Underlying + "#correl",
+        UnderlyingCurrency + "_" + BaseCurrency + "#" + Underlying + node_name::CORREL,
         [&]( ConstantNode* C )
         { C->SetConstantValue( GetValue( UnderlyingCurrency, BaseCurrency, Underlying ) ); } );
 }
@@ -508,7 +508,7 @@ MonteCarloNode* Correlation::GetFxNode( NodeCollector& NC,
                                         const string& BaseCurrency )
 {
     MonteCarloNode* N;
-    string node_name = UnderlyingCurrency + "_" + BaseCurrency + "#quanto_" + BaseCurrency + "#spot";
+    string node_name = UnderlyingCurrency + "_" + BaseCurrency + node_name::QUANTO_PREFIX + BaseCurrency + node_name::SPOT;
     if ( !( N = NC.GetNode( node_name ) ) )
     {
         // AB = AI * IB
@@ -553,7 +553,7 @@ MonteCarloNode* Correlation::GetCorrelNode( NodeCollector& NC,
 {
     return NC.GetOrCreate<ConstantNode>(
         UnderlyingCurrency1 + "_" + BaseCurrency1 + "#" +
-            UnderlyingCurrency2 + "_" + BaseCurrency2 + "#correl",
+            UnderlyingCurrency2 + "_" + BaseCurrency2 + node_name::CORREL,
         [&]( ConstantNode* C )
         {
             C->SetConstantValue( GetValue( UnderlyingCurrency1,
@@ -569,7 +569,7 @@ MonteCarloNode* Correlation::GetCholeskyNode( NodeCollector& NC,
                                               const string& Underlying2 )
 {
     return NC.GetOrCreate<ConstantNode>(
-        Underlying1 + "#" + Underlying2 + "#cholesky",
+        Underlying1 + "#" + Underlying2 + node_name::CHOLESKY,
         [&]( ConstantNode* C )
         { C->SetConstantValue( GetCholeskyValue( Underlying1, Underlying2 ) ); } );
 }
@@ -579,7 +579,7 @@ MonteCarloNode* Correlation::GetFxVolNode( NodeCollector& NC,
                                            const string& BaseCurrency )
 {
     return NC.GetOrCreate<ConstantNode>(
-        UnderlyingCurrency + "_" + BaseCurrency + "#vol",
+        UnderlyingCurrency + "_" + BaseCurrency + node_name::VOL,
         [&]( ConstantNode* C )
         { C->SetConstantValue( GetFxVol( UnderlyingCurrency, BaseCurrency ) ); } );
 }

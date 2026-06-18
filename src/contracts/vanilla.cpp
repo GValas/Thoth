@@ -178,7 +178,7 @@ MonteCarloNode* Vanilla::GetFlowNode( NodeCollector& NC,
                                       const date& /*AsOfDate*/ )
 {
 
-    return NC.GetOrCreate<VanillaFlowNode>( _name + "#flow",
+    return NC.GetOrCreate<VanillaFlowNode>( _name + node_name::FLOW,
                                             [&]( VanillaFlowNode* C )
                                             {
                                                 C->SetFloor( 0 );

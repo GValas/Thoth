@@ -1,0 +1,32 @@
+#pragma once
+
+//! Monte-Carlo node-name suffixes.
+//!
+//! Every node in the graph is keyed by a string name, almost always
+//! "<object-name><suffix>" (e.g. "eq#spot"). The suffix is the *role* of the node
+//! for that object. These were scattered string literals, so a builder and a
+//! consumer had to spell the same "#white_noise" by hand — a typo produced a
+//! silent null child at lookup, not a compile error. Centralising them here makes
+//! the construction site and the lookup site share one symbol, and a typo a
+//! compile error. The collector still keys by the resulting string; this only
+//! formalises how that string is spelled.
+namespace node_name
+{
+inline constexpr char SPOT[] = "#spot";                       //!< the diffused spot
+inline constexpr char BROWNIAN[] = "#brownian";               //!< correlated Brownian increment
+inline constexpr char WHITE_NOISE[] = "#white_noise";         //!< independent Gaussian (spot)
+inline constexpr char VOL_WHITE_NOISE[] = "#vol_white_noise"; //!< independent Gaussian (variance)
+inline constexpr char JUMP_NOISE[] = "#jump_noise";           //!< Bates compound-Poisson jump
+inline constexpr char NOISE[] = "#noise";                     //!< generic noise source
+inline constexpr char VARIANCE[] = "#variance";               //!< Heston variance process
+inline constexpr char DRIFT[] = "#drift";                     //!< risk-neutral drift
+inline constexpr char VOL[] = "#vol";                         //!< scalar (constant) vol
+inline constexpr char ATM_VOL[] = "#atmvol";                  //!< representative ATM vol (local-vol surfaces)
+inline constexpr char LOCAL_VOL[] = "#localvol";              //!< Dupire local-vol grid
+inline constexpr char CORREL[] = "#correl";                   //!< correlation node
+inline constexpr char FLOW[] = "#flow";                       //!< contract payoff / flow
+inline constexpr char RATE[] = "#rate";                       //!< short-rate / discount node
+inline constexpr char FX[] = "#fx";                           //!< FX rate node
+inline constexpr char CHOLESKY[] = "#cholesky";               //!< Cholesky-correlated factor
+inline constexpr char QUANTO_PREFIX[] = "#quanto_";           //!< prefix: "#quanto_<ccy>" (quanto-adjusted spot)
+} // namespace node_name

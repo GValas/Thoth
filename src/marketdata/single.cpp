@@ -56,40 +56,40 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
 
 {
     //! stochastic vol (Heston): a dedicated variance + spot diffusion (Andersen
-    //! QE) instead of the constant-vol GBM step. Reuses the shared "#white_noise"
-    //! for the spot's independent Gaussian and "#vol_white_noise" for the variance.
+    //! QE) instead of the constant-vol GBM step. Reuses the shared node_name::WHITE_NOISE
+    //! for the spot's independent Gaussian and node_name::VOL_WHITE_NOISE for the variance.
     if ( _volatility->IsStochastic() )
     {
         const StochasticVolParams h = _volatility->StochasticParams();
         MonteCarloNode* var = NC.GetOrCreate<HestonVarianceNode>(
-            _name + "#variance",
+            _name + node_name::VARIANCE,
             [&]( HestonVarianceNode* V )
             {
                 V->SetParameters( h.v0, h.kappa, h.theta, h.xi );
-                V->SetNoiseNode( NC.GetNode( _name + "#vol_white_noise" ) );
+                V->SetNoiseNode( NC.GetNode( _name + node_name::VOL_WHITE_NOISE ) );
             } );
         return NC.GetOrCreate<HestonSpotNode>(
-            _name + "#spot",
+            _name + node_name::SPOT,
             [&]( HestonSpotNode* S )
             {
                 S->SetParameters( h.kappa, h.theta, h.xi, h.rho );
                 S->SetVarianceNode( var );
                 S->SetDriftNode( GetDriftNode( NC ) );
-                S->SetNoiseNode( NC.GetNode( _name + "#white_noise" ) );
+                S->SetNoiseNode( NC.GetNode( _name + node_name::WHITE_NOISE ) );
                 //! Bates : wire the jump source if this stochastic vol carries jumps
                 if ( h.has_jumps() )
                 {
-                    S->SetJumpNode( NC.GetNode( _name + "#jump_noise" ) );
+                    S->SetJumpNode( NC.GetNode( _name + node_name::JUMP_NOISE ) );
                 }
                 S->SetSpot( _spot );
             } );
     }
 
     return NC.GetOrCreate<SpotDiffusionNode>(
-        _name + "#spot",
+        _name + node_name::SPOT,
         [&]( SpotDiffusionNode* S )
         {
-            S->SetBrownianNode( NC.GetNode( _name + "#brownian" ) );
+            S->SetBrownianNode( NC.GetNode( _name + node_name::BROWNIAN ) );
             S->SetDriftNode( GetDriftNode( NC ) );
             S->SetSpot( _spot );
             //! local-vol surface (e.g. SABR): sample the Dupire surface onto a
@@ -123,7 +123,7 @@ MonteCarloNode* Single::GetVolNode( NodeCollector& NC )
     {
         const vector<date>& dates = NC.GetDateList();
         double atm = GetImplicitVol( 0, dates.back() );
-        return NC.GetOrCreate<ConstantNode>( _name + "#atmvol",
+        return NC.GetOrCreate<ConstantNode>( _name + node_name::ATM_VOL,
                                              [&]( ConstantNode* C )
                                              { C->SetConstantValue( atm ); } );
     }
@@ -140,7 +140,7 @@ static constexpr int LOCAL_VOL_GRID_POINTS = 201;
 LocalVolatilityNode* Single::BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode )
 {
     return static_cast<LocalVolatilityNode*>( NC.GetOrCreate<LocalVolatilityNode>(
-        _name + "#localvol",
+        _name + node_name::LOCAL_VOL,
         [&]( LocalVolatilityNode* L )
         {
             L->SetSpotNode( SpotNode );

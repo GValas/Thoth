@@ -26,7 +26,7 @@ double Rainbow::GetSpot() const
 MonteCarloNode* Rainbow::GetNode( NodeCollector& NC )
 {
     return NC.GetOrCreate<RainbowNode>(
-        _name + "#spot",
+        _name + node_name::SPOT,
         [&]( RainbowNode* R )
         {
             R->SetBest( _type == RainbowType::BestOf );

@@ -216,7 +216,7 @@ MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
 {
 
     return NC.GetOrCreate<BarrierFlowNode>(
-        _name + "#flow",
+        _name + node_name::FLOW,
         [&]( BarrierFlowNode* C )
         {
             C->SetFloor( 0 );
