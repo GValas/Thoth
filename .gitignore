@@ -18,3 +18,7 @@ TODO.md
 # coverage build (gcov)
 build-cov/
 *.gcov
+
+# Generated node-graph artifacts (run_local_graph.sh)
+samples/*_nodes.dot
+samples/*_nodes.png
