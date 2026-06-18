@@ -48,6 +48,7 @@
     "!yield_curve mapping",
     "!repo_curve mapping",
     "!continuous_dividends_curve mapping",
+    "!discrete_dividends mapping",
     "!bs_volatility mapping",
     "!sabr_volatility mapping",
     "!heston_volatility mapping",
