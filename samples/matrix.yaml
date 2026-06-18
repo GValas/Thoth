@@ -20,6 +20,8 @@ root: matrix
 #   vanilla mono am put heston (stoch vol)  mcl   pde   (American under Heston: ADI / QE+LSM)
 #   vanilla mono am put quanto              mcl   pde
 #   vanilla mono eu call                    ana   mcl   pde
+#   vanilla mono eu call discrete-div       ana   mcl   pde (escrowed cash dividends)
+#   vanilla mono us put discrete-div        mcl   pde     (american, escrowed cash divs)
 #   vanilla mono eu call (pseudo-random)    mcl         (use_sobol: false, vs the Sobol row)
 #   vanilla mono eu call (gpu)              mcl         (allow_gpu: true; device on a CUDA build, else CPU)
 #   vanilla mono eu put                     ana   mcl   pde
@@ -79,6 +81,12 @@ matrix: !sequence
     - vanilla_mono_eu_call_mcl
     - vanilla_mono_eu_call_mcl_gpu
     - vanilla_mono_eu_call_pde
+    #! discrete cash dividends (escrowed model) — EU call + US (american) put
+    - vanilla_mono_eu_call_div_ana
+    - vanilla_mono_eu_call_div_mcl
+    - vanilla_mono_eu_call_div_pde
+    - vanilla_mono_am_put_div_mcl
+    - vanilla_mono_am_put_div_pde
     - vanilla_mono_eu_call_bates_ana
     - vanilla_mono_eu_call_bates_mcl
     - vanilla_mono_eu_call_bates_pde
@@ -161,6 +169,51 @@ vanilla_mono_eu_call_ana: !pricer
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: vanilla_mono_eu_call_ana_result
+
+# discrete cash dividends (escrowed-dividend model): the same EUR equity but with
+# an annual 3.0 cash dividend over the 5y life (underlying eq_div -> divs schedule).
+# EU call priced ana/mcl/pde, US (american) put priced mcl/pde — all three engines
+# share the one escrowed forward, so they agree.
+vanilla_mono_eu_call_div_ana: !pricer
+  today: 2000-01-01
+  book: book_van_eu_div
+  currency: eur
+  configuration: cfg_ana
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_div_ana_result
+vanilla_mono_eu_call_div_mcl: !pricer
+  today: 2000-01-01
+  book: book_van_eu_div
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_div_mcl_result
+vanilla_mono_eu_call_div_pde: !pricer
+  today: 2000-01-01
+  book: book_van_eu_div
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_div_pde_result
+vanilla_mono_am_put_div_mcl: !pricer
+  today: 2000-01-01
+  book: book_van_am_div
+  currency: eur
+  configuration: cfg_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_am_put_div_mcl_result
+vanilla_mono_am_put_div_pde: !pricer
+  today: 2000-01-01
+  book: book_van_am_div
+  currency: eur
+  configuration: cfg_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_am_put_div_pde_result
 
 # quanto european vanilla (EUR asset, USD premium) — PDE, MCL and ANA agree
 vanilla_mono_eu_call_quanto_pde: !pricer
@@ -767,6 +820,10 @@ book_van_eu: !book
   options: [c_van_eu]
 book_van_am: !book
   options: [c_van_am]
+book_van_eu_div: !book
+  options: [c_van_eu_div]
+book_van_am_div: !book
+  options: [c_van_am_div]
 book_barr_cont: !book
   options: [c_barr_cont]
 book_barr_disc: !book
@@ -825,6 +882,20 @@ c_van_eu: !vanilla
 
 c_van_am: !vanilla
   underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2004-12-31
+  type: put
+  exercise: american
+c_van_eu_div: !vanilla
+  underlying: eq_div
+  premium_currency: eur
+  strike: 100
+  maturity: 2004-12-31
+  type: call
+  exercise: european
+c_van_am_div: !vanilla
+  underlying: eq_div
   premium_currency: eur
   strike: 100
   maturity: 2004-12-31
@@ -1034,6 +1105,15 @@ eq: !equity
   spot: 100
   volatility: vol
   currency: eur
+# the same EUR equity carrying an annual 3.0 cash dividend (escrowed-dividend model)
+eq_div: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+  discrete_dividends: divs
+divs: !discrete_dividends
+  dates: [2000-12-31, 2001-12-31, 2002-12-31, 2003-12-31, 2004-12-31]
+  amounts: [3.0, 3.0, 3.0, 3.0, 3.0]
 # composite view of eq: the EUR asset settled in USD (uses eur/usd + the shared correl)
 comp: !composite
   equity: eq
