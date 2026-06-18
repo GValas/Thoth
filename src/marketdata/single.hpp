@@ -31,6 +31,11 @@ class Single : public Asset
     //! engines (ANA/PDE) subtract the same div+repo the MCL drift node does.
     virtual double DividendRepoYield( const date& /*MaturityDate*/ ) const { return 0; }
 
+    //! escrowed-dividend model: PV (as of AsOf) of the discrete cash dividends due
+    //! after AsOf. 0 by default; an equity with discrete dividends overrides it. Lets
+    //! the PDE recover the observed spot (escrowed value + this) for early exercise.
+    virtual double FutureDividendPv( const date& /*AsOf*/ ) const { return 0; }
+
     Volatility* GetVolatility() const;
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;

@@ -39,6 +39,11 @@ class Equity : public Single
     //! continuous dividend yield + repo spread (the carry yield)
     double DividendRepoYield( const date& MaturityDate ) const override;
 
+    //! escrowed-dividend model: PV (as of AsOf) of the discrete cash dividends due
+    //! after AsOf, on this equity's curve (matches the MCL escrow node). Added to the
+    //! escrowed grid value to recover the observed spot for PDE early exercise.
+    double FutureDividendPv( const date& AsOf ) const override;
+
     //! local vol
     bool UseLocalVol();
 

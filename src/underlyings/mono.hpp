@@ -22,6 +22,7 @@ class Mono : public Underlying
     double GetSpot() const override;
     double GetDiffusionSpot( const date& LastDate ) const override;      //!< escrowed spot of the wrapped single
     double DividendRepoYield( const date& MaturityDate ) const override; //!< div+repo of the wrapped single
+    double FutureDividendPv( const date& AsOf ) const override;          //!< future-dividend PV of the wrapped single
 
     //! a single-asset underlying: griddable and the canonical mono shape
     bool IsGriddable() const override { return true; }

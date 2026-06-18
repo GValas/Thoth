@@ -121,6 +121,20 @@ class PricerPDE : public Pricer
     //! zero a solved layer in the knocked region (used at each monitoring step)
     void ApplyDiscreteBarrier( la_vector* U );
 
+    //! escrowed-dividend model: future-dividend PV at each grid time step (size
+    //! N+1, indexed by step i at year-fraction i*k). The grid diffuses the escrowed
+    //! value X, so the observed spot at step i is X + _future_pv[i]; the American
+    //! early-exercise test uses that observed spot (matching the MCL engine). Empty
+    //! when the underlying carries no discrete dividends.
+    vector<double> _future_pv;
+
+    //! observed spot at grid step i for an escrowed grid value X (adds the
+    //! future-dividend PV; == X when there are no discrete dividends)
+    double ObservedSpot( double X, int Step ) const
+    {
+        return ( Step >= 0 && Step < (int)_future_pv.size() ) ? X + _future_pv[Step] : X;
+    }
+
     //! init & solve. ApplyBarrier turns on barrier handling: a Dirichlet clamp
     //! for continuous monitoring, or the discrete-step zeroing set up here.
     void InitGrid( Contract*, bool ApplyBarrier );

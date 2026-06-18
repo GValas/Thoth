@@ -70,6 +70,32 @@ double Equity::GetDiffusionSpot( const date& LastDate ) const
     return _spot - DiscreteDividendsPv( LastDate );
 }
 
+//! escrowed-dividend model: future-dividend PV as of AsOf — sum over ex-dates d
+//! strictly after AsOf of amount * DF(d) / DF(AsOf), on this equity's currency
+//! curve. Identical to the per-date value the MCL DividendNode publishes, so the
+//! PDE can add it to the escrowed grid value to recover the observed spot.
+double Equity::FutureDividendPv( const date& AsOf ) const
+{
+    if ( !_discrete_dividends )
+    {
+        return 0;
+    }
+    const vector<date>& dates = _discrete_dividends->GetDates();
+    const vector<double>& amounts = _discrete_dividends->GetAmounts();
+    YieldCurve* rate = Asset::_currency->GetRate();
+    const double df_asof = rate->GetDiscountFactor( AsOf );
+
+    double pv = 0;
+    for ( size_t i = 0; i < dates.size() && i < amounts.size(); i++ )
+    {
+        if ( dates[i] > AsOf )
+        {
+            pv += amounts[i] * rate->GetDiscountFactor( dates[i] );
+        }
+    }
+    return ( df_asof > 0 ) ? pv / df_asof : pv;
+}
+
 //! getter
 double Equity::GetSpot() const
 {

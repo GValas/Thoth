@@ -58,6 +58,12 @@ class Underlying : public Asset
     //! rate; 0 by default, a mono equity returns its single's div+repo.
     [[nodiscard]] virtual double DividendRepoYield( const date& /*MaturityDate*/ ) const { return 0; }
 
+    //! escrowed-dividend model: PV (as of AsOf) of the discrete cash dividends with
+    //! ex-date after AsOf. Added to the escrowed grid value to recover the observed
+    //! spot for the PDE early-exercise test (matching the MCL dividend node). 0 by
+    //! default; a mono equity returns its single's future-dividend PV.
+    [[nodiscard]] virtual double FutureDividendPv( const date& /*AsOf*/ ) const { return 0; }
+
     //! mcl node
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
     virtual MonteCarloNode* GetVolNode( NodeCollector& NC ) = 0;

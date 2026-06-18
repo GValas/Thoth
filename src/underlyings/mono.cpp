@@ -53,6 +53,11 @@ double Mono::DividendRepoYield( const date& MaturityDate ) const
     return _single->DividendRepoYield( MaturityDate );
 }
 
+double Mono::FutureDividendPv( const date& AsOf ) const
+{
+    return _single->FutureDividendPv( AsOf );
+}
+
 CurrencySet Mono::GetCurrencySet() const
 {
     CurrencySet s;

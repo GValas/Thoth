@@ -20,8 +20,8 @@ root: matrix
 #   vanilla mono am put heston (stoch vol)  mcl   pde   (American under Heston: ADI / QE+LSM)
 #   vanilla mono am put quanto              mcl   pde
 #   vanilla mono eu call                    ana   mcl   pde
-#   vanilla mono eu call discrete-div       ana   mcl   pde (escrowed cash dividends)
-#   vanilla mono us put discrete-div        mcl   pde     (american, escrowed cash divs)
+#   vanilla mono eu call discrete-div+repo  ana   mcl   pde (escrowed cash divs + repo carry)
+#   vanilla mono us put discrete-div+repo   mcl   pde     (american, escrowed cash divs + repo)
 #   vanilla mono eu call (pseudo-random)    mcl         (use_sobol: false, vs the Sobol row)
 #   vanilla mono eu call (gpu)              mcl         (allow_gpu: true; device on a CUDA build, else CPU)
 #   vanilla mono eu put                     ana   mcl   pde
@@ -1111,9 +1111,15 @@ eq_div: !equity
   volatility: vol
   currency: eur
   discrete_dividends: divs
+  repo: repo_div
 divs: !discrete_dividends
   dates: [2000-12-31, 2001-12-31, 2002-12-31, 2003-12-31, 2004-12-31]
   amounts: [3.0, 3.0, 3.0, 3.0, 3.0]
+# 1% repo spread (a continuous carry yield); the MCL drift node subtracts the repo
+# node, the ANA forward and the PDE carry subtract the same yield -> engines agree
+repo_div: !repo_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [1.0, 1.0]
 # composite view of eq: the EUR asset settled in USD (uses eur/usd + the shared correl)
 comp: !composite
   equity: eq

@@ -128,7 +128,10 @@ the ANA cells. A parameter no underlying's surface exposes is silently skipped.
   `discrete_dividends` is an (ex-`dates`, cash `amounts`) schedule on an equity,
   priced by the **escrowed-dividend model**: the forward (and the MCL diffusion
   spot) net the present value of the dividends due before maturity off the spot,
-  so the ANA, PDE and MCL engines all price the same escrowed forward.
+  so the ANA, PDE and MCL engines all price the same escrowed forward. American
+  early exercise tests the payoff against the **observed spot** (escrowed value +
+  the PV of the still-future dividends), not the dividend-stripped escrowed value,
+  so the PDE and MCL American prices agree on dividend-paying equities.
 - Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
   (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
   and `heston_volatility` (genuine stochastic vol — see below).

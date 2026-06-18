@@ -275,6 +275,24 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     u_up = V_up;
     u_dw = V_dw;
 
+    //! escrowed-dividend model: precompute the future-dividend PV at each grid time
+    //! step so the American early-exercise test can recover the observed spot
+    //! (escrowed value + PV) instead of testing on the escrowed value alone, which
+    //! would over-value the option. Step i is at year-fraction i*k from today;
+    //! map it to a calendar date (ACT/365) to read the curve. Left empty (no-op in
+    //! ObservedSpot) when the underlying carries no discrete dividends.
+    _future_pv.clear();
+    Underlying* udl = Ctr->GetUnderlying();
+    if ( is_american && udl->FutureDividendPv( _today ) != 0 )
+    {
+        _future_pv.resize( N + 1 );
+        for ( int i = 0; i <= N; i++ )
+        {
+            long days = lround( (double)i * k * NB_OF_DAYS_A_YEAR );
+            _future_pv[i] = udl->FutureDividendPv( _today + boost::gregorian::days( days ) );
+        }
+    }
+
     //! discrete monitoring : map each scheduled date to the nearest time step
     //! (step i is at year-fraction i*k from today). The knocked region is zeroed
     //! at these steps in SolveGrid.
@@ -366,12 +384,14 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         // solving system
         SolveTridiagonal( diag_m, diag_u, diag_d, D_1, U_0 );
 
-        // american mode : max(intrinsec value, expected value)
+        // american mode : max(intrinsec value, expected value). The grid value
+        // Phi(k*h) is the escrowed spot; exercise is against the OBSERVED spot
+        // (escrowed + future-dividend PV at this step i), matching the MCL engine.
         if ( is_american )
         {
             for ( int k = 0; k < J + 1; k++ )
             {
-                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( Phi( k * h ) ) );
+                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( ObservedSpot( Phi( k * h ), i ) ) );
             }
         }
 
