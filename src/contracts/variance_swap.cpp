@@ -51,12 +51,15 @@ void VarianceSwap::ANA_EvalPrice()
     double fwd = _underlying->GetForward( _maturity_date, _premium_currency );
 
     //! build the strike grid (+/- span ATM std devs around the forward) and sample
-    //! the implied-vol surface at each strike, then integrate the strip in finance.cpp
+    //! the implied-vol surface at each strike, then integrate the strip in finance.cpp.
+    //! The grid is uniform in LOG-strike (geometric spacing): the 1/K^2 replication
+    //! weight and the lognormal density both decay geometrically, so a log grid puts
+    //! its resolution where the integrand has mass (near the forward) instead of
+    //! wasting points in the far upper wing a linear-K grid over-samples — tighter
+    //! integration for the same point count, and strikes stay strictly positive.
     double sigma_atm = _underlying->GetImplicitVol( fwd, _maturity_date );
     double span = VARSWAP_STRIP_SIGMA_SPAN * sigma_atm * sqrt( t );
-    double k_lo = fwd * exp( -span );
-    double k_hi = fwd * exp( span );
-    double dk = ( k_hi - k_lo ) / VARSWAP_STRIP_POINTS;
+    double dlogk = 2.0 * span / VARSWAP_STRIP_POINTS;
 
     vector<double> strikes;
     vector<double> vols;
@@ -64,11 +67,7 @@ void VarianceSwap::ANA_EvalPrice()
     vols.reserve( VARSWAP_STRIP_POINTS + 1 );
     for ( int i = 0; i <= VARSWAP_STRIP_POINTS; i++ )
     {
-        double k = k_lo + i * dk;
-        if ( k <= 0 )
-        {
-            continue;
-        }
+        double k = fwd * exp( -span + i * dlogk );
         strikes.push_back( k );
         vols.push_back( _underlying->GetImplicitVol( k, _maturity_date ) );
     }

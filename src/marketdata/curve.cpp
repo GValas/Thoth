@@ -58,13 +58,14 @@ double Curve::GetCurveValue( const date& MaturityDate ) const
     return r + _curve_shift;
 }
 
-//! MCL drives a single constant rate over the whole diffusion (no term structure
-//! on the simulation path yet): use the front-pillar rate, matching the historical
-//! flat behaviour. Term-structured MCL paths are a separate, larger change.
+//! Term-structured rate leg for the MCL drift: a YieldCurveNode that samples this
+//! curve's zero rate at every diffusion date, so the simulated drift follows the
+//! whole curve instead of a single front-pillar rate. For a flat curve every zero
+//! rate equals the flat rate, so the behaviour is unchanged there.
 MonteCarloNode* Curve::GetNode( NodeCollector& NC )
 {
 
-    return NC.GetOrCreate<ConstantNode>( _name,
-                                         [&]( ConstantNode* Y )
-                                         { Y->SetConstantValue( GetCurveValue( _date_list.front() ) ); } );
+    return NC.GetOrCreate<YieldCurveNode>( _name,
+                                           [&]( YieldCurveNode* Y )
+                                           { Y->SetCurve( this ); } );
 }

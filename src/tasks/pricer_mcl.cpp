@@ -2,6 +2,7 @@
 #include "pricer_mcl.hpp"
 #include "cancellation.hpp"
 #include "contract.hpp"
+#include "vanilla.hpp"
 #include "mcl_gpu.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
@@ -896,9 +897,13 @@ void PricerMCL::PriceAmerican()
 
 //! Fit a Longstaff-Schwartz exercise policy on the recorded base paths. Backward
 //! induction over the exercise grid; at each interior date the continuation value
-//! of the in-the-money paths is regressed on { 1, m, m^2 } (m = S/S0) and the
-//! per-date coefficients are stored. The fitted continuation also drives the
-//! cashflow roll-back so earlier dates regress against the realised policy value.
+//! of the in-the-money paths is regressed on { 1, m, m^2 } (m = S/K, the moneyness
+//! normalised by the STRIKE) and the per-date coefficients are stored. Normalising
+//! by the strike — where the early-exercise boundary sits — keeps the regressor
+//! O(1) around the decision region and better-conditions the { 1, m, m^2 } fit than
+//! S/S0 would for deep in/out-of-the-money initial spots. The fitted continuation
+//! also drives the cashflow roll-back so earlier dates regress against the realised
+//! policy value.
 PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
                                                         const la_matrix* Paths,
                                                         const vector<double>& Tau,
@@ -916,9 +921,18 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
     //! continuation values, so demand several observations per basis function.
     constexpr size_t MIN_ITM_FOR_REGRESSION = 50;
 
-    size_t N = Paths->size1;               //!< paths
-    size_t M = Paths->size2;               //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
-    pol.s0 = la_matrix_get( Paths, 0, 0 ); //!< initial spot (constant across base paths)
+    size_t N = Paths->size1; //!< paths
+    size_t M = Paths->size2; //!< columns: tau[0]=0 (today) .. tau[M-1]=maturity
+    //! moneyness normaliser: the strike (the exercise boundary sits near it) for a
+    //! vanilla, falling back to the base-path initial spot for any other contract
+    pol.basis_norm = la_matrix_get( Paths, 0, 0 ); //!< initial spot (fallback)
+    if ( Vanilla* van = dynamic_cast<Vanilla*>( Contract ) )
+    {
+        if ( van->GetStrike() > 0 )
+        {
+            pol.basis_norm = van->GetStrike();
+        }
+    }
     pol.tau = Tau;
     pol.b0.assign( M, 0.0 );
     pol.b1.assign( M, 0.0 );
@@ -968,7 +982,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
         LaVector y = la_vector_alloc( ni );
         for ( size_t k = 0; k < ni; k++ )
         {
-            double m = la_matrix_get( Paths, itm[k], t ) / pol.s0;
+            double m = la_matrix_get( Paths, itm[k], t ) / pol.basis_norm;
             la_matrix_set( X, k, 0, 1.0 );
             la_matrix_set( X, k, 1, m );
             la_matrix_set( X, k, 2, m * m );
@@ -988,7 +1002,7 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
         for ( size_t p : itm )
         {
             double s = la_matrix_get( Paths, p, t );
-            double m = s / pol.s0;
+            double m = s / pol.basis_norm;
             double continuation = pol.b0[t] + pol.b1[t] * m + pol.b2[t] * m * m;
             double intrinsic = Contract->Intrinsic( s );
             if ( intrinsic >= continuation )
@@ -1007,7 +1021,8 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
 //! frozen continuation estimate, otherwise take the maturity payoff. Returns the
 //! discounted MC mean (vs immediate exercise at the path-set's initial spot).
 //! Rate is the scenario's discount rate (bumped for rho); the moneyness is always
-//! normalised by the policy's base s0 so the frozen boundary stays comparable.
+//! normalised by the policy's basis_norm (the strike) so the frozen boundary stays
+//! comparable across the base and bumped path sets.
 double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
                                        const la_matrix* Paths,
                                        const vector<double>& Tau,
@@ -1042,7 +1057,7 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
             //! interior date : exercise when intrinsic beats the frozen continuation
             if ( intrinsic > 0 && Policy.has_fit[t] )
             {
-                double m = s / Policy.s0;
+                double m = s / Policy.basis_norm;
                 double continuation = Policy.b0[t] + Policy.b1[t] * m + Policy.b2[t] * m * m;
                 if ( intrinsic >= continuation )
                 {

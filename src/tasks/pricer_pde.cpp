@@ -4,11 +4,15 @@
 #include "progress_bar.hpp"
 #include "variance_swap.hpp"
 
-//! Heston / Bates 2-D (S, v) ADI grid parameters (see SolveHestonGrid). Fixed
-//! grid for now (does not yet follow vanilla_precision).
-static constexpr int HESTON_GRID_NS = 120;              //!< spot nodes
-static constexpr int HESTON_GRID_NV = 60;               //!< variance nodes
-static constexpr int HESTON_GRID_NT = 120;              //!< time steps
+//! Heston / Bates 2-D (S, v) ADI grid parameters (see SolveHestonGrid). The grid
+//! resolution follows the book's vanilla_precision (low | medium | high): a 2-D ADI
+//! grid cannot use the 1-D vanilla node counts (1501x1301) — the (NS x Nv x Nt)
+//! product would be billions of nodes — so a dedicated, coarser triplet is selected
+//! per precision level. Medium reproduces the historical 120/60/120 default; high
+//! refines it for long-dated contracts where the coarse grid was too imprecise.
+static constexpr int HESTON_GRID_NS_LOW = 80, HESTON_GRID_NV_LOW = 40, HESTON_GRID_NT_LOW = 80;
+static constexpr int HESTON_GRID_NS_MEDIUM = 120, HESTON_GRID_NV_MEDIUM = 60, HESTON_GRID_NT_MEDIUM = 120;
+static constexpr int HESTON_GRID_NS_HIGH = 240, HESTON_GRID_NV_HIGH = 120, HESTON_GRID_NT_HIGH = 240;
 static constexpr double HESTON_VMAX_FACTOR = 6.0;       //!< variance domain = max(1, factor * max(v0, theta))
 static constexpr double HESTON_SMAX_MIN_FACTOR = 3.0;   //!< spot domain is at least factor * S0 ...
 static constexpr double HESTON_SMAX_SIGMA_FACTOR = 5.0; //!< ... or S0 * exp(factor * sqrt(var * T)), whichever is larger
@@ -444,15 +448,30 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 //! (Kolmogorov backward, NO discount — it is an undiscounted expectation — with a
 //! +sigma^2 source). The fair annualized variance is u(S0,0)/T, and the value is
 //!   PV = notional * DF * (fair_var - strike_var).
-//! sigma^2 here is the (flat / ATM) diffusion variance, so for a flat surface the
-//! grid reproduces sigma^2 exactly; a Dupire-local-variance source is future work.
+//! sigma^2 here is the Dupire LOCAL variance sigma_loc(S, t)^2 read per grid node,
+//! so the grid integrates the same implied smile the static-replication analytic
+//! does and the two agree (for a flat surface the local vol equals the flat vol, so
+//! it still reproduces sigma^2 exactly). The far-wing Dirichlet boundaries use the
+//! flat ATM variance (negligible probability weight there).
 //! Reuses the transformed grid + Crank-Nicolson solve, with C() = 0 (_variance_mode).
 void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 {
     InitGrid( Ctr, false ); //!< transformed grid, v (ATM vol), r, T_max, ...
     _variance_mode = true;  //!< drop the reaction term: C() = 0
 
-    const double var = v * v; //!< instantaneous variance source (flat / ATM vol)
+    const double atm_var = v * v; //!< ATM variance: far-wing boundaries + fallback
+
+    //! the Dupire surface lives on a single name; a multi-name underlying has none,
+    //! so fall back to the flat ATM variance there. Precompute each node's spot
+    //! level Phi(j*h) once (fixed across the backward time steps).
+    SingleSet sset = Ctr->GetUnderlying()->GetSingleSet();
+    Single* single = ( sset.size() == 1 ) ? *sset.begin() : nullptr;
+    vector<double> spot( J + 1 );
+    for ( int j = 0; j <= J; j++ )
+    {
+        spot[j] = Phi( j * h );
+    }
+    vector<double> src( J + 1, atm_var ); //!< per-step local-variance source, reused
 
     LaVector diag_u = la_vector_calloc( J );
     LaVector diag_m = la_vector_calloc( J + 1 );
@@ -477,21 +496,37 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 
     for ( int i = N - 1; i >= 0; i-- )
     {
-        const double tau = T_max - i * k;   //!< remaining time -> remaining variance
-        la_vector_set( D_1, 0, var * tau ); //!< Dirichlet boundaries: v^2 * remaining time
-        la_vector_set( D_1, J, var * tau );
+        const double tau = T_max - i * k; //!< remaining time -> remaining variance
+
+        //! instantaneous-variance source at this step's calendar date: the Dupire
+        //! local variance per node sigma_loc(S_j, t_i)^2. The evaluation date is
+        //! floored two days ahead of today so the local-vol finite differences stay
+        //! regular (T > 0) on the first steps; for a flat surface src stays atm_var.
+        if ( single )
+        {
+            long days_i = std::max( 2L, lround( (double)i * k * NB_OF_DAYS_A_YEAR ) );
+            date t_i = _today + boost::gregorian::days( days_i );
+            for ( int j = 1; j < J; j++ )
+            {
+                double lv = single->GetLocalVolatility( spot[j], t_i );
+                src[j] = lv * lv;
+            }
+        }
+
+        la_vector_set( D_1, 0, atm_var * tau ); //!< Dirichlet far-wing boundaries
+        la_vector_set( D_1, J, atm_var * tau );
         for ( int j = 1; j < J; j++ )
         {
             double rhs = T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) +
                          T_1( j, j ) * la_vector_get( U_1, j ) +
                          T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 );
-            la_vector_set( D_1, j, rhs + k * var ); //!< + source sigma^2 dt
+            la_vector_set( D_1, j, rhs + k * src[j] ); //!< + source sigma_loc^2 dt
         }
         SolveTridiagonal( diag_m, diag_u, diag_d, D_1, U_0 );
         la_vector_memcpy( U_1, U_0 );
     }
 
-    const double fair_var = ( T_max > 0 ) ? GetGridPrice( x_0, U_0 ) / T_max : var;
+    const double fair_var = ( T_max > 0 ) ? GetGridPrice( x_0, U_0 ) / T_max : atm_var;
     _variance_mode = false;
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
@@ -647,22 +682,63 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const bool american = Ctr->IsAmerican();
 
     //! Bates jumps (lambda = 0 -> pure Heston): lognormal jump size e^Z, Z~N(muJ,
-    //! sigJ^2), mean relative jump kbar = e^{muJ+0.5 sigJ^2}-1. The PIDE adds an
-    //! explicit jump integral lambda*E_J[V(S e^Z) - V] and a -lambda*kbar*S V_S
-    //! compensator drift (folded into the diffusion drift bdrift, kept implicit).
+    //! sigJ^2). The PIDE adds an explicit jump integral lambda*E_J[V(S e^Z) - V] and
+    //! a -lambda*kbar*S V_S compensator drift (folded into the diffusion drift
+    //! bdrift, kept implicit).
     const double lambda = hv.jump_intensity;
     const double muJ = hv.jump_mean;
     const double sigJ = hv.jump_vol;
     const bool bates = lambda > 0.0;
-    const double kbar = bates ? ( exp( muJ + 0.5 * sigJ * sigJ ) - 1.0 ) : 0.0;
+
+    //! Jump-size quadrature: discretise Z ~ N(muJ, sigJ^2) on a trapezoid grid out
+    //! to +/-span sigma, re-normalised for truncation (sum w = 1). The compensator
+    //! MUST use the same discretised mean jump as this quadrature, not the analytic
+    //! kbar = e^{muJ+0.5 sigJ^2}-1: with the renormalised weights the discretised
+    //! mean differs slightly, and if the -lambda*kbar*S V_S drift does not match the
+    //! mean of the explicit jump integral the two fail to cancel on the forward, so
+    //! the scheme carries a price bias that grows with the jump vol. Hence
+    //! kbar = sum_m w_m (e^{z_m} - 1), consistent with the integral applied below.
+    const int NJ = BATES_JUMP_QUAD_POINTS;
+    vector<double> zval, zwt;
+    double kbar = 0.0;
+    if ( bates )
+    {
+        const double sg = std::max( sigJ, 1e-8 );
+        const double zlo = muJ - BATES_JUMP_SIGMA_SPAN * sg, zhi = muJ + BATES_JUMP_SIGMA_SPAN * sg, dz = ( zhi - zlo ) / NJ;
+        double wsum = 0;
+        for ( int m = 0; m <= NJ; m++ )
+        {
+            double z = zlo + m * dz;
+            double pdf = exp( -0.5 * ( z - muJ ) * ( z - muJ ) / ( sg * sg ) ) / ( sg * sqrt( 2 * M_PI ) );
+            double w = pdf * dz * ( ( m == 0 || m == NJ ) ? 0.5 : 1.0 ); //!< trapezoid
+            zval.push_back( z );
+            zwt.push_back( w );
+            wsum += w;
+        }
+        for ( double& w : zwt )
+            w /= wsum; //!< normalise to sum 1 (truncation correction)
+        for ( int m = 0; m <= NJ; m++ )
+            kbar += zwt[m] * ( exp( zval[m] ) - 1.0 ); //!< discretised mean jump (matches the integral)
+    }
     const double bdrift = b - lambda * kbar; //!< == b for pure Heston
 
     //! grid extents
     const double vmax = std::max( 1.0, HESTON_VMAX_FACTOR * std::max( v0, th ) );
     const double smax = std::max( HESTON_SMAX_MIN_FACTOR * S0, S0 * exp( HESTON_SMAX_SIGMA_FACTOR * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
-    const int NS = HESTON_GRID_NS;
-    const int Nv = HESTON_GRID_NV;
-    const int Nt = HESTON_GRID_NT;
+    //! grid resolution from the book's vanilla_precision (see the constants above)
+    int NS = HESTON_GRID_NS_MEDIUM, Nv = HESTON_GRID_NV_MEDIUM, Nt = HESTON_GRID_NT_MEDIUM;
+    switch ( _configuration->_pde->_vanilla_precision )
+    {
+    case Precision::Low:
+        NS = HESTON_GRID_NS_LOW, Nv = HESTON_GRID_NV_LOW, Nt = HESTON_GRID_NT_LOW;
+        break;
+    case Precision::Medium:
+        NS = HESTON_GRID_NS_MEDIUM, Nv = HESTON_GRID_NV_MEDIUM, Nt = HESTON_GRID_NT_MEDIUM;
+        break;
+    case Precision::High:
+        NS = HESTON_GRID_NS_HIGH, Nv = HESTON_GRID_NV_HIGH, Nt = HESTON_GRID_NT_HIGH;
+        break;
+    }
     const double dS = smax / NS;
     const double dv = vmax / Nv;
     const double dt = T / Nt;
@@ -688,28 +764,9 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     }
     const double intrinsic0 = Ctr->Intrinsic( 0.0 ); //!< payoff at S=0 (0 call, K put)
 
-    //! Bates jump integral. Discretise the jump size Z ~ N(muJ, sigJ^2) on a grid
-    //! out to +/-6 sigma (re-normalised for truncation), and read V at the jumped
-    //! spot S*e^Z by linear interpolation in S (linear extrapolation past Smax).
-    const int NJ = BATES_JUMP_QUAD_POINTS;
-    vector<double> zval, zwt;
-    if ( bates )
-    {
-        const double sg = std::max( sigJ, 1e-8 );
-        const double zlo = muJ - BATES_JUMP_SIGMA_SPAN * sg, zhi = muJ + BATES_JUMP_SIGMA_SPAN * sg, dz = ( zhi - zlo ) / NJ;
-        double wsum = 0;
-        for ( int m = 0; m <= NJ; m++ )
-        {
-            double z = zlo + m * dz;
-            double pdf = exp( -0.5 * ( z - muJ ) * ( z - muJ ) / ( sg * sg ) ) / ( sg * sqrt( 2 * M_PI ) );
-            double w = pdf * dz * ( ( m == 0 || m == NJ ) ? 0.5 : 1.0 ); //!< trapezoid
-            zval.push_back( z );
-            zwt.push_back( w );
-            wsum += w;
-        }
-        for ( double& w : zwt )
-            w /= wsum; //!< normalise to sum 1 (truncation correction)
-    }
+    //! Bates jump integral: read V at the jumped spot S*e^Z by linear interpolation
+    //! in S (linear extrapolation past Smax), weighted by the zval/zwt quadrature
+    //! built above (the same one whose discretised mean feeds the kbar compensator).
     auto Vinterp = [&]( double St, int j, const vector<double>& g )
     {
         double fi = St / dS; //!< grid index (S(i) = i*dS)

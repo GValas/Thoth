@@ -37,8 +37,14 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
     const double dt = _dt_list[DateIndex];
     const double vp = _variance_node->GetValue( DateIndex - 1 );
     const double vc = _variance_node->GetValue( DateIndex );
-    const double b = _drift_node->GetValue( DateIndex ); //!< carry r - q (- repo)
     const double z = _noise_node->GetValue( DateIndex ); //!< independent N(0,1)
+
+    //! term-structured carry over the step: the drift node holds the net zero rate
+    //! (r - q - repo) to each date, so the deterministic log-drift is the difference
+    //! of the cumulative carries (the integral of the forward carry across the step).
+    //! For a flat carry c this is c*(t_i - t_{i-1}) = c*dt, the old flat behaviour.
+    const double carry_drift = _drift_node->GetValue( DateIndex ) * _t_list[DateIndex] -
+                               _drift_node->GetValue( DateIndex - 1 ) * _t_list[DateIndex - 1];
 
     double step;
     if ( _xi > 1e-12 )
@@ -54,11 +60,11 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
         {
             var = 0;
         }
-        step = b * dt + K0 + K1 * vp + K2 * vc + sqrt( var ) * z;
+        step = carry_drift + K0 + K1 * vp + K2 * vc + sqrt( var ) * z;
     }
     else //!< degenerate (no vol-of-vol): plain log-Euler on the (still CIR) variance
     {
-        step = ( b - 0.5 * vp ) * dt + sqrt( vp * dt ) * z;
+        step = carry_drift - 0.5 * vp * dt + sqrt( vp * dt ) * z;
     }
 
     //! Bates : add the compound-Poisson jump increment (compensator + realised
@@ -83,6 +89,9 @@ void HestonSpotNode::GetDateDependencies( size_t DateIndex,
         DateList.push_back( DateIndex - 1 );
         NodeList.push_back( _drift_node );
         DateList.push_back( DateIndex );
+        //! the term-structured carry also reads the previous date's cumulative carry
+        NodeList.push_back( _drift_node );
+        DateList.push_back( DateIndex - 1 );
         NodeList.push_back( _noise_node );
         DateList.push_back( DateIndex );
         if ( _jump_node )

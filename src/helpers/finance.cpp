@@ -318,9 +318,17 @@ double heston_integrand( double phi, void* params )
 
 //! P_j = 1/2 + 1/pi * integral_0^inf integrand dphi
 //! Heston/Bates characteristic-function probability integral (Gauss-Kronrod).
+//! boost's gauss_kronrod stops when the estimated error falls below
+//! tolerance * L1-norm-of-the-integrand, i.e. the tolerance is RELATIVE to the
+//! integrand magnitude, not absolute. Deep OTM the oscillatory integrand largely
+//! cancels, so the net result is tiny compared with that L1 norm; a loose tolerance
+//! then leaves an absolute error far bigger than the (small) probability and the
+//! price is unreliable. A tight relative tolerance with extra refinement depth
+//! resolves the cancellation. The integrals are cheap (one analytic contract), so
+//! the extra subdivisions cost nothing material.
 constexpr double HESTON_CF_LOWER_BOUND = 1e-8; //!< lower limit (integrand regular at 0)
-constexpr double HESTON_CF_TOLERANCE = 1e-8;   //!< absolute convergence tolerance
-constexpr unsigned HESTON_CF_MAX_DEPTH = 15;   //!< adaptive-refinement depth
+constexpr double HESTON_CF_TOLERANCE = 1e-10;  //!< relative (to integrand L1) convergence tolerance
+constexpr unsigned HESTON_CF_MAX_DEPTH = 20;   //!< adaptive-refinement depth
 
 double heston_probability( HestonParams h, int j )
 {

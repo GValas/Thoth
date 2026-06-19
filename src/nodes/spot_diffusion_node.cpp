@@ -28,12 +28,20 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
         double w1 = _brownian_node->GetValue( DateIndex );
         double w0 = _brownian_node->GetValue( DateIndex - 1 );
         double dw = w1 - w0;
-        double r = _drift_node->GetValue( DateIndex );
         double v = _local_vol_node->GetValue( DateIndex );
         double dt = _dt_list[DateIndex];
 
-        //! log-Euler step for d(lnS) = (r - v^2/2) dt + v dW (exact for constant v).
-        double expo = ( r - v * v / 2 ) * dt + v * dw;
+        //! term-structured carry: the drift node carries the net zero rate to each
+        //! date (r_dom - r_for - repo - div), so the deterministic log-drift over
+        //! this step is the difference of the cumulative carries, i.e. the integral
+        //! of the forward carry across [t_{i-1}, t_i]. This makes the simulated
+        //! forward reproduce the curve exactly on a steep term structure; for a flat
+        //! carry c it collapses to c*(t_i - t_{i-1}) = c*dt, the old flat behaviour.
+        double carry_drift = _drift_node->GetValue( DateIndex ) * _t_list[DateIndex] -
+                             _drift_node->GetValue( DateIndex - 1 ) * _t_list[DateIndex - 1];
+
+        //! log-Euler step for d(lnS) = carry dt - v^2/2 dt + v dW (exact for const v).
+        double expo = carry_drift - v * v / 2 * dt + v * dw;
 
         //! log-space Milstein correction for a state-dependent (local) vol:
         //! + 1/2 v (dv/dlnS) (dW^2 - dt). Vanishes when v is constant, so this only
@@ -120,6 +128,10 @@ void SpotDiffusionNode::GetDateDependencies( size_t DateIndex,
         DateList.push_back( DateIndex );
         NodeList.push_back( _drift_node );
         DateList.push_back( DateIndex );
+        //! the term-structured carry over the step also reads the previous date's
+        //! cumulative carry (drift node), so depend on it at DateIndex - 1 too
+        NodeList.push_back( _drift_node );
+        DateList.push_back( DateIndex - 1 );
         NodeList.push_back( _brownian_node );
         DateList.push_back( DateIndex );
         NodeList.push_back( _brownian_node );

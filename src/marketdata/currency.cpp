@@ -35,12 +35,16 @@ MonteCarloNode* Currency::GetDiscFactorNode( NodeCollector& /*NC*/ )
 
 MonteCarloNode* Currency::GetRateNode( NodeCollector& NC )
 {
-    auto init = [&]( ConstantNode* C )
-    { C->SetConstantValue( _rate->GetCurveValue( _today ) ); };
+    //! term-structured zero-rate node: the drift and the discounting both follow the
+    //! whole curve (a flat curve reduces to the previous single-rate behaviour). The
+    //! rho bump is carried inside the curve's GetCurveValue, so a bumped scenario
+    //! builds its own node (below) over the shifted curve.
+    auto init = [&]( YieldCurveNode* Y )
+    { Y->SetCurve( _rate ); };
     //! mutualise with the base tree unless the current Greek scenario bumps rates
     if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
     {
-        return NC.GetOrCreateShared<ConstantNode>( _name + node_name::RATE, init );
+        return NC.GetOrCreateShared<YieldCurveNode>( _name + node_name::RATE, init );
     }
-    return NC.GetOrCreate<ConstantNode>( _name + node_name::RATE, init );
+    return NC.GetOrCreate<YieldCurveNode>( _name + node_name::RATE, init );
 }

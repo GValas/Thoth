@@ -32,8 +32,10 @@ usable as a batch tool or as an HTTP service.
 - **PDE (`pde`)** — Crank-Nicolson finite-difference scheme; supports **American**
   exercise (backward induction `max(intrinsic, continuation)`), a 2-D `(S,v)`
   Douglas-ADI grid for **Heston** (and **Bates** as a PIDE — the ADI plus an
-  explicit jump integral, IMEX), and the **variance swap** fair strike as a
-  backward expected-accumulated-variance solve.
+  explicit jump integral, IMEX) whose resolution follows `vanilla_precision`, and
+  the **variance swap** fair strike as a backward expected-accumulated-variance
+  solve driven by the **Dupire local variance** per node (so it integrates the
+  smile, matching the analytic static replication).
 - **Analytic (`ana`)** — closed-form (Black-Scholes) for instruments that admit
   it.
 - **GPU acceleration (`mcl` + `allow_gpu`)** — the `mcl` engine offloads to a CUDA
@@ -430,7 +432,7 @@ my_mcl: !mcl_configuration
   use_sobol: true
   allow_gpu: false       # true -> run on a CUDA GPU when present + book supported, else CPU
 my_pde: !pde_configuration
-  vanilla_precision: high
+  vanilla_precision: high   # low|medium|high: sizes the 1-D grid AND the Heston/Bates ADI grid
 
 # optional debug switches (referenced from the pricer via debug_configuration).
 # generate_nodes_graph returns each MCL tree's Monte-Carlo node DAG as Graphviz
@@ -511,17 +513,22 @@ run_local_client_matrix.sh POST a !sequence book to a running server and tabulat
 - The `nominal` contract field is not yet wired into the engine (premiums are
   per unit).
 - The HTTP server serialises pricing requests (single global engine state).
-- Yield/repo/dividend curves interpolate across their pillars for the ANA and PDE
-  engines; the MCL diffusion still drives a single (front-pillar) rate over the
-  whole path, so a sloped curve reaches MCL prices only through that front rate.
+- Yield/repo/dividend curves interpolate across their pillars in **every** engine:
+  the MCL diffusion now follows the full curve term structure (each rate/repo/
+  dividend leg is a term-structured zero-rate node, and the spot diffuses at the
+  per-step forward carry), so a sloped curve reaches the right MCL forward and the
+  MCL/PDE/ANA prices agree on steep curves. A flat curve reduces exactly to the
+  previous single-rate behaviour.
 - Local volatility: the **MCL** engine diffuses a `sabr_volatility` surface as a
   full **Dupire local-vol** surface — the surface is sampled onto a
   per-diffusion-date log-spot grid and read along each path. Mono, **basket**
   (each component on its own local vol) and **composite** underlyings are covered
   (the composite's quanto drift correction uses the ATM vol, as ANA/PDE do).
   The **ANA** engine uses the implied vol at the option's strike, while the
-  **PDE** engine still uses a single ATM vol (no local-vol grid). `bs_volatility`
-  (flat) is exact in every engine.
+  **PDE** engine uses a single ATM vol for vanillas (no local-vol grid) — except
+  the **variance-swap PDE**, whose accumulated-variance source is the **Dupire
+  local variance per grid node**, so it integrates the same smile the analytic
+  static replication does. `bs_volatility` (flat) is exact in every engine.
 - GPU (CUDA) acceleration (`mcl` + `allow_gpu`) currently covers **single-asset
   European vanillas under GBM** only; American / barrier / stochastic-vol /
   multi-asset books run on the CPU `mcl` engine. Extending the kernel to Heston-QE
