@@ -229,15 +229,13 @@ static string BlockifyMultilineScalars( const string& Yaml )
 //! contructor
 YamlConfig::YamlConfig( const string& InputCfgFile,
                         const string& OutputCfgFile )
+    : _out_yml( OutputCfgFile )
 {
-    //! attributes
-    input_cfg_file = InputCfgFile;
-    output_cfg_file = OutputCfgFile;
 
     // load config
     try
     {
-        _root = YAML::LoadFile( input_cfg_file );
+        _root = YAML::LoadFile( InputCfgFile );
     }
     catch ( const std::exception& p )
     {
@@ -291,19 +289,19 @@ string YamlConfig::Dump()
 //! errors are reported here rather than swallowed in the destructor.
 void YamlConfig::WriteFile()
 {
-    if ( !_write_file || output_cfg_file.empty() )
+    if ( !_write_file || _out_yml.empty() )
     {
         return;
     }
-    std::ofstream out( output_cfg_file );
+    std::ofstream out( _out_yml );
     if ( !out )
     {
-        ERR( "cannot open output file : " + output_cfg_file );
+        ERR( "cannot open output file : " + _out_yml );
     }
     out << Dump() << "\n";
     if ( !out )
     {
-        ERR( "error while writing output file : " + output_cfg_file );
+        ERR( "error while writing output file : " + _out_yml );
     }
 }
 

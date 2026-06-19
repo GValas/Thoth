@@ -27,10 +27,10 @@ debug: !debug_configuration
 mcl_config: !mcl_configuration
   max_day_step: 1
   min_day_step: -1
-  paths: 10000000
+  paths: 50000
   vol_year_step: 0.01
   use_sobol: true
-  generate_nodes_graph: true
+  generate_nodes_graph: false
 
 pde_config: !pde_configuration
   vanilla_precision: high

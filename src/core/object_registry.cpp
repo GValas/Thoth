@@ -476,7 +476,7 @@ Object* ObjectManager::Build( const string& ObjectName )
 {
     static const map<string, Factory> registry = MakeRegistry();
 
-    const string kind = _c->GetTag( ObjectName );
+    const string kind = _yml.GetTag( ObjectName );
     auto entry = registry.find( kind );
     if ( entry == registry.end() )
     {

@@ -31,16 +31,16 @@ class ObjectManager
     //! result config emitted as a YAML string (in-memory / HTTP mode)
     string ResultYaml();
 
-    //! constructors
+    //! constructors: the manager owns its YamlConfig, built from files or (for an
+    //! in-memory HTTP request) from a YAML string.
     ObjectManager( const string& InputFile, const string& OutputFile );
-    ObjectManager( YamlConfig::from_string_t,
-                   const string& YamlContent ); //!< build from an in-memory YAML request
+    ObjectManager( YamlConfig::from_string_t, const string& YamlContent );
     ~ObjectManager();
 
     //! --- services used by the registry factories ---
 
     //! config tree (field access)
-    YamlConfig& cfg() { return *_c; }
+    YamlConfig& cfg() { return _yml; }
 
     //! object store (factories Add/Own their product here)
     ObjectCollector& collector() { return _collector; }
@@ -78,7 +78,7 @@ class ObjectManager
     }
 
   private:
-    std::unique_ptr<YamlConfig> _c;
+    YamlConfig _yml;
     Task* _exec_node = nullptr;
     string _exec_name;
     ObjectCollector _collector;

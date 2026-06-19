@@ -13,8 +13,7 @@ class YamlConfig
   private:
     //! config tree (YAML) + file paths
     YAML::Node _root;
-    string input_cfg_file;
-    string output_cfg_file;
+    string _out_yml;
     bool _write_file = true; //!< file mode writes output on destruction; string mode does not
 
     void SplitPath( const string& Path,

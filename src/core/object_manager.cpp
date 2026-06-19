@@ -1,24 +1,22 @@
 #include "thoth.hpp"
 #include "object_manager.hpp"
 
-//! constructor
-ObjectManager::ObjectManager( const string& InputFile,
-                              const string& OutputFile )
+//! constructor: built from files; the manager owns the config
+ObjectManager::ObjectManager( const string& InputFile, const string& OutputFile )
+    : _yml( InputFile, OutputFile )
 {
-    _c = std::make_unique<YamlConfig>( InputFile, OutputFile );
 }
 
 //! in-memory constructor (HTTP request body)
-ObjectManager::ObjectManager( YamlConfig::from_string_t,
-                              const string& YamlContent )
+ObjectManager::ObjectManager( YamlConfig::from_string_t, const string& YamlContent )
+    : _yml( YamlConfig::from_string_t{}, YamlContent )
 {
-    _c = std::make_unique<YamlConfig>( YamlConfig::from_string_t{}, YamlContent );
 }
 
 //! results as a YAML string
 string ObjectManager::ResultYaml()
 {
-    return _c->Dump();
+    return _yml.Dump();
 }
 
 //! destructor
@@ -27,7 +25,7 @@ ObjectManager::~ObjectManager() = default;
 //! an object exists iff it carries a kind tag (e.g. `name: !equity { ... }`)
 bool ObjectManager::IsObject( const string& Path )
 {
-    return !_c->GetTag( Path ).empty();
+    return !_yml.GetTag( Path ).empty();
 }
 
 //!
@@ -43,13 +41,13 @@ void ObjectManager::CheckObject( const string& ObjectName )
 void ObjectManager::ReadObjects( const string& ExecName )
 {
     //! parsing task (root is special _name)
-    _exec_name = ( ExecName == ROOT_NODE ) ? _c->GetString( ROOT_NODE ) : ExecName;
+    _exec_name = ( ExecName == ROOT_NODE ) ? _yml.GetString( ROOT_NODE ) : ExecName;
     _exec_node = IsObject( _exec_name ) ? Get<Task>( _exec_name ) : nullptr;
 
     //! getting exec result node
     if ( _exec_node )
     {
-        _exec_node->SetResult( _c->GetString( _exec_name + ".result" ) );
+        _exec_node->SetResult( _yml.GetString( _exec_name + ".result" ) );
     }
 }
 
@@ -66,9 +64,9 @@ void ObjectManager::ExecuteTask()
         _exec_node->Execute();
 
         //! system_information
-        _c->SetString( "system_information.last_exec_name", _exec_node->GetName() );
-        _c->SetString( "system_information.last_exec_kind", _exec_node->GetKind() );
-        _c->SetDouble( "system_information.exec_time", ExecTime( t0 ) );
+        _yml.SetString( "system_information.last_exec_name", _exec_node->GetName() );
+        _yml.SetString( "system_information.last_exec_kind", _exec_node->GetKind() );
+        _yml.SetDouble( "system_information.exec_time", ExecTime( t0 ) );
     }
 
     //! no task to execute
@@ -91,5 +89,5 @@ void ObjectManager::WriteResults()
 //! flush the config tree to the output file (batch mode)
 void ObjectManager::WriteOutputFile()
 {
-    _c->WriteFile();
+    _yml.WriteFile();
 }
