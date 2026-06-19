@@ -19,10 +19,10 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     Correlation* _correlation = nullptr; //! for quanto purposes
 
     // mcl indexes
-    vector<int> vect_idx_flow_date;   // flow dates
-    vector<int> vect_idx_fixing_date; // fixing dates
-    int idx_underlying = 0;           // underling position
-    int idx_contract = 0;             // contract position
+    vector<int> _vect_idx_flow_date;   // flow dates
+    vector<int> _vect_idx_fixing_date; // fixing dates
+    int _idx_underlying = 0;           // underling position
+    int _idx_contract = 0;             // contract position
 
   public:
     //! setter

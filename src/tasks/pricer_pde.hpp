@@ -28,31 +28,31 @@ class PricerPDE : public Pricer
 
   private:
     // market data
-    double s;      // spot
-    double v;      // vol
-    double r;      // carry / drift rate (underlying ccy, quanto-corrected)
-    double r_disc; // discount rate (premium ccy); equals r for non-quanto
-    date maturity;
-    bool is_american;
+    double _s;      // spot
+    double _v;      // vol
+    double _r;      // carry / drift rate (underlying ccy, quanto-corrected)
+    double _r_disc; // discount rate (premium ccy); equals r for non-quanto
+    date _maturity;
+    bool _is_american;
 
     // outputs
-    double Price;
+    double _price;
     double GetGridPrice( double x, la_vector* Uy );
 
     // original grid
-    double X_0; // we look for V(X_0) = u(x_0)
-    double X_max;
-    double X_min;
-    double T_max;
-    double V_up; // up border
-    double V_dw; // dw border
+    double _x_0_orig; // we look for V(X_0) = u(x_0)
+    double _x_max_orig;
+    double _x_min_orig;
+    double _t_max;
+    double _v_up; // up border
+    double _v_dw; // dw border
 
     // transformation settings
-    double c1;
-    double c2;
-    double aa; // alpha
-    double bb; // = c1 - c2
-    double cc; // = c2
+    double _c1;
+    double _c2;
+    double _aa; // alpha
+    double _bb; // = c1 - c2
+    double _cc; // = c2
 
     // transformation function derivatives & inverse : X = Phi(x), x = Psi(X)
     inline double Phi( double x );
@@ -61,15 +61,15 @@ class PricerPDE : public Pricer
     inline double Psi( double X );
 
     // transformed grid attributes
-    double x_0;   // we look for V(X_0) = u(x_0)
-    double x_min; // 0
-    double x_max; // 1
-    double h;     // du
-    double k;     // dt
-    int J;        // nb of h
-    int N;        //    nb of k
-    double u_up;  // up border
-    double u_dw;  // down border
+    double _x_0;   // we look for V(X_0) = u(x_0)
+    double _x_min; // 0
+    double _x_max; // 1
+    double _h;     // du
+    double _k;     // dt
+    int _j;        // nb of h
+    int _n;        //    nb of k
+    double _u_up;  // up border
+    double _u_dw;  // down border
 
     // V_t = A(X).V_XX + C(X).V_X +  + C(X).V
     double A( double x );
@@ -92,7 +92,7 @@ class PricerPDE : public Pricer
 
     // U_0.(I + k.theta.L) = U_1.(I - k.theta.L)
     // U_0.T_0             = U_1.T_1
-    double theta;
+    double _theta;
 
     // identity matrix
     inline double I( int i, int j );

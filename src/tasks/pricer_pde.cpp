@@ -32,7 +32,7 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
     LaVector Ux = la_vector_alloc( Uy->size );
     for ( int j = 0; j < (int)Uy->size; j++ )
     {
-        la_vector_set( Ux, j, j * h );
+        la_vector_set( Ux, j, j * _h );
     }
 
     // interpolation (inputs stay owned here)
@@ -169,10 +169,10 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
 {
 
     // cranck-nicholson scheme
-    theta = PDE_THETA;
+    _theta = PDE_THETA;
 
     //
-    maturity = Ctr->GetMaturityDate();
+    _maturity = Ctr->GetMaturityDate();
     string Und = Ctr->GetUnderlying()->GetName();
     string Ccy = Ctr->GetPremiumCurrency()->GetName();
 
@@ -181,13 +181,13 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! escrowed spot (== plain spot unless the underlying carries discrete
     //! dividends): nets the PV of dividends due before maturity, so the grid prices
     //! the same escrowed forward as the analytic and MCL engines.
-    s = Ctr->GetUnderlying()->GetDiffusionSpot( maturity );
-    v = Ctr->GetUnderlying()->GetImplicitVol( 0, maturity );
+    _s = Ctr->GetUnderlying()->GetDiffusionSpot( _maturity );
+    _v = Ctr->GetUnderlying()->GetImplicitVol( 0, _maturity );
     //! carry = rate - continuous yield (dividend yield + repo), matching the ANA
     //! forward and the MCL drift node so the three engines agree
-    r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( maturity ) -
-        Ctr->GetUnderlying()->DividendRepoYield( maturity );
-    r_disc = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( maturity );
+    _r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( _maturity ) -
+         Ctr->GetUnderlying()->DividendRepoYield( _maturity );
+    _r_disc = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( _maturity );
 
     //! quanto drift correction (payoff currency != underlying currency): the
     //! carry becomes r - rho(S,FX)*sigma_S*sigma_X while discounting stays in the
@@ -207,17 +207,17 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
         }
         double v_fx = _correlation->GetFxVol( udl_ccy->GetName(), pre_ccy->GetName() );
         double rho = _correlation->GetValue( udl_ccy->GetName(), pre_ccy->GetName(), Und );
-        r -= rho * v * v_fx;
+        _r -= rho * _v * v_fx;
     }
 
     // original grid
-    T_max = YearFraction( _today, maturity );
-    X_0 = s;
-    X_max = s * exp( _configuration->_pde->_custom_sigma_factor * v * sqrt( T_max ) );
-    X_min = s * exp( -_configuration->_pde->_custom_sigma_factor * v * sqrt( T_max ) );
-    N = _configuration->_pde->_custom_n_t;
-    J = _configuration->_pde->_custom_n_s;
-    is_american = Ctr->IsAmerican();
+    _t_max = YearFraction( _today, _maturity );
+    _x_0_orig = _s;
+    _x_max_orig = _s * exp( _configuration->_pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
+    _x_min_orig = _s * exp( -_configuration->_pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
+    _n = _configuration->_pde->_custom_n_t;
+    _j = _configuration->_pde->_custom_n_s;
+    _is_american = Ctr->IsAmerican();
 
     //! barrier handling
     if ( ApplyBarrier && Ctr->PDE_IsBarrier() )
@@ -230,13 +230,13 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             //! monitoring dates) and hold the knocked-side boundary at zero.
             if ( is_up )
             {
-                V_up = 0;
-                V_dw = Ctr->Intrinsic( X_min );
+                _v_up = 0;
+                _v_dw = Ctr->Intrinsic( _x_min_orig );
             }
             else
             {
-                V_dw = 0;
-                V_up = Ctr->Intrinsic( X_max );
+                _v_dw = 0;
+                _v_up = Ctr->Intrinsic( _x_max_orig );
             }
         }
         else
@@ -245,39 +245,39 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             //! a zero Dirichlet condition there.
             if ( is_up )
             {
-                X_max = H;
-                V_up = 0;
-                V_dw = Ctr->Intrinsic( X_min );
+                _x_max_orig = H;
+                _v_up = 0;
+                _v_dw = Ctr->Intrinsic( _x_min_orig );
             }
             else
             {
-                X_min = H;
-                V_dw = 0;
-                V_up = Ctr->Intrinsic( X_max );
+                _x_min_orig = H;
+                _v_dw = 0;
+                _v_up = Ctr->Intrinsic( _x_max_orig );
             }
         }
     }
     else
     {
-        V_up = Ctr->Intrinsic( X_max );
-        V_dw = Ctr->Intrinsic( X_min );
+        _v_up = Ctr->Intrinsic( _x_max_orig );
+        _v_dw = Ctr->Intrinsic( _x_min_orig );
     }
 
     // transformation settings -> more points around X_0
-    cc = .02;                           //.02 / .05
-    c1 = asinh( ( X_min - X_0 ) / cc ); // particular case !!! [0,1] <-> [X_min, X_max]
-    c2 = asinh( ( X_max - X_0 ) / cc );
-    aa = c2 - c1;
-    bb = c1;
+    _cc = .02;                                        //.02 / .05
+    _c1 = asinh( ( _x_min_orig - _x_0_orig ) / _cc ); // particular case !!! [0,1] <-> [X_min, X_max]
+    _c2 = asinh( ( _x_max_orig - _x_0_orig ) / _cc );
+    _aa = _c2 - _c1;
+    _bb = _c1;
 
     // transformed grid
-    x_0 = Psi( X_0 );
-    x_min = Psi( X_min );
-    x_max = Psi( X_max );
-    h = ( x_max - x_min ) / (double)J;
-    k = T_max / (double)N;
-    u_up = V_up;
-    u_dw = V_dw;
+    _x_0 = Psi( _x_0_orig );
+    _x_min = Psi( _x_min_orig );
+    _x_max = Psi( _x_max_orig );
+    _h = ( _x_max - _x_min ) / (double)_j;
+    _k = _t_max / (double)_n;
+    _u_up = _v_up;
+    _u_dw = _v_dw;
 
     //! escrowed-dividend model: precompute the future-dividend PV at each grid time
     //! step so the American early-exercise test can recover the observed spot
@@ -287,12 +287,12 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! ObservedSpot) when the underlying carries no discrete dividends.
     _future_pv.clear();
     Underlying* udl = Ctr->GetUnderlying();
-    if ( is_american && udl->FutureDividendPv( _today ) != 0 )
+    if ( _is_american && udl->FutureDividendPv( _today ) != 0 )
     {
-        _future_pv.resize( N + 1 );
-        for ( int i = 0; i <= N; i++ )
+        _future_pv.resize( _n + 1 );
+        for ( int i = 0; i <= _n; i++ )
         {
-            long days = lround( (double)i * k * NB_OF_DAYS_A_YEAR );
+            long days = lround( (double)i * _k * NB_OF_DAYS_A_YEAR );
             _future_pv[i] = udl->FutureDividendPv( _today + boost::gregorian::days( days ) );
         }
     }
@@ -307,8 +307,8 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
         _barrier_level = Ctr->PDE_BarrierLevel();
         for ( const date& d : Ctr->GetFixingDates() ) //!< == the monitoring schedule
         {
-            int step = (int)lround( YearFraction( _today, d ) / k );
-            step = max( 0, min( N, step ) );
+            int step = (int)lround( YearFraction( _today, d ) / _k );
+            step = max( 0, min( _n, step ) );
             _discrete_monitor_steps.insert( step );
         }
     }
@@ -317,9 +317,9 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
 //! zero the solved layer in the knocked region (called at each monitoring step)
 void PricerPDE::ApplyDiscreteBarrier( la_vector* U )
 {
-    for ( int j = 0; j < J + 1; j++ )
+    for ( int j = 0; j < _j + 1; j++ )
     {
-        double X = Phi( j * h );
+        double X = Phi( j * _h );
         bool knocked = _barrier_is_up ? ( X >= _barrier_level ) : ( X <= _barrier_level );
         if ( knocked )
         {
@@ -333,22 +333,22 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 {
 
     // vectors & matrices allocations (RAII: freed on every exit, incl. ERR throw)
-    LaVector diag_u = la_vector_calloc( J );     // up diag
-    LaVector diag_m = la_vector_calloc( J + 1 ); // mid diag
-    LaVector diag_d = la_vector_calloc( J );     // down diag
-    LaVector D_1 = la_vector_calloc( J + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
-    LaVector U_0 = la_vector_calloc( J + 1 );
-    LaVector U_1 = la_vector_calloc( J + 1 );
+    LaVector diag_u = la_vector_calloc( _j );     // up diag
+    LaVector diag_m = la_vector_calloc( _j + 1 ); // mid diag
+    LaVector diag_d = la_vector_calloc( _j );     // down diag
+    LaVector D_1 = la_vector_calloc( _j + 1 );    // D = T_1(j+1, j).u(j-1) + T_1(j, j).u(j) + T_1(j, j+1).u(j+1)
+    LaVector U_0 = la_vector_calloc( _j + 1 );
+    LaVector U_1 = la_vector_calloc( _j + 1 );
     // la_matrix * V        = la_matrix_calloc(J+1, N+1);
 
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
-    for ( int i = 0; i < J + 1; i++ )
+    for ( int i = 0; i < _j + 1; i++ )
     {
-        la_vector_set( U_1, i, Ctr->Intrinsic( Phi( i * h ) ) );
+        la_vector_set( U_1, i, Ctr->Intrinsic( Phi( i * _h ) ) );
     }
 
     //! discrete barrier observed at maturity (terminal step N)
-    if ( _discrete_monitor_steps.count( N ) )
+    if ( _discrete_monitor_steps.count( _n ) )
     {
         ApplyDiscreteBarrier( U_1 );
     }
@@ -359,9 +359,9 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // diagonals
     la_vector_set( diag_u, 0, 0 );
     la_vector_set( diag_m, 0, 1 );
-    la_vector_set( diag_m, J, 1 );
-    la_vector_set( diag_d, J - 1, 0 );
-    for ( int j = 1; j < J; j++ )
+    la_vector_set( diag_m, _j, 1 );
+    la_vector_set( diag_d, _j - 1, 0 );
+    for ( int j = 1; j < _j; j++ )
     {
         la_vector_set( diag_u, j, T_0( j, j + 1 ) );
         la_vector_set( diag_m, j, T_0( j, j ) );
@@ -372,13 +372,13 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // PrintList(diag_d);
 
     // backwarding
-    for ( int i = N - 1; i >= 0; i-- )
+    for ( int i = _n - 1; i >= 0; i-- )
     {
 
         // right side
-        la_vector_set( D_1, 0, u_dw ); // down boundary (fonction de t?)
-        la_vector_set( D_1, J, u_up ); // up boundary (fonction de t?)
-        for ( int j = 1; j < J; j++ )
+        la_vector_set( D_1, 0, _u_dw );  // down boundary (fonction de t?)
+        la_vector_set( D_1, _j, _u_up ); // up boundary (fonction de t?)
+        for ( int j = 1; j < _j; j++ )
         {
             la_vector_set( D_1, j, T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) + T_1( j, j ) * la_vector_get( U_1, j ) + T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 ) );
         }
@@ -391,11 +391,11 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         // american mode : max(intrinsec value, expected value). The grid value
         // Phi(k*h) is the escrowed spot; exercise is against the OBSERVED spot
         // (escrowed + future-dividend PV at this step i), matching the MCL engine.
-        if ( is_american )
+        if ( _is_american )
         {
-            for ( int k = 0; k < J + 1; k++ )
+            for ( int k = 0; k < _j + 1; k++ )
             {
-                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( ObservedSpot( Phi( k * h ), i ) ) );
+                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( ObservedSpot( Phi( k * _h ), i ) ) );
             }
         }
 
@@ -420,16 +420,16 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // premium, gamma
     if ( _request_premium || _request_gamma )
     {
-        result.premium = GetGridPrice( x_0, U_0 );
+        result.premium = GetGridPrice( _x_0, U_0 );
     }
 
     // delta, gamma : central differences around X_0 with spot half-bump h = X_0 * SHIFT/2
-    const double h = X_0 * GREEK_SPOT_BUMP / 2;
+    const double h = _x_0_orig * GREEK_SPOT_BUMP / 2;
     double delta_price_sup, delta_price_inf;
     if ( _request_delta || _request_gamma )
     {
-        double x_inf = Psi( X_0 - h );
-        double x_sup = Psi( X_0 + h );
+        double x_inf = Psi( _x_0_orig - h );
+        double x_sup = Psi( _x_0_orig + h );
         delta_price_inf = GetGridPrice( x_inf, U_0 );
         delta_price_sup = GetGridPrice( x_sup, U_0 );
         result.delta = ( delta_price_sup - delta_price_inf ) / ( 2 * h ); //!< dV/dS
@@ -459,44 +459,44 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
     InitGrid( Ctr, false ); //!< transformed grid, v (ATM vol), r, T_max, ...
     _variance_mode = true;  //!< drop the reaction term: C() = 0
 
-    const double atm_var = v * v; //!< ATM variance: far-wing boundaries + fallback
+    const double atm_var = _v * _v; //!< ATM variance: far-wing boundaries + fallback
 
     //! the Dupire surface lives on a single name; a multi-name underlying has none,
     //! so fall back to the flat ATM variance there. Precompute each node's spot
     //! level Phi(j*h) once (fixed across the backward time steps).
     SingleSet sset = Ctr->GetUnderlying()->GetSingleSet();
     Single* single = ( sset.size() == 1 ) ? *sset.begin() : nullptr;
-    vector<double> spot( J + 1 );
-    for ( int j = 0; j <= J; j++ )
+    vector<double> spot( _j + 1 );
+    for ( int j = 0; j <= _j; j++ )
     {
-        spot[j] = Phi( j * h );
+        spot[j] = Phi( j * _h );
     }
-    vector<double> src( J + 1, atm_var ); //!< per-step local-variance source, reused
+    vector<double> src( _j + 1, atm_var ); //!< per-step local-variance source, reused
 
-    LaVector diag_u = la_vector_calloc( J );
-    LaVector diag_m = la_vector_calloc( J + 1 );
-    LaVector diag_d = la_vector_calloc( J );
-    LaVector D_1 = la_vector_calloc( J + 1 );
-    LaVector U_0 = la_vector_calloc( J + 1 );
-    LaVector U_1 = la_vector_calloc( J + 1 );
+    LaVector diag_u = la_vector_calloc( _j );
+    LaVector diag_m = la_vector_calloc( _j + 1 );
+    LaVector diag_d = la_vector_calloc( _j );
+    LaVector D_1 = la_vector_calloc( _j + 1 );
+    LaVector U_0 = la_vector_calloc( _j + 1 );
+    LaVector U_1 = la_vector_calloc( _j + 1 );
 
     //! terminal condition: zero accumulated variance at maturity (U_1 starts at 0)
 
     //! diagonals (c = 0 in variance mode)
     la_vector_set( diag_u, 0, 0 );
     la_vector_set( diag_m, 0, 1 );
-    la_vector_set( diag_m, J, 1 );
-    la_vector_set( diag_d, J - 1, 0 );
-    for ( int j = 1; j < J; j++ )
+    la_vector_set( diag_m, _j, 1 );
+    la_vector_set( diag_d, _j - 1, 0 );
+    for ( int j = 1; j < _j; j++ )
     {
         la_vector_set( diag_u, j, T_0( j, j + 1 ) );
         la_vector_set( diag_m, j, T_0( j, j ) );
         la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) );
     }
 
-    for ( int i = N - 1; i >= 0; i-- )
+    for ( int i = _n - 1; i >= 0; i-- )
     {
-        const double tau = T_max - i * k; //!< remaining time -> remaining variance
+        const double tau = _t_max - i * _k; //!< remaining time -> remaining variance
 
         //! instantaneous-variance source at this step's calendar date: the Dupire
         //! local variance per node sigma_loc(S_j, t_i)^2. The evaluation date is
@@ -504,9 +504,9 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
         //! regular (T > 0) on the first steps; for a flat surface src stays atm_var.
         if ( single )
         {
-            long days_i = std::max( 2L, lround( (double)i * k * NB_OF_DAYS_A_YEAR ) );
+            long days_i = std::max( 2L, lround( (double)i * _k * NB_OF_DAYS_A_YEAR ) );
             date t_i = _today + boost::gregorian::days( days_i );
-            for ( int j = 1; j < J; j++ )
+            for ( int j = 1; j < _j; j++ )
             {
                 double lv = single->GetLocalVolatility( spot[j], t_i );
                 src[j] = lv * lv;
@@ -514,23 +514,23 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
         }
 
         la_vector_set( D_1, 0, atm_var * tau ); //!< Dirichlet far-wing boundaries
-        la_vector_set( D_1, J, atm_var * tau );
-        for ( int j = 1; j < J; j++ )
+        la_vector_set( D_1, _j, atm_var * tau );
+        for ( int j = 1; j < _j; j++ )
         {
             double rhs = T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) +
                          T_1( j, j ) * la_vector_get( U_1, j ) +
                          T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 );
-            la_vector_set( D_1, j, rhs + k * src[j] ); //!< + source sigma_loc^2 dt
+            la_vector_set( D_1, j, rhs + _k * src[j] ); //!< + source sigma_loc^2 dt
         }
         SolveTridiagonal( diag_m, diag_u, diag_d, D_1, U_0 );
         la_vector_memcpy( U_1, U_0 );
     }
 
-    const double fair_var = ( T_max > 0 ) ? GetGridPrice( x_0, U_0 ) / T_max : atm_var;
+    const double fair_var = ( _t_max > 0 ) ? GetGridPrice( _x_0, U_0 ) / _t_max : atm_var;
     _variance_mode = false;
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
-    const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( maturity );
+    const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( _maturity );
     Ctr->Result().premium = Ctr->GetNotional() * df * ( fair_var - k_var );
     Ctr->Result().delta = 0;
     Ctr->Result().gamma = 0;
@@ -538,33 +538,33 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 
 inline double PricerPDE::Phi( double x )
 {
-    return X_0 + cc * sinh( aa * x + bb );
+    return _x_0_orig + _cc * sinh( _aa * x + _bb );
 }
 inline double PricerPDE::Phi_x( double x )
 {
-    return cc * aa * cosh( aa * x + bb );
+    return _cc * _aa * cosh( _aa * x + _bb );
 }
 inline double PricerPDE::Phi_xx( double x )
 {
-    return cc * aa * aa * sinh( aa * x + bb );
+    return _cc * _aa * _aa * sinh( _aa * x + _bb );
 }
 inline double PricerPDE::Psi( double X )
 {
-    return ( asinh( ( X - X_0 ) / cc ) - bb ) / aa;
+    return ( asinh( ( X - _x_0_orig ) / _cc ) - _bb ) / _aa;
 }
 double PricerPDE::A( double x )
 {
-    return -.5 * v * v * x * x;
+    return -.5 * _v * _v * x * x;
 }
 double PricerPDE::B( double x )
 {
-    return -r * x;
+    return -_r * x;
 }
 double PricerPDE::C( double /*x*/ )
 {
     //! variance-swap solve accumulates expected variance (an undiscounted
     //! expectation), so there is no reaction/discount term there.
-    return _variance_mode ? 0.0 : r_disc;
+    return _variance_mode ? 0.0 : _r_disc;
 }
 inline double PricerPDE::a( double x )
 {
@@ -599,15 +599,15 @@ inline double PricerPDE::L( int i, int j )
 }
 inline double PricerPDE::L_u( int j )
 {
-    return b( j * h ) / 2 / h + a( j * h ) / h / h;
+    return b( j * _h ) / 2 / _h + a( j * _h ) / _h / _h;
 }
 inline double PricerPDE::L_m( int j )
 {
-    return c( j * h ) - 2 * a( j * h ) / h / h;
+    return c( j * _h ) - 2 * a( j * _h ) / _h / _h;
 }
 inline double PricerPDE::L_d( int j )
 {
-    return -b( j * h ) / 2 / h + a( j * h ) / h / h;
+    return -b( j * _h ) / 2 / _h + a( j * _h ) / _h / _h;
 }
 inline double PricerPDE::I( int i, int j )
 {
@@ -615,11 +615,11 @@ inline double PricerPDE::I( int i, int j )
 }
 inline double PricerPDE::T_0( int i, int j )
 {
-    return I( i, j ) + k * ( 1 - theta ) * L( i, j );
+    return I( i, j ) + _k * ( 1 - _theta ) * L( i, j );
 }
 inline double PricerPDE::T_1( int i, int j )
 {
-    return I( i, j ) - k * theta * L( i, j );
+    return I( i, j ) - _k * _theta * L( i, j );
 }
 //! ----------------------------------------------------------------------
 //! Heston 2-D (S, v) finite-difference pricer (Douglas ADI)
