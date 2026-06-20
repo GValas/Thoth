@@ -371,8 +371,12 @@ The master splits `paths` as evenly as possible (capping the fan-out at `paths`
 so no slave gets zero) and gives each slave a distinct `seed` for the pseudo-
 random generator plus an explicit Sobol skip (the running path count of the
 slaves before it), so the slaves draw **disjoint, independent** blocks even when
-the split is uneven. It pools the premium path-weighted and combines the
-per-slave variances for the trust. The
+the split is uneven. It pools every numeric field a slave reports
+path-weighted — premium, the book Greeks (delta…theta), the model-parameter
+`vega_<param>` Greeks and the per-contract premia/Greeks — and combines the
+per-slave variances for the `*_trust` standard errors. Pooling is
+schema-agnostic (it enumerates the result keys rather than matching a fixed
+list), so a new result field aggregates without touching the master. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
 precision. A **`!sequence`** root is dispatched task by task: each MCL cell is
 path-split across the slaves in turn (ANA/PDE and other non-splittable cells are
@@ -428,7 +432,9 @@ my_mcl: !mcl_configuration
   max_day_step: 1
   min_day_step: -1
   paths: 100000           # 64-bit; may exceed 2^31 (e.g. billions, useful on the GPU)
-  vol_year_step: 0.01
+  vol_year_step: 0.01     # variance sub-step (yr): on Heston/Bates books caps the
+                          # diffusion step below max_day_step to cut Andersen-QE
+                          # bias on long steps; no effect on plain GBM books or <=0
   use_sobol: true
   allow_gpu: false       # true -> run on a CUDA GPU when present + book supported, else CPU
 my_pde: !pde_configuration

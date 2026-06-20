@@ -7,9 +7,9 @@ class CompositeVolNode : public MonteCarloNode
 {
 
   private:
-    MonteCarloNode* _rho_SX_node;
-    MonteCarloNode* _vol_S_node;
-    MonteCarloNode* _vol_X_node;
+    MonteCarloNode* _rho_SX_node = nullptr;
+    MonteCarloNode* _vol_S_node = nullptr;
+    MonteCarloNode* _vol_X_node = nullptr;
 
   public:
     void ComputeValue( size_t DateIndex ) override;

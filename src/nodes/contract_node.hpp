@@ -9,7 +9,7 @@ class ContractNode : public MonteCarloNode
   private:
     vector<size_t> _flow_date_index_list;
     vector<MonteCarloNode*> _flow_node_list;
-    MonteCarloNode* _rate_curve_node;
+    MonteCarloNode* _rate_curve_node = nullptr;
 
   public:
     void ComputeValue( size_t DateIndex ) override;

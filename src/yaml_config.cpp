@@ -781,6 +781,27 @@ vector<string> YamlConfig::GetObjectsByKind( const string& kind )
     return s;
 }
 
+vector<string> YamlConfig::GetChildKeys( const string& Path )
+{
+    vector<string> s;
+    try
+    {
+        YAML::Node n = LookUp( Path );
+        if ( !n.IsMap() )
+        {
+            return s;
+        }
+        for ( const auto& kv : n )
+        {
+            s.push_back( kv.first.as<string>() );
+        }
+    }
+    catch ( ... )
+    {
+    }
+    return s;
+}
+
 //! ----------------------------------------------------------------------
 //! get-with-default overloads
 //! ----------------------------------------------------------------------

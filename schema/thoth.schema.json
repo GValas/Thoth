@@ -413,7 +413,7 @@
         "max_day_step": { "type": "integer", "description": "Max diffusion step in days." },
         "min_day_step": { "type": "integer", "description": "Min step in days (-1 = unconstrained)." },
         "paths": { "type": "integer", "description": "Number of simulated paths." },
-        "vol_year_step": { "type": "number", "description": "Variance sub-step." },
+        "vol_year_step": { "type": "number", "description": "Variance sub-step (year fraction). On a stochastic-variance book (Heston/Bates), caps the diffusion step below max_day_step so the variance process is sub-stepped (reduces Andersen-QE bias on long steps). No effect on plain GBM books or when <= 0." },
         "node_file": { "type": "string" },
         "use_sobol": { "type": "boolean", "description": "Sobol + Brownian-bridge quasi-random paths." },
         "allow_gpu": { "type": "boolean", "description": "Run on a CUDA GPU when one is present and the book is GPU-supported (single-asset European GBM vanillas); otherwise runs on the CPU. Default false." },

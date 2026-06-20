@@ -130,6 +130,12 @@ class YamlConfig
     //! objects byt kind
     vector<string> GetObjectsByKind( const string& kind );
 
+    //! immediate child keys of the map at Path (in document order); empty if the
+    //! path is missing or not a map. Lets a consumer walk a result block without
+    //! knowing its field names ahead of time (e.g. the cluster aggregator pooling
+    //! every premium/Greek a slave reported, including model Greeks like vega_v0).
+    vector<string> GetChildKeys( const string& Path );
+
     //! tag to disambiguate the in-memory (string) constructor
     struct from_string_t
     {

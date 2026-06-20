@@ -129,7 +129,6 @@ static string ClusterPrice( const string& Body,
 
     const long total = req.GetLong( mcl + ".paths" );
     const string result = req.GetString( exec + ".result" );
-    const vector<string> contracts = req.GetStringList( req.GetString( exec + ".book" ) + ".options" );
 
     //! slaves actually used: never hand a slave 0 paths (a zero-path book is
     //! rejected with "paths must be > 0"), so cap the fan-out at `total`. A
@@ -213,45 +212,55 @@ static string ClusterPrice( const string& Body,
         }
     }
 
-    //! aggregate : path-weighted mean for values, combined variance for trusts
-    const vector<string> gnames = { "delta", "gamma", "vega", "rho", "theta" };
-    double premium = 0;
-    double trust2 = 0;
-    map<string, double> cprem, ctrust2, greeks;
+    //! aggregate every numeric field a slave reported, schema-agnostically. The
+    //! result block holds premium, the requested book Greeks (delta..theta), the
+    //! model-parameter Greeks (vega_<param>, e.g. vega_v0/vega_kappa) and the
+    //! per-contract premia/Greeks — all pooled the same way. Enumerating the keys
+    //! (rather than matching a hardcoded list by eye) is what keeps producer and
+    //! aggregator in sync: a fixed {delta..theta} list silently dropped every
+    //! vega_<param> on the cluster. Path-weighted mean for values; quadrature
+    //! (sum of w^2*stderr^2) for the *_trust standard errors. exec_time is a
+    //! per-slave wall time (not poolable) and string fields (kind, *_graph) are
+    //! left as the first slave's copy.
+    auto ends_with = []( const string& s, const string& suf )
+    { return s.size() >= suf.size() && s.compare( s.size() - suf.size(), suf.size(), suf ) == 0; };
+
+    map<string, double> pooled; //!< path-weighted means (premium, Greeks, ...)
+    map<string, double> trust2; //!< summed w^2 * stderr^2, square-rooted on write
+    const vector<string> keys =
+        YamlConfig( YamlConfig::from_string_t{}, responses[0] ).GetChildKeys( result );
     for ( int k = 0; k < N; k++ )
     {
         YamlConfig r( YamlConfig::from_string_t{}, responses[k] );
         const double w = (double)npaths[k] / (double)total;
-        premium += w * r.GetDouble( result + ".premium" );
-        const double tr = r.GetDouble( result + ".premium_trust", 0.0 );
-        trust2 += w * w * tr * tr;
-        for ( const string& c : contracts )
+        for ( const string& key : keys )
         {
-            cprem[c] += w * r.GetDouble( result + "." + c + "_premium", 0.0 );
-            const double ct = r.GetDouble( result + "." + c + "_premium_trust", 0.0 );
-            ctrust2[c] += w * w * ct * ct;
-        }
-        for ( const string& g : gnames )
-        {
-            if ( r.IsDouble( result + "." + g ) )
+            const string path = result + "." + key;
+            if ( key == "exec_time" || !r.IsDouble( path ) )
             {
-                greeks[g] += w * r.GetDouble( result + "." + g );
+                continue;
+            }
+            const double v = r.GetDouble( path, 0.0 );
+            if ( ends_with( key, "_trust" ) )
+            {
+                trust2[key] += w * w * v * v;
+            }
+            else
+            {
+                pooled[key] += w * v;
             }
         }
     }
 
     //! patch the first slave's response with the pooled numbers
     YamlConfig out( YamlConfig::from_string_t{}, responses[0] );
-    out.SetDouble( result + ".premium", premium );
-    out.SetDouble( result + ".premium_trust", sqrt( trust2 ) );
-    for ( const string& c : contracts )
+    for ( const auto& [key, v] : pooled )
     {
-        out.SetDouble( result + "." + c + "_premium", cprem[c] );
-        out.SetDouble( result + "." + c + "_premium_trust", sqrt( ctrust2[c] ) );
+        out.SetDouble( result + "." + key, v );
     }
-    for ( const auto& [g, v] : greeks )
+    for ( const auto& [key, v] : trust2 )
     {
-        out.SetDouble( result + "." + g, v );
+        out.SetDouble( result + "." + key, sqrt( v ) );
     }
     out.SetString( "system_information.cluster",
                    "aggregated " + std::to_string( total ) + " paths over " +

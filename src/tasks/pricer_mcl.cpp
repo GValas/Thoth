@@ -56,7 +56,38 @@ void PricerMCL::InitDates()
     //! diffusion dates = fixing_dates + mcl dates + without today
     set<date> fixing_dates = _book->GetFixingDates();
     date last_date = *( --( fixing_dates.end() ) );
-    days days_step( _configuration->_mcl->_max_day_step );
+
+    //! diffusion-grid resolution: the grid is stepped at max_day_step, but
+    //! vol_year_step (a year fraction) caps the step further so the variance
+    //! process is sub-stepped — Andersen-QE bias grows with the step size, so a
+    //! long max_day_step (e.g. 30d) under strong mean-reversion would otherwise
+    //! accumulate variance-path bias. Refining the shared grid (rather than only
+    //! the variance node) keeps every sub-step's spot/variance Brownians
+    //! correlated and Sobol-drawn, and keeps the same grid across Greek bumps
+    //! (common random numbers). Applied only when the book carries a genuine
+    //! stochastic-variance model (Heston / Bates): a plain GBM book has no
+    //! variance path to sub-step, so it stays on max_day_step (cost unchanged).
+    //! vol_year_step <= 0 disables the cap.
+    long step_days = _configuration->_mcl->_max_day_step;
+    if ( _configuration->_mcl->_vol_year_step > 0 )
+    {
+        bool has_stochastic_vol = false;
+        for ( Single* s : _single_set )
+        {
+            if ( s->GetVolatility()->IsStochastic() )
+            {
+                has_stochastic_vol = true;
+                break;
+            }
+        }
+        if ( has_stochastic_vol )
+        {
+            const long vol_days = std::max<long>(
+                1, (long)std::floor( _configuration->_mcl->_vol_year_step * NB_OF_DAYS_A_YEAR ) );
+            step_days = std::min( step_days, vol_days );
+        }
+    }
+    days days_step( step_days );
     for ( date d = _today;
           d < last_date;
           d += days_step )
