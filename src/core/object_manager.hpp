@@ -23,7 +23,7 @@ class ObjectManager
     using Factory = std::function<Object*( ObjectManager&, const string& )>;
 
     //! lifecycle
-    void ReadObjects( const string& ExecName ); //!< resolve the exec (root) task
+    void ReadObjects( const string& TaskName ); //!< resolve the root task
     void ExecuteTask();                         //!< run it
     void WriteResults();                        //!< export results into the config tree
     void WriteOutputFile();                     //!< flush the config tree to the output file
@@ -80,8 +80,8 @@ class ObjectManager
 
   private:
     YamlConfig _yml;
-    Task* _exec_node = nullptr;
-    string _exec_name;
+    Task* _task_node = nullptr;
+    string _task_name;
     ObjectCollector _collector;
 
     //! an object exists iff it carries a kind tag (e.g. `name: !equity { ... }`)

@@ -31,10 +31,10 @@ The binary's mode is selected by the first argument. Argument counts are
 validated in `GetRunningMode`; an invalid invocation falls back to the help
 banner and a non-zero exit.
 
-### `-batch <input.yaml> <output.yaml> [exec_name]`
+### `-batch <input.yaml> <output.yaml> [task_name]`
 
 Read the task in `input.yaml`, run it, and write `output.yaml` (the input config
-with the computed `*_result` blocks added). The optional `exec_name` overrides
+with the computed `*_result` blocks added). The optional `task_name` overrides
 which object to execute; it defaults to the `root` object.
 
 ```bash
@@ -46,7 +46,7 @@ which object to execute; it defaults to the `root` object.
 
 Start the HTTP pricing service, listening on `0.0.0.0:<port>`:
 
-- `POST /price` — YAML body in, YAML result out. An optional `X-Exec-Name`
+- `POST /price` — YAML body in, YAML result out. An optional `X-Task-Name`
   header selects the object to run (default: the `root` object).
 - `GET /health` — returns `ok`.
 - `GET /progress` — `"<current> <total> <active>"` of the in-flight pricing

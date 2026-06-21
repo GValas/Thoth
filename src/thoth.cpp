@@ -45,7 +45,7 @@ int main( int argc,
     switch ( GetRunningMode( argc, argv[1] ) )
     {
     case MODE_BATCH:
-        //! -batch <input> <output> [exec_name]
+        //! -batch <input> <output> [task_name]
         return RunBatch( argv[2], argv[3], argc >= 5 ? argv[4] : ROOT_NODE );
 
     case MODE_SERVER:
@@ -110,12 +110,12 @@ static RunningMode GetRunningMode( const int argc,
 //! display command line help
 static void DisplayHelp()
 {
-    LOG( "HLP", "batch  : thoth -batch <input.yaml> <output.yaml> [exec_name]" );
+    LOG( "HLP", "batch  : thoth -batch <input.yaml> <output.yaml> [task_name]" );
     LOG( "HLP", "         price the task in input.yaml and write output.yaml" );
     cout << endl;
     LOG( "HLP", "server : thoth -server <port>" );
     LOG( "HLP", "         HTTP pricing service: POST /price (YAML body -> YAML result)," );
-    LOG( "HLP", "         optional header X-Exec-Name; GET /health" );
+    LOG( "HLP", "         optional header X-Task-Name; GET /health" );
     cout << endl;
     LOG( "HLP", "client : thoth -client <url> <input.yaml>" );
     LOG( "HLP", "         POST input.yaml to a thoth server and print the result" );

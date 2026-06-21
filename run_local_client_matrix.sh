@@ -125,7 +125,7 @@ BEGIN {
 /^[^[:space:]]/ { flush(); reset(); next }
 # scalars inside the block (exactly two-space indent, unprefixed top-level fields)
 name != "" && /^  kind:[[:space:]]*pricer_result/ { is_pricer=1 }
-name != "" && /^  exec_time:/ { t=$2 }
+name != "" && /^  task_time:/ { t=$2 }
 name != "" && /^  premium:/   { prem=$2 }
 name != "" && /^  delta:/     { de=$2 }
 name != "" && /^  gamma:/     { ga=$2 }

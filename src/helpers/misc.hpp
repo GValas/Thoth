@@ -26,10 +26,10 @@ void LOG( const string& Context,
 
 void CheckDateList( const vector<date>& DateList );
 //! monotonic wall-clock time in seconds (steady_clock); use as the start stamp
-//! for ExecTime / ExecTimeLog so timings are real elapsed time, not CPU time.
+//! for TaskTime / TaskTimeLog so timings are real elapsed time, not CPU time.
 double WallClockSeconds();
-string ExecTimeLog( double StartSeconds );
-double ExecTime( double StartSeconds );
+string TaskTimeLog( double StartSeconds );
+double TaskTime( double StartSeconds );
 
 //! ACT/365 year fraction between two dates (the single day-count convention)
 inline double YearFraction( const date& From, const date& To )

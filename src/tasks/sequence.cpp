@@ -37,8 +37,8 @@ void Sequence::Execute()
         _tasks[i]->Execute();
         _tasks[i]->WriteResults();
     }
-    _exec_time = ExecTime( t0 );
-    LOG( "SEQ", "ran " + ToString( _tasks.size() ) + " task(s), exec_time = " + ToString( _exec_time ) + " sec" );
+    _task_time = TaskTime( t0 );
+    LOG( "SEQ", "ran " + ToString( _tasks.size() ) + " task(s), task_time = " + ToString( _task_time ) + " sec" );
 }
 
 //! sub-task results are written as they run (see Execute); only the summary
@@ -48,7 +48,7 @@ void Sequence::WriteResults()
     if ( !_result.empty() )
     {
         _cfg->Set( _result + ".kind", _kind + "_result" );
-        _cfg->Set( _result + ".exec_time", _exec_time );
+        _cfg->Set( _result + ".task_time", _task_time );
         _cfg->Set( _result + ".tasks", _task_names );
     }
 }

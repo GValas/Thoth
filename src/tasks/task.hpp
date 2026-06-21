@@ -9,7 +9,7 @@ class Task : public Object
 
   protected:
     //! attributes
-    double _exec_time = 0;
+    double _task_time = 0;
     string _result;
 
     //! enables to write results

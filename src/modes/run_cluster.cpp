@@ -23,16 +23,16 @@
 //! POST a YAML body to one slave and return its response body (throws on failure)
 static string PostToSlave( const string& Url,
                            const string& Body,
-                           const string& ExecName )
+                           const string& TaskName )
 {
     httplib::Client client( Url );
     client.set_read_timeout( 3600 );
     client.set_write_timeout( 60 );
 
     httplib::Headers headers;
-    if ( ExecName != ROOT_NODE )
+    if ( TaskName != ROOT_NODE )
     {
-        headers.emplace( "X-Exec-Name", ExecName );
+        headers.emplace( "X-Task-Name", TaskName );
     }
 
     auto res = client.Post( "/price", headers, Body, "application/x-yaml" );
@@ -73,7 +73,7 @@ static bool PollSlaveProgress( const string& Url, long& Current, long& Total, bo
 //! forward declaration : a !sequence is dispatched per sub-task (mutual recursion
 //! with ClusterPrice, which a sub-task re-enters as an individual pricer).
 static string ClusterPriceSequence( const string& Body,
-                                    const string& Exec,
+                                    const string& TaskName,
                                     const vector<string>& Slaves );
 
 //! split a single-pricer MCL request across the slaves and aggregate. A !sequence
@@ -81,26 +81,26 @@ static string ClusterPriceSequence( const string& Body,
 //! else (non-MCL engine, an MCL pricer with no path config) is computed on the
 //! master rather than offloading a whole, unsplit job onto one slave.
 static string ClusterPrice( const string& Body,
-                            const string& ExecName,
+                            const string& TaskName,
                             const vector<string>& Slaves )
 {
     YamlConfig req( YamlConfig::from_string_t{}, Body );
-    const string exec = ( ExecName == ROOT_NODE ) ? req.GetString( "root" ) : ExecName;
+    const string task = ( TaskName == ROOT_NODE ) ? req.GetString( "root" ) : TaskName;
 
     //! a sequence (e.g. the full pricer matrix) : apply the cluster logic to each
     //! sub-pricer in turn, so its MCL cells are path-split across the slaves too.
-    if ( req.GetTag( exec ) == "sequence" )
+    if ( req.GetTag( task ) == "sequence" )
     {
-        return ClusterPriceSequence( Body, exec, Slaves );
+        return ClusterPriceSequence( Body, task, Slaves );
     }
 
     //! only a plain (CPU) MCL single-pricer is path-split across the slaves
-    bool splittable = req.GetTag( exec ) == "pricer";
+    bool splittable = req.GetTag( task ) == "pricer";
     string cfg, mcl;
     bool allow_gpu = false;
     if ( splittable )
     {
-        cfg = req.GetString( exec + ".configuration" );
+        cfg = req.GetString( task + ".configuration" );
         if ( req.GetString( cfg + ".method" ) == "mcl" && req.IsString( cfg + ".mcl_configuration" ) )
         {
             mcl = req.GetString( cfg + ".mcl_configuration" );
@@ -124,11 +124,11 @@ static string ClusterPrice( const string& Body,
         LOG( allow_gpu ? "GPU" : "CLU",
              allow_gpu ? "GPU pricer : computing on the master device (not path-split)"
                        : "request is not a splittable MCL pricer : computing on the master" );
-        return ExecuteYaml( Body, ExecName );
+        return ExecuteYaml( Body, TaskName );
     }
 
     const long total = req.GetLong( mcl + ".paths" );
-    const string result = req.GetString( exec + ".result" );
+    const string result = req.GetString( task + ".result" );
 
     //! slaves actually used: never hand a slave 0 paths (a zero-path book is
     //! rejected with "paths must be > 0"), so cap the fan-out at `total`. A
@@ -168,7 +168,7 @@ static string ClusterPrice( const string& Body,
     {
         threads.emplace_back( [&, k]()
                               {
-            try { responses[k] = PostToSlave( Slaves[k], bodies[k], ExecName ); }
+            try { responses[k] = PostToSlave( Slaves[k], bodies[k], TaskName ); }
             catch ( ... ) { errs[k] = std::current_exception(); } } );
     }
 
@@ -219,7 +219,7 @@ static string ClusterPrice( const string& Body,
     //! (rather than matching a hardcoded list by eye) is what keeps producer and
     //! aggregator in sync: a fixed {delta..theta} list silently dropped every
     //! vega_<param> on the cluster. Path-weighted mean for values; quadrature
-    //! (sum of w^2*stderr^2) for the *_trust standard errors. exec_time is a
+    //! (sum of w^2*stderr^2) for the *_trust standard errors. task_time is a
     //! per-slave wall time (not poolable) and string fields (kind, *_graph) are
     //! left as the first slave's copy.
     auto ends_with = []( const string& s, const string& suf )
@@ -236,7 +236,7 @@ static string ClusterPrice( const string& Body,
         for ( const string& key : keys )
         {
             const string path = result + "." + key;
-            if ( key == "exec_time" || !r.IsDouble( path ) )
+            if ( key == "task_time" || !r.IsDouble( path ) )
             {
                 continue;
             }
@@ -277,12 +277,12 @@ static string ClusterPrice( const string& Body,
 //! bar coherent. Each call re-prices from the original Body, so sub-pricers sharing
 //! a book stay independent (no carried-over state between cells).
 static string ClusterPriceSequence( const string& Body,
-                                    const string& Exec,
+                                    const string& TaskName,
                                     const vector<string>& Slaves )
 {
     YamlConfig out( YamlConfig::from_string_t{}, Body ); //!< accumulator = input doc
-    const vector<string> tasks = out.GetStringList( Exec + ".tasks" );
-    LOG( "SEQ", "sequence '" + Exec + "' : dispatching " + std::to_string( tasks.size() ) + " task(s) across the cluster" );
+    const vector<string> tasks = out.GetStringList( TaskName + ".tasks" );
+    LOG( "SEQ", "sequence '" + TaskName + "' : dispatching " + std::to_string( tasks.size() ) + " task(s) across the cluster" );
 
     const double t0 = WallClockSeconds();
     for ( size_t i = 0; i < tasks.size(); i++ )
@@ -294,16 +294,16 @@ static string ClusterPriceSequence( const string& Body,
     }
 
     //! final SEQ line with the total time, mirroring the in-process Sequence::Execute
-    const double total_time = ExecTime( t0 );
-    LOG( "SEQ", "ran " + std::to_string( tasks.size() ) + " task(s), exec_time = " +
+    const double total_time = TaskTime( t0 );
+    LOG( "SEQ", "ran " + std::to_string( tasks.size() ) + " task(s), task_time = " +
                     ToString( total_time ) + " sec" );
 
     //! sequence summary block, mirroring Sequence::WriteResults
-    const string seq_result = out.GetString( Exec + ".result", "" );
+    const string seq_result = out.GetString( TaskName + ".result", "" );
     if ( !seq_result.empty() )
     {
         out.Set( seq_result + ".kind", "sequence_result" );
-        out.Set( seq_result + ".exec_time", total_time );
+        out.Set( seq_result + ".task_time", total_time );
         out.Set( seq_result + ".tasks", tasks );
     }
     out.Set( "system_information.cluster",
@@ -328,15 +328,15 @@ int RunClusterMaster( int Port,
 
     server.Post( "/price", [Slaves]( const httplib::Request& req, httplib::Response& res )
                  {
-        const string exec_name = req.has_header( "X-Exec-Name" )
-                                 ? req.get_header_value( "X-Exec-Name" )
+        const string task_name = req.has_header( "X-Task-Name" )
+                                 ? req.get_header_value( "X-Task-Name" )
                                  : string( ROOT_NODE );
         const string client = req.remote_addr + ":" + std::to_string( req.remote_port );
         LOG( "CLU", "client " + client + " connected (price request)" );
 
         std::lock_guard<std::mutex> lock( price_mutex );
         string result;
-        try { result = ClusterPrice( req.body, exec_name, Slaves ); }
+        try { result = ClusterPrice( req.body, task_name, Slaves ); }
         catch ( const std::exception& e ) { result = string( "error: " ) + e.what() + "\n"; }
         catch ( ... ) { result = "error: unknown cluster failure\n"; }
         res.set_content( result, "application/x-yaml" ); } );

@@ -122,7 +122,7 @@ void Pricer::Execute()
         ComputeParamGreeks();
     }
 
-    _exec_time = ExecTime( t0 );
+    _task_time = TaskTime( t0 );
 }
 
 //! model-parameter Greeks: for each requested vega_<param>, bump that parameter on
@@ -492,7 +492,7 @@ void Pricer::WriteResults()
     LOG( "BPR",
          "book price = " + ToString( _premium ) + ", " +
              "book trust = " + ToString( _book->GetPremiumTrust() ) + greeks + ", " +
-             "book time = " + ToString( _exec_time ) + "sec" );
+             "book time = " + ToString( _task_time ) + "sec" );
 
     //! write cfg results
     Task::WriteResults();

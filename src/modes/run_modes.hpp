@@ -6,8 +6,8 @@
 //! run_client.cpp / run_cluster.cpp so each mode is a focused translation unit;
 //! main() in thoth.cpp only parses the command line and dispatches.
 
-//! launch a single pricing task from files (-batch <input> <output> [exec])
-int RunBatch( const string& InputFile, const string& OutputFile, const string& ExecName );
+//! launch a single pricing task from files (-batch <input> <output> [task])
+int RunBatch( const string& InputFile, const string& OutputFile, const string& TaskName );
 
 //! HTTP pricing service (-server <port>): POST /price, GET /health, GET /progress
 int RunHttpServer( int Port );
@@ -20,4 +20,4 @@ int RunClusterMaster( int Port, const vector<string>& Slaves );
 
 //! execute an in-memory YAML request (any task, not only pricing) and return the
 //! YAML result (throws on error). Shared by the server and the cluster master.
-string ExecuteYaml( const string& YamlRequest, const string& ExecName );
+string ExecuteYaml( const string& YamlRequest, const string& TaskName );

@@ -287,7 +287,7 @@ so debug with a small book or a reduced `paths`.
 ### Batch (file in / file out)
 
 ```bash
-./build/thoth -batch <input.yaml> <output.yaml> [exec_name]
+./build/thoth -batch <input.yaml> <output.yaml> [task_name]
 # or build the production image and price in a container — the result is written
 # next to the input as <input>.out.yaml, owned by the invoking user:
 ./run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
@@ -334,7 +334,7 @@ curl --data-binary @samples/simple_call.yaml localhost:8080/price
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
-`X-Exec-Name` header selects which object to run (default: the `root` object).
+`X-Task-Name` header selects which object to run (default: the `root` object).
 Send `Content-Type: application/x-yaml` for bodies over ~8 KB (the built-in client
 and `run_local_client_matrix.sh` already do); the default form content type is
 capped by the HTTP library.

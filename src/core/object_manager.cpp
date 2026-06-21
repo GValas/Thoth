@@ -37,42 +37,42 @@ void ObjectManager::CheckObject( const string& ObjectName )
     }
 }
 
-//! init objects tree (the exec node is the task named by _exec_name)
-void ObjectManager::ReadObjects( const string& ExecName )
+//! init objects tree (the task node is the task named by _task_name)
+void ObjectManager::ReadObjects( const string& TaskName )
 {
     //! parsing task (root is special _name)
-    _exec_name = ( ExecName == ROOT_NODE ) ? _yml.GetString( ROOT_NODE ) : ExecName;
-    _exec_node = Get<Task>( _exec_name );
+    _task_name = ( TaskName == ROOT_NODE ) ? _yml.GetString( ROOT_NODE ) : TaskName;
+    _task_node = Get<Task>( _task_name );
 
-    //! getting exec result node
-    if ( _exec_node )
+    //! getting task result node
+    if ( _task_node )
     {
-        _exec_node->SetResult( _yml.GetString( _exec_name + ".result" ) );
+        _task_node->SetResult( _yml.GetString( _task_name + ".result" ) );
     }
 }
 
 //! execute task
 void ObjectManager::ExecuteTask()
 {
-    LOG( "EXE", "executing task : " + _exec_name );
+    LOG( "TSK", "executing task : " + _task_name );
 
     //! executing root
-    if ( _exec_node )
+    if ( _task_node )
     {
         //! total wall-clock time for the whole task (real elapsed, not CPU time)
         const double t0 = WallClockSeconds();
-        _exec_node->Execute();
+        _task_node->Execute();
 
         //! system_information
-        _yml.Set( "system_information.last_exec_name", _exec_node->GetName() );
-        _yml.Set( "system_information.last_exec_kind", _exec_node->GetKind() );
-        _yml.Set( "system_information.exec_time", ExecTime( t0 ) );
+        _yml.Set( "system_information.last_task_name", _task_node->GetName() );
+        _yml.Set( "system_information.last_task_kind", _task_node->GetKind() );
+        _yml.Set( "system_information.task_time", TaskTime( t0 ) );
     }
 
     //! no task to execute
     else
     {
-        ERR( _exec_name + " is not a task" );
+        ERR( _task_name + " is not a task" );
     }
 }
 
@@ -80,9 +80,9 @@ void ObjectManager::ExecuteTask()
 void ObjectManager::WriteResults()
 {
     //! executing root
-    if ( _exec_node )
+    if ( _task_node )
     {
-        _exec_node->WriteResults();
+        _task_node->WriteResults();
     }
 }
 

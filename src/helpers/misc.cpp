@@ -203,14 +203,14 @@ double WallClockSeconds()
 }
 
 //!
-string ExecTimeLog( double StartSeconds )
+string TaskTimeLog( double StartSeconds )
 {
     double x = WallClockSeconds() - StartSeconds;
-    return "exec_time = " + ToString( x ) + " sec";
+    return "task_time = " + ToString( x ) + " sec";
 }
 
 //!
-double ExecTime( double StartSeconds )
+double TaskTime( double StartSeconds )
 {
     return WallClockSeconds() - StartSeconds;
 }

@@ -12,10 +12,10 @@
 
 //! execute an in-memory YAML request (any task, not only pricing) and return the
 //! YAML result (throws on error). Shared with the cluster master (run_cluster.cpp).
-string ExecuteYaml( const string& YamlRequest, const string& ExecName )
+string ExecuteYaml( const string& YamlRequest, const string& TaskName )
 {
     ObjectManager manager( YamlConfig::from_string_t{}, YamlRequest );
-    manager.ReadObjects( ExecName );
+    manager.ReadObjects( TaskName );
     manager.ExecuteTask();
     manager.WriteResults();
     return manager.ResultYaml();
@@ -53,8 +53,8 @@ int RunHttpServer( int Port )
                  {
         //! copy what the worker needs : the provider runs after this returns
         const string body = req.body;
-        const string exec_name = req.has_header( "X-Exec-Name" )
-                                 ? req.get_header_value( "X-Exec-Name" )
+        const string task_name = req.has_header( "X-Task-Name" )
+                                 ? req.get_header_value( "X-Task-Name" )
                                  : string( ROOT_NODE );
         const string client = req.remote_addr + ":" + std::to_string( req.remote_port );
         LOG( "HTTP", "client " + client + " connected (price request)" );
@@ -66,7 +66,7 @@ int RunHttpServer( int Port )
         //! a result nobody will read.
         res.set_chunked_content_provider(
             "application/x-yaml",
-            [body, exec_name, client]( size_t /*offset*/, httplib::DataSink& sink ) -> bool
+            [body, task_name, client]( size_t /*offset*/, httplib::DataSink& sink ) -> bool
             {
                 //! one pricing at a time (global GSL state) -> serialise end to end.
                 //! if another request holds the lock, this client is queued : say so.
@@ -82,7 +82,7 @@ int RunHttpServer( int Port )
                 std::atomic<bool> done{ false };
                 std::thread worker( [&]()
                 {
-                    try { result = ExecuteYaml( body, exec_name ); }
+                    try { result = ExecuteYaml( body, task_name ); }
                     catch ( const std::exception& e ) { result = string( "error: " ) + e.what() + "\n"; }
                     catch ( ... ) { result = "error: unknown failure\n"; }
                     done.store( true );
