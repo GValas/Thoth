@@ -56,12 +56,13 @@ class ObjectManager
         {
             return cached;
         }
-        T* built = dynamic_cast<T*>( Build( ObjectName ) );
-        if ( !built )
+        //! Build returns the bare Object (the registry is the only TU that knows the
+        //! concrete types); the T-dependent dynamic_cast stays here, where T is complete.
+        if ( T* built = dynamic_cast<T*>( Build( ObjectName ) ) )
         {
-            ERR( "object '" + ObjectName + "' has an unexpected type for this reference" );
+            return built;
         }
-        return built;
+        ERR( "object '" + ObjectName + "' has an unexpected type for this reference" );
     }
 
     //! map a list of names through Get<T>

@@ -42,7 +42,7 @@ void ObjectManager::ReadObjects( const string& ExecName )
 {
     //! parsing task (root is special _name)
     _exec_name = ( ExecName == ROOT_NODE ) ? _yml.GetString( ROOT_NODE ) : ExecName;
-    _exec_node = IsObject( _exec_name ) ? Get<Task>( _exec_name ) : nullptr;
+    _exec_node = Get<Task>( _exec_name );
 
     //! getting exec result node
     if ( _exec_node )

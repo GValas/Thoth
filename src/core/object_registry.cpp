@@ -153,12 +153,11 @@ map<string, ObjectManager::Factory> MakeRegistry()
 Object* ObjectManager::Build( const string& ObjectName )
 {
     static const map<string, Factory> registry = MakeRegistry();
-
     const string kind = _yml.GetTag( ObjectName );
     auto entry = registry.find( kind );
-    if ( entry == registry.end() )
+    if ( entry != registry.end() )
     {
-        ERR( "unknown kind : " + kind );
+        return entry->second( *this, ObjectName );
     }
-    return entry->second( *this, ObjectName );
+    ERR( "unknown kind : " + kind );
 }
