@@ -80,10 +80,10 @@ file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/sr
 # the engine library (so the test binary does not link the HTTP server / cluster).
 set(THOTH_APP_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/thoth.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_batch.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_server.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_client.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/run_cluster.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/modes/run_batch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/modes/run_server.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/modes/run_client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/modes/run_cluster.cpp"
 )
 list(REMOVE_ITEM CORE_SOURCES ${THOTH_APP_SOURCES})
 
@@ -106,6 +106,7 @@ target_include_directories(thoth_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vol_correl"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/fixings"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/modes"
 )
 target_link_libraries(thoth_core PUBLIC
     Boost::date_time
