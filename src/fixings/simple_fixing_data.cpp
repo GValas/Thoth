@@ -1,11 +1,20 @@
 #include "thoth.hpp"
 #include "simple_fixing_data.hpp"
+#include "object_reader.hpp"
 
 SimpleFixingData::SimpleFixingData( const string& ObjectName ) : Object( ObjectName, KIND_SIMPLE_FIXING_DATA )
 {
 }
 
 SimpleFixingData::~SimpleFixingData() = default;
+
+//! read the fixing time series (dates + values) and its underlying name
+void SimpleFixingData::Configure( ObjectReader& reader )
+{
+    SetDateList( reader.Get<vector<date>>( "dates" ) );
+    SetValueList( reader.LaVector( "values" ) );
+    SetUnderlying( reader.Get<string>( "underlying" ) );
+}
 
 //! setter
 void SimpleFixingData::SetDateList( const vector<date>& DateList )

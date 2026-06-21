@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "correlation.hpp"
+#include "object_reader.hpp"
 
 //!
 Correlation::Correlation( const string& ObjectName ) : Object( ObjectName, KIND_CORRELATION_MATRIX )
@@ -8,6 +9,31 @@ Correlation::Correlation( const string& ObjectName ) : Object( ObjectName, KIND_
 
 //!
 Correlation::~Correlation() = default;
+
+//! read the matrix (full or symmetric form) and the optional name lists
+void Correlation::Configure( ObjectReader& reader )
+{
+    if ( reader.Has<vector<double>>( "matrix" ) )
+    {
+        SetMatrix( reader.LaVector( "matrix" ) );
+    }
+    else if ( reader.Has<vector<double>>( "symmetric_matrix" ) )
+    {
+        SetSymmetricMatrix( reader.LaVector( "symmetric_matrix" ) );
+    }
+    else
+    {
+        ERR( ".matrix & .symmetric matrix are missing" );
+    }
+    if ( reader.Has<vector<string>>( "underlyings" ) )
+    {
+        SetUnderlyingList( reader.Get<vector<string>>( "underlyings" ) );
+    }
+    if ( reader.Has<vector<string>>( "forexs" ) )
+    {
+        SetForexList( reader.Ref<vector<Forex>>( "forexs" ) );
+    }
+}
 
 //! setter (takes ownership of Matrix)
 void Correlation::SetMatrix( LaVector Matrix )

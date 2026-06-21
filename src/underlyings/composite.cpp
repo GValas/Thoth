@@ -1,5 +1,8 @@
 #include "thoth.hpp"
 #include "composite.hpp"
+#include "correlation.hpp"
+#include "currency.hpp"
+#include "object_reader.hpp"
 
 //!
 Composite::Composite( const string& ObjectName ) : Underlying( ObjectName, KIND_COMPOSITE )
@@ -9,6 +12,13 @@ Composite::Composite( const string& ObjectName ) : Underlying( ObjectName, KIND_
 
 //!
 Composite::~Composite() = default;
+
+//! read the wrapped underlying (field "equity") and the composite currency
+void Composite::Configure( ObjectReader& reader )
+{
+    SetUnderlying( *reader.Ref<Underlying>( "equity" ) );
+    SetCompoCurrency( *reader.Ref<Currency>( "composite_currency" ) );
+}
 
 //! setter
 void Composite::SetCompoCurrency( Currency& CompositeCurrency )

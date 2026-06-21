@@ -13,6 +13,9 @@ class Vanilla : public Contract
     OptionType _type = OptionType::Call;
 
   public:
+    //! read own fields from the configuration (strike / maturity / type / exercise)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetStrike( const double Strike );
     void SetMaturityDate( const date& MaturityDate );

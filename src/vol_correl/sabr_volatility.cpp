@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "sabr_volatility.hpp"
+#include "object_reader.hpp"
 
 //!
 SabrVolatility::SabrVolatility( const string& ObjectName ) : Volatility( ObjectName, KIND_SABR_VOLATILITY )
@@ -9,6 +10,17 @@ SabrVolatility::SabrVolatility( const string& ObjectName ) : Volatility( ObjectN
 
 //!
 SabrVolatility::~SabrVolatility() = default;
+
+//! read own fields (per-maturity SABR params), then the common calendar
+void SabrVolatility::Configure( ObjectReader& reader )
+{
+    SetMaturityList( reader.Get<vector<double>>( "maturities" ) );
+    SetAlphaList( reader.Get<vector<double>>( "alpha" ) );
+    SetBetaList( reader.Get<vector<double>>( "beta" ) );
+    SetRhoList( reader.Get<vector<double>>( "rho" ) );
+    SetNuList( reader.Get<vector<double>>( "nu" ) );
+    ConfigureCommon( reader );
+}
 
 void SabrVolatility::SetMaturityList( const vector<double>& MaturityList ) { _maturity_list = MaturityList; }
 void SabrVolatility::SetAlphaList( const vector<double>& AlphaList ) { _alpha_list = AlphaList; }

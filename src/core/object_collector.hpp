@@ -15,10 +15,6 @@ class ObjectCollector
     //! owns every object, keyed by name
     map<string, std::unique_ptr<Object>> _object_map;
 
-    //! owns auxiliary objects that intentionally share a name with another
-    //! object (e.g. a mono wrapper around an equity) and so cannot be indexed
-    vector<std::unique_ptr<Object>> _owned_extra;
-
   public:
     //! register an object (ownership taken). A name must map to a single object
     //! of a single type: re-adding the same name with a different type is a
@@ -48,25 +44,12 @@ class ObjectCollector
         return it == _object_map.end() ? nullptr : dynamic_cast<T*>( it->second.get() );
     }
 
-    //! take ownership of an auxiliary object not exposed for lookup
-    template <class T>
-    T* Own( std::unique_ptr<T> o )
-    {
-        T* p = o.get();
-        _owned_extra.push_back( std::move( o ) );
-        return p;
-    }
-
     //! propagate the valuation date to every object
     void SetToday( const date& Today )
     {
         for ( auto& o : _object_map )
         {
             o.second->SetToday( Today );
-        }
-        for ( auto& o : _owned_extra )
-        {
-            o->SetToday( Today );
         }
     }
 };

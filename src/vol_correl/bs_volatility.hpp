@@ -11,6 +11,9 @@ class BsVolatility : public Volatility
     double _volatility;
 
   public:
+    //! read own field (flat vol), then the common calendar
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetVolatility( double BsVolatility );
 

@@ -22,6 +22,9 @@ class Barrier : public Contract
     {
         return _barrier_monitoring_type == BarrierMonitoring::Discrete;
     }
+    //! read own fields from the configuration (strike / maturity / type / barrier)
+    void Configure( ObjectReader& reader ) override;
+
     //! monitoring schedule: today + k*period (k>=1) up to and including maturity
     set<date> GetMonitoringDates();
 

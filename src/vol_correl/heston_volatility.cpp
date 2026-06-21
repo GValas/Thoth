@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "heston_volatility.hpp"
+#include "object_reader.hpp"
 
 HestonVolatility::HestonVolatility( const string& ObjectName )
     : Volatility( ObjectName, KIND_HESTON_VOLATILITY )
@@ -8,6 +9,23 @@ HestonVolatility::HestonVolatility( const string& ObjectName )
 }
 
 HestonVolatility::~HestonVolatility() = default;
+
+//! read own fields (Heston + optional Bates jumps), then the common calendar
+void HestonVolatility::Configure( ObjectReader& reader )
+{
+    SetSpot( reader.Get<double>( "spot" ) );
+    //! vols quoted in percent (like every vol) -> variances
+    SetV0( pow( reader.Get<double>( "init_vol" ) / 100.0, 2 ) );
+    SetTheta( pow( reader.Get<double>( "long_vol" ) / 100.0, 2 ) );
+    SetKappa( reader.Get<double>( "kappa" ) );
+    SetXi( reader.Get<double>( "vol_of_vol" ) );
+    //! optional Bates jumps (absent -> 0 -> pure Heston). jump_mean / jump_vol
+    //! are in log-return space; jump_intensity is the yearly jump frequency.
+    SetJumpIntensity( reader.Get<double>( "jump_intensity", 0 ) );
+    SetJumpMean( reader.Get<double>( "jump_mean", 0 ) );
+    SetJumpVol( reader.Get<double>( "jump_vol", 0 ) );
+    ConfigureCommon( reader );
+}
 
 //! coarse single-number proxy (instantaneous vol, vega-bumped): used only by
 //! callers that still expect one vol (e.g. PDE grid bounds, quanto fallback).

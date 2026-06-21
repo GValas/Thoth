@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "object_manager.hpp"
+#include "object_reader.hpp"
 
 //! The single translation unit aware of every concrete object type. The kind
 //! tag -> factory table below is the one place to touch when adding a type:
@@ -24,7 +25,6 @@
 
 //! underlyings
 #include "equity.hpp"
-#include "mono.hpp"
 #include "absolute_basket.hpp"
 #include "rainbow.hpp"
 #include "composite.hpp"
@@ -44,430 +44,122 @@
 
 namespace
 {
-//! attributes common to every contract (resolved after the concrete part)
-void ConfigureContractCommon( ObjectManager& m, Contract* c, const string& n )
+//! bind a field reader to an already-built object and let it read itself, returning
+//! the object so a factory can keep wrapping / owning it. This is the whole of the
+//! "object configures itself" step; the few factories that still need a custom
+//! bootstrap (Equity's Mono wrap, the Pricer type selection, the cfg-owning tasks)
+//! reuse it after their bespoke construction.
+template <class T>
+T* ConfigureObject( ObjectManager& m, T* o )
 {
-    c->SetUnderlying( *m.Get<Underlying>( m.cfg().GetString( n + ".underlying" ) ) );
-    c->SetPremiumCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".premium_currency" ) ) );
-
-    //! force underlying currency for a basket / rainbow (its rebased spot is
-    //! dimensionless and settled in the premium currency)
-    if ( c->GetUnderlying()->GetKind() == KIND_BASKET ||
-         c->GetUnderlying()->GetKind() == KIND_RAINBOW )
-    {
-        c->GetUnderlying()->SetCurrency( *c->GetPremiumCurrency() );
-    }
+    ObjectReader reader( m, o->GetName() );
+    o->Configure( reader );
+    return o;
 }
 
-//! optional calendar shared by every volatility
-void ConfigureVolatilityCommon( ObjectManager& m, Volatility* v, const string& n )
+//! generic factory for a "configurable" object: create the bare object, register it
+//! (so references can resolve back to it during configuration), then configure it.
+//! The registry entry for such a type is reduced to a single index line; all field
+//! knowledge lives on the class. A task that needs the YamlConfig at construction
+//! (to write its result block back) is built with T(name, cfg) — detected here, so
+//! both shapes share this one factory instead of a separate task variant.
+template <class T>
+ObjectManager::Factory MakeConfigurable()
 {
-    if ( m.cfg().IsString( n + ".calendar" ) )
+    return []( ObjectManager& m, const string& n ) -> Object*
     {
-        const string cal = m.cfg().GetString( n + ".calendar" );
-        v->SetNonWorkingDaysWeight( m.cfg().GetDouble( cal + ".non_working_days_weight" ) );
-    }
+        std::unique_ptr<T> o;
+        if constexpr ( std::is_constructible_v<T, const string&, YamlConfig&> )
+            o = std::make_unique<T>( n, m.cfg() );
+        else
+            o = std::make_unique<T>( n );
+        return ConfigureObject( m, m.collector().Add( std::move( o ) ) );
+    };
 }
 
-//! build the kind -> factory table (one entry per object type)
+//! the configuration-selected pricer factory: the one bootstrap the registry must
+//! keep, since a not-yet-created object cannot choose its own concrete class. Once
+//! the right PricerXXX is built, the common fields are read by Pricer::Configure
+//! like every other migrated object.
+Object* BuildPricer( ObjectManager& m, const string& n )
+{
+    PricerConfiguration* PC = m.Get<PricerConfiguration>( m.cfg().GetString( n + ".configuration" ) );
+    std::unique_ptr<Pricer> p;
+    if ( PC->_method == PRICING_METHOD_MCL )
+    {
+        p = std::make_unique<PricerMCL>( n, m.cfg() );
+    }
+    else if ( PC->_method == PRICING_METHOD_MCL_GPU )
+    {
+        //! legacy alias: GPU is now an MCL capability gated by the mcl_configuration's
+        //! allow_gpu flag. "mcl_gpu" forces that flag on, so old books keep
+        //! accelerating; prefer `method: mcl` + `allow_gpu`.
+        if ( PC->_mcl )
+        {
+            PC->_mcl->_allow_gpu = true;
+        }
+        LOG( "INI", "method 'mcl_gpu' is deprecated: use 'mcl' with 'allow_gpu: true' "
+                    "in the mcl_configuration (treating it as that now)" );
+        p = std::make_unique<PricerMCL>( n, m.cfg() );
+    }
+    else if ( PC->_method == PRICING_METHOD_PDE )
+    {
+        p = std::make_unique<PricerPDE>( n, m.cfg() );
+    }
+    else if ( PC->_method == PRICING_METHOD_ANA )
+    {
+        p = std::make_unique<PricerANA>( n, m.cfg() );
+    }
+    else
+    {
+        ERR( "pricing configuration '" + PC->GetName() + "' has unknown method '" +
+             PC->_method + "' (expected '" + PRICING_METHOD_PDE + "', '" +
+             PRICING_METHOD_MCL + "', '" + PRICING_METHOD_MCL_GPU + "' or '" +
+             PRICING_METHOD_ANA + "')" );
+    }
+    return ConfigureObject( m, m.collector().Add( std::move( p ) ) );
+}
+
+//! build the kind -> factory table (one entry per object type). Every "self-
+//! configuring" type is a single { kind, MakeConfigurable<T> } row — the class owns
+//! all its field knowledge (including the cfg-owning tasks, which MakeConfigurable
+//! detects). Only the pricer needs a hand-written factory (BuildPricer), to pick its
+//! concrete engine type from the configuration before configuring it.
 map<string, ObjectManager::Factory> MakeRegistry()
 {
-    map<string, ObjectManager::Factory> r;
-
-    // ---- tasks --------------------------------------------------------
-    r[KIND_PRICER] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        //! the configuration drives the concrete pricer type
-        PricerConfiguration* PC = m.Get<PricerConfiguration>( m.cfg().GetString( n + ".configuration" ) );
-        std::unique_ptr<Pricer> p;
-        if ( PC->_method == PRICING_METHOD_MCL )
-        {
-            p = std::make_unique<PricerMCL>( n, m.cfg() );
-        }
-        else if ( PC->_method == PRICING_METHOD_MCL_GPU )
-        {
-            //! legacy alias: GPU is now an MCL capability gated by the
-            //! mcl_configuration's allow_gpu flag. "mcl_gpu" forces that flag on,
-            //! so old books keep accelerating; prefer `method: mcl` + `allow_gpu`.
-            if ( PC->_mcl )
-            {
-                PC->_mcl->_allow_gpu = true;
-            }
-            LOG( "INI", "method 'mcl_gpu' is deprecated: use 'mcl' with 'allow_gpu: true' "
-                        "in the mcl_configuration (treating it as that now)" );
-            p = std::make_unique<PricerMCL>( n, m.cfg() );
-        }
-        else if ( PC->_method == PRICING_METHOD_PDE )
-        {
-            p = std::make_unique<PricerPDE>( n, m.cfg() );
-        }
-        else if ( PC->_method == PRICING_METHOD_ANA )
-        {
-            p = std::make_unique<PricerANA>( n, m.cfg() );
-        }
-        else
-        {
-            ERR( "pricing configuration '" + PC->GetName() + "' has unknown method '" +
-                 PC->_method + "' (expected '" + PRICING_METHOD_PDE + "', '" +
-                 PRICING_METHOD_MCL + "', '" + PRICING_METHOD_MCL_GPU + "' or '" +
-                 PRICING_METHOD_ANA + "')" );
-        }
-        Pricer* B = m.collector().Add( std::move( p ) );
-        B->SetCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".currency" ) ) );
-        B->SetBook( *m.Get<Book>( m.cfg().GetString( n + ".book" ) ) );
-        B->SetToday( m.cfg().GetDate( n + ".today" ) );
-        B->SetConfiguration( *PC );
-        B->SetIndicatorRequestList( m.cfg().GetStringList( n + ".indicators" ) );
-        B->SetResult( m.cfg().GetString( n + ".result" ) );
-        if ( m.cfg().IsString( n + ".correlation" ) )
-        {
-            B->SetCorrelation( m.Get<Correlation>( m.cfg().GetString( n + ".correlation" ) ) );
-        }
-        if ( m.cfg().IsString( n + ".debug_configuration" ) )
-        {
-            B->SetDebugConfiguration( m.Get<DebugConfiguration>( m.cfg().GetString( n + ".debug_configuration" ) ) );
-        }
-        return B;
+    return {
+        // ---- tasks ----
+        { KIND_PRICER, BuildPricer },
+        { KIND_SEQUENCE, MakeConfigurable<Sequence>() },
+        // ---- instruments ----
+        { KIND_VANILLA, MakeConfigurable<Vanilla>() },
+        { KIND_BARRIER, MakeConfigurable<Barrier>() },
+        { KIND_VARIANCE_SWAP, MakeConfigurable<VarianceSwap>() },
+        // ---- underlyings (an equity / forex is itself a single-asset underlying) ----
+        { KIND_EQUITY, MakeConfigurable<Equity>() },
+        { KIND_BASKET, MakeConfigurable<AbsoluteBasket>() },
+        { KIND_RAINBOW, MakeConfigurable<Rainbow>() },
+        { KIND_COMPOSITE, MakeConfigurable<Composite>() },
+        { KIND_FOREX, MakeConfigurable<Forex>() },
+        // ---- market data (the three curve kinds share Curve::Configure) ----
+        { KIND_CURRENCY, MakeConfigurable<Currency>() },
+        { KIND_YIELD_CURVE, MakeConfigurable<YieldCurve>() },
+        { KIND_REPO_CURVE, MakeConfigurable<RepoCurve>() },
+        { KIND_CONTINUOUS_DIVIDENDS_CURVE, MakeConfigurable<ContinuousDividendsCurve>() },
+        { KIND_DISCRETE_DIVIDENDS, MakeConfigurable<DiscreteDividends>() },
+        { KIND_BS_VOLATILITY, MakeConfigurable<BsVolatility>() },
+        { KIND_HESTON_VOLATILITY, MakeConfigurable<HestonVolatility>() },
+        { KIND_SABR_VOLATILITY, MakeConfigurable<SabrVolatility>() },
+        { KIND_CORRELATION_MATRIX, MakeConfigurable<Correlation>() },
+        // ---- configurations ----
+        { KIND_PRICER_CONFIGURATION, MakeConfigurable<PricerConfiguration>() },
+        { KIND_DEBUG_CONFIGURATION, MakeConfigurable<DebugConfiguration>() },
+        { KIND_PDE_CONFIGURATION, MakeConfigurable<PdeConfiguration>() },
+        { KIND_MCL_CONFIGURATION, MakeConfigurable<MclConfiguration>() },
+        // ---- book & fixings ----
+        { KIND_BOOK, MakeConfigurable<Book>() },
+        { KIND_SIMPLE_FIXING_DATA, MakeConfigurable<SimpleFixingData>() },
     };
-
-    r[KIND_SEQUENCE] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Sequence* S = m.collector().Add( std::make_unique<Sequence>( n, m.cfg() ) );
-        //! resolve each referenced task (built and configured on demand). Their
-        //! own factories have already set each task's result block.
-        const vector<string> names = m.cfg().GetStringList( n + ".tasks" );
-        S->SetTaskList( m.GetList<Task>( names ), names );
-        S->SetResult( m.cfg().GetString( n + ".result", "" ) );
-        return S;
-    };
-
-    // ---- instruments --------------------------------------------------
-    r[KIND_VANILLA] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Vanilla* V = m.collector().Add( std::make_unique<Vanilla>( n ) );
-        V->SetStrike( m.cfg().GetDouble( n + ".strike" ) );
-        V->SetExerciseMode( ParseExerciseMode( m.cfg().GetString( n + ".exercise" ) ) );
-        V->SetMaturityDate( m.cfg().GetDate( n + ".maturity" ) );
-        V->SetType( ParseOptionType( m.cfg().GetString( n + ".type" ) ) );
-        ConfigureContractCommon( m, V, n );
-        return V;
-    };
-
-    r[KIND_BARRIER] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Barrier* B = m.collector().Add( std::make_unique<Barrier>( n ) );
-        B->_strike = m.cfg().GetDouble( n + ".strike" );
-        B->_maturity_date = m.cfg().GetDate( n + ".maturity" );
-        B->_type = ParseOptionType( m.cfg().GetString( n + ".type" ) );
-        B->_barrier_type = ParseBarrierType( m.cfg().GetString( n + ".barrier_type" ) );
-        B->_barrier_monitoring_type = ParseBarrierMonitoring( m.cfg().GetString( n + ".barrier_monitoring_type" ) );
-        B->_monitoring_period_days = m.cfg().GetInteger( n + ".monitoring_period_days", 0 );
-        B->_barrier_up_level = m.cfg().GetDouble( n + ".barrier_up_level", 0 );
-        B->_barrier_down_level = m.cfg().GetDouble( n + ".barrier_down_level", 0 );
-        ConfigureContractCommon( m, B, n );
-        return B;
-    };
-
-    r[KIND_VARIANCE_SWAP] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        VarianceSwap* V = m.collector().Add( std::make_unique<VarianceSwap>( n ) );
-        V->SetMaturityDate( m.cfg().GetDate( n + ".maturity" ) );
-        //! volatility_strike is in percent (like every vol), stored as decimal
-        V->SetVolatilityStrike( m.cfg().GetDouble( n + ".volatility_strike" ) / 100.0 );
-        V->SetNotional( m.cfg().GetDouble( n + ".notional", 1 ) );
-        ConfigureContractCommon( m, V, n );
-        return V;
-    };
-
-    // ---- underlyings --------------------------------------------------
-    r[KIND_EQUITY] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        //! build the equity (indexed under n) ...
-        Equity* E = m.collector().Add( std::make_unique<Equity>( n ) );
-        E->SetSpot( m.cfg().GetDouble( n + ".spot" ) );
-        E->SetVolatility( *m.Get<Volatility>( m.cfg().GetString( n + ".volatility" ) ) );
-        E->SetCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".currency" ) ) );
-        if ( m.cfg().IsString( n + ".continuous_dividends" ) )
-        {
-            E->SetContinuousDividends( m.Get<ContinuousDividendsCurve>( m.cfg().GetString( n + ".continuous_dividends" ) ) );
-        }
-        if ( m.cfg().IsString( n + ".discrete_dividends" ) )
-        {
-            E->SetDiscreteDividends( m.Get<DiscreteDividends>( m.cfg().GetString( n + ".discrete_dividends" ) ) );
-        }
-        if ( m.cfg().IsString( n + ".repo" ) )
-        {
-            E->SetRepo( m.Get<RepoCurve>( m.cfg().GetString( n + ".repo" ) ) );
-        }
-        //! ... and expose it as an underlying through a mono wrapper (not
-        //! indexed: it intentionally shares the equity's name)
-        auto mono = std::make_unique<Mono>( n, KIND_EQUITY );
-        mono->SetSingle( *E );
-        return m.collector().Own( std::move( mono ) );
-    };
-
-    r[KIND_BASKET] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        AbsoluteBasket* B = m.collector().Add( std::make_unique<AbsoluteBasket>( n ) );
-        B->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
-        B->SetWeightList( m.cfg().GetLaVector( n + ".weights" ) );
-        B->CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
-        return B;
-    };
-
-    r[KIND_RAINBOW] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Rainbow* R = m.collector().Add( std::make_unique<Rainbow>( n ) );
-        R->SetUnderlyingList( m.GetList<Underlying>( m.cfg().GetStringList( n + ".underlyings" ) ) );
-        R->SetType( ParseRainbowType( m.cfg().GetString( n + ".type" ) ) );
-        R->CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
-        return R;
-    };
-
-    r[KIND_COMPOSITE] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Composite* E = m.collector().Add( std::make_unique<Composite>( n ) );
-        E->SetUnderlying( *m.Get<Underlying>( m.cfg().GetString( n + ".equity" ) ) );
-        E->SetCompoCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".composite_currency" ) ) );
-        return E;
-    };
-
-    r[KIND_FOREX] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Forex* E = m.collector().Add( std::make_unique<Forex>( n ) );
-        E->SetBaseCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".base_currency" ) ) );
-        E->SetUnderlyingCurrency( *m.Get<Currency>( m.cfg().GetString( n + ".underlying_currency" ) ) );
-        if ( m.cfg().IsString( n + ".volatility" ) )
-        {
-            E->SetVolatility( *m.Get<Volatility>( m.cfg().GetString( n + ".volatility" ) ) );
-        }
-        if ( m.cfg().IsDouble( n + ".spot" ) )
-        {
-            E->SetSpot( m.cfg().GetDouble( n + ".spot" ) );
-        }
-        return E;
-    };
-
-    // ---- market data --------------------------------------------------
-    r[KIND_CURRENCY] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Currency* C = m.collector().Add( std::make_unique<Currency>( n ) );
-        C->SetRate( *m.Get<YieldCurve>( m.cfg().GetString( n + ".rate" ) ) );
-        return C;
-    };
-
-    r[KIND_YIELD_CURVE] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        YieldCurve* Y = m.collector().Add( std::make_unique<YieldCurve>( n ) );
-        Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
-        return Y;
-    };
-
-    r[KIND_REPO_CURVE] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        RepoCurve* Y = m.collector().Add( std::make_unique<RepoCurve>( n ) );
-        Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
-        return Y;
-    };
-
-    r[KIND_CONTINUOUS_DIVIDENDS_CURVE] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        ContinuousDividendsCurve* Y = m.collector().Add( std::make_unique<ContinuousDividendsCurve>( n ) );
-        Y->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        Y->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
-        return Y;
-    };
-
-    r[KIND_DISCRETE_DIVIDENDS] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        DiscreteDividends* D = m.collector().Add( std::make_unique<DiscreteDividends>( n ) );
-        D->SetDates( m.cfg().GetDateList( n + ".dates" ) );
-        D->SetAmounts( m.cfg().GetDoubleList( n + ".amounts" ) );
-        return D;
-    };
-
-    r[KIND_BS_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        BsVolatility* B = m.collector().Add( std::make_unique<BsVolatility>( n ) );
-        B->SetVolatility( m.cfg().GetDouble( n + ".volatility" ) );
-        ConfigureVolatilityCommon( m, B, n );
-        return B;
-    };
-
-    r[KIND_HESTON_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        HestonVolatility* H = m.collector().Add( std::make_unique<HestonVolatility>( n ) );
-        H->SetSpot( m.cfg().GetDouble( n + ".spot" ) );
-        //! vols quoted in percent (like every vol) -> variances
-        H->SetV0( pow( m.cfg().GetDouble( n + ".init_vol" ) / 100.0, 2 ) );
-        H->SetTheta( pow( m.cfg().GetDouble( n + ".long_vol" ) / 100.0, 2 ) );
-        H->SetKappa( m.cfg().GetDouble( n + ".kappa" ) );
-        H->SetXi( m.cfg().GetDouble( n + ".vol_of_vol" ) );
-        //! optional Bates jumps (absent -> 0 -> pure Heston). jump_mean / jump_vol
-        //! are in log-return space; jump_intensity is the yearly jump frequency.
-        H->SetJumpIntensity( m.cfg().GetDouble( n + ".jump_intensity", 0 ) );
-        H->SetJumpMean( m.cfg().GetDouble( n + ".jump_mean", 0 ) );
-        H->SetJumpVol( m.cfg().GetDouble( n + ".jump_vol", 0 ) );
-        ConfigureVolatilityCommon( m, H, n );
-        return H;
-    };
-
-    r[KIND_SABR_VOLATILITY] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        SabrVolatility* S = m.collector().Add( std::make_unique<SabrVolatility>( n ) );
-        S->SetMaturityList( m.cfg().GetDoubleList( n + ".maturities" ) );
-        S->SetAlphaList( m.cfg().GetDoubleList( n + ".alpha" ) );
-        S->SetBetaList( m.cfg().GetDoubleList( n + ".beta" ) );
-        S->SetRhoList( m.cfg().GetDoubleList( n + ".rho" ) );
-        S->SetNuList( m.cfg().GetDoubleList( n + ".nu" ) );
-        ConfigureVolatilityCommon( m, S, n );
-        return S;
-    };
-
-    r[KIND_CORRELATION_MATRIX] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Correlation* C = m.collector().Add( std::make_unique<Correlation>( n ) );
-        if ( m.cfg().IsDoubleList( n + ".matrix" ) )
-        {
-            C->SetMatrix( m.cfg().GetLaVector( n + ".matrix" ) );
-        }
-        else if ( m.cfg().IsDoubleList( n + ".symmetric_matrix" ) )
-        {
-            C->SetSymmetricMatrix( m.cfg().GetLaVector( n + ".symmetric_matrix" ) );
-        }
-        else
-        {
-            ERR( ".matrix & .symmetric matrix are missing" );
-        }
-        if ( m.cfg().IsStringList( n + ".underlyings" ) )
-        {
-            C->SetUnderlyingList( m.cfg().GetStringList( n + ".underlyings" ) );
-        }
-        if ( m.cfg().IsStringList( n + ".forexs" ) )
-        {
-            C->SetForexList( m.GetList<Forex>( m.cfg().GetStringList( n + ".forexs" ) ) );
-        }
-        return C;
-    };
-
-    // ---- configurations ----------------------------------------------
-    r[KIND_PRICER_CONFIGURATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        PricerConfiguration* P = m.collector().Add( std::make_unique<PricerConfiguration>( n ) );
-        P->_method = m.cfg().GetString( n + ".method" );
-        if ( m.cfg().IsString( n + ".mcl_configuration" ) )
-        {
-            P->_mcl = m.Get<MclConfiguration>( m.cfg().GetString( n + ".mcl_configuration" ) );
-        }
-        if ( m.cfg().IsString( n + ".pde_configuration" ) )
-        {
-            P->_pde = m.Get<PdeConfiguration>( m.cfg().GetString( n + ".pde_configuration" ) );
-        }
-        if ( m.cfg().IsString( n + ".log_path" ) )
-        {
-            P->_log_path = m.cfg().GetString( n + ".log_path" );
-        }
-        return P;
-    };
-
-    r[KIND_DEBUG_CONFIGURATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        DebugConfiguration* D = m.collector().Add( std::make_unique<DebugConfiguration>( n ) );
-        D->_generate_nodes_graph = m.cfg().GetBoolean( n + ".generate_nodes_graph", false );
-        return D;
-    };
-
-    r[KIND_PDE_CONFIGURATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        PdeConfiguration* P = m.collector().Add( std::make_unique<PdeConfiguration>( n ) );
-        const string prec = m.cfg().GetString( n + ".vanilla_precision", "high" );
-        if ( prec == "low" )
-        {
-            P->_vanilla_precision = Precision::Low;
-            P->_custom_n_s = PDE_VANILLA_PRECISION_LOW_N_S;
-            P->_custom_n_t = PDE_VANILLA_PRECISION_LOW_N_T;
-        }
-        else if ( prec == "medium" )
-        {
-            P->_vanilla_precision = Precision::Medium;
-            P->_custom_n_s = PDE_VANILLA_PRECISION_MEDIUM_N_S;
-            P->_custom_n_t = PDE_VANILLA_PRECISION_MEDIUM_N_T;
-        }
-        else if ( prec == "high" )
-        {
-            P->_vanilla_precision = Precision::High;
-            P->_custom_n_s = PDE_VANILLA_PRECISION_HIGH_N_S;
-            P->_custom_n_t = PDE_VANILLA_PRECISION_HIGH_N_T;
-        }
-        else
-        {
-            ERR( "unknown vanilla_precision '" + prec + "' (expected 'low', 'medium' or 'high')" );
-        }
-        if ( m.cfg().IsInteger( n + ".custom_n_s" ) )
-        {
-            P->_custom_n_s = m.cfg().GetInteger( n + ".custom_n_s" );
-        }
-        if ( m.cfg().IsInteger( n + ".custom_n_t" ) )
-        {
-            P->_custom_n_t = m.cfg().GetInteger( n + ".custom_n_t" );
-        }
-        if ( m.cfg().IsDouble( n + ".custom_sigma_factor" ) )
-        {
-            P->_custom_sigma_factor = m.cfg().GetDouble( n + ".custom_sigma_factor" );
-        }
-        else
-        {
-            P->_custom_sigma_factor = PDE_SIGMA_FACTOR;
-        }
-        return P;
-    };
-
-    r[KIND_MCL_CONFIGURATION] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        MclConfiguration* M = m.collector().Add( std::make_unique<MclConfiguration>( n ) );
-        M->_max_day_step = m.cfg().GetInteger( n + ".max_day_step" );
-        M->_min_day_step = m.cfg().GetInteger( n + ".min_day_step" );
-        M->_paths = m.cfg().GetLong( n + ".paths" );
-        //! year-fraction sub-step, so it is a double (0.01, not 0)
-        M->_vol_year_step = m.cfg().GetDouble( n + ".vol_year_step" );
-        M->_node_file = m.cfg().GetString( n + ".node_file", MCL_NODE_PATH );
-        M->_use_sobol = m.cfg().GetBoolean( n + ".use_sobol", MC_USE_SOBOL );
-        M->_seed = m.cfg().GetInteger( n + ".seed", 0 );
-        M->_sobol_skip = m.cfg().GetLong( n + ".sobol_skip", 0 );
-        M->_allow_gpu = m.cfg().GetBoolean( n + ".allow_gpu", false );
-        //! guard against degenerate grids: paths <= 0 -> NaN premium, and
-        //! max_day_step <= 0 -> a zero-day diffusion step that never advances
-        if ( M->_paths <= 0 )
-        {
-            ERR( "mcl_configuration '" + n + "': paths must be > 0" );
-        }
-        if ( M->_max_day_step <= 0 )
-        {
-            ERR( "mcl_configuration '" + n + "': max_day_step must be > 0 (days)" );
-        }
-        return M;
-    };
-
-    // ---- book & fixings ----------------------------------------------
-    r[KIND_BOOK] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        Book* B = m.collector().Add( std::make_unique<Book>( n ) );
-        B->SetOptionList( m.GetList<Contract>( m.cfg().GetStringList( n + ".options" ) ) );
-        return B;
-    };
-
-    r[KIND_SIMPLE_FIXING_DATA] = []( ObjectManager& m, const string& n ) -> Object*
-    {
-        SimpleFixingData* S = m.collector().Add( std::make_unique<SimpleFixingData>( n ) );
-        S->SetDateList( m.cfg().GetDateList( n + ".dates" ) );
-        S->SetValueList( m.cfg().GetLaVector( n + ".values" ) );
-        S->SetUnderlying( m.cfg().GetString( n + ".underlying" ) );
-        return S;
-    };
-
-    return r;
 }
 } // namespace
 

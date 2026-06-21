@@ -40,6 +40,10 @@ class Correlation : public Object
                      const string& BaseCurrency );
 
   public:
+    //! read own fields: the matrix (full or symmetric/lower-triangular form) plus
+    //! the optional underlying / forex name lists it indexes
+    void Configure( ObjectReader& reader ) override;
+
     //! cholesky
     void ComputeCholeskyMatrix( const vector<string>& UnderlyingList );
 

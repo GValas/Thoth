@@ -1,6 +1,12 @@
 #pragma once
 #include "asset.hpp"
-#include "correlation.hpp"
+#include "object_sets.hpp"
+
+//! Underlying only stores a Correlation* (the quanto matrix) — a forward declaration
+//! keeps this header out of the correlation -> forex -> single include cycle (Single
+//! now derives from Underlying). The .cpp files that call Correlation methods include
+//! correlation.hpp directly.
+class Correlation;
 
 //! Abstract diffusable underlying of a contract (mono / composite / basket /
 //! rainbow): exposes the forward, implied vol and its single-name & currency sets,

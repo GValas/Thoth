@@ -29,6 +29,9 @@ class Book : public Object
 
     //
   public:
+    //! read own field (the list of contracts priced together)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetOptionList( const vector<Contract*>& OptionList );
     void SetPremium( double Premium );

@@ -22,6 +22,9 @@ class SabrVolatility : public Volatility
     double Interp( const vector<double>& Values, double T ) const;
 
   public:
+    //! read own fields (per-maturity SABR params), then the common calendar
+    void Configure( ObjectReader& reader ) override;
+
     //! setters
     void SetMaturityList( const vector<double>& MaturityList );
     void SetAlphaList( const vector<double>& AlphaList );

@@ -8,6 +8,9 @@
 class DebugConfiguration : public Object
 {
   public:
+    //! read own switches
+    void Configure( ObjectReader& reader ) override;
+
     //! dump the Monte-Carlo node graph (the built node DAG) to a Graphviz .dot
     //! file next to the log path, for inspection / rendering.
     bool _generate_nodes_graph = false;

@@ -15,6 +15,9 @@ class DiscreteDividends : public MarketData
     vector<double> _amounts; //!< cash amount paid at each date (equity currency)
 
   public:
+    //! read own fields (ex-dates + cash amounts)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetDates( const vector<date>& Dates );
     void SetAmounts( const vector<double>& Amounts );

@@ -1,5 +1,8 @@
 #include "thoth.hpp"
 #include "vanilla.hpp"
+#include "enums.hpp"
+#include "object_reader.hpp"
+#include "single.hpp" //!< Volatility / StochasticVolParams (MonoVol helper)
 
 namespace
 {
@@ -17,6 +20,16 @@ Vanilla::Vanilla( const string& ObjectName ) : Contract( ObjectName, KIND_VANILL
 }
 
 Vanilla::~Vanilla() = default;
+
+//! read own fields, then the common contract attributes
+void Vanilla::Configure( ObjectReader& reader )
+{
+    SetStrike( reader.Get<double>( "strike" ) );
+    SetExerciseMode( ParseExerciseMode( reader.Get<string>( "exercise" ) ) );
+    SetMaturityDate( reader.Get<date>( "maturity" ) );
+    SetType( ParseOptionType( reader.Get<string>( "type" ) ) );
+    ConfigureCommon( reader );
+}
 
 //! setter
 void Vanilla::SetStrike( const double Strike )

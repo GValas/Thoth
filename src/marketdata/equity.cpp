@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "equity.hpp"
+#include "object_reader.hpp"
 
 //! constructor
 Equity::Equity( const string& ObjectName ) : Single( ObjectName, KIND_EQUITY )
@@ -9,6 +10,26 @@ Equity::Equity( const string& ObjectName ) : Single( ObjectName, KIND_EQUITY )
 }
 
 Equity::~Equity() = default;
+
+//! read spot / volatility / currency and the optional dividend & repo schedules
+void Equity::Configure( ObjectReader& reader )
+{
+    SetSpot( reader.Get<double>( "spot" ) );
+    SetVolatility( *reader.Ref<Volatility>( "volatility" ) );
+    SetCurrency( *reader.Ref<Currency>( "currency" ) );
+    if ( reader.Has<string>( "continuous_dividends" ) )
+    {
+        SetContinuousDividends( reader.Ref<ContinuousDividendsCurve>( "continuous_dividends" ) );
+    }
+    if ( reader.Has<string>( "discrete_dividends" ) )
+    {
+        SetDiscreteDividends( reader.Ref<DiscreteDividends>( "discrete_dividends" ) );
+    }
+    if ( reader.Has<string>( "repo" ) )
+    {
+        SetRepo( reader.Ref<RepoCurve>( "repo" ) );
+    }
+}
 
 //! setter
 void Equity::SetRepo( RepoCurve* Repo )

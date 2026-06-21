@@ -12,6 +12,9 @@ class Sequence : public Task
     vector<string> _task_names; //!< their names, for the summary block
 
   public:
+    //! read own field (the ordered list of sub-task references) + result block
+    void Configure( ObjectReader& reader ) override;
+
     //! setter (resolved sub-tasks and their names, same order)
     void SetTaskList( const vector<Task*>& Tasks, const vector<string>& Names );
 

@@ -21,6 +21,10 @@ class Equity : public Single
     double DiscreteDividendsPv( const date& UpTo ) const;
 
   public:
+    //! read own fields (spot, volatility, currency, optional repo / continuous /
+    //! discrete dividends)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetRepo( RepoCurve* Repo );
     void SetContinuousDividends( ContinuousDividendsCurve* ContinuousDividends );

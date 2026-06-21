@@ -9,24 +9,16 @@
 #include <map>
 
 //! constants
-//! grid sizes per Precision level (see PricerConfiguration.h)
-inline constexpr int PDE_VANILLA_PRECISION_LOW_N_S = 501;
-inline constexpr int PDE_VANILLA_PRECISION_LOW_N_T = 301;
-inline constexpr int PDE_VANILLA_PRECISION_MEDIUM_N_S = 1001;
-inline constexpr int PDE_VANILLA_PRECISION_MEDIUM_N_T = 601;
-inline constexpr int PDE_VANILLA_PRECISION_HIGH_N_S = 1501;
-inline constexpr int PDE_VANILLA_PRECISION_HIGH_N_T = 1301;
-inline constexpr double PDE_SIGMA_FACTOR = 5.0;
+//! Crank-Nicolson time-weighting of the PDE solver (a solver parameter, not a
+//! configured field). The configured grid-size / sigma defaults live next to the
+//! object that reads them (pde_configuration.hpp); the MCL defaults likewise.
 inline constexpr double PDE_THETA = 0.5;
-inline constexpr bool MC_USE_SOBOL = true;
 
 //! pricing method selectors (config field "method")
 inline constexpr char PRICING_METHOD_PDE[] = "pde";         //!< finite-difference PDE grid solving
 inline constexpr char PRICING_METHOD_MCL[] = "mcl";         //!< monte-carlo (longstaff-schwartz) tree; GPU via allow_gpu
 inline constexpr char PRICING_METHOD_ANA[] = "ana";         //!< closed-form (analytic) formulas
 inline constexpr char PRICING_METHOD_MCL_GPU[] = "mcl_gpu"; //!< deprecated alias for mcl + allow_gpu: true
-
-inline constexpr char MCL_NODE_PATH[] = "";
 
 //! finite-difference bump sizes for the bump-and-revalue Greeks. The spot bump
 //! (GREEK_SPOT_BUMP, for delta/gamma) is the canonical one in constants.hpp, so
@@ -201,6 +193,11 @@ class Pricer : public Task
                        const string& MethodLabel );
 
   public:
+    //! read the fields common to every pricer (currency / book / today /
+    //! configuration / indicators / result, with optional correlation & debug).
+    //! The concrete pricer class is chosen by the registry before this runs.
+    void Configure( ObjectReader& reader ) override;
+
     // setter
     void SetBook( Book& Book );
     void SetCorrelation( Correlation* Correlation );

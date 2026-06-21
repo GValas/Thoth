@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "curve.hpp"
+#include "object_reader.hpp"
 
 //!
 Curve::Curve( const string& ObjectName,
@@ -9,6 +10,13 @@ Curve::Curve( const string& ObjectName,
 
 //! _value_list is owned by its LaVector wrapper; nothing to free by hand
 Curve::~Curve() = default;
+
+//! read the term-structure pillars (dates + values)
+void Curve::Configure( ObjectReader& reader )
+{
+    SetDateList( reader.Get<vector<date>>( "dates" ) );
+    SetValueList( reader.LaVector( "values" ) );
+}
 
 //! setter
 void Curve::SetDateList( const vector<date>& DateList )

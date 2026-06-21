@@ -1,11 +1,19 @@
 #include "thoth.hpp"
 #include "book.hpp"
+#include "object_reader.hpp"
+#include "single.hpp" //!< complete Single for the aggregated SingleSet
 
 //! constructor (members are initialised in-class)
 Book::Book( const string& ObjectName ) : Object( ObjectName, KIND_BOOK ) {}
 
 //! destructor
 Book::~Book() = default;
+
+//! read the list of contracts (resolved as Contract references)
+void Book::Configure( ObjectReader& reader )
+{
+    SetOptionList( reader.Ref<vector<Contract>>( "options" ) );
+}
 
 //! setter
 void Book::SetOptionList( const vector<Contract*>& OptionList )

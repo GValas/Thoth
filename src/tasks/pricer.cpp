@@ -1,6 +1,7 @@
 #include "thoth.hpp"
 #include "pricer.hpp"
 #include "cancellation.hpp"
+#include "object_reader.hpp"
 #include "progress_bar.hpp"
 
 //! constructor (members are initialised in-class)
@@ -9,6 +10,26 @@ Pricer::Pricer( const string& ObjectName,
 
 //! destructor
 Pricer::~Pricer() = default;
+
+//! read the fields common to every pricer (the concrete class was already chosen
+//! by the registry, which drives the type off the configuration's method)
+void Pricer::Configure( ObjectReader& reader )
+{
+    SetCurrency( *reader.Ref<Currency>( "currency" ) );
+    SetBook( *reader.Ref<Book>( "book" ) );
+    SetToday( reader.Get<date>( "today" ) );
+    SetConfiguration( *reader.Ref<PricerConfiguration>( "configuration" ) );
+    SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) );
+    SetResult( reader.Get<string>( "result" ) );
+    if ( reader.Has<string>( "correlation" ) )
+    {
+        SetCorrelation( reader.Ref<Correlation>( "correlation" ) );
+    }
+    if ( reader.Has<string>( "debug_configuration" ) )
+    {
+        SetDebugConfiguration( reader.Ref<DebugConfiguration>( "debug_configuration" ) );
+    }
+}
 
 // setter
 void Pricer::SetBook( Book& Book )

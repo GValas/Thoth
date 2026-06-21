@@ -11,6 +11,9 @@ class SimpleFixingData : public Object
     string _underlying;
 
   public:
+    //! read own fields (dates + values + the underlying name)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetDateList( const vector<date>& DateList );
     void SetValueList( la_vector* ValueList );

@@ -1,9 +1,26 @@
 #include "thoth.hpp"
 #include "contract.hpp"
+#include "correlation.hpp"
+#include "currency.hpp"
+#include "object_reader.hpp"
 
 //! constructor (members are initialised in-class)
 Contract::Contract( const string& ObjectName,
                     const string& ObjectKind ) : Object( ObjectName, ObjectKind ) {}
+
+//! attributes common to every contract (resolved after the concrete part)
+void Contract::ConfigureCommon( ObjectReader& reader )
+{
+    SetUnderlying( *reader.Ref<Underlying>( "underlying" ) );
+    SetPremiumCurrency( *reader.Ref<Currency>( "premium_currency" ) );
+
+    //! force underlying currency for a basket / rainbow (its rebased spot is
+    //! dimensionless and settled in the premium currency)
+    if ( _underlying->GetKind() == KIND_BASKET || _underlying->GetKind() == KIND_RAINBOW )
+    {
+        _underlying->SetCurrency( *_premium_currency );
+    }
+}
 
 //! destructor
 Contract::~Contract() = default;

@@ -1,6 +1,8 @@
 #pragma once
 #include "thoth.hpp"
 
+class ObjectReader; //!< field reader passed to Configure (see object_reader.hpp)
+
 //! constants
 inline constexpr char KIND_BARRIER[] = "barrier";
 inline constexpr char KIND_VARIANCE_SWAP[] = "variance_swap";
@@ -45,6 +47,12 @@ class Object
 
     //! setter
     virtual void SetToday( const date& Today );
+
+    //! read this object's own fields / references from the configuration. The
+    //! registry creates the bare object and calls this; concrete types override
+    //! it (symmetrically to GetFlowNode, they own their own deserialisation).
+    //! Default no-op so a not-yet-migrated type can keep a custom registry factory.
+    virtual void Configure( ObjectReader& /*reader*/ ) {}
 
     //! constructor, destructor
     Object( const string& ObjectName,

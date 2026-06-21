@@ -27,6 +27,11 @@ class Volatility : public MarketData
   protected:
     double GetDayWeight();
 
+    //! read the optional calendar shared by every volatility kind: when present it
+    //! resolves the named calendar object's non_working_days_weight. Each concrete
+    //! volatility's Configure calls this after reading its own fields.
+    void ConfigureCommon( ObjectReader& reader );
+
     //! additive parallel shift (in vol units) applied on top of the quoted vol;
     //! used by the bump-and-revalue vega. Zero in normal pricing.
     double _vol_shift = 0.0;

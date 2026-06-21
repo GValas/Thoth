@@ -1,6 +1,8 @@
 #include "thoth.hpp"
 #include "rainbow.hpp"
 #include "nodes.hpp"
+#include "enums.hpp"
+#include "object_reader.hpp"
 
 //!
 Rainbow::Rainbow( const string& ObjectName ) : Basket( ObjectName, KIND_RAINBOW )
@@ -9,6 +11,14 @@ Rainbow::Rainbow( const string& ObjectName ) : Basket( ObjectName, KIND_RAINBOW 
 
 //!
 Rainbow::~Rainbow() = default;
+
+//! read the component underlyings and type, then fix the rebasing reference
+void Rainbow::Configure( ObjectReader& reader )
+{
+    SetUnderlyingList( reader.Ref<vector<Underlying>>( "underlyings" ) );
+    SetType( ParseRainbowType( reader.Get<string>( "type" ) ) );
+    CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
+}
 
 //! setter
 void Rainbow::SetType( RainbowType Type )

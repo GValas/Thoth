@@ -10,6 +10,9 @@ class Currency : public Object
     YieldCurve* _rate;
 
   public:
+    //! read own field (the discount/yield curve)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetRate( YieldCurve& Rate );
     void SetToday( const date& Today ) override;

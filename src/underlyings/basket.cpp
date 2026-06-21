@@ -1,5 +1,7 @@
 #include "thoth.hpp"
 #include "basket.hpp"
+#include "correlation.hpp" //!< propagate correlation to members
+#include "single.hpp"      //!< complete Single for the aggregated SingleSet
 
 //!
 Basket::Basket( const string& ObjectName,

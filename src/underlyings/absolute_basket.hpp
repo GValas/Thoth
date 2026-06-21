@@ -11,6 +11,10 @@ class AbsoluteBasket : public Basket
     LaVector _weight_list;
 
   public:
+    //! read own fields (component list + weights), then capture the rebasing
+    //! reference spots at load
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetWeightList( la_vector* WeightList );
 

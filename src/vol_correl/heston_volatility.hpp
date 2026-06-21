@@ -26,6 +26,9 @@ class HestonVolatility : public Volatility
     double _jump_vol = 0;
 
   public:
+    //! read own fields (Heston + optional Bates jumps), then the common calendar
+    void Configure( ObjectReader& reader ) override;
+
     //! setters
     void SetSpot( double Spot ) { _spot = Spot; }
     void SetV0( double V0 ) { _v0 = V0; }

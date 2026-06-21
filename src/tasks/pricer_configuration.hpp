@@ -10,6 +10,9 @@ class PricerConfiguration : public Object
 {
   private:
   public:
+    //! read own fields (method, optional engine-config references, log path)
+    void Configure( ObjectReader& reader ) override;
+
     string _method; //!< "pde", "mcl" or "ana"
 
     //! engine parameters, each grouped in its own referenced object

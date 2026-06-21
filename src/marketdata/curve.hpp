@@ -17,6 +17,11 @@ class Curve : public MarketData
     double _curve_shift = 0.0;
 
   public:
+    //! read the (date, value) pillars common to every curve kind (yield / repo /
+    //! continuous-dividend). The concrete kinds add no own fields, so they inherit
+    //! this directly through MakeConfigurable<T>.
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetDateList( const vector<date>& DateList );
     void SetValueList( la_vector* ValueList );

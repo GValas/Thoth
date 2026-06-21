@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "volatility.hpp"
+#include "object_reader.hpp"
 
 //!
 Volatility::Volatility( const string& ObjectName,
@@ -10,6 +11,18 @@ Volatility::Volatility( const string& ObjectName,
 
 //!
 Volatility::~Volatility() = default;
+
+//! optional calendar shared by every volatility: the field holds the name of a
+//! calendar object whose non_working_days_weight scales the vol (a second reader
+//! bound to that object reads its field).
+void Volatility::ConfigureCommon( ObjectReader& reader )
+{
+    if ( reader.Has<string>( "calendar" ) )
+    {
+        ObjectReader calendar( reader.Manager(), reader.Get<string>( "calendar" ) );
+        SetNonWorkingDaysWeight( calendar.Get<double>( "non_working_days_weight" ) );
+    }
+}
 
 //!
 double Volatility::GetLocalVolatility( const double Strike,

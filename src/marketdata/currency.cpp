@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "currency.hpp"
+#include "object_reader.hpp"
 
 Currency::Currency( const string& ObjectName ) : Object( ObjectName, KIND_CURRENCY )
 {
@@ -7,6 +8,12 @@ Currency::Currency( const string& ObjectName ) : Object( ObjectName, KIND_CURREN
 }
 
 Currency::~Currency() = default;
+
+//! read the discount (yield) curve this currency wraps
+void Currency::Configure( ObjectReader& reader )
+{
+    SetRate( *reader.Ref<YieldCurve>( "rate" ) );
+}
 
 //! setter
 void Currency::SetRate( YieldCurve& Rate )

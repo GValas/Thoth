@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "forex.hpp"
+#include "object_reader.hpp"
 
 Forex::Forex( const string& ObjectName ) : Single( ObjectName, KIND_FOREX )
 {
@@ -7,6 +8,21 @@ Forex::Forex( const string& ObjectName ) : Single( ObjectName, KIND_FOREX )
 }
 
 Forex::~Forex() = default;
+
+//! read the currency pair, with an optional volatility and spot
+void Forex::Configure( ObjectReader& reader )
+{
+    SetBaseCurrency( *reader.Ref<Currency>( "base_currency" ) );
+    SetUnderlyingCurrency( *reader.Ref<Currency>( "underlying_currency" ) );
+    if ( reader.Has<string>( "volatility" ) )
+    {
+        SetVolatility( *reader.Ref<Volatility>( "volatility" ) );
+    }
+    if ( reader.Has<double>( "spot" ) )
+    {
+        SetSpot( reader.Get<double>( "spot" ) );
+    }
+}
 
 //! setter
 void Forex::SetUnderlyingCurrency( Currency& UnderlyingCurrency )

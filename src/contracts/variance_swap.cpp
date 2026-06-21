@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "variance_swap.hpp"
+#include "object_reader.hpp"
 
 //! constructor
 VarianceSwap::VarianceSwap( const string& ObjectName ) : Contract( ObjectName, KIND_VARIANCE_SWAP )
@@ -7,6 +8,16 @@ VarianceSwap::VarianceSwap( const string& ObjectName ) : Contract( ObjectName, K
 }
 
 VarianceSwap::~VarianceSwap() = default;
+
+//! read own fields, then the common contract attributes
+void VarianceSwap::Configure( ObjectReader& reader )
+{
+    SetMaturityDate( reader.Get<date>( "maturity" ) );
+    //! volatility_strike is in percent (like every vol), stored as decimal
+    SetVolatilityStrike( reader.Get<double>( "volatility_strike" ) / 100.0 );
+    SetNotional( reader.Get<double>( "notional", 1 ) );
+    ConfigureCommon( reader );
+}
 
 //! setters
 void VarianceSwap::SetMaturityDate( const date& MaturityDate )

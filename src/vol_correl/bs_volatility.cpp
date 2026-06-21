@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "bs_volatility.hpp"
+#include "object_reader.hpp"
 
 //! constructor
 BsVolatility::BsVolatility( const string& ObjectName ) : Volatility( ObjectName, KIND_BS_VOLATILITY )
@@ -8,6 +9,13 @@ BsVolatility::BsVolatility( const string& ObjectName ) : Volatility( ObjectName,
 }
 
 BsVolatility::~BsVolatility() = default;
+
+//! read own field (flat vol), then the common calendar
+void BsVolatility::Configure( ObjectReader& reader )
+{
+    SetVolatility( reader.Get<double>( "volatility" ) );
+    ConfigureCommon( reader );
+}
 
 //! setter
 void BsVolatility::SetVolatility( double BsVolatility )

@@ -24,6 +24,11 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     int _idx_underlying = 0;           // underling position
     int _idx_contract = 0;             // contract position
 
+    //! read the attributes common to every contract (underlying + premium
+    //! currency, with the basket/rainbow currency override). Called by each
+    //! concrete contract's Configure after it has read its own fields.
+    void ConfigureCommon( ObjectReader& reader );
+
   public:
     //! setter
     void SetUnderlying( Underlying& underlying );

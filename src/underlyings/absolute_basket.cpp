@@ -1,5 +1,7 @@
 #include "thoth.hpp"
 #include "absolute_basket.hpp"
+#include "correlation.hpp"
+#include "object_reader.hpp"
 
 //!
 AbsoluteBasket::AbsoluteBasket( const string& ObjectName ) : Basket( ObjectName, KIND_BASKET )
@@ -8,6 +10,14 @@ AbsoluteBasket::AbsoluteBasket( const string& ObjectName ) : Basket( ObjectName,
 
 //!
 AbsoluteBasket::~AbsoluteBasket() = default;
+
+//! read the component underlyings and weights, then fix the rebasing reference
+void AbsoluteBasket::Configure( ObjectReader& reader )
+{
+    SetUnderlyingList( reader.Ref<vector<Underlying>>( "underlyings" ) );
+    SetWeightList( reader.LaVector( "weights" ) );
+    CaptureReferenceSpots(); //!< fix the rebasing reference (S_i0) at load
+}
 
 //! setter
 void AbsoluteBasket::SetWeightList( la_vector* WeightList )

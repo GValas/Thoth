@@ -1,11 +1,19 @@
 #include "thoth.hpp"
 #include "discrete_dividends.hpp"
+#include "object_reader.hpp"
 
 DiscreteDividends::DiscreteDividends( const string& ObjectName ) : MarketData( ObjectName, KIND_DISCRETE_DIVIDENDS )
 {
 }
 
 DiscreteDividends::~DiscreteDividends() = default;
+
+//! read own fields (ex-dates + cash amounts)
+void DiscreteDividends::Configure( ObjectReader& reader )
+{
+    SetDates( reader.Get<vector<date>>( "dates" ) );
+    SetAmounts( reader.Get<vector<double>>( "amounts" ) );
+}
 
 void DiscreteDividends::SetDates( const vector<date>& Dates )
 {

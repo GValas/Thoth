@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "sequence.hpp"
+#include "object_reader.hpp"
 
 //! constructor
 Sequence::Sequence( const string& ObjectName,
@@ -7,6 +8,15 @@ Sequence::Sequence( const string& ObjectName,
 
 //! destructor
 Sequence::~Sequence() = default;
+
+//! resolve the referenced sub-tasks (built and configured on demand) and the
+//! object that receives this sequence's summary result block
+void Sequence::Configure( ObjectReader& reader )
+{
+    const vector<string> names = reader.Get<vector<string>>( "tasks" );
+    SetTaskList( reader.Manager().GetList<Task>( names ), names );
+    SetResult( reader.Get<string>( "result", "" ) );
+}
 
 //! setter
 void Sequence::SetTaskList( const vector<Task*>& Tasks, const vector<string>& Names )

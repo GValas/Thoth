@@ -1,11 +1,16 @@
 #pragma once
-#include "asset.hpp"
+#include "underlying.hpp"
 #include "volatility.hpp"
 
 //! A single tradable name (base of Equity / Forex): an Asset with a spot and a
 //! volatility surface. Provides the implied / Dupire local vol and builds the MCL
 //! spot-diffusion node (constant-vol, or a local-vol grid for a SABR surface).
-class Single : public Asset
+//!
+//! A single name IS a single-asset underlying, so Single derives from Underlying and
+//! implements its contract-diffusion interface (quanto forward, single/currency sets,
+//! correlation node) directly — there is no separate Mono adapter. The multi-asset
+//! underlyings (Composite / Basket / Rainbow) are the other Underlying shapes.
+class Single : public Underlying
 {
 
   protected:
@@ -40,12 +45,36 @@ class Single : public Asset
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;
     double GetImplicitVol( const double Strike,
-                           const date& MaturityDate );
+                           const date& MaturityDate ) override;
+
+    //! the plain (non-quanto) forward, supplied by the concrete name (Equity / Forex)
     virtual double GetForward( const date& MaturityDate ) const = 0;
 
     //! an FX leg (rather than an equity name): the MCL correlation/Cholesky split
     //! groups FX singles separately. Default false; Forex overrides.
     [[nodiscard]] virtual bool IsForex() const { return false; }
+
+    //! --- Underlying (contract-diffusion) role, formerly the Mono adapter ---
+
+    //! quanto-aware forward: the plain forward times the quanto drift correction when
+    //! the payoff settles in a currency other than this asset's (mirrors the MCL
+    //! QuantoAdjustmentNode so ANA / PDE / MCL agree).
+    double GetForward( const date& MaturityDate,
+                       Currency* QuantoCurrency ) override;
+
+    //! a single name spans exactly itself / its own currency
+    SingleSet GetSingleSet() const override;
+    CurrencySet GetCurrencySet() const override;
+
+    //! correlation node for this single name (resolved from the global matrix)
+    MonteCarloNode* GetCorrelNode( NodeCollector& NC,
+                                   const string& UnderlyingCurrency,
+                                   const string& BaseCurrency ) override;
+
+    //! a single griddable name (an FX leg is not griddable); the mono shape the MCL
+    //! single-tree Greeks can isolate a per-contract spot bump within
+    [[nodiscard]] bool IsGriddable() const override { return !IsForex(); }
+    [[nodiscard]] bool IsMono() const override { return true; }
 
     //! mcl node
     virtual MonteCarloNode* GetDriftNode( NodeCollector& NC ) = 0;

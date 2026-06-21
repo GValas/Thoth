@@ -13,6 +13,10 @@ class Rainbow : public Basket
     RainbowType _type = RainbowType::BestOf;
 
   public:
+    //! read own fields (component list + best/worst-of type), then capture the
+    //! rebasing reference spots at load
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetType( RainbowType Type );
 

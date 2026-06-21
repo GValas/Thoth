@@ -17,6 +17,9 @@ class VarianceSwap : public Contract
     double _notional = 1;          //!< variance notional
 
   public:
+    //! read own fields from the configuration (maturity / volatility_strike / notional)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetMaturityDate( const date& MaturityDate );
     void SetVolatilityStrike( double VolatilityStrike );

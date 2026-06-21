@@ -12,6 +12,9 @@ class Composite : public Underlying
     Underlying* _underlying;
 
   public:
+    //! read own fields (wrapped underlying + the composite/settlement currency)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetCompoCurrency( Currency& CompositeCurrency );
     void SetUnderlying( Underlying& Underlying );

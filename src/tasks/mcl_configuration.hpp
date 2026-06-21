@@ -1,12 +1,19 @@
 #pragma once
 #include "object.hpp"
 
+//! defaults read by MclConfiguration::Configure for the optional fields
+inline constexpr bool MC_USE_SOBOL = true;  //!< Sobol (vs pseudo-random) by default
+inline constexpr char MCL_NODE_PATH[] = ""; //!< node-dump file (empty: no dump)
+
 //! Monte-Carlo (Longstaff-Schwartz) engine parameters, grouped in their own
 //! YAML object (kind "mcl_configuration") and referenced from a
 //! pricer_configuration via its "mcl" field.
 class MclConfiguration : public Object
 {
   public:
+    //! read own fields (grid steps, path count, Sobol / GPU switches) with guards
+    void Configure( ObjectReader& reader ) override;
+
     int _max_day_step;
     int _min_day_step;
     long _paths;           //!< path count — 64-bit so it can exceed 2^31 (e.g. billions on GPU)

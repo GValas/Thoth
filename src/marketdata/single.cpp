@@ -1,9 +1,10 @@
 #include "thoth.hpp"
 #include "single.hpp"
+#include "correlation.hpp"
 
 //! constructor
 Single::Single( const string& ObjectName,
-                const string& ObjectKind ) : Asset( ObjectName, ObjectKind )
+                const string& ObjectKind ) : Underlying( ObjectName, ObjectKind )
 {
     _volatility = nullptr;
 }
@@ -182,4 +183,58 @@ LocalVolatilityNode* Single::BuildLocalVolNode( NodeCollector& NC, MonteCarloNod
                 L->PushVolVector( vol );
             }
         } ) );
+}
+
+//! --- Underlying (contract-diffusion) role, formerly the Mono adapter ---
+
+double Single::GetForward( const date& MaturityDate,
+                           Currency* QuantoCurrency )
+{
+    double f = GetForward( MaturityDate );
+
+    //! quanto drift correction: when the payoff is settled in a currency other than
+    //! the underlying's, the asset's forward in the payoff-currency measure is
+    //! F *= exp( -rho(S,FX) * sigma_S * sigma_X * t ). This mirrors the MCL
+    //! QuantoAdjustmentNode (exp(-v*w*c*dt) on the spot) so ANA/PDE/MCL agree. rho is
+    //! the signed FX-underlying correlation (GetValue already carries the sign), so no
+    //! extra negation here. The correction uses the ATM implied vol (GetImplicitVol at
+    //! strike 0); under a flat BS surface this is exact, but for a local/stochastic-vol
+    //! surface it is an approximation of the instantaneous-vol drift term. Currency
+    //! identity is by pointer: all Currency objects are singletons in the book graph.
+    if ( QuantoCurrency && QuantoCurrency != _currency )
+    {
+        if ( !_correlation )
+        {
+            ERR( "missing correlation for quanto adjustment of " + _name );
+        }
+        double dt = YearFraction( _today, MaturityDate );
+        double v_s = GetImplicitVol( 0, MaturityDate );
+        double v_fx = _correlation->GetFxVol( _currency->GetName(), QuantoCurrency->GetName() );
+        double rho = _correlation->GetValue( _currency->GetName(), QuantoCurrency->GetName(), _name );
+        f *= exp( -rho * v_s * v_fx * dt );
+    }
+    return f;
+}
+
+//! a single name spans exactly itself (the set holds mutable handles the pricing
+//! mutates — vol/rate bumps — hence the const_cast off this const getter)
+SingleSet Single::GetSingleSet() const
+{
+    SingleSet s;
+    s.insert( const_cast<Single*>( this ) );
+    return s;
+}
+
+CurrencySet Single::GetCurrencySet() const
+{
+    CurrencySet s;
+    s.insert( GetCurrency() );
+    return s;
+}
+
+MonteCarloNode* Single::GetCorrelNode( NodeCollector& NC,
+                                       const string& UnderlyingCurrency,
+                                       const string& BaseCurrency )
+{
+    return _correlation->GetCorrelNode( NC, UnderlyingCurrency, BaseCurrency, _name );
 }

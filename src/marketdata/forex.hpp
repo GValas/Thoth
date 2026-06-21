@@ -14,6 +14,9 @@ class Forex : public Single
     Currency* _underlying_currency;
 
   public:
+    //! read own fields (base/underlying currencies, optional vol + spot)
+    void Configure( ObjectReader& reader ) override;
+
     //! setter
     void SetUnderlyingCurrency( Currency& UnderlyingCurrency );
     void SetBaseCurrency( Currency& BaseCurrency );
