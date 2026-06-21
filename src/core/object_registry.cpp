@@ -89,19 +89,6 @@ Object* BuildPricer( ObjectManager& m, const string& n )
     {
         p = std::make_unique<PricerMCL>( n, m.cfg() );
     }
-    else if ( PC->_method == PRICING_METHOD_MCL_GPU )
-    {
-        //! legacy alias: GPU is now an MCL capability gated by the mcl_configuration's
-        //! allow_gpu flag. "mcl_gpu" forces that flag on, so old books keep
-        //! accelerating; prefer `method: mcl` + `allow_gpu`.
-        if ( PC->_mcl )
-        {
-            PC->_mcl->_allow_gpu = true;
-        }
-        LOG( "INI", "method 'mcl_gpu' is deprecated: use 'mcl' with 'allow_gpu: true' "
-                    "in the mcl_configuration (treating it as that now)" );
-        p = std::make_unique<PricerMCL>( n, m.cfg() );
-    }
     else if ( PC->_method == PRICING_METHOD_PDE )
     {
         p = std::make_unique<PricerPDE>( n, m.cfg() );
@@ -114,8 +101,7 @@ Object* BuildPricer( ObjectManager& m, const string& n )
     {
         ERR( "pricing configuration '" + PC->GetName() + "' has unknown method '" +
              PC->_method + "' (expected '" + PRICING_METHOD_PDE + "', '" +
-             PRICING_METHOD_MCL + "', '" + PRICING_METHOD_MCL_GPU + "' or '" +
-             PRICING_METHOD_ANA + "')" );
+             PRICING_METHOD_MCL + "' or '" + PRICING_METHOD_ANA + "')" );
     }
     return ConfigureObject( m, m.collector().Add( std::move( p ) ) );
 }

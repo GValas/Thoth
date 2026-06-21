@@ -15,10 +15,9 @@
 inline constexpr double PDE_THETA = 0.5;
 
 //! pricing method selectors (config field "method")
-inline constexpr char PRICING_METHOD_PDE[] = "pde";         //!< finite-difference PDE grid solving
-inline constexpr char PRICING_METHOD_MCL[] = "mcl";         //!< monte-carlo (longstaff-schwartz) tree; GPU via allow_gpu
-inline constexpr char PRICING_METHOD_ANA[] = "ana";         //!< closed-form (analytic) formulas
-inline constexpr char PRICING_METHOD_MCL_GPU[] = "mcl_gpu"; //!< deprecated alias for mcl + allow_gpu: true
+inline constexpr char PRICING_METHOD_PDE[] = "pde"; //!< finite-difference PDE grid solving
+inline constexpr char PRICING_METHOD_MCL[] = "mcl"; //!< monte-carlo (longstaff-schwartz) tree; GPU via allow_gpu
+inline constexpr char PRICING_METHOD_ANA[] = "ana"; //!< closed-form (analytic) formulas
 
 //! finite-difference bump sizes for the bump-and-revalue Greeks. The spot bump
 //! (GREEK_SPOT_BUMP, for delta/gamma) is the canonical one in constants.hpp, so

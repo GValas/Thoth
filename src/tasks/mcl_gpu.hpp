@@ -10,8 +10,9 @@
 //!   * mcl_gpu.cu       — real CUDA kernels (built when THOTH_ENABLE_CUDA=ON)
 //!   * mcl_gpu_stub.cpp — Available()==false fallback (CPU-only build)
 //!
-//! The pricer (PricerMCLGpu) calls Available() once and falls back to the CPU MCL
-//! engine when it is false, so a CPU-only build still accepts `method: mcl_gpu`.
+//! The pricer (PricerMCL) calls Available() once and falls back to the CPU MCL
+//! engine when it is false, so a CPU-only build still runs `method: mcl` with
+//! `allow_gpu: true` (transparently on the CPU).
 namespace gpu
 {
 

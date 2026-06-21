@@ -74,7 +74,7 @@ Always build, test and format before you consider a change done.
 ```
 src/             C++ engine, instruments, market data, IO
   core/          object model: Object, ObjectManager, object_registry, collectors
-  tasks/         pricers (mcl/pde/ana/mcl_gpu), pricer & mcl/pde configurations, sequence
+  tasks/         pricers (mcl/pde/ana; GPU via mcl + allow_gpu), pricer & mcl/pde configurations, sequence
   contracts/     instruments: book, contract, vanilla, barrier, variance_swap
   underlyings/   mono, basket, absolute_basket, rainbow, composite, underlying
   marketdata/    equity, currency, curves (yield/repo/dividends), forex, asset

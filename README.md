@@ -46,8 +46,7 @@ usable as a batch tool or as an HTTP service.
   `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only build, a host with no GPU, or any book it
   does not yet support (American / barrier / stochastic vol / multi-asset) it
   **runs on the CPU `mcl` engine** instead — so `allow_gpu` is always safe to set.
-  (The old `method: mcl_gpu` still works as a deprecated alias.) See
-  [`docs/gpu.md`](docs/gpu.md).
+  See [`docs/gpu.md`](docs/gpu.md).
 
 Long runs show a `│███░░░│` progress bar with the running price/trust. On a
 terminal it redraws in place as a single updating line; when stdout is not a TTY
@@ -167,9 +166,9 @@ Heston, Bates and SABR cases are exercised by the cells in `samples/matrix.yaml`
 ## Documentation
 
 In-depth guides live in [`docs/`](docs/) (see the [index](docs/README.md)):
-[running](docs/running.md) · [products](docs/products.md) ·
-[volatility](docs/volatility.md) · [Monte-Carlo](docs/monte_carlo.md) ·
-[PDE](docs/pde.md) · [GPU](docs/gpu.md) ·
+[architecture](docs/architecture.md) · [running](docs/running.md) ·
+[products](docs/products.md) · [volatility](docs/volatility.md) ·
+[Monte-Carlo](docs/monte_carlo.md) · [PDE](docs/pde.md) · [GPU](docs/gpu.md) ·
 [agent workflow](docs/agent.md).
 
 ---
@@ -425,7 +424,7 @@ my_pricing: !pricer
 # pricer_configuration selects the method and points at an mcl_configuration
 # and/or pde_configuration sub-object.
 my_config: !pricer_configuration
-  method: pde   # pde | mcl | ana  (mcl_gpu = deprecated alias for mcl + allow_gpu)
+  method: pde   # pde | mcl | ana  (GPU: method mcl + allow_gpu in the mcl_configuration)
   mcl_configuration: my_mcl
   pde_configuration: my_pde
 my_mcl: !mcl_configuration

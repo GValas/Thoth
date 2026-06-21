@@ -3,8 +3,8 @@
 Thoth ships an optional CUDA Monte-Carlo backend, exposed as a capability of the
 `mcl` engine: set `allow_gpu: true` in the `mcl_configuration`. It runs single-asset
 European vanillas on an NVIDIA GPU and stays on the CPU MCL engine for everything
-else — automatically, at runtime. (The old `method: mcl_gpu` is a **deprecated
-alias** for `method: mcl` + `allow_gpu: true`, kept so existing books keep working.)
+else — automatically, at runtime. (The legacy `method: mcl_gpu` alias has been
+removed: request the GPU with `method: mcl` + `allow_gpu: true`.)
 This guide covers what the engine does, how it is built, how to run it, how the
 kernel works, and what is still missing.
 

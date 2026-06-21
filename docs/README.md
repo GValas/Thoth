@@ -5,6 +5,7 @@ Guides to running and understanding the engine. Start with the project
 
 | Guide | What it covers |
 |-------|----------------|
+| [architecture.md](architecture.md) | UML class diagrams of the object model, by subsystem: underlyings, market data, contracts, pricers, the configuration/build layer and the MC node graph. |
 | [running.md](running.md) | Building, the four `thoth` CLI modes, and the `run_*` Docker wrappers (batch / server / cluster) with examples. |
 | [products.md](products.md) | Supported instruments and underlyings, their YAML fields, and the per-engine support matrix. |
 | [volatility.md](volatility.md) | Volatility models end to end: constant, SABR, implied→Dupire local vol, the Milstein step, Heston and Bates. |

@@ -192,7 +192,7 @@ the underlyings' Brownian motions).
 ```yaml
 # pricer_configuration selects the method and points at an mcl_configuration
 my_pricer: !pricer_configuration
-  method: mcl                 # pde | mcl | ana  (mcl_gpu = deprecated alias for mcl + allow_gpu)
+  method: mcl                 # pde | mcl | ana  (GPU: method mcl + allow_gpu in the mcl_configuration)
   mcl_configuration: my_mcl
 
 my_mcl: !mcl_configuration

@@ -33,7 +33,7 @@ class MclConfiguration : public Object
     //! opt in to GPU (CUDA) acceleration: when true AND a usable device is present
     //! AND the whole book is GPU-supported (single-asset European vanillas under
     //! GBM), the MCL engine prices on the device; otherwise it transparently runs
-    //! on the CPU. Default false. Auto-enabled by the legacy method "mcl_gpu".
+    //! on the CPU. Default false.
     bool _allow_gpu = false;
 
     //!
