@@ -261,8 +261,8 @@ YamlConfig::YamlConfig( from_string_t,
 //! emit the config tree (with admin info) as a YAML string
 string YamlConfig::Dump()
 {
-    SetString( "system_information.last_update", GetSysInfoLastUpdate() );
-    SetString( "system_information.version", GetSysInfoVersion() );
+    Set( "system_information.last_update", GetSysInfoLastUpdate() );
+    Set( "system_information.version", GetSysInfoVersion() );
 
     //! fields are written in alphabetical order (stable across runs, easy to diff)
     YAML::Node root = SortKeysAlpha( _root );
@@ -542,18 +542,7 @@ YAML::Node YamlConfig::PathNode( const string& Path )
     return _root[object_name][attribute_name];
 }
 
-void YamlConfig::SetDouble( const string& Path,
-                            const double Value )
-{
-    PathNode( Path ) = Value;
-}
-
-void YamlConfig::SetDoubleList( const string& Path,
-                                const vector<double>& Value )
-{
-    SetSeq( Path, Value.begin(), Value.end() );
-}
-
+//! raw-buffer double list, behind SetLaMatrix / SetLaVector
 void YamlConfig::SetDoubleList( const string& Path,
                                 const double* Value,
                                 size_t size )
@@ -571,46 +560,6 @@ void YamlConfig::SetLaVector( const string& Path,
                               const la_vector* Value )
 {
     SetDoubleList( Path, Value->data, Value->size );
-}
-
-void YamlConfig::SetStringList( const string& Path,
-                                const vector<string>& Value )
-{
-    SetSeq( Path, Value.begin(), Value.end() );
-}
-
-void YamlConfig::SetDate( const string& Path,
-                          const date& Value )
-{
-    SetString( Path, to_iso_extended_string( Value ) );
-}
-
-void YamlConfig::SetDateList( const string& Path,
-                              const vector<date>& Value )
-{
-    SetSeq( Path, Value.begin(), Value.end(),
-            []( const date& d )
-            { return to_iso_extended_string( d ); } );
-}
-
-void YamlConfig::SetBooleanList( const string& Path,
-                                 const vector<bool>& Value )
-{
-    //! map the vector<bool> proxy to a real bool (yaml-cpp emits true/false)
-    SetSeq( Path, Value.begin(), Value.end(), []( bool b )
-            { return b; } );
-}
-
-void YamlConfig::SetString( const string& Path,
-                            const string& Value )
-{
-    PathNode( Path ) = Value;
-}
-
-void YamlConfig::SetBoolean( const string& Path,
-                             const bool Value )
-{
-    PathNode( Path ) = Value; //!< native boolean; yaml-cpp emits true/false
 }
 
 //! ----------------------------------------------------------------------

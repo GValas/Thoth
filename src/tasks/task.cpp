@@ -21,6 +21,6 @@ void Task::SetResult( const string& Result )
 //!
 void Task::WriteResults()
 {
-    _cfg->SetString( _result + ".kind", _kind + "_result" );
-    _cfg->SetDouble( _result + ".exec_time", _exec_time );
+    _cfg->Set( _result + ".kind", _kind + "_result" );
+    _cfg->Set( _result + ".exec_time", _exec_time );
 }

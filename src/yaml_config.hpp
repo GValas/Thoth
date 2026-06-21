@@ -1,5 +1,6 @@
 #pragma once
 #include "thoth.hpp"
+#include <type_traits>
 #include <yaml-cpp/yaml.h>
 
 inline constexpr char OBJECT_SEPARATOR[] = ".";
@@ -113,30 +114,35 @@ class YamlConfig
     vector<int> GetIntegerList( const string& Path );
     vector<date> GetDateList( const string& Path );
 
-    //! set methods
-    void SetDouble( const string& Path,
-                    const double Value );
+    //! set methods. One templated writer covers every scalar (double / int / long /
+    //! bool / string / date) and value list (vector<double|string|date|bool>),
+    //! dispatching on the type (dates emit ISO strings); the raw-buffer and la_*
+    //! writers stay named.
+    template <class T>
+    void Set( const string& Path, const T& Value )
+    {
+        if constexpr ( std::is_same_v<T, date> )
+            PathNode( Path ) = to_iso_extended_string( Value );
+        else if constexpr ( std::is_same_v<T, vector<date>> )
+            SetSeq( Path, Value.begin(), Value.end(),
+                    []( const date& d )
+                    { return to_iso_extended_string( d ); } );
+        else if constexpr ( std::is_same_v<T, vector<bool>> )
+            SetSeq( Path, Value.begin(), Value.end(), []( bool b )
+                    { return b; } );
+        else if constexpr ( std::is_same_v<T, vector<double>> || std::is_same_v<T, vector<string>> )
+            SetSeq( Path, Value.begin(), Value.end() );
+        else
+            PathNode( Path ) = Value; //!< double / int / long / bool / string scalar
+    }
+
     void SetDoubleList( const string& Path,
                         const double* Value,
                         size_t size );
-    void SetDoubleList( const string& Path,
-                        const vector<double>& Value );
-    void SetDate( const string& Path,
-                  const date& Value );
-    void SetDateList( const string& Path,
-                      const vector<date>& Value );
     void SetLaMatrix( const string& Path,
                       const la_matrix* Value );
     void SetLaVector( const string& Path,
                       const la_vector* Value );
-    void SetString( const string& Path,
-                    const string& Value );
-    void SetStringList( const string& Path,
-                        const vector<string>& Value );
-    void SetBoolean( const string& Path,
-                     const bool Value );
-    void SetBooleanList( const string& Path,
-                         const vector<bool>& Value );
 
     //! object existence
     bool IsString( const string& Path );

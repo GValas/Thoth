@@ -47,8 +47,8 @@ void Sequence::WriteResults()
 {
     if ( !_result.empty() )
     {
-        _cfg->SetString( _result + ".kind", _kind + "_result" );
-        _cfg->SetDouble( _result + ".exec_time", _exec_time );
-        _cfg->SetStringList( _result + ".tasks", _task_names );
+        _cfg->Set( _result + ".kind", _kind + "_result" );
+        _cfg->Set( _result + ".exec_time", _exec_time );
+        _cfg->Set( _result + ".tasks", _task_names );
     }
 }

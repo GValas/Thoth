@@ -64,9 +64,9 @@ void ObjectManager::ExecuteTask()
         _exec_node->Execute();
 
         //! system_information
-        _yml.SetString( "system_information.last_exec_name", _exec_node->GetName() );
-        _yml.SetString( "system_information.last_exec_kind", _exec_node->GetKind() );
-        _yml.SetDouble( "system_information.exec_time", ExecTime( t0 ) );
+        _yml.Set( "system_information.last_exec_name", _exec_node->GetName() );
+        _yml.Set( "system_information.last_exec_kind", _exec_node->GetKind() );
+        _yml.Set( "system_information.exec_time", ExecTime( t0 ) );
     }
 
     //! no task to execute

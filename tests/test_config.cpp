@@ -26,8 +26,8 @@ TEST_CASE( "YamlConfig string round-trip: scalars and lists" )
 TEST_CASE( "YamlConfig set then get is consistent" )
 {
     YamlConfig cfg( YamlConfig::from_string_t{}, "res: {}\n" );
-    cfg.SetDouble( "res.premium", 15.7113 );
-    cfg.SetString( "res.label", "atm-call" );
+    cfg.Set( "res.premium", 15.7113 );
+    cfg.Set( "res.label", "atm-call" );
     CHECK( cfg.GetDouble( "res.premium" ) == Approx( 15.7113 ) );
     CHECK( cfg.GetString( "res.label" ) == "atm-call" );
 

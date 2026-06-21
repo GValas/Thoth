@@ -152,9 +152,9 @@ static string ClusterPrice( const string& Body,
     vector<string> bodies( N );
     for ( int k = 0; k < N; k++ )
     {
-        req.SetString( mcl + ".paths", std::to_string( npaths[k] ) );
-        req.SetString( mcl + ".seed", std::to_string( k ) );
-        req.SetString( mcl + ".sobol_skip", std::to_string( skip[k] ) );
+        req.Set( mcl + ".paths", std::to_string( npaths[k] ) );
+        req.Set( mcl + ".seed", std::to_string( k ) );
+        req.Set( mcl + ".sobol_skip", std::to_string( skip[k] ) );
         bodies[k] = req.Dump();
     }
 
@@ -256,15 +256,15 @@ static string ClusterPrice( const string& Body,
     YamlConfig out( YamlConfig::from_string_t{}, responses[0] );
     for ( const auto& [key, v] : pooled )
     {
-        out.SetDouble( result + "." + key, v );
+        out.Set( result + "." + key, v );
     }
     for ( const auto& [key, v] : trust2 )
     {
-        out.SetDouble( result + "." + key, sqrt( v ) );
+        out.Set( result + "." + key, sqrt( v ) );
     }
-    out.SetString( "system_information.cluster",
-                   "aggregated " + std::to_string( total ) + " paths over " +
-                       std::to_string( N ) + " slaves" );
+    out.Set( "system_information.cluster",
+             "aggregated " + std::to_string( total ) + " paths over " +
+                 std::to_string( N ) + " slaves" );
     return out.Dump();
 }
 
@@ -302,13 +302,13 @@ static string ClusterPriceSequence( const string& Body,
     const string seq_result = out.GetString( Exec + ".result", "" );
     if ( !seq_result.empty() )
     {
-        out.SetString( seq_result + ".kind", "sequence_result" );
-        out.SetDouble( seq_result + ".exec_time", total_time );
-        out.SetStringList( seq_result + ".tasks", tasks );
+        out.Set( seq_result + ".kind", "sequence_result" );
+        out.Set( seq_result + ".exec_time", total_time );
+        out.Set( seq_result + ".tasks", tasks );
     }
-    out.SetString( "system_information.cluster",
-                   "sequence of " + std::to_string( tasks.size() ) +
-                       " task(s) dispatched over " + std::to_string( Slaves.size() ) + " slave(s)" );
+    out.Set( "system_information.cluster",
+             "sequence of " + std::to_string( tasks.size() ) +
+                 " task(s) dispatched over " + std::to_string( Slaves.size() ) + " slave(s)" );
     return out.Dump();
 }
 
