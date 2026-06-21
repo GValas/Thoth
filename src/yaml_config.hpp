@@ -48,6 +48,41 @@ class YamlConfig
         }
     }
 
+    //! every Is* type test is "does the matching GetX parse?" (a throw means no);
+    //! this folds their identical try/catch.
+    template <class Getter>
+    bool Probe( Getter&& get )
+    {
+        try
+        {
+            get();
+            return true;
+        }
+        catch ( ... )
+        {
+            return false;
+        }
+    }
+
+    //! build a YAML sequence at Path from [first, last), optionally mapping each
+    //! element through conv (e.g. date -> ISO string); shared by the list setters.
+    template <class It>
+    void SetSeq( const string& Path, It first, It last )
+    {
+        YAML::Node seq( YAML::NodeType::Sequence );
+        for ( ; first != last; ++first )
+            seq.push_back( *first );
+        PathNode( Path ) = seq;
+    }
+    template <class It, class Conv>
+    void SetSeq( const string& Path, It first, It last, Conv conv )
+    {
+        YAML::Node seq( YAML::NodeType::Sequence );
+        for ( ; first != last; ++first )
+            seq.push_back( conv( *first ) );
+        PathNode( Path ) = seq;
+    }
+
     bool IsPath( const string& Path );
 
   public:
@@ -101,7 +136,7 @@ class YamlConfig
     void SetBoolean( const string& Path,
                      const bool Value );
     void SetBooleanList( const string& Path,
-                         const vector<bool> Value );
+                         const vector<bool>& Value );
 
     //! object existence
     bool IsString( const string& Path );

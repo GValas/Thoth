@@ -491,106 +491,43 @@ la_vector* YamlConfig::GetLaVector( const string& Path )
 
 bool YamlConfig::IsString( const string& Path )
 {
-    try
-    {
-        GetString( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetString( Path ); } );
 }
-
 bool YamlConfig::IsStringList( const string& Path )
 {
-    try
-    {
-        GetStringList( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetStringList( Path ); } );
 }
-
 bool YamlConfig::IsDouble( const string& Path )
 {
-    try
-    {
-        GetDouble( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetDouble( Path ); } );
 }
-
 bool YamlConfig::IsDoubleList( const string& Path )
 {
-    try
-    {
-        GetDoubleList( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetDoubleList( Path ); } );
 }
-
 bool YamlConfig::IsInteger( const string& Path )
 {
-    try
-    {
-        GetInteger( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetInteger( Path ); } );
 }
-
 bool YamlConfig::IsIntegerList( const string& Path )
 {
-    try
-    {
-        GetIntegerList( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetIntegerList( Path ); } );
 }
-
 bool YamlConfig::IsBoolean( const string& Path )
 {
-    try
-    {
-        LookUp( Path ).as<bool>(); //!< parses as a native YAML boolean ?
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetBoolean( Path ); } );
 }
-
 bool YamlConfig::IsBooleanList( const string& Path )
 {
-    try
-    {
-        GetBooleanList( Path );
-        return true;
-    }
-    catch ( ... )
-    {
-        return false;
-    }
+    return Probe( [&]
+                  { GetBooleanList( Path ); } );
 }
 
 //! ----------------------------------------------------------------------
@@ -614,24 +551,14 @@ void YamlConfig::SetDouble( const string& Path,
 void YamlConfig::SetDoubleList( const string& Path,
                                 const vector<double>& Value )
 {
-    YAML::Node seq( YAML::NodeType::Sequence );
-    for ( double d : Value )
-    {
-        seq.push_back( d );
-    }
-    PathNode( Path ) = seq;
+    SetSeq( Path, Value.begin(), Value.end() );
 }
 
 void YamlConfig::SetDoubleList( const string& Path,
                                 const double* Value,
                                 size_t size )
 {
-    YAML::Node seq( YAML::NodeType::Sequence );
-    for ( size_t i = 0; i < size; i++ )
-    {
-        seq.push_back( Value[i] );
-    }
-    PathNode( Path ) = seq;
+    SetSeq( Path, Value, Value + size );
 }
 
 void YamlConfig::SetLaMatrix( const string& Path,
@@ -649,12 +576,7 @@ void YamlConfig::SetLaVector( const string& Path,
 void YamlConfig::SetStringList( const string& Path,
                                 const vector<string>& Value )
 {
-    YAML::Node seq( YAML::NodeType::Sequence );
-    for ( const string& s : Value )
-    {
-        seq.push_back( s );
-    }
-    PathNode( Path ) = seq;
+    SetSeq( Path, Value.begin(), Value.end() );
 }
 
 void YamlConfig::SetDate( const string& Path,
@@ -666,23 +588,17 @@ void YamlConfig::SetDate( const string& Path,
 void YamlConfig::SetDateList( const string& Path,
                               const vector<date>& Value )
 {
-    YAML::Node seq( YAML::NodeType::Sequence );
-    for ( const date& d : Value )
-    {
-        seq.push_back( to_iso_extended_string( d ) );
-    }
-    PathNode( Path ) = seq;
+    SetSeq( Path, Value.begin(), Value.end(),
+            []( const date& d )
+            { return to_iso_extended_string( d ); } );
 }
 
 void YamlConfig::SetBooleanList( const string& Path,
-                                 const vector<bool> Value )
+                                 const vector<bool>& Value )
 {
-    YAML::Node seq( YAML::NodeType::Sequence );
-    for ( bool b : Value )
-    {
-        seq.push_back( b ); //!< native boolean; yaml-cpp emits true/false
-    }
-    PathNode( Path ) = seq;
+    //! map the vector<bool> proxy to a real bool (yaml-cpp emits true/false)
+    SetSeq( Path, Value.begin(), Value.end(), []( bool b )
+            { return b; } );
 }
 
 void YamlConfig::SetString( const string& Path,

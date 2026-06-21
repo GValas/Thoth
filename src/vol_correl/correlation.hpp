@@ -53,12 +53,12 @@ class Correlation : public Object
     void SetForexList( const vector<Forex*>& ForexList );
     void SetUnderlyingList( const vector<string>& UnderlyingList );
     void SetSubMatrix( const vector<string>& UnderlyingList,
-                       vector<string> ForexList );
+                       const vector<string>& ForexList );
 
     //! access to matrix (ExtractMatrix returns a freshly-built, caller-owned matrix)
-    la_matrix* ExtractCholeskyMatrix( const vector<string> UnderlyingNames );
-    LaMatrix ExtractMatrix( vector<string> UnderlyingNameList,
-                            vector<Forex*> ForexList );
+    la_matrix* ExtractCholeskyMatrix( const vector<string>& UnderlyingNames );
+    LaMatrix ExtractMatrix( const vector<string>& UnderlyingNameList,
+                            const vector<Forex*>& ForexList );
 
     //! read correl matrix : 3 ways
     double GetValue( const string& udl1,
@@ -79,7 +79,7 @@ class Correlation : public Object
                       const string& fx_base_ccy );
     double GetFxVol( const string& fx_udl_ccy,
                      const string& fx_base_ccy );
-    set<string> GetForexNameList( set<string> currency_name_list );
+    set<string> GetForexNameList( const set<string>& currency_name_list );
 
     //!
     ForexSet GetForexSet( const string& UnderlyingCurrency,

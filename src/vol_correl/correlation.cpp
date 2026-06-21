@@ -133,8 +133,8 @@ ForexSet Correlation::GetForexSet( const string& I,
 
 // get matrix (owned by the caller, RAII LaMatrix)
 // udl, then fx
-LaMatrix Correlation::ExtractMatrix( vector<string> UnderlyingNameList,
-                                     vector<Forex*> ForexList )
+LaMatrix Correlation::ExtractMatrix( const vector<string>& UnderlyingNameList,
+                                     const vector<Forex*>& ForexList )
 {
 
     //! sizes
@@ -382,7 +382,7 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
 }
 
 //!
-la_matrix* Correlation::ExtractCholeskyMatrix( const vector<string> /*UnderlyingNames*/ )
+la_matrix* Correlation::ExtractCholeskyMatrix( const vector<string>& /*UnderlyingNames*/ )
 {
     //! not implemented (and currently unused)
     ERR( "correlation '" + _name + "' : ExtractCholeskyMatrix not implemented" );
@@ -477,14 +477,14 @@ double Correlation::GetFxVol( const string& I,
 }
 
 // list of forex list used
-set<string> Correlation::GetForexNameList( set<string> currency_name_list )
+set<string> Correlation::GetForexNameList( const set<string>& currency_name_list )
 {
     set<string> s;
     if ( currency_name_list.size() > 1 )
     {
         if ( _pivot_currency != "" )
         {
-            set<string>::iterator c;
+            set<string>::const_iterator c;
             for ( c = currency_name_list.begin();
                   c != currency_name_list.end();
                   c++ )
