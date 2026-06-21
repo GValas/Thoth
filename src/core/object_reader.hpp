@@ -54,27 +54,27 @@ class ObjectReader
     {
         const string p = Path( f );
         if constexpr ( std::is_same_v<T, double> )
-            return _m.cfg().GetDouble( p );
+            return _m.yml().GetDouble( p );
         else if constexpr ( std::is_same_v<T, int> )
-            return _m.cfg().GetInteger( p );
+            return _m.yml().GetInteger( p );
         else if constexpr ( std::is_same_v<T, long> )
-            return _m.cfg().GetLong( p );
+            return _m.yml().GetLong( p );
         else if constexpr ( std::is_same_v<T, bool> )
-            return _m.cfg().GetBoolean( p );
+            return _m.yml().GetBoolean( p );
         else if constexpr ( std::is_same_v<T, string> )
-            return _m.cfg().GetString( p );
+            return _m.yml().GetString( p );
         else if constexpr ( std::is_same_v<T, date> )
-            return _m.cfg().GetDate( p );
+            return _m.yml().GetDate( p );
         else if constexpr ( std::is_same_v<T, vector<double>> )
-            return _m.cfg().GetDoubleList( p );
+            return _m.yml().GetDoubleList( p );
         else if constexpr ( std::is_same_v<T, vector<int>> )
-            return _m.cfg().GetIntegerList( p );
+            return _m.yml().GetIntegerList( p );
         else if constexpr ( std::is_same_v<T, vector<date>> )
-            return _m.cfg().GetDateList( p );
+            return _m.yml().GetDateList( p );
         else if constexpr ( std::is_same_v<T, vector<string>> )
-            return _m.cfg().GetStringList( p );
+            return _m.yml().GetStringList( p );
         else if constexpr ( std::is_same_v<T, vector<bool>> )
-            return _m.cfg().GetBooleanList( p );
+            return _m.yml().GetBooleanList( p );
         else
             static_assert( unsupported<T>, "ObjectReader::Get: unsupported type" );
     }
@@ -85,23 +85,23 @@ class ObjectReader
     {
         const string p = Path( f );
         if constexpr ( std::is_same_v<T, double> )
-            return _m.cfg().GetDouble( p, d );
+            return _m.yml().GetDouble( p, d );
         else if constexpr ( std::is_same_v<T, int> )
-            return _m.cfg().GetInteger( p, d );
+            return _m.yml().GetInteger( p, d );
         else if constexpr ( std::is_same_v<T, long> )
-            return _m.cfg().GetLong( p, d );
+            return _m.yml().GetLong( p, d );
         else if constexpr ( std::is_same_v<T, bool> )
-            return _m.cfg().GetBoolean( p, d );
+            return _m.yml().GetBoolean( p, d );
         else if constexpr ( std::is_same_v<T, string> )
-            return _m.cfg().GetString( p, d );
+            return _m.yml().GetString( p, d );
         else if constexpr ( std::is_same_v<T, date> )
-            return _m.cfg().GetDate( p, d );
+            return _m.yml().GetDate( p, d );
         else
             static_assert( unsupported<T>, "ObjectReader::Get: unsupported scalar type" );
     }
 
     //! the la_vector view is a raw pointer (not a vector<T>), so it stays named
-    la_vector* LaVector( const string& f ) { return _m.cfg().GetLaVector( Path( f ) ); }
+    la_vector* LaVector( const string& f ) { return _m.yml().GetLaVector( Path( f ) ); }
 
     //! --- presence of an optional field, scalar (Has<string>("calendar")) or list
     //! (Has<vector<double>>("matrix")) ---
@@ -110,17 +110,17 @@ class ObjectReader
     {
         const string p = Path( f );
         if constexpr ( std::is_same_v<T, string> )
-            return _m.cfg().IsString( p );
+            return _m.yml().IsString( p );
         else if constexpr ( std::is_same_v<T, double> )
-            return _m.cfg().IsDouble( p );
+            return _m.yml().IsDouble( p );
         else if constexpr ( std::is_same_v<T, int> )
-            return _m.cfg().IsInteger( p );
+            return _m.yml().IsInteger( p );
         else if constexpr ( std::is_same_v<T, bool> )
-            return _m.cfg().IsBoolean( p );
+            return _m.yml().IsBoolean( p );
         else if constexpr ( std::is_same_v<T, vector<double>> )
-            return _m.cfg().IsDoubleList( p );
+            return _m.yml().IsDoubleList( p );
         else if constexpr ( std::is_same_v<T, vector<string>> )
-            return _m.cfg().IsStringList( p );
+            return _m.yml().IsStringList( p );
         else
             static_assert( unsupported<T>, "ObjectReader::Has: unsupported type" );
     }
@@ -135,11 +135,11 @@ class ObjectReader
         if constexpr ( reader_detail::is_vector<T> )
         {
             using E = typename T::value_type; //!< T = vector<E> -> vector<E*>
-            return _m.GetList<E>( _m.cfg().GetStringList( Path( f ) ) );
+            return _m.GetList<E>( _m.yml().GetStringList( Path( f ) ) );
         }
         else
         {
-            return _m.Get<T>( _m.cfg().GetString( Path( f ) ) );
+            return _m.Get<T>( _m.yml().GetString( Path( f ) ) );
         }
     }
 

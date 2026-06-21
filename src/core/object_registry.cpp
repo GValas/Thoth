@@ -70,7 +70,7 @@ ObjectManager::Factory MakeConfigurable()
     {
         std::unique_ptr<T> o;
         if constexpr ( std::is_constructible_v<T, const string&, YamlConfig&> )
-            o = std::make_unique<T>( n, m.cfg() );
+            o = std::make_unique<T>( n, m.yml() );
         else
             o = std::make_unique<T>( n );
         return ConfigureObject( m, m.collector().Add( std::move( o ) ) );
@@ -83,19 +83,19 @@ ObjectManager::Factory MakeConfigurable()
 //! like every other migrated object.
 Object* BuildPricer( ObjectManager& m, const string& n )
 {
-    PricerConfiguration* PC = m.Get<PricerConfiguration>( m.cfg().GetString( n + ".configuration" ) );
+    PricerConfiguration* PC = m.Get<PricerConfiguration>( m.yml().GetString( n + ".configuration" ) );
     std::unique_ptr<Pricer> p;
     if ( PC->_method == PRICING_METHOD_MCL )
     {
-        p = std::make_unique<PricerMCL>( n, m.cfg() );
+        p = std::make_unique<PricerMCL>( n, m.yml() );
     }
     else if ( PC->_method == PRICING_METHOD_PDE )
     {
-        p = std::make_unique<PricerPDE>( n, m.cfg() );
+        p = std::make_unique<PricerPDE>( n, m.yml() );
     }
     else if ( PC->_method == PRICING_METHOD_ANA )
     {
-        p = std::make_unique<PricerANA>( n, m.cfg() );
+        p = std::make_unique<PricerANA>( n, m.yml() );
     }
     else
     {

@@ -40,7 +40,7 @@ class ObjectManager
     //! --- services used by the registry factories ---
 
     //! config tree (field access)
-    YamlConfig& cfg() { return _yml; }
+    YamlConfig& yml() { return _yml; }
 
     //! object store (factories Add/Own their product here)
     ObjectCollector& collector() { return _collector; }
