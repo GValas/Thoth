@@ -2,7 +2,7 @@
 #include "currency.hpp"
 #include "object_reader.hpp"
 
-Currency::Currency( const string& ObjectName ) : Object( ObjectName, KIND_CURRENCY )
+Currency::Currency( const string& ObjectName ) : MarketData( ObjectName, KIND_CURRENCY )
 {
     _rate = nullptr;
 }

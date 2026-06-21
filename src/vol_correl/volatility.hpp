@@ -61,6 +61,20 @@ class Volatility : public MarketData
     //! restores it. Reading is via ParamShift in the derived accessors.
     void SetParamShift( const string& Name, double Shift ) { _param_shift[Name] = Shift; }
 
+    //! MarketData bump-and-revalue: "vol" routes to the parallel vega shift, any
+    //! other factor to the matching model-parameter shift (the vega_<param> Greeks).
+    void ApplyShift( const string& Factor, double Shift ) override
+    {
+        if ( Factor == RISK_FACTOR_VOL )
+            SetVolShift( Shift );
+        else
+            SetParamShift( Factor, Shift );
+    }
+    [[nodiscard]] bool HasFactor( const string& Factor ) const override
+    {
+        return Factor == RISK_FACTOR_VOL || HasParam( Factor );
+    }
+
     //
     bool _is_local;
 

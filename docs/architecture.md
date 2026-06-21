@@ -85,6 +85,8 @@ classDiagram
 classDiagram
     class MarketData {
         <<abstract>>
+        +ApplyShift(factor, shift)
+        +HasFactor(factor) bool
     }
     class Curve {
         <<abstract>>
@@ -100,11 +102,11 @@ classDiagram
     }
 
     Object <|-- MarketData
-    Object <|-- Currency
-    Object <|-- Correlation
     MarketData <|-- Curve
     MarketData <|-- Volatility
     MarketData <|-- DiscreteDividends
+    MarketData <|-- Currency
+    MarketData <|-- Correlation
     Curve <|-- YieldCurve
     Curve <|-- RepoCurve
     Curve <|-- ContinuousDividendsCurve

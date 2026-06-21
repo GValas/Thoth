@@ -1,6 +1,7 @@
 #include "thoth.hpp"
 #include "pricer.hpp"
 #include "cancellation.hpp"
+#include "market_data.hpp" //!< RISK_FACTOR_VOL / RISK_FACTOR_RATE
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
 
@@ -144,7 +145,7 @@ void Pricer::ComputeParamGreeks()
         for ( Single* s : singles )
         {
             Volatility* v = s->GetVolatility();
-            if ( v->HasParam( param ) )
+            if ( v->HasFactor( param ) )
             {
                 vols.push_back( v );
             }
@@ -156,13 +157,13 @@ void Pricer::ComputeParamGreeks()
 
         for ( Volatility* v : vols )
         {
-            v->SetParamShift( param, GREEK_PARAM_BUMP );
+            v->ApplyShift( param, GREEK_PARAM_BUMP );
         }
         PriceBook();
         const double pu = _book->GetPremium();
         for ( Volatility* v : vols )
         {
-            v->SetParamShift( param, 0 ); //!< restore
+            v->ApplyShift( param, 0 ); //!< restore
         }
         _param_greeks[param] = ( pu - p0 ) / GREEK_PARAM_BUMP;
     }
@@ -178,7 +179,7 @@ void Pricer::ApplyVolShift( double Shift )
 {
     for ( Single* s : _single_set )
     {
-        s->GetVolatility()->SetVolShift( Shift );
+        s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, Shift );
     }
 }
 
@@ -187,7 +188,7 @@ void Pricer::ApplyRateShift( double Shift )
 {
     for ( Currency* c : _currency_set )
     {
-        c->GetRate()->SetCurveShift( Shift );
+        c->GetRate()->ApplyShift( RISK_FACTOR_RATE, Shift );
     }
 }
 
@@ -303,7 +304,7 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
     {
         for ( Single* s : Singles )
         {
-            s->GetVolatility()->SetVolShift( GREEK_VOL_BUMP );
+            s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, GREEK_VOL_BUMP );
         }
         _graph_tree_tag = "vega";
         const double pu = Reprice();
@@ -311,7 +312,7 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         Tick();
         for ( Single* s : Singles )
         {
-            s->GetVolatility()->SetVolShift( 0 ); //!< restore
+            s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, 0 ); //!< restore
         }
         g.vega = ( pu - P0 ) / GREEK_VOL_BUMP * 0.01;
     }
@@ -321,7 +322,7 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
     {
         for ( Currency* c : Currencies )
         {
-            c->GetRate()->SetCurveShift( GREEK_RATE_BUMP );
+            c->GetRate()->ApplyShift( RISK_FACTOR_RATE, GREEK_RATE_BUMP );
         }
         _graph_tree_tag = "rho";
         const double pu = Reprice();
@@ -329,7 +330,7 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         Tick();
         for ( Currency* c : Currencies )
         {
-            c->GetRate()->SetCurveShift( 0 ); //!< restore
+            c->GetRate()->ApplyShift( RISK_FACTOR_RATE, 0 ); //!< restore
         }
         g.rho = ( pu - P0 ) / GREEK_RATE_BUMP * 0.01;
     }

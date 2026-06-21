@@ -29,6 +29,17 @@ class Curve : public MarketData
     //! set the parallel shift (rho bump, in decimal rate); 0 restores the curve
     void SetCurveShift( double Shift ) { _curve_shift = Shift; }
 
+    //! MarketData bump-and-revalue: a curve responds only to the "rate" factor (rho)
+    void ApplyShift( const string& Factor, double Shift ) override
+    {
+        if ( Factor == RISK_FACTOR_RATE )
+            SetCurveShift( Shift );
+    }
+    [[nodiscard]] bool HasFactor( const string& Factor ) const override
+    {
+        return Factor == RISK_FACTOR_RATE;
+    }
+
     //! getter
 
     //! mcl node

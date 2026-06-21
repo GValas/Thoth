@@ -3,7 +3,7 @@
 #include "object_reader.hpp"
 
 //!
-Correlation::Correlation( const string& ObjectName ) : Object( ObjectName, KIND_CORRELATION_MATRIX )
+Correlation::Correlation( const string& ObjectName ) : MarketData( ObjectName, KIND_CORRELATION_MATRIX )
 {
 }
 

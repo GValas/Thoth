@@ -1,9 +1,11 @@
 #pragma once
+#include "market_data.hpp"
 #include "yield_curve.hpp"
 
 //! A currency and its discount (yield) curve: provides discount factors / rates and
-//! the MCL rate / discount-factor nodes.
-class Currency : public Object
+//! the MCL rate / discount-factor nodes. A market-data input — its bumpable risk
+//! factor (rho) lives on the wrapped curve, so it carries no factor of its own.
+class Currency : public MarketData
 {
   private:
     //! attribute

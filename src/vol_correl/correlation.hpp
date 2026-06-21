@@ -1,11 +1,12 @@
 #pragma once
 #include "forex.hpp"
-#include "object.hpp"
+#include "market_data.hpp"
 
 //! The correlation matrix over the book's underlyings and FX pairs: validated
 //! positive-definite at load, it serves correlation entries to the analytic
 //! engines and the Cholesky factor (cached) that correlates the MC noise factors.
-class Correlation : public Object
+//! A market-data input (correlation Greeks would override ApplyShift on "correl").
+class Correlation : public MarketData
 {
 
   private:
