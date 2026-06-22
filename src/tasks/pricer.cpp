@@ -18,11 +18,11 @@ Pricer::~Pricer() = default;
 //! by the registry straight off the YAML tag: !mcl_pricer / !pde_pricer / !ana_pricer)
 void Pricer::Configure( ObjectReader& reader )
 {
-    SetCurrency( *reader.Ref<Currency>( "currency" ) );                      //!< reporting currency
+    SetCurrency( *reader.Ref<Currency>( "currency" ) );                    //!< reporting currency
     SetBook( *reader.Ref<Book>( "book" ) );                                //!< the contracts to price
     SetToday( reader.Get<date>( "today" ) );                               //!< valuation date
     SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) ); //!< premium / Greeks to compute
-    SetResult( reader.Get<string>( "result" ) );                             //!< where to write the output block
+    SetResult( reader.Get<string>( "result" ) );                           //!< where to write the output block
     //! correlation is optional (single-asset single-ccy books need none); resolved
     //! by reference when present
     if ( reader.Has<string>( "correlation" ) )

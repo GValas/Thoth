@@ -169,7 +169,8 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd," : " mcl_configuration: m," )
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd,"
+                                                                                                                                           : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"
@@ -220,7 +221,8 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd," : " mcl_configuration: m," )
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd,"
+                                                                                                                                           : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"

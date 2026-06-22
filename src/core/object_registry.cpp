@@ -2,6 +2,8 @@
 #include "object_manager.hpp"
 #include "object_reader.hpp"
 
+#include <functional>
+
 //! The single translation unit aware of every concrete object type. The kind
 //! tag -> factory table below is the one place to touch when adding a type:
 //! one entry here plus the new class, the ObjectManager stays type-agnostic.
@@ -72,7 +74,9 @@ Object* Create( ObjectManager& m, const string& name )
 //! (built once on first use, no global init-order issue).
 Object* ObjectManager::Build( const string& ObjectName )
 {
-    using Factory = Object* ( * )( ObjectManager&, const string& ); //!< plain function pointer
+    //! every kind maps to a factory of the same shape: (manager, name) -> Object*.
+    //! &Create<T> (a function pointer) slots straight into the std::function.
+    using Factory = std::function<Object*( ObjectManager&, const string& )>;
     static const map<string, Factory> registry = {
         // ---- tasks (engine picked by the tag: !mcl_pricer / !pde_pricer / !ana_pricer) ----
         { KIND_MCL_PRICER, &Create<PricerMCL> },

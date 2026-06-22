@@ -27,6 +27,24 @@ class YamlConfig
     //! create/replace the node addressed by a dotted path and return it
     YAML::Node PathNode( const string& Path );
 
+    //! shared scalar getter: resolve Path, convert the leaf via conv, and report a
+    //! single typed error ("... must be a <TypeName>") on any failure — a missing
+    //! node (LookUp throws) or a bad conversion (conv throws). The named GetDouble /
+    //! GetString / ... below are one-line specialisations of this; GetList is its
+    //! sequence twin.
+    template <class T, class Conv>
+    T GetScalar( const string& Path, const char* TypeName, Conv conv )
+    {
+        try
+        {
+            return conv( LookUp( Path ) );
+        }
+        catch ( ... )
+        {
+            ERR( "parsing error : " + Path + " must be a " + TypeName );
+        }
+    }
+
     //! shared list getter: validate the sequence, convert each element via conv,
     //! and report a single typed error message on any failure
     template <class T, class Conv>
@@ -84,6 +102,10 @@ class YamlConfig
         PathNode( Path ) = seq;
     }
 
+    //! dependent-false for the unified Get/Has type switches' unmatched arm
+    template <class>
+    static constexpr bool unsupported = false;
+
     bool IsPath( const string& Path );
 
   public:
@@ -118,6 +140,78 @@ class YamlConfig
     la_vector* GetLaVector( const string& Path ); //!< caller owns the returned raw vector
     vector<int> GetIntegerList( const string& Path );
     vector<date> GetDateList( const string& Path );
+
+    //! unified typed read: ONE type -> getter switch over the named getters above, so
+    //! a caller (notably ObjectReader) writes Get<double>(path) / Get<vector<date>>(path)
+    //! instead of picking the matching GetX by hand. The required form throws on a
+    //! missing / ill-typed node; the (Path, ElseValue) form returns the default; Has<T>
+    //! is the matching presence test. A type with no branch fails to compile.
+    template <class T>
+    T Get( const string& Path )
+    {
+        if constexpr ( std::is_same_v<T, double> )
+            return GetDouble( Path );
+        else if constexpr ( std::is_same_v<T, int> )
+            return GetInteger( Path );
+        else if constexpr ( std::is_same_v<T, long> )
+            return GetLong( Path );
+        else if constexpr ( std::is_same_v<T, bool> )
+            return GetBoolean( Path );
+        else if constexpr ( std::is_same_v<T, string> )
+            return GetString( Path );
+        else if constexpr ( std::is_same_v<T, date> )
+            return GetDate( Path );
+        else if constexpr ( std::is_same_v<T, vector<double>> )
+            return GetDoubleList( Path );
+        else if constexpr ( std::is_same_v<T, vector<int>> )
+            return GetIntegerList( Path );
+        else if constexpr ( std::is_same_v<T, vector<date>> )
+            return GetDateList( Path );
+        else if constexpr ( std::is_same_v<T, vector<string>> )
+            return GetStringList( Path );
+        else if constexpr ( std::is_same_v<T, vector<bool>> )
+            return GetBooleanList( Path );
+        else
+            static_assert( unsupported<T>, "YamlConfig::Get: unsupported type" );
+    }
+
+    template <class T>
+    T Get( const string& Path, const T& ElseValue )
+    {
+        if constexpr ( std::is_same_v<T, double> )
+            return GetDouble( Path, ElseValue );
+        else if constexpr ( std::is_same_v<T, int> )
+            return GetInteger( Path, ElseValue );
+        else if constexpr ( std::is_same_v<T, long> )
+            return GetLong( Path, ElseValue );
+        else if constexpr ( std::is_same_v<T, bool> )
+            return GetBoolean( Path, ElseValue );
+        else if constexpr ( std::is_same_v<T, string> )
+            return GetString( Path, ElseValue );
+        else if constexpr ( std::is_same_v<T, date> )
+            return GetDate( Path, ElseValue );
+        else
+            static_assert( unsupported<T>, "YamlConfig::Get: unsupported scalar default type" );
+    }
+
+    template <class T>
+    bool Has( const string& Path )
+    {
+        if constexpr ( std::is_same_v<T, string> )
+            return IsString( Path );
+        else if constexpr ( std::is_same_v<T, double> )
+            return IsDouble( Path );
+        else if constexpr ( std::is_same_v<T, int> )
+            return IsInteger( Path );
+        else if constexpr ( std::is_same_v<T, bool> )
+            return IsBoolean( Path );
+        else if constexpr ( std::is_same_v<T, vector<double>> )
+            return IsDoubleList( Path );
+        else if constexpr ( std::is_same_v<T, vector<string>> )
+            return IsStringList( Path );
+        else
+            static_assert( unsupported<T>, "YamlConfig::Has: unsupported type" );
+    }
 
     //! set methods. One templated writer covers every scalar (double / int / long /
     //! bool / string / date) and value list (vector<double|string|date|bool>),

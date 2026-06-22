@@ -341,100 +341,53 @@ YAML::Node YamlConfig::LookUp( const string& Path ) const
 //! getters
 //! ----------------------------------------------------------------------
 
-//! scalar getters : resolve Path then convert; on a missing node or a failed
-//! conversion they ERR (which throws) with a type-specific message.
+//! scalar getters : each is a one-line GetScalar specialisation (resolve + convert,
+//! one typed error on failure). The conv lambda is the only per-type bit — the
+//! try/catch + error message live once, in GetScalar.
 bool YamlConfig::GetBoolean( const string& Path )
 {
-    try
-    {
-        return LookUp( Path ).as<bool>(); //!< native YAML boolean (true/false, also yes/no)
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be true/false" );
-    }
+    return GetScalar<bool>( Path, "boolean (true/false)", []( const YAML::Node& n )
+                            { return n.as<bool>(); } ); //!< native YAML bool (also yes/no)
 }
 
 string YamlConfig::GetString( const string& Path )
 {
-    try
-    {
-        YAML::Node n = LookUp( Path );
-        if ( !n.IsScalar() ) //!< reject maps/sequences : only a scalar is a string
-            throw std::runtime_error( "not a scalar" );
-        return n.as<string>();
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be a string" );
-    }
+    return GetScalar<string>( Path, "string", []( const YAML::Node& n )
+                              {
+        if ( !n.IsScalar() )                            //!< reject maps/sequences :
+            throw std::runtime_error( "not a scalar" ); //!< only a scalar is a string
+        return n.as<string>(); } );
 }
 
 //! a date is stored as an ISO/simple-string scalar; parse it via boost.gregorian
 date YamlConfig::GetDate( const string& Path )
 {
-    try
-    {
-        return from_simple_string( GetString( Path ) );
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be a date" );
-    }
+    return GetScalar<date>( Path, "date", []( const YAML::Node& n )
+                            { return from_simple_string( n.as<string>() ); } );
 }
 
 double YamlConfig::GetDouble( const string& Path )
 {
-    try
-    {
-        return LookUp( Path ).as<double>();
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be a double" );
-    }
+    return GetScalar<double>( Path, "double", []( const YAML::Node& n )
+                              { return n.as<double>(); } );
 }
 
+//! integers auto-convert from a float leaf (libconfig parity), so a "3.0" still
+//! reads as 3. GetLong is the same with a 64-bit result (path counts above 2^31).
 int YamlConfig::GetInteger( const string& Path )
 {
-    try
-    {
-        YAML::Node n = LookUp( Path );
-        try
-        {
-            return n.as<int>();
-        }
-        catch ( ... )
-        {
-            return (int)n.as<double>(); //!< autoConvert float -> int
-        }
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be an integer" );
-    }
+    return GetScalar<int>( Path, "integer", []( const YAML::Node& n )
+                           {
+        try { return n.as<int>(); }
+        catch ( ... ) { return (int)n.as<double>(); } } );
 }
 
-//! like GetInteger but 64-bit, so values above 2^31 (e.g. billions of MC paths)
-//! are not truncated.
 long YamlConfig::GetLong( const string& Path )
 {
-    try
-    {
-        YAML::Node n = LookUp( Path );
-        try
-        {
-            return n.as<long>();
-        }
-        catch ( ... )
-        {
-            return (long)n.as<double>(); //!< autoConvert float -> long
-        }
-    }
-    catch ( ... )
-    {
-        ERR( "parsing error : " + Path + " must be an integer" );
-    }
+    return GetScalar<long>( Path, "integer", []( const YAML::Node& n )
+                            {
+        try { return n.as<long>(); }
+        catch ( ... ) { return (long)n.as<double>(); } } );
 }
 
 vector<string> YamlConfig::GetStringList( const string& Path )

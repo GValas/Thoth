@@ -1,6 +1,5 @@
 #pragma once
 #include "object_manager.hpp"
-#include <type_traits>
 
 //! object_reader.hpp — the typed field-reading facade handed to Object::Configure.
 //! It turns "this object reads itself from YAML" into a handful of type-dispatched
@@ -38,14 +37,6 @@ class ObjectReader
     //! qualify a bare field name into the object's full YAML path ("<name>.<field>")
     string Path( const string& Field ) const { return _n + OBJECT_SEPARATOR + Field; }
 
-    //! the four field categories below dispatch on the requested C++ type instead of
-    //! exposing one named accessor per type. Each helper maps T to the matching
-    //! YamlConfig call at compile time (if constexpr), so adding a scalar/list type
-    //! is a single branch rather than a new pair of methods. A T with no branch fails
-    //! to compile (the static_assert below), keeping the mapping total and explicit.
-    template <class>
-    static constexpr bool unsupported = false;
-
   public:
     //! bind the reader to one object (by name) and the manager that holds the config
     ObjectReader( ObjectManager& Manager, string ObjectName )
@@ -53,86 +44,25 @@ class ObjectReader
     {
     }
 
-    //! --- field read, dispatched on the requested type. T is a scalar
-    //! (Get<double>("strike"), Get<date>("maturity"), ...) or a list
-    //! (Get<vector<double>>("weights"), Get<vector<date>>("dates"), ...) ---
+    //! --- field read, dispatched on the requested type by YamlConfig::Get<T>. T is a
+    //! scalar (Get<double>("strike"), Get<date>("maturity"), ...) or a list
+    //! (Get<vector<double>>("weights"), ...). The type -> parse mapping lives once, in
+    //! YamlConfig; here we only qualify the bare field name into the object's path. ---
     template <class T>
-    T Get( const string& f )
-    {
-        const string p = Path( f );
-        if constexpr ( std::is_same_v<T, double> )
-            return _m.yml().GetDouble( p );
-        else if constexpr ( std::is_same_v<T, int> )
-            return _m.yml().GetInteger( p );
-        else if constexpr ( std::is_same_v<T, long> )
-            return _m.yml().GetLong( p );
-        else if constexpr ( std::is_same_v<T, bool> )
-            return _m.yml().GetBoolean( p );
-        else if constexpr ( std::is_same_v<T, string> )
-            return _m.yml().GetString( p );
-        else if constexpr ( std::is_same_v<T, date> )
-            return _m.yml().GetDate( p );
-        else if constexpr ( std::is_same_v<T, vector<double>> )
-            return _m.yml().GetDoubleList( p );
-        else if constexpr ( std::is_same_v<T, vector<int>> )
-            return _m.yml().GetIntegerList( p );
-        else if constexpr ( std::is_same_v<T, vector<date>> )
-            return _m.yml().GetDateList( p );
-        else if constexpr ( std::is_same_v<T, vector<string>> )
-            return _m.yml().GetStringList( p );
-        else if constexpr ( std::is_same_v<T, vector<bool>> )
-            return _m.yml().GetBooleanList( p );
-        else
-            static_assert( unsupported<T>, "ObjectReader::Get: unsupported type" );
-    }
+    T Get( const string& f ) { return _m.yml().Get<T>( Path( f ) ); }
 
     //! --- scalar (optional, with a default) : Get<double>("notional", 1) ---
     template <class T>
-    T Get( const string& f, const T& d )
-    {
-        const string p = Path( f );
-        if constexpr ( std::is_same_v<T, double> )
-            return _m.yml().GetDouble( p, d );
-        else if constexpr ( std::is_same_v<T, int> )
-            return _m.yml().GetInteger( p, d );
-        else if constexpr ( std::is_same_v<T, long> )
-            return _m.yml().GetLong( p, d );
-        else if constexpr ( std::is_same_v<T, bool> )
-            return _m.yml().GetBoolean( p, d );
-        else if constexpr ( std::is_same_v<T, string> )
-            return _m.yml().GetString( p, d );
-        else if constexpr ( std::is_same_v<T, date> )
-            return _m.yml().GetDate( p, d );
-        else
-            static_assert( unsupported<T>, "ObjectReader::Get: unsupported scalar type" );
-    }
+    T Get( const string& f, const T& d ) { return _m.yml().Get<T>( Path( f ), d ); }
 
     //! the la_vector view is a raw pointer (not a vector<T>), so it stays named —
-    //! a zero-copy view onto the YAML-backed buffer rather than a value type that
-    //! could be folded into the Get<T> type switch above.
+    //! a zero-copy view onto the YAML-backed buffer rather than a value type.
     la_vector* LaVector( const string& f ) { return _m.yml().GetLaVector( Path( f ) ); }
 
     //! --- presence of an optional field, scalar (Has<string>("calendar")) or list
     //! (Has<vector<double>>("matrix")) ---
     template <class T>
-    bool Has( const string& f )
-    {
-        const string p = Path( f );
-        if constexpr ( std::is_same_v<T, string> )
-            return _m.yml().IsString( p );
-        else if constexpr ( std::is_same_v<T, double> )
-            return _m.yml().IsDouble( p );
-        else if constexpr ( std::is_same_v<T, int> )
-            return _m.yml().IsInteger( p );
-        else if constexpr ( std::is_same_v<T, bool> )
-            return _m.yml().IsBoolean( p );
-        else if constexpr ( std::is_same_v<T, vector<double>> )
-            return _m.yml().IsDoubleList( p );
-        else if constexpr ( std::is_same_v<T, vector<string>> )
-            return _m.yml().IsStringList( p );
-        else
-            static_assert( unsupported<T>, "ObjectReader::Has: unsupported type" );
-    }
+    bool Has( const string& f ) { return _m.yml().Has<T>( Path( f ) ); }
 
     //! --- typed references: the field holds the *name(s)* of other object(s); each
     //! is got-or-built as the target type. Scalar (Ref<Currency>("rate") ->

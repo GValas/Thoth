@@ -50,13 +50,4 @@ class ObjectCollector
         auto it = _object_map.find( ObjectName );
         return it == _object_map.end() ? nullptr : dynamic_cast<T*>( it->second.get() );
     }
-
-    //! propagate the valuation date to every object
-    void SetToday( const date& Today )
-    {
-        for ( auto& o : _object_map )
-        {
-            o.second->SetToday( Today );
-        }
-    }
 };
