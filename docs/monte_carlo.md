@@ -173,7 +173,8 @@ master/slave commands and the aggregate progress bar.
 ## 7. Configuration (`mcl_configuration`)
 
 The engine reads an `mcl_configuration` object (`src/tasks/mcl_configuration.hpp`),
-referenced from a `pricer_configuration` via its `mcl_configuration` field:
+referenced directly from the `!mcl_pricer` via its `mcl_configuration` field
+(shareable between pricers):
 
 | Field            | Type   | Meaning |
 |------------------|--------|---------|
@@ -186,14 +187,16 @@ referenced from a `pricer_configuration` via its `mcl_configuration` field:
 | `sobol_skip`     | long   | Leading Sobol points to skip (default 0; set per slave so blocks stay disjoint). |
 | `node_file`      | string | Optional path for the node dump. |
 
-`PreCheck` requires both an `mcl` object and a correlation matrix (MCL correlates
-the underlyings' Brownian motions).
+The `mcl_configuration` reference is required (resolved in `Configure`), and
+`PreCheck` additionally requires a correlation matrix (MCL correlates the
+underlyings' Brownian motions).
 
 ```yaml
-# pricer_configuration selects the method and points at an mcl_configuration
-my_pricer: !pricer_configuration
-  method: mcl                 # pde | mcl | ana  (GPU: method mcl + allow_gpu in the mcl_configuration)
+# the !mcl_pricer tag selects the MC engine; it references its mcl_configuration
+# directly (GPU: !mcl_pricer + allow_gpu in the mcl_configuration)
+my_pricer: !mcl_pricer
   mcl_configuration: my_mcl
+  # ... book / currency / correlation / indicators / result ...
 
 my_mcl: !mcl_configuration
   max_day_step: 30           # calendar days

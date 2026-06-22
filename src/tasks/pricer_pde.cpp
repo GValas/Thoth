@@ -1,6 +1,7 @@
 #include "thoth.hpp"
 #include "pricer_pde.hpp"
 #include "cancellation.hpp"
+#include "object_reader.hpp"
 #include "progress_bar.hpp"
 #include "variance_swap.hpp"
 
@@ -22,11 +23,18 @@ static constexpr double BATES_JUMP_SIGMA_SPAN = 6.0;    //!< jump-size grid span
 //! a finite-difference pricer is just a Pricer; the grid state is built per
 //! contract in InitGrid, so nothing to initialise here
 PricerPDE::PricerPDE( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_PDE_PRICER )
 {
 }
 
 PricerPDE::~PricerPDE() = default;
+
+//! common pricer fields first, then this engine's required parameter object
+void PricerPDE::Configure( ObjectReader& reader )
+{
+    Pricer::Configure( reader );
+    _pde = reader.Ref<PdeConfiguration>( "pde_configuration" ); //!< grid precision / sizes
+}
 
 //! read the option value at the transformed coordinate x off a solved grid layer Uy
 //! by cubic-spline interpolation across the (uniform-in-x) grid nodes. Used to
@@ -45,17 +53,12 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
     return InterpolateWithSpline( Ux, Uy, x );
 }
 
-//! check that PDE resolution is allowed and the configuration is complete
+//! check that PDE resolution is allowed for every contract (the pde_configuration
+//! is resolved as a required reference in Configure, so it is always non-null here)
 void PricerPDE::PreCheck()
 {
     CheckAllowed( []( Contract* c )
                   { return c->PDE_HasSolution(); }, "PDE" );
-
-    //! pde pricing needs its parameter object (config field "pde")
-    if ( !_configuration->_pde )
-    {
-        ERR( "book pricing '" + _name + "' uses the pde method but its configuration has no 'pde' object" );
-    }
 }
 
 //! solve the grid for every contract (re-runnable for the Greeks bumps)
@@ -223,10 +226,10 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     // original grid
     _t_max = YearFraction( _today, _maturity );
     _x_0_orig = _s;
-    _x_max_orig = _s * exp( _configuration->_pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
-    _x_min_orig = _s * exp( -_configuration->_pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
-    _n = _configuration->_pde->_custom_n_t;
-    _j = _configuration->_pde->_custom_n_s;
+    _x_max_orig = _s * exp( _pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
+    _x_min_orig = _s * exp( -_pde->_custom_sigma_factor * _v * sqrt( _t_max ) );
+    _n = _pde->_custom_n_t;
+    _j = _pde->_custom_n_s;
     _is_american = Ctr->IsAmerican();
 
     //! barrier handling
@@ -767,7 +770,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double smax = std::max( HESTON_SMAX_MIN_FACTOR * S0, S0 * exp( HESTON_SMAX_SIGMA_FACTOR * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
     //! grid resolution from the book's vanilla_precision (see the constants above)
     int NS = HESTON_GRID_NS_MEDIUM, Nv = HESTON_GRID_NV_MEDIUM, Nt = HESTON_GRID_NT_MEDIUM;
-    switch ( _configuration->_pde->_vanilla_precision )
+    switch ( _pde->_vanilla_precision )
     {
     case Precision::Low:
         NS = HESTON_GRID_NS_LOW, Nv = HESTON_GRID_NV_LOW, Nt = HESTON_GRID_NT_LOW;

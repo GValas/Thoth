@@ -18,9 +18,9 @@ std::string VarSwapCfg( double vol_pct, double rate_pct, double strike_vol_pct,
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, 1, 30, 5 )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 1, 30, 5 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"

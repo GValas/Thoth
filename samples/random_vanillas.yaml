@@ -7,19 +7,14 @@ root: random_vanillas
 # mcl_configuration sets allow_gpu, so on a CUDA build the whole book runs on the
 # device (CPU fallback otherwise). e.g. ./build_run.sh samples/random_vanillas.yaml --gpu
 
-random_vanillas: !pricer
+random_vanillas: !mcl_pricer
   today: 2000-01-01
   book: book
   currency: eur
-  configuration: config
+  mcl_configuration: mcl_config
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: random_vanillas_result
-
-config: !pricer_configuration
-  method: mcl
-  mcl_configuration: mcl_config
-  log_path: "/tmp/"
 
 mcl_config: !mcl_configuration
   max_day_step: 7

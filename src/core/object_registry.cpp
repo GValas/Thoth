@@ -13,7 +13,6 @@
 #include "pricer_ana.hpp"
 #include "pricer_mcl.hpp"
 #include "pricer_pde.hpp"
-#include "pricer_configuration.hpp"
 #include "debug_configuration.hpp"
 #include "sequence.hpp"
 
@@ -44,131 +43,76 @@
 
 namespace
 {
-//! bind a field reader to an already-built object and let it read itself, returning
-//! the object so a factory can keep wrapping / owning it. This is the whole of the
-//! "object configures itself" step; the few factories that still need a custom
-//! bootstrap (Equity's Mono wrap, the Pricer type selection, the cfg-owning tasks)
-//! reuse it after their bespoke construction.
+//! The one factory, shared by every kind. Build a bare T, register it in the collector
+//! FIRST (Add returns a stable pointer, so a reference that resolves back to this same
+//! object while it configures itself finds it), then let it read its own fields. A task
+//! that needs the YamlConfig at construction (to write its result block back) takes
+//! T(name, cfg); every other object takes T(name) — detected at compile time, so this
+//! single function covers all of them. All field knowledge lives on the class.
 template <class T>
-T* ConfigureObject( ObjectManager& m, T* o )
+Object* Create( ObjectManager& m, const string& name )
 {
-    ObjectReader reader( m, o->GetName() );
-    o->Configure( reader );
-    return o;
-}
-
-//! generic factory for a "configurable" object: create the bare object, register it
-//! (so references can resolve back to it during configuration), then configure it.
-//! The registry entry for such a type is reduced to a single index line; all field
-//! knowledge lives on the class. A task that needs the YamlConfig at construction
-//! (to write its result block back) is built with T(name, cfg) — detected here, so
-//! both shapes share this one factory instead of a separate task variant.
-template <class T>
-ObjectManager::Factory MakeConfigurable()
-{
-    return []( ObjectManager& m, const string& n ) -> Object*
-    {
-        std::unique_ptr<T> o;
-        //! detect the two construction shapes at compile time: a task that owns its
-        //! YamlConfig takes (name, cfg); a plain object takes just (name). One factory
-        //! covers both, so the registry never needs a separate task variant.
-        if constexpr ( std::is_constructible_v<T, const string&, YamlConfig&> )
-            o = std::make_unique<T>( n, m.yml() );
-        else
-            o = std::make_unique<T>( n );
-        //! register BEFORE configuring: Add returns a stable pointer, so references
-        //! resolved during Configure (which may cycle back to this object) find it.
-        return ConfigureObject( m, m.collector().Add( std::move( o ) ) );
-    };
-}
-
-//! the configuration-selected pricer factory: the one bootstrap the registry must
-//! keep, since a not-yet-created object cannot choose its own concrete class. Once
-//! the right PricerXXX is built, the common fields are read by Pricer::Configure
-//! like every other migrated object.
-Object* BuildPricer( ObjectManager& m, const string& n )
-{
-    //! the pricer points to a PricerConfiguration whose _method selects the engine;
-    //! resolve it first (get-or-build) so we can branch on the chosen method.
-    PricerConfiguration* PC = m.Get<PricerConfiguration>( m.yml().GetString( n + ".configuration" ) );
-    std::unique_ptr<Pricer> p;
-    if ( PC->_method == PRICING_METHOD_MCL )
-    {
-        p = std::make_unique<PricerMCL>( n, m.yml() );
-    }
-    else if ( PC->_method == PRICING_METHOD_PDE )
-    {
-        p = std::make_unique<PricerPDE>( n, m.yml() );
-    }
-    else if ( PC->_method == PRICING_METHOD_ANA )
-    {
-        p = std::make_unique<PricerANA>( n, m.yml() );
-    }
+    std::unique_ptr<T> object;
+    if constexpr ( std::is_constructible_v<T, const string&, YamlConfig&> )
+        object = std::make_unique<T>( name, m.yml() );
     else
-    {
-        ERR( "pricing configuration '" + PC->GetName() + "' has unknown method '" +
-             PC->_method + "' (expected '" + PRICING_METHOD_PDE + "', '" +
-             PRICING_METHOD_MCL + "' or '" + PRICING_METHOD_ANA + "')" );
-    }
-    return ConfigureObject( m, m.collector().Add( std::move( p ) ) );
-}
+        object = std::make_unique<T>( name );
 
-//! build the kind -> factory table (one entry per object type). Every "self-
-//! configuring" type is a single { kind, MakeConfigurable<T> } row — the class owns
-//! all its field knowledge (including the cfg-owning tasks, which MakeConfigurable
-//! detects). Only the pricer needs a hand-written factory (BuildPricer), to pick its
-//! concrete engine type from the configuration before configuring it.
-map<string, ObjectManager::Factory> MakeRegistry()
-{
-    return {
-        // ---- tasks ----
-        { KIND_PRICER, BuildPricer },
-        { KIND_SEQUENCE, MakeConfigurable<Sequence>() },
-        // ---- instruments ----
-        { KIND_VANILLA, MakeConfigurable<Vanilla>() },
-        { KIND_BARRIER, MakeConfigurable<Barrier>() },
-        { KIND_VARIANCE_SWAP, MakeConfigurable<VarianceSwap>() },
-        // ---- underlyings (an equity / forex is itself a single-asset underlying) ----
-        { KIND_EQUITY, MakeConfigurable<Equity>() },
-        { KIND_BASKET, MakeConfigurable<AbsoluteBasket>() },
-        { KIND_RAINBOW, MakeConfigurable<Rainbow>() },
-        { KIND_COMPOSITE, MakeConfigurable<Composite>() },
-        { KIND_FOREX, MakeConfigurable<Forex>() },
-        // ---- market data (the three curve kinds share Curve::Configure) ----
-        { KIND_CURRENCY, MakeConfigurable<Currency>() },
-        { KIND_YIELD_CURVE, MakeConfigurable<YieldCurve>() },
-        { KIND_REPO_CURVE, MakeConfigurable<RepoCurve>() },
-        { KIND_CONTINUOUS_DIVIDENDS_CURVE, MakeConfigurable<ContinuousDividendsCurve>() },
-        { KIND_DISCRETE_DIVIDENDS, MakeConfigurable<DiscreteDividends>() },
-        { KIND_BS_VOLATILITY, MakeConfigurable<BsVolatility>() },
-        { KIND_HESTON_VOLATILITY, MakeConfigurable<HestonVolatility>() },
-        { KIND_SABR_VOLATILITY, MakeConfigurable<SabrVolatility>() },
-        { KIND_CORRELATION_MATRIX, MakeConfigurable<Correlation>() },
-        // ---- configurations ----
-        { KIND_PRICER_CONFIGURATION, MakeConfigurable<PricerConfiguration>() },
-        { KIND_DEBUG_CONFIGURATION, MakeConfigurable<DebugConfiguration>() },
-        { KIND_PDE_CONFIGURATION, MakeConfigurable<PdeConfiguration>() },
-        { KIND_MCL_CONFIGURATION, MakeConfigurable<MclConfiguration>() },
-        // ---- book & fixings ----
-        { KIND_BOOK, MakeConfigurable<Book>() },
-        { KIND_SIMPLE_FIXING_DATA, MakeConfigurable<SimpleFixingData>() },
-    };
+    T* registered = m.collector().Add( std::move( object ) );
+    ObjectReader reader( m, registered->GetName() );
+    registered->Configure( reader );
+    return registered;
 }
 } // namespace
 
-//! dispatch a name's kind tag to its factory (single registry, built once).
-//! Defined here because this is the only TU that knows every concrete type; the
-//! ObjectManager calls Build on a cache miss and stays type-agnostic.
+//! Dispatch a YAML !kind tag to the concrete type that handles it. This is the only
+//! translation unit that knows every concrete class, so adding a type is one
+//! { tag, &Create<T> } line below plus the class itself — ObjectManager stays
+//! type-agnostic and calls Build on a cache miss. The table is a function-local static
+//! (built once on first use, no global init-order issue).
 Object* ObjectManager::Build( const string& ObjectName )
 {
-    //! function-local static: the table is constructed once on first use and reused
-    //! for every subsequent build (no per-call rebuild, no global init-order issue).
-    static const map<string, Factory> registry = MakeRegistry();
+    using Factory = Object* ( * )( ObjectManager&, const string& ); //!< plain function pointer
+    static const map<string, Factory> registry = {
+        // ---- tasks (engine picked by the tag: !mcl_pricer / !pde_pricer / !ana_pricer) ----
+        { KIND_MCL_PRICER, &Create<PricerMCL> },
+        { KIND_PDE_PRICER, &Create<PricerPDE> },
+        { KIND_ANA_PRICER, &Create<PricerANA> },
+        { KIND_SEQUENCE, &Create<Sequence> },
+        // ---- instruments ----
+        { KIND_VANILLA, &Create<Vanilla> },
+        { KIND_BARRIER, &Create<Barrier> },
+        { KIND_VARIANCE_SWAP, &Create<VarianceSwap> },
+        // ---- underlyings (an equity / forex is itself a single-asset underlying) ----
+        { KIND_EQUITY, &Create<Equity> },
+        { KIND_BASKET, &Create<AbsoluteBasket> },
+        { KIND_RAINBOW, &Create<Rainbow> },
+        { KIND_COMPOSITE, &Create<Composite> },
+        { KIND_FOREX, &Create<Forex> },
+        // ---- market data (the three curve kinds share Curve::Configure) ----
+        { KIND_CURRENCY, &Create<Currency> },
+        { KIND_YIELD_CURVE, &Create<YieldCurve> },
+        { KIND_REPO_CURVE, &Create<RepoCurve> },
+        { KIND_CONTINUOUS_DIVIDENDS_CURVE, &Create<ContinuousDividendsCurve> },
+        { KIND_DISCRETE_DIVIDENDS, &Create<DiscreteDividends> },
+        { KIND_BS_VOLATILITY, &Create<BsVolatility> },
+        { KIND_HESTON_VOLATILITY, &Create<HestonVolatility> },
+        { KIND_SABR_VOLATILITY, &Create<SabrVolatility> },
+        { KIND_CORRELATION_MATRIX, &Create<Correlation> },
+        // ---- configurations (engine-parameter objects, referenced by the pricers) ----
+        { KIND_DEBUG_CONFIGURATION, &Create<DebugConfiguration> },
+        { KIND_PDE_CONFIGURATION, &Create<PdeConfiguration> },
+        { KIND_MCL_CONFIGURATION, &Create<MclConfiguration> },
+        // ---- book & fixings ----
+        { KIND_BOOK, &Create<Book> },
+        { KIND_SIMPLE_FIXING_DATA, &Create<SimpleFixingData> },
+    };
+
     const string kind = _yml.GetTag( ObjectName ); //!< the !kind tag on the YAML node
     auto entry = registry.find( kind );
-    if ( entry != registry.end() )
+    if ( entry == registry.end() )
     {
-        return entry->second( *this, ObjectName ); //!< create + register + configure
+        ERR( "unknown kind : " + kind ); //!< no factory for this tag -> configuration error
     }
-    ERR( "unknown kind : " + kind ); //!< no factory for this tag -> configuration error
+    return entry->second( *this, ObjectName ); //!< create + register + configure
 }

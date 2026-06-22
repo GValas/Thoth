@@ -3,7 +3,6 @@
 #include "yaml_config.hpp"
 #include "task.hpp"
 
-#include <functional>
 #include <map>
 
 //! object_manager.hpp — orchestrates loading, building, running and emitting a book.
@@ -23,9 +22,6 @@
 class ObjectManager
 {
   public:
-    //! a kind tag's factory: create + register + configure, returned as Object*
-    using Factory = std::function<Object*( ObjectManager&, const string& )>;
-
     //! lifecycle
     void ReadObjects( const string& TaskName ); //!< resolve the root task
     void ExecuteTask();                         //!< run it

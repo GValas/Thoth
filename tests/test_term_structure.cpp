@@ -18,10 +18,8 @@ std::string TsCfg( const std::string& method )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: " << method
-      << ", mcl_configuration: cfg_mcl, pde_configuration: cfg_pde, log_path: \"/tmp/\"}\n"
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
       << "cfg_mcl: !mcl_configuration {max_day_step: 7, min_day_step: -1,"
       << " paths: 400000, vol_year_step: 0.01, use_sobol: true}\n"
       << "cfg_pde: !pde_configuration {vanilla_precision: high}\n"

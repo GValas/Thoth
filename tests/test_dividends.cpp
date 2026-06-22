@@ -5,7 +5,7 @@ using namespace test;
 using doctest::Approx;
 
 // Continuous dividends enter the engine forward (F = S e^{(r-q)T}). These checks
-// use method: ana for a clean closed form; the carry yield (dividend + repo) is
+// use the !ana_pricer for a clean closed form; the carry yield (dividend + repo) is
 // now consistent across ana / pde / mcl (see test_repo.cpp for the cross-engine
 // check).
 
@@ -17,9 +17,9 @@ std::string DivCfg( double spot, double strike, double vol_pct, double rate_pct,
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( "ana", 1, 30, 6 )
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 1, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"
@@ -81,9 +81,9 @@ std::string AmDivCfg( const std::string& method, int draws )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, draws, 7, 6 )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, 7, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "divs: !discrete_dividends {dates: [2000-12-31, 2001-12-31, 2002-12-31,"

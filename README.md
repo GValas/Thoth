@@ -10,8 +10,8 @@ usable as a batch tool or as an HTTP service.
 
 ## Features
 
-**Pricers** (selected per book via `method`)
-- **Monte-Carlo (`mcl`)** — correlated geometric Brownian motion via a Cholesky
+**Pricers** (each engine is its own kind/tag: `!mcl_pricer` / `!pde_pricer` / `!ana_pricer`)
+- **Monte-Carlo (`!mcl_pricer`)** — correlated geometric Brownian motion via a Cholesky
   factorisation of the correlation matrix; exact log-Euler step for constant
   volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`;
   mono, basket and composite underlyings) it diffuses the **Dupire** local vol
@@ -29,16 +29,16 @@ usable as a batch tool or as an HTTP service.
   path-dependent payoffs keep the QMC benefit. Reproducible: the node graph and
   factors are name-ordered, so results are independent of heap layout / build /
   platform.
-- **PDE (`pde`)** — Crank-Nicolson finite-difference scheme; supports **American**
+- **PDE (`!pde_pricer`)** — Crank-Nicolson finite-difference scheme; supports **American**
   exercise (backward induction `max(intrinsic, continuation)`), a 2-D `(S,v)`
   Douglas-ADI grid for **Heston** (and **Bates** as a PIDE — the ADI plus an
   explicit jump integral, IMEX) whose resolution follows `vanilla_precision`, and
   the **variance swap** fair strike as a backward expected-accumulated-variance
   solve driven by the **Dupire local variance** per node (so it integrates the
   smile, matching the analytic static replication).
-- **Analytic (`ana`)** — closed-form (Black-Scholes) for instruments that admit
+- **Analytic (`!ana_pricer`)** — closed-form (Black-Scholes) for instruments that admit
   it.
-- **GPU acceleration (`mcl` + `allow_gpu`)** — the `mcl` engine offloads to a CUDA
+- **GPU acceleration (`!mcl_pricer` + `allow_gpu`)** — the `mcl` engine offloads to a CUDA
   backend when the `mcl_configuration` sets `allow_gpu: true`, a usable NVIDIA GPU
   is present, and the whole book is GPU-supported (single-asset European-vanilla
   GBM: one thread per path, cuRAND, block-reduced payoff, per-contract bump Greeks
@@ -402,7 +402,7 @@ docker run --rm -p 8080:8080 thoth               # HTTP server on 8080
 ## Configuration
 
 YAML, as a flat namespace of named objects; each object declares its kind
-through a YAML tag (`!pricer`, `!equity`, ...) and is referenced by name. The
+through a YAML tag (`!mcl_pricer`, `!equity`, ...) and is referenced by name. The
 tag sits on its own line with the object's fields below; sequences stay inline.
 `root` names the object to execute. A minimal 1y ATM call (spot 100, vol 30%,
 rate 8%, prices to ~15.7 — Black-Scholes 15.71):
@@ -410,23 +410,19 @@ rate 8%, prices to ~15.7 — Black-Scholes 15.71):
 ```yaml
 root: my_pricing
 
-my_pricing: !pricer
+my_pricing: !pde_pricer   # engine = the tag: !mcl_pricer | !pde_pricer | !ana_pricer
   today: 2000-01-01
   book: my_book
   currency: eur
-  configuration: my_config
-  correlation: my_correl
+  pde_configuration: my_pde   # engine params: an !mcl_pricer names mcl_configuration
+  correlation: my_correl       # instead; an !ana_pricer needs neither
   indicators: [premium, delta]
   result: my_result
   # debug_configuration: my_debug   # optional, see below
 
-# engine parameters live in their own referenced objects: the
-# pricer_configuration selects the method and points at an mcl_configuration
-# and/or pde_configuration sub-object.
-my_config: !pricer_configuration
-  method: pde   # pde | mcl | ana  (GPU: method mcl + allow_gpu in the mcl_configuration)
-  mcl_configuration: my_mcl
-  pde_configuration: my_pde
+# engine parameters live in their own objects, referenced directly by the pricer
+# (and shareable between pricers). The engine itself is chosen by the pricer's tag
+# above, not here. (GPU: !mcl_pricer + allow_gpu in the mcl_configuration.)
 my_mcl: !mcl_configuration
   max_day_step: 1
   min_day_step: -1

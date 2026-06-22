@@ -1,4 +1,5 @@
 #pragma once
+#include "mcl_configuration.hpp"
 #include "pricer.hpp"
 #include "rng.hpp"
 #include <memory>
@@ -14,6 +15,12 @@ class PricerMCL : public Pricer
 {
 
   private:
+    //! Monte-Carlo engine parameters (grid steps, path count, Sobol/GPU switches),
+    //! referenced directly from the !mcl_pricer node via its "mcl_configuration"
+    //! field and resolved in Configure. Borrowed (owned by the ObjectManager), so it
+    //! may be shared by several pricers.
+    MclConfiguration* _mcl = nullptr;
+
     //! random numbers
     Rng _rng;
 
@@ -109,7 +116,7 @@ class PricerMCL : public Pricer
                                 double& Trust );
 
   protected:
-    void PreCheck() override;  //!< require an mcl_configuration + correlation; decide GPU vs CPU
+    void PreCheck() override;  //!< require correlation; decide GPU vs CPU
     void PriceBook() override; //!< CPU diffusion tree, or the GPU per-contract loop when _use_gpu
     //! single-tree Greeks (delta/gamma/vega/rho in one path sweep); theta stays
     //! bump-and-revalue. Falls back to Pricer::ComputeGreeks when !CanSingleTreeGreeks.
@@ -120,6 +127,11 @@ class PricerMCL : public Pricer
     void PriceContract( Contract* Ctr ) override; //!< one contract on the device (GPU mode)
 
   public:
+    //! read the common pricer fields (Pricer::Configure) then resolve the required
+    //! "mcl_configuration" reference for this engine's parameters. Public (like the
+    //! base) so the registry's factory can configure the freshly built object.
+    void Configure( ObjectReader& reader ) override;
+
     //! constructor, destructor
     PricerMCL( const string& ObjectName,
                YamlConfig& YamlConfig );

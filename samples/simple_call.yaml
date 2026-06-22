@@ -3,21 +3,15 @@ root: simple_call_pricing
 # 1y ATM call: spot 100, strike 100, flat vol 30%, flat rate 8%, no repo,
 # no dividends. Black-Scholes reference premium ~= 15.71.
 
-simple_call_pricing: !pricer
+simple_call_pricing: !mcl_pricer
   today: 2000-01-01
   book: book
   currency: eur
-  configuration: config
+  mcl_configuration: mcl_config
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: simple_call_result
   debug_configuration: debug
-
-config: !pricer_configuration
-  method: mcl
-  mcl_configuration: mcl_config
-  pde_configuration: pde_config
-  log_path: "/tmp/"
 
 # node-graph dump: a debug switch on its own object, referenced by the pricer
 # above (debug_configuration: debug) — NOT a field of mcl_configuration.
@@ -31,9 +25,6 @@ mcl_config: !mcl_configuration
   vol_year_step: 0.01
   use_sobol: true
   generate_nodes_graph: false
-
-pde_config: !pde_configuration
-  vanilla_precision: high
 
 book: !book
   options: [simple_call]

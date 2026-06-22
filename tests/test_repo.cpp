@@ -18,9 +18,9 @@ std::string RepoCfg( const std::string& method, const std::string& type,
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, draws, 30, 5 )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, 30, 5 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

@@ -8,7 +8,7 @@
   "properties": {
     "root": {
       "type": "string",
-      "description": "Name of the task object to execute (a !pricer, !sequence, or one of the historical computations)."
+      "description": "Name of the task object to execute (an !mcl_pricer / !pde_pricer / !ana_pricer, a !sequence, or one of the historical computations)."
     }
   },
   "additionalProperties": {
@@ -38,10 +38,25 @@
       "type": "array",
       "items": { "type": "number" }
     },
+    "indicators": {
+      "type": "array",
+      "description": "Outputs to compute.",
+      "items": {
+        "enum": [
+          "premium", "delta", "gamma", "vega", "rho", "theta",
+          "vega_alpha", "vega_beta", "vega_nu",
+          "vega_v0", "vega_kappa", "vega_theta", "vega_xi", "vega_rho",
+          "vega_jump_intensity", "vega_jump_mean", "vega_jump_vol"
+        ],
+        "description": "Standard Greeks plus model-parameter Greeks: vega_<param> bumps a SABR (alpha/beta/rho/nu), Heston (v0/kappa/theta/xi/rho) or Bates jump (jump_intensity/jump_mean/jump_vol) parameter."
+      }
+    },
 
     "object": {
       "anyOf": [
-        { "$ref": "#/$defs/pricer" },
+        { "$ref": "#/$defs/mcl_pricer" },
+        { "$ref": "#/$defs/pde_pricer" },
+        { "$ref": "#/$defs/ana_pricer" },
         { "$ref": "#/$defs/sequence" },
         { "$ref": "#/$defs/historical_volatility_computation" },
         { "$ref": "#/$defs/historical_correlation_computation" },
@@ -63,7 +78,6 @@
         { "$ref": "#/$defs/sabr_volatility" },
         { "$ref": "#/$defs/correlation_matrix" },
         { "$ref": "#/$defs/simple_weighted_calendar" },
-        { "$ref": "#/$defs/pricer_configuration" },
         { "$ref": "#/$defs/mcl_configuration" },
         { "$ref": "#/$defs/pde_configuration" },
         { "$ref": "#/$defs/debug_configuration" },
@@ -72,32 +86,55 @@
       ]
     },
 
-    "pricer": {
+    "mcl_pricer": {
       "type": "object",
-      "title": "!pricer",
-      "description": "Price a book of contracts with one engine and report the requested indicators.",
+      "title": "!mcl_pricer",
+      "description": "Price a book by Monte-Carlo (Longstaff-Schwartz). The engine is the tag itself; its parameters live in the referenced !mcl_configuration.",
       "additionalProperties": false,
-      "required": ["today", "book", "currency", "configuration", "indicators", "result"],
+      "required": ["today", "book", "currency", "mcl_configuration", "indicators", "result"],
       "properties": {
         "today": { "$ref": "#/$defs/date", "description": "Valuation date." },
         "book": { "$ref": "#/$defs/ref", "description": "Name of the !book to price." },
         "currency": { "$ref": "#/$defs/ref", "description": "Reporting (book) currency." },
-        "configuration": { "$ref": "#/$defs/ref", "description": "Name of the !pricer_configuration (selects the engine)." },
-        "correlation": { "$ref": "#/$defs/ref", "description": "Name of the !correlation_matrix (required for MCL / multi-asset)." },
+        "mcl_configuration": { "$ref": "#/$defs/ref", "description": "Name of the !mcl_configuration (this engine's parameters; shareable between pricers)." },
+        "correlation": { "$ref": "#/$defs/ref", "description": "Name of the !correlation_matrix (required: MCL correlates the underlyings' Brownian motions)." },
         "debug_configuration": { "$ref": "#/$defs/ref", "description": "Optional !debug_configuration (e.g. node-graph dump)." },
-        "indicators": {
-          "type": "array",
-          "description": "Outputs to compute.",
-          "items": {
-            "enum": [
-              "premium", "delta", "gamma", "vega", "rho", "theta",
-              "vega_alpha", "vega_beta", "vega_nu",
-              "vega_v0", "vega_kappa", "vega_theta", "vega_xi", "vega_rho",
-              "vega_jump_intensity", "vega_jump_mean", "vega_jump_vol"
-            ],
-            "description": "Standard Greeks plus model-parameter Greeks: vega_<param> bumps a SABR (alpha/beta/rho/nu), Heston (v0/kappa/theta/xi/rho) or Bates jump (jump_intensity/jump_mean/jump_vol) parameter."
-          }
-        },
+        "indicators": { "$ref": "#/$defs/indicators" },
+        "result": { "type": "string", "description": "Name of the result block written back into the output." }
+      }
+    },
+
+    "pde_pricer": {
+      "type": "object",
+      "title": "!pde_pricer",
+      "description": "Price a book by finite-difference PDE grid. The engine is the tag itself; its parameters live in the referenced !pde_configuration.",
+      "additionalProperties": false,
+      "required": ["today", "book", "currency", "pde_configuration", "indicators", "result"],
+      "properties": {
+        "today": { "$ref": "#/$defs/date", "description": "Valuation date." },
+        "book": { "$ref": "#/$defs/ref", "description": "Name of the !book to price." },
+        "currency": { "$ref": "#/$defs/ref", "description": "Reporting (book) currency." },
+        "pde_configuration": { "$ref": "#/$defs/ref", "description": "Name of the !pde_configuration (this engine's grid parameters; shareable between pricers)." },
+        "correlation": { "$ref": "#/$defs/ref", "description": "Name of the !correlation_matrix (for multi-asset / quanto books)." },
+        "debug_configuration": { "$ref": "#/$defs/ref", "description": "Optional !debug_configuration." },
+        "indicators": { "$ref": "#/$defs/indicators" },
+        "result": { "type": "string", "description": "Name of the result block written back into the output." }
+      }
+    },
+
+    "ana_pricer": {
+      "type": "object",
+      "title": "!ana_pricer",
+      "description": "Price a book by closed-form (analytic) formulas. No engine-parameter object: the tag is self-contained.",
+      "additionalProperties": false,
+      "required": ["today", "book", "currency", "indicators", "result"],
+      "properties": {
+        "today": { "$ref": "#/$defs/date", "description": "Valuation date." },
+        "book": { "$ref": "#/$defs/ref", "description": "Name of the !book to price." },
+        "currency": { "$ref": "#/$defs/ref", "description": "Reporting (book) currency." },
+        "correlation": { "$ref": "#/$defs/ref", "description": "Name of the !correlation_matrix (for multi-asset / quanto books)." },
+        "debug_configuration": { "$ref": "#/$defs/ref", "description": "Optional !debug_configuration." },
+        "indicators": { "$ref": "#/$defs/indicators" },
         "result": { "type": "string", "description": "Name of the result block written back into the output." }
       }
     },
@@ -386,20 +423,6 @@
       "required": ["non_working_days_weight"],
       "properties": {
         "non_working_days_weight": { "type": "number", "description": "Weight of non-working days (0..1)." }
-      }
-    },
-
-    "pricer_configuration": {
-      "type": "object",
-      "title": "!pricer_configuration",
-      "description": "Engine selection plus references to the engine-specific configurations.",
-      "additionalProperties": false,
-      "required": ["method"],
-      "properties": {
-        "method": { "enum": ["mcl", "pde", "ana"], "description": "Pricing engine." },
-        "mcl_configuration": { "$ref": "#/$defs/ref" },
-        "pde_configuration": { "$ref": "#/$defs/ref" },
-        "log_path": { "type": "string", "description": "Directory for logs / node-graph dumps (must exist)." }
       }
     },
 

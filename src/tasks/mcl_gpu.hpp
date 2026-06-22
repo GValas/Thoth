@@ -11,7 +11,7 @@
 //!   * mcl_gpu_stub.cpp — Available()==false fallback (CPU-only build)
 //!
 //! The pricer (PricerMCL) calls Available() once and falls back to the CPU MCL
-//! engine when it is false, so a CPU-only build still runs `method: mcl` with
+//! engine when it is false, so a CPU-only build still runs an `!mcl_pricer` with
 //! `allow_gpu: true` (transparently on the CPU).
 namespace gpu
 {

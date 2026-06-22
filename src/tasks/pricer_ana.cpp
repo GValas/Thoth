@@ -5,7 +5,7 @@
 
 //! a closed-form pricer is just a Pricer; no engine state to initialise
 PricerANA::PricerANA( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_ANA_PRICER )
 {
 }
 

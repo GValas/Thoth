@@ -212,7 +212,7 @@ names (`src/tasks/pricer.cpp`):
 | `theta` | dPV over one calendar day | re-date bump |
 
 ```yaml
-my_pricer: !pricer
+my_pricer: !mcl_pricer
   indicators: [premium, delta, gamma, vega, rho, theta]
 ```
 

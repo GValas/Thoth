@@ -2,7 +2,6 @@
 #include "book.hpp"
 #include "correlation.hpp"
 #include "debug_configuration.hpp"
-#include "pricer_configuration.hpp"
 #include "single.hpp"
 #include "task.hpp"
 #include <functional>
@@ -13,11 +12,6 @@
 //! configured field). The configured grid-size / sigma defaults live next to the
 //! object that reads them (pde_configuration.hpp); the MCL defaults likewise.
 inline constexpr double PDE_THETA = 0.5;
-
-//! pricing method selectors (config field "method")
-inline constexpr char PRICING_METHOD_PDE[] = "pde"; //!< finite-difference PDE grid solving
-inline constexpr char PRICING_METHOD_MCL[] = "mcl"; //!< monte-carlo (longstaff-schwartz) tree; GPU via allow_gpu
-inline constexpr char PRICING_METHOD_ANA[] = "ana"; //!< closed-form (analytic) formulas
 
 //! finite-difference bump sizes for the bump-and-revalue Greeks. The spot bump
 //! (GREEK_SPOT_BUMP, for delta/gamma) is the canonical one in constants.hpp, so
@@ -41,7 +35,6 @@ class Pricer : public Task
     //! attributes
     Book* _book = nullptr;
     Correlation* _correlation = nullptr;
-    PricerConfiguration* _configuration = nullptr;
     DebugConfiguration* _debug = nullptr; //!< optional debug switches (null = off)
     vector<string> _indicator_request_list;
     Currency* _currency = nullptr;
@@ -191,6 +184,10 @@ class Pricer : public Task
     void CheckAllowed( const std::function<bool( Contract* )>& HasSolution,
                        const string& MethodLabel );
 
+    //! every engine writes the same "pricer_result" block kind (the three pricer
+    //! kinds share one result schema), rather than the per-kind default.
+    string ResultKind() const override { return "pricer_result"; }
+
   public:
     //! read the fields common to every pricer (currency / book / today /
     //! configuration / indicators / result, with optional correlation & debug).
@@ -200,7 +197,6 @@ class Pricer : public Task
     // setter
     void SetBook( Book& Book );
     void SetCorrelation( Correlation* Correlation );
-    void SetConfiguration( PricerConfiguration& Configuration );
     void SetDebugConfiguration( DebugConfiguration* Debug ) { _debug = Debug; }
     void SetIndicatorRequestList( const vector<string>& IndicatorRequestList );
     void SetCurrency( Currency& Currency );
@@ -208,9 +204,12 @@ class Pricer : public Task
     //! getter
     date GetToday() const;
 
-    //! constructor & destructor
+    //! constructor & destructor. ObjectKind is the concrete engine kind passed up by
+    //! the PricerMCL / PricerPDE / PricerANA subclass (the registry picks the subclass
+    //! straight off the YAML tag, so each one knows its own kind).
     Pricer( const string& ObjectName,
-            YamlConfig& YamlConfig );
+            YamlConfig& YamlConfig,
+            const string& ObjectKind );
     ~Pricer() override;
 
     //!

@@ -16,6 +16,11 @@ class Task : public Object
     //! task's output back into the same document the engine was driven from
     YamlConfig* _cfg = nullptr;
 
+    //! the "kind" tag stamped on the result block. Defaults to "<kind>_result"
+    //! (e.g. sequence -> sequence_result); the pricer overrides it to a single
+    //! "pricer_result" so the result schema does not fork per engine kind.
+    virtual string ResultKind() const;
+
   public:
     //! setter (target object for this task's result block, read from "result")
     void SetResult( const string& Result );
@@ -30,7 +35,7 @@ class Task : public Object
     virtual void Execute() = 0;
     virtual void WriteResults();
 
-    //! constructor / destructor. ObjectKind is the concrete leaf kind (KIND_PRICER /
+    //! constructor / destructor. ObjectKind is the concrete leaf kind (KIND_MCL_PRICER /
     //! KIND_SEQUENCE), forwarded to Object for the registry; YamlConfig is retained
     //! by pointer for WriteResults.
     Task( const string& ObjectName,

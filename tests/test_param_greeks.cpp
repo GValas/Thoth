@@ -23,9 +23,8 @@ std::string HestonCfg( const std::string& indicators )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: cfg,"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: bk, currency: eur,"
       << " correlation: cor, indicators: " << indicators << ", result: res}\n"
-      << "cfg: !pricer_configuration {method: ana, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 3, min_day_step: -1, paths: 1,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -46,9 +45,8 @@ std::string SabrCfg( const std::string& indicators )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: cfg,"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: bk, currency: eur,"
       << " correlation: cor, indicators: " << indicators << ", result: res}\n"
-      << "cfg: !pricer_configuration {method: ana, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 3, min_day_step: -1, paths: 1,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"

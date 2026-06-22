@@ -6,8 +6,9 @@ using namespace test;
 
 // The engine should fail loudly (std::runtime_error) on inconsistent input.
 
-TEST_CASE( "unknown method is rejected" )
+TEST_CASE( "unknown pricer kind is rejected" )
 {
+    // "quantum" yields the tag !quantum_pricer, which no registry factory claims
     std::string y = VanillaCfg( 100, 100, 30, 5, "call", "european", 1, false, 5, "quantum" );
     CHECK_THROWS_AS( Price( y ), std::runtime_error );
 }
@@ -17,9 +18,9 @@ TEST_CASE( "MCL without a correlation matrix throws" )
     // a book priced with mcl but no `correlation:` field on the pricer
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, indicators: [premium], result: res}\n"
-      << CfgBlock( "mcl", 100, 30, 6 )
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " mcl_configuration: cfg_mcl, indicators: [premium], result: res}\n"
+      << CfgBlock( 100, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -42,9 +43,9 @@ TEST_CASE( "a missing referenced object is rejected" )
     // the book references a contract `ghost` that is never defined
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( "ana", 1, 30, 6 )
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 1, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -61,9 +62,9 @@ TEST_CASE( "a non positive-definite correlation matrix is rejected" )
     // correlation object must reject it at load rather than misprice silently.
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( "ana", 1, 30, 6 )
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 1, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

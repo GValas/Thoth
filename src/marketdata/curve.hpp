@@ -28,7 +28,7 @@ class Curve : public MarketData
   public:
     //! read the (date, value) pillars common to every curve kind (yield / repo /
     //! continuous-dividend). The concrete kinds add no own fields, so they inherit
-    //! this directly through MakeConfigurable<T>.
+    //! this directly through the registry's generic Create<T>.
     void Configure( ObjectReader& reader ) override;
 
     //! setter — store the pillar dates (validated ascending via CheckDateList)

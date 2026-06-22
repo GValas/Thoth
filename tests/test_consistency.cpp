@@ -86,9 +86,9 @@ TEST_CASE( "book premium is the sum of its contracts" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( "ana", 1, 30, 6 )
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 1, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

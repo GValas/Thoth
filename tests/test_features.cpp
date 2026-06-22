@@ -18,9 +18,9 @@ std::string OneContract( const std::string& method, const std::string& contract_
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, draws, step, 5 )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, step, 5 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -79,9 +79,8 @@ TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " mcl_configuration: m, correlation: cor, indicators: [premium], result: res}\n"
       << "m: !mcl_configuration {max_day_step: 30, min_day_step: -1, paths: 100000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -105,12 +104,10 @@ TEST_CASE( "sequence runs every sub-task" )
     std::ostringstream o;
     o << "root: seq\n"
       << "seq: !sequence {tasks: [p_pde, p_ana], result: seq_result}\n"
-      << "p_pde: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cpde,"
+      << "p_pde: !pde_pricer {today: 2000-01-01, book: book, currency: eur, pde_configuration: pcfg,"
       << " correlation: cor, indicators: [premium], result: pde_res}\n"
-      << "p_ana: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cana,"
+      << "p_ana: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
       << " correlation: cor, indicators: [premium], result: ana_res}\n"
-      << "cpde: !pricer_configuration {method: pde, pde_configuration: pcfg, log_path: \"/tmp/\"}\n"
-      << "cana: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
       << "pcfg: !pde_configuration {vanilla_precision: high}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
@@ -133,9 +130,8 @@ TEST_CASE( "basket: near-perfectly correlated 50/50 basket equals the single ass
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 30, min_day_step: -1, paths: 60000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -173,10 +169,8 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd," : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "cfg: !pricer_configuration {method: " << method
-          << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"
           << "pd: !pde_configuration {vanilla_precision: high}\n"
@@ -226,10 +220,8 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd," : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "cfg: !pricer_configuration {method: " << method
-          << ", mcl_configuration: m, pde_configuration: pd, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"
           << "pd: !pde_configuration {vanilla_precision: high}\n"
@@ -272,9 +264,8 @@ TEST_CASE( "composite MCL Greeks do not corrupt the correlation Cholesky" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: usd, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium, delta, vega, rho, theta], result: res}\n"
-      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 30, min_day_step: -1, paths: 8000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: r_eur}\n"
@@ -303,9 +294,8 @@ TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -331,9 +321,9 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur," << ConfigRef( method )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << CfgBlock( method, 300000, 7, 6 )
+          << CfgBlock( 300000, 7, 6 )
           << "eur: !currency {rate: rate}\n"
           << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
           << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -382,9 +372,8 @@ TEST_CASE( "basket local-vol MCL: flat SABR components match the BS basket" )
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+          << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur, mcl_configuration: m,"
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"
           << "eur: !currency {rate: rate}\n"
@@ -421,10 +410,8 @@ TEST_CASE( "composite local-vol MCL reprices the implied surface (matches ANA)" 
     {
         std::ostringstream o;
         o << "root: pricer\n"
-          << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd, configuration: cfg,"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "cfg: !pricer_configuration {method: " << method
-          << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 300000,"
           << " vol_year_step: 0.01, use_sobol: true}\n"
           << "eur: !currency {rate: r_eur}\n"
@@ -471,9 +458,8 @@ TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
 {
     std::ostringstream o;
     o << "root: p\n"
-      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << "p: !mcl_pricer {today: 2000-01-01, book: bk, currency: eur, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -496,9 +482,8 @@ TEST_CASE( "Heston MCL negative-rho skew enriches the OTM put" )
 {
     std::ostringstream o;
     o << "root: p\n"
-      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << "p: !mcl_pricer {today: 2000-01-01, book: bk, currency: eur, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "c: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 5, min_day_step: -1, paths: 200000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -523,9 +508,8 @@ TEST_CASE( "Heston ANA characteristic function agrees with MCL" )
     {
         std::ostringstream o;
         o << "root: p\n"
-          << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+          << "p: !" << method << "_pricer {today: 2000-01-01, book: bk, currency: eur," << ( method == "ana" ? "" : " mcl_configuration: m," )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "c: !pricer_configuration {method: " << method << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
           << "m: !mcl_configuration {max_day_step: 3, min_day_step: -1, paths: " << mcl
           << ", vol_year_step: 0.01, use_sobol: true}\n"
           << "eur: !currency {rate: rate}\n"
@@ -550,9 +534,8 @@ TEST_CASE( "Heston ANA degenerate limit matches Black-Scholes" )
 {
     std::ostringstream o;
     o << "root: p\n"
-      << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+      << "p: !ana_pricer {today: 2000-01-01, book: bk, currency: eur,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "c: !pricer_configuration {method: ana, log_path: \"/tmp/\"}\n"
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
@@ -575,9 +558,8 @@ TEST_CASE( "Heston PDE 2-D ADI matches ANA and supports American" )
     {
         std::ostringstream o;
         o << "root: p\n"
-          << "p: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: c,"
+          << "p: !" << method << "_pricer {today: 2000-01-01, book: bk, currency: eur," << ( method == "ana" ? "" : " pde_configuration: pc," )
           << " correlation: cor, indicators: [premium], result: res}\n"
-          << "c: !pricer_configuration {method: " << method << ", pde_configuration: pc, log_path: \"/tmp/\"}\n"
           << "pc: !pde_configuration {vanilla_precision: high}\n"
           << "eur: !currency {rate: rate}\n"
           << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"

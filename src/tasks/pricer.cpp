@@ -5,22 +5,23 @@
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
 
-//! constructor (members are initialised in-class)
+//! constructor (members are initialised in-class). The concrete kind is supplied by
+//! the subclass (KIND_MCL_PRICER / KIND_PDE_PRICER / KIND_ANA_PRICER).
 Pricer::Pricer( const string& ObjectName,
-                YamlConfig& YamlConfig ) : Task( ObjectName, YamlConfig, KIND_PRICER ) {}
+                YamlConfig& YamlConfig,
+                const string& ObjectKind ) : Task( ObjectName, YamlConfig, ObjectKind ) {}
 
 //! destructor
 Pricer::~Pricer() = default;
 
 //! read the fields common to every pricer (the concrete class was already chosen
-//! by the registry, which drives the type off the configuration's method)
+//! by the registry straight off the YAML tag: !mcl_pricer / !pde_pricer / !ana_pricer)
 void Pricer::Configure( ObjectReader& reader )
 {
     SetCurrency( *reader.Ref<Currency>( "currency" ) );                      //!< reporting currency
-    SetBook( *reader.Ref<Book>( "book" ) );                                  //!< the contracts to price
-    SetToday( reader.Get<date>( "today" ) );                                 //!< valuation date
-    SetConfiguration( *reader.Ref<PricerConfiguration>( "configuration" ) ); //!< method + engine params
-    SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) );   //!< premium / Greeks to compute
+    SetBook( *reader.Ref<Book>( "book" ) );                                //!< the contracts to price
+    SetToday( reader.Get<date>( "today" ) );                               //!< valuation date
+    SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) ); //!< premium / Greeks to compute
     SetResult( reader.Get<string>( "result" ) );                             //!< where to write the output block
     //! correlation is optional (single-asset single-ccy books need none); resolved
     //! by reference when present
@@ -46,12 +47,6 @@ void Pricer::SetBook( Book& Book )
 void Pricer::SetCorrelation( Correlation* Correlation )
 {
     _correlation = Correlation;
-}
-
-// setter : the engine-parameter bundle (method + mcl/pde sub-configs)
-void Pricer::SetConfiguration( PricerConfiguration& Configuration )
-{
-    _configuration = &Configuration;
 }
 
 // setter : record the requested indicators and derive the per-greek flags from them

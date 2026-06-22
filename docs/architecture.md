@@ -158,8 +158,9 @@ classDiagram
 
 ## Tasks & pricers
 
-The registry picks the concrete `Pricer` from the configuration's `method`
-(`mcl` / `pde` / `ana`; GPU is the `mcl` engine with `allow_gpu`). A `Sequence`
+Each pricer engine is its own kind/tag (`!mcl_pricer` / `!pde_pricer` /
+`!ana_pricer`), so the registry picks the concrete `Pricer` straight from the
+tag (GPU is the `mcl` engine with `allow_gpu`). A `Sequence`
 runs a list of sub-tasks.
 
 ```mermaid
@@ -173,7 +174,6 @@ classDiagram
     class Pricer {
         <<abstract>>
         -Book _book
-        -PricerConfiguration _configuration
         -Correlation _correlation
         +PriceBook()*
     }
@@ -187,17 +187,15 @@ classDiagram
 
     Pricer --> Book
     Pricer --> Currency
-    Pricer --> PricerConfiguration
     Pricer --> Correlation
     Pricer --> DebugConfiguration
     Sequence --> "*" Task : sub-tasks
 
-    Object <|-- PricerConfiguration
     Object <|-- MclConfiguration
     Object <|-- PdeConfiguration
     Object <|-- DebugConfiguration
-    PricerConfiguration --> MclConfiguration
-    PricerConfiguration --> PdeConfiguration
+    PricerMCL --> MclConfiguration : mcl_configuration
+    PricerPDE --> PdeConfiguration : pde_configuration
 ```
 
 ## Configuration & build

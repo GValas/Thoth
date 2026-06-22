@@ -105,7 +105,7 @@ Match these — don't reformat or rename surrounding code to a different style.
   `GPU_GbmParams`). Kind tags are `KIND_*` constants in `enums.hpp`.
 - **Object-registry + YAML config model.** Every priceable thing is a named
   `Object`. The YAML is a flat namespace of named objects, each tagged by kind
-  (`!pricer`, `!equity`, `!vanilla`, ...) and referenced by name; `root` names
+  (`!mcl_pricer`, `!equity`, `!vanilla`, ...) and referenced by name; `root` names
   the object to execute. `src/core/object_registry.cpp` is *the* single
   translation unit aware of every concrete type: it builds a `kind -> factory`
   table, one entry per object kind. Adding a type = a new class + exactly one

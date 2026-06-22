@@ -18,7 +18,12 @@ class ObjectReader; //!< field reader passed to Configure (see object_reader.hpp
 inline constexpr char KIND_BARRIER[] = "barrier";
 inline constexpr char KIND_VARIANCE_SWAP[] = "variance_swap";
 inline constexpr char KIND_BOOK[] = "book";
-inline constexpr char KIND_PRICER[] = "pricer";
+//! the three pricer engines are each their own kind: the YAML tag (!mcl_pricer /
+//! !pde_pricer / !ana_pricer) picks the concrete engine directly, the same way the
+//! volatility / curve families do. There is no generic "pricer" kind.
+inline constexpr char KIND_MCL_PRICER[] = "mcl_pricer"; //!< monte-carlo (longstaff-schwartz)
+inline constexpr char KIND_PDE_PRICER[] = "pde_pricer"; //!< finite-difference PDE grid
+inline constexpr char KIND_ANA_PRICER[] = "ana_pricer"; //!< closed-form (analytic) formulas
 inline constexpr char KIND_BS_VOLATILITY[] = "bs_volatility";
 inline constexpr char KIND_CONTINUOUS_DIVIDENDS_CURVE[] = "continuous_dividends_curve";
 inline constexpr char KIND_DISCRETE_DIVIDENDS[] = "discrete_dividends";
@@ -34,7 +39,6 @@ inline constexpr char KIND_HESTON_VOLATILITY[] = "heston_volatility";
 inline constexpr char KIND_MCL_CONFIGURATION[] = "mcl_configuration";
 inline constexpr char KIND_SABR_VOLATILITY[] = "sabr_volatility";
 inline constexpr char KIND_PDE_CONFIGURATION[] = "pde_configuration";
-inline constexpr char KIND_PRICER_CONFIGURATION[] = "pricer_configuration";
 inline constexpr char KIND_REPO_CURVE[] = "repo_curve";
 inline constexpr char KIND_SEQUENCE[] = "sequence";
 inline constexpr char KIND_SIMPLE_FIXING_DATA[] = "simple_fixing_data";

@@ -20,9 +20,9 @@ TEST_CASE( "multi-asset correlated book is bit-reproducible" )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( "mcl", 80000, 30, 6 )
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " mcl_configuration: cfg_mcl, correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( 80000, 30, 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"

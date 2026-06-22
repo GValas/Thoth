@@ -22,8 +22,8 @@ inline constexpr int PDE_VANILLA_PRECISION_HIGH_N_T = 1301;
 inline constexpr double PDE_SIGMA_FACTOR = 5.0;
 
 //! Finite-difference (PDE) engine parameters, grouped in their own YAML object
-//! (kind "pde_configuration") and referenced from a pricer_configuration via
-//! its "pde" field.
+//! (kind "pde_configuration") and referenced directly from a !pde_pricer via
+//! its "pde_configuration" field (shareable across pricers).
 class PdeConfiguration : public Object
 {
   public:

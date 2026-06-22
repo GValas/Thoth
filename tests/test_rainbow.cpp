@@ -14,9 +14,8 @@ std::string RainbowCfg( const std::string& type, double strike,
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: " << draws
       << ", vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"
@@ -40,9 +39,8 @@ std::string SingleCfg( double spot, double vol, double strike )
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur, configuration: cfg,"
+      << "pricer: !mcl_pricer {today: 2000-01-01, book: book, currency: eur, mcl_configuration: m,"
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: mcl, mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
       << " vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"

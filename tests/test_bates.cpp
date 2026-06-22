@@ -16,9 +16,8 @@ std::string BatesCfg( const std::string& method, double lambda, double mu, doubl
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: bk, currency: eur, configuration: cfg,"
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: bk, currency: eur," << ( method == "ana" ? "" : " mcl_configuration: m," )
       << " correlation: cor, indicators: [premium], result: res}\n"
-      << "cfg: !pricer_configuration {method: " << method << ", mcl_configuration: m, log_path: \"/tmp/\"}\n"
       << "m: !mcl_configuration {max_day_step: 3, min_day_step: -1, paths: " << draws
       << ", vol_year_step: 0.01, use_sobol: true}\n"
       << "eur: !currency {rate: rate}\n"

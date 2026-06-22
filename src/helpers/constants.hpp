@@ -22,7 +22,7 @@ inline constexpr char ROOT_NODE[] = "root";
 //! constants.hpp (not pricer.hpp) so the contracts can use it too.
 inline constexpr double GREEK_SPOT_BUMP = 0.01;
 
-// pricer_configuration - mcl
+// mcl_configuration
 //! Monte-Carlo / cluster (mcl): weight given to a non-working (calendar, non-
 //! trading) day when accumulating time/variance. 1.0 = treat it like any other
 //! day (no calendar-vs-trading-day down-weighting).

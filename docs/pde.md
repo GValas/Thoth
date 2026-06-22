@@ -7,8 +7,9 @@ a 2-D Douglas-ADI solve for Heston (stochastic-vol) vanillas. It prices European
 and American payoffs, continuous and discrete knock-out / knock-in barriers, and
 handles quanto carry corrections.
 
-It is selected per pricer through `!pricer_configuration` (`method: pde`) plus a
-`!pde_configuration` object. See [running.md](running.md) for the run wrappers.
+It is selected by tagging the pricer `!pde_pricer`, with a `!pde_configuration`
+object referenced directly through its `pde_configuration` field. See
+[running.md](running.md) for the run wrappers.
 
 ## 1. The 1-D Black-Scholes solver
 
@@ -247,9 +248,9 @@ a flat BS surface and an approximation under local/stochastic vol.
 ## Configuration example
 
 ```yaml
-cfg_pde: !pricer_configuration
-  method: pde
-  pde_configuration: pde_cfg
+my_pde_pricer: !pde_pricer        # the tag picks the engine
+  # ... book / currency / indicators / result ...
+  pde_configuration: pde_cfg      # direct reference to the grid params (shareable)
 
 pde_cfg: !pde_configuration
   vanilla_precision: high      # low | medium | high (default high)

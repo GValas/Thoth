@@ -5,7 +5,7 @@ using namespace test;
 using doctest::Approx;
 
 // Continuously-monitored single-barrier options priced by the closed-form
-// (Reiner-Rubinstein) engine, driven through method: ana.
+// (Reiner-Rubinstein) engine, driven through the !ana_pricer.
 // Reference values were produced by an independent Python implementation that
 // was itself cross-checked against a Brownian-bridge Monte-Carlo simulation.
 // All cases: T = 1y, no dividends (cost-of-carry b = r).

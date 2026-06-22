@@ -144,21 +144,30 @@ constexpr double T1 = 1.0;
 //! map the legacy integer pde precision to the current low|medium|high scheme
 inline std::string PrecisionLevel( int p ) { return p <= 3 ? "low" : ( p == 4 ? "medium" : "high" ); }
 
-//! the pricing-configuration trio (a pricer_configuration plus its referenced
-//! mcl_configuration / pde_configuration sub-objects). Named cfg / cfg_mcl /
-//! cfg_pde so a pricer can reference them as configuration: cfg.
-inline std::string CfgBlock( const std::string& method, int draws, int max_day_step,
-                             int pde_precision )
+//! the engine-parameter objects a pricer node references by name (cfg_mcl /
+//! cfg_pde). Both are emitted; a node wires up the one its engine needs via
+//! ConfigRef (an ana pricer references neither, so they sit unused).
+inline std::string CfgBlock( int draws, int max_day_step, int pde_precision )
 {
     std::ostringstream o;
-    o << "cfg: !pricer_configuration {method: " << method
-      << ", mcl_configuration: cfg_mcl, pde_configuration: cfg_pde, log_path: \"/tmp/\"}\n"
-      << "cfg_mcl: !mcl_configuration {max_day_step: " << max_day_step
+    o << "cfg_mcl: !mcl_configuration {max_day_step: " << max_day_step
       << ", min_day_step: -1, paths: " << draws
       << ", vol_year_step: 0.01, use_sobol: false}\n"
       << "cfg_pde: !pde_configuration {vanilla_precision: " << PrecisionLevel( pde_precision )
       << "}\n";
     return o.str();
+}
+
+//! the engine-config reference field a pricer node adds for its engine: it points
+//! at CfgBlock's cfg_mcl / cfg_pde object. Leading space + trailing comma so it
+//! slots between two comma-separated node fields. ana needs no engine parameters.
+inline std::string ConfigRef( const std::string& method )
+{
+    if ( method == "mcl" )
+        return " mcl_configuration: cfg_mcl,";
+    if ( method == "pde" )
+        return " pde_configuration: cfg_pde,";
+    return "";
 }
 
 //! a single vanilla option on one equity (eur, flat rate, constant vol).
@@ -172,9 +181,9 @@ inline std::string VanillaCfg( double spot, double strike, double vol_pct, doubl
     const std::string chosen_method = !method.empty() ? method : ( pde ? "pde" : "mcl" );
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( chosen_method, draws, 30, pde ? pde_precision : 6 )
+      << "pricer: !" << chosen_method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( chosen_method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, 30, pde ? pde_precision : 6 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"
@@ -206,9 +215,9 @@ inline std::string BarrierCfg( double spot, double strike, double barrier,
     const bool is_down = barrier_type.rfind( "down", 0 ) == 0;
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, draws, mcl_step, pde_precision )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, mcl_step, pde_precision )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"
@@ -238,9 +247,9 @@ inline std::string QuantoVanillaCfg( double spot, double strike, double vol_pct,
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: usd,"
-      << " configuration: cfg, correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( method, draws, 30, pde_precision )
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd,"
+      << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+      << CfgBlock( draws, 30, pde_precision )
       << "eur: !currency {rate: eur_rate}\n"
       << "eur_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << r_eur_pct << ", " << r_eur_pct << "]}\n"

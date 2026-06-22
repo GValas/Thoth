@@ -30,8 +30,9 @@
   // Declare them so the YAML linter (redhat.vscode-yaml) stops reporting
   // "Unresolved tag: !...". All kinds are mappings.
   "yaml.customTags": [
-    "!pricer mapping",
-    "!pricer_configuration mapping",
+    "!mcl_pricer mapping",
+    "!pde_pricer mapping",
+    "!ana_pricer mapping",
     "!debug_configuration mapping",
     "!mcl_configuration mapping",
     "!pde_configuration mapping",
@@ -60,8 +61,8 @@
     "!simple_weighted_calendar mapping"
   ],
 
-  // Color local YAML tags (e.g. !pricer, !vanilla) in red. Under the
-  // active redhat.vscode-yaml grammar, a node tag like "!pricer" is scoped
+  // Color local YAML tags (e.g. !mcl_pricer, !vanilla) in red. Under the
+  // active redhat.vscode-yaml grammar, a node tag like "!mcl_pricer" is scoped
   // storage.type.tag-handle.yaml. NB: entity.name.tag.yaml is the mapping-KEY
   // scope, so do not use it here or the fields turn red instead of the tags.
   "editor.tokenColorCustomizations": {

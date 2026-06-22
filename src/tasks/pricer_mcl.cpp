@@ -4,6 +4,7 @@
 #include "contract.hpp"
 #include "vanilla.hpp"
 #include "mcl_gpu.hpp"
+#include "object_reader.hpp"
 #include "progress_bar.hpp"
 #include "path_generator.hpp"
 #include "maths.hpp"
@@ -44,13 +45,20 @@ string GraphTreeKey( const string& Tag )
 //! the diffusion tree, node collector and path generator are all built lazily in
 //! PriceBook (so each re-price gets a clean tree); only the RNG is held as a member
 PricerMCL::PricerMCL( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_MCL_PRICER )
 {
     //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom from the config seed
 }
 
 //! unique_ptr members (progress bar, path generator) clean themselves up
 PricerMCL::~PricerMCL() = default;
+
+//! common pricer fields first, then this engine's required parameter object
+void PricerMCL::Configure( ObjectReader& reader )
+{
+    Pricer::Configure( reader );
+    _mcl = reader.Ref<MclConfiguration>( "mcl_configuration" ); //!< Monte-Carlo grid / paths / GPU
+}
 
 //! diffusion dates
 void PricerMCL::InitDates()
@@ -71,8 +79,8 @@ void PricerMCL::InitDates()
     //! stochastic-variance model (Heston / Bates): a plain GBM book has no
     //! variance path to sub-step, so it stays on max_day_step (cost unchanged).
     //! vol_year_step <= 0 disables the cap.
-    long step_days = _configuration->_mcl->_max_day_step;
-    if ( _configuration->_mcl->_vol_year_step > 0 )
+    long step_days = _mcl->_max_day_step;
+    if ( _mcl->_vol_year_step > 0 )
     {
         bool has_stochastic_vol = false;
         for ( Single* s : _single_set )
@@ -86,7 +94,7 @@ void PricerMCL::InitDates()
         if ( has_stochastic_vol )
         {
             const long vol_days = std::max<long>(
-                1, (long)std::floor( _configuration->_mcl->_vol_year_step * NB_OF_DAYS_A_YEAR ) );
+                1, (long)std::floor( _mcl->_vol_year_step * NB_OF_DAYS_A_YEAR ) );
             step_days = std::min( step_days, vol_days );
         }
     }
@@ -101,15 +109,10 @@ void PricerMCL::InitDates()
     //_diffusion_dates.erase( _today );
 }
 
-//! check the mcl configuration and correlation are present
+//! check the correlation is present (the mcl_configuration is resolved as a
+//! required reference in Configure, so it is always non-null here)
 void PricerMCL::PreCheck()
 {
-    //! mcl pricing needs its parameter object (config field "mcl")
-    if ( !_configuration->_mcl )
-    {
-        ERR( "book pricing '" + _name + "' uses the mcl method but its configuration has no 'mcl' object" );
-    }
-
     //! MCL diffusion correlates the underlyings' Brownian motions, so a
     //! correlation matrix is mandatory (guards the unconditional derefs in
     //! ComputeCholeskyMatrix / CorrelateBrownianNodes below).
@@ -120,8 +123,8 @@ void PricerMCL::PreCheck()
 
     //! GPU acceleration is opt-in (allow_gpu) and falls back to the CPU path when a
     //! device is absent or the book is not GPU-supported — decided once, here.
-    _use_gpu = _configuration->_mcl->_allow_gpu && BookIsGpuSupported();
-    if ( _configuration->_mcl->_allow_gpu )
+    _use_gpu = _mcl->_allow_gpu && BookIsGpuSupported();
+    if ( _mcl->_allow_gpu )
     {
         LOG( "GPU", _use_gpu ? ( "device Monte-Carlo enabled: " + gpu::DeviceInfo() )
                              : ( "allow_gpu set but GPU pricing is unavailable or unsupported for "
@@ -169,9 +172,9 @@ void PricerMCL::PriceContract( Contract* Ctr )
         ERR( "gpu pricing '" + _name + "': contract '" + Ctr->GetName() + "' is not GPU-supported" );
     }
 
-    const long paths = _configuration->_mcl->_paths;
+    const long paths = _mcl->_paths;
     //! one fixed seed for the base price and every bump -> common random numbers
-    const unsigned long seed = (unsigned long)_configuration->_mcl->_seed;
+    const unsigned long seed = (unsigned long)_mcl->_seed;
 
     const gpu::GbmResult r = gpu::PriceEuropeanGbm( p.forward, p.strike, p.t, p.vol,
                                                     p.df, p.is_call, paths, seed );
@@ -210,7 +213,7 @@ void PricerMCL::PriceBook()
     _collector.Reset();
     _scenario_roots.clear();
     _scenario_premium.clear();
-    _rng.Seed( (std::uint64_t)_configuration->_mcl->_seed );
+    _rng.Seed( (std::uint64_t)_mcl->_seed );
 
     //! single-tree Greeks: build the bump sub-trees alongside the base tree (and
     //! price them in the same path sweep) when delta/gamma/vega/rho are requested
@@ -523,7 +526,7 @@ void PricerMCL::CreateBrownianNodes()
 //! independent pseudo-random gaussians.
 void PricerMCL::SetupQuasiRandom()
 {
-    if ( !_configuration->_mcl->_use_sobol )
+    if ( !_mcl->_use_sobol )
     {
         return;
     }
@@ -540,7 +543,7 @@ void PricerMCL::SetupQuasiRandom()
     //! a cluster slave skips the running path count of the slaves before it
     //! (_sobol_skip, set by the master) so each slave draws a disjoint Sobol block.
     int factors = (int)_single_set.size();
-    uint64_t sobol_skip = (uint64_t)_configuration->_mcl->_sobol_skip;
+    uint64_t sobol_skip = (uint64_t)_mcl->_sobol_skip;
     _path_generator = std::make_unique<PathGenerator>( times, factors, true, &_rng, sobol_skip );
 
     int f = 0;
@@ -662,9 +665,9 @@ void PricerMCL::Tree_Init()
         }
         {
             std::ostringstream oss;
-            oss << "drawings = " << _configuration->_mcl->_paths << ", "
-                << "max day step = " << _configuration->_mcl->_max_day_step << ", "
-                << "vol year step = " << _configuration->_mcl->_vol_year_step;
+            oss << "drawings = " << _mcl->_paths << ", "
+                << "max day step = " << _mcl->_max_day_step << ", "
+                << "vol year step = " << _mcl->_vol_year_step;
             LOG( LogLabel(), oss.str() );
         }
     }
@@ -685,7 +688,7 @@ void PricerMCL::Tree_Run()
     }
 
     //! iterations
-    long n = _configuration->_mcl->_paths;
+    long n = _mcl->_paths;
 
     //! the bar spans the whole job: the path sweep plus the American LSM fit
     //! (one backward step per exercise date, per American contract). For a plain
@@ -789,7 +792,7 @@ string PricerMCL::AmericanSpotName( Contract* Contract )
 //! register the underlying spot of every American contract for path recording
 void PricerMCL::SetupAmericanRecording()
 {
-    size_t n = (size_t)_configuration->_mcl->_paths;
+    size_t n = (size_t)_mcl->_paths;
     for ( Contract* c : _book->GetOptionList() )
     {
         if ( !c->IsAmerican() )

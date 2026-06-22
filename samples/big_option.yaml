@@ -13,20 +13,16 @@
 # the rate/discount nodes.
 root: big_option
 
-big_option: !pricer
+big_option: !mcl_pricer
   today: 2000-01-01
   book: book
   currency: usd
-  configuration: cfg
+  mcl_configuration: mcl
   correlation: correl
   debug_configuration: dbg
   indicators: [premium, delta, gamma, vega, rho, theta]
   result: big_option_result
 
-cfg: !pricer_configuration
-  method: mcl
-  mcl_configuration: mcl
-  log_path: "/tmp/"
 mcl: !mcl_configuration
   max_day_step: 30
   min_day_step: -1

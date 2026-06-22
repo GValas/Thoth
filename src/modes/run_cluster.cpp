@@ -94,16 +94,16 @@ static string ClusterPrice( const string& Body,
         return ClusterPriceSequence( Body, task, Slaves );
     }
 
-    //! only a plain (CPU) MCL single-pricer is path-split across the slaves
-    bool splittable = req.GetTag( task ) == "pricer";
-    string cfg, mcl;
+    //! only a plain (CPU) MCL single-pricer is path-split across the slaves. The
+    //! engine is the tag itself now (!mcl_pricer), so the split test is a tag check.
+    bool splittable = req.GetTag( task ) == "mcl_pricer";
+    string mcl;
     bool allow_gpu = false;
     if ( splittable )
     {
-        cfg = req.GetString( task + ".configuration" );
-        if ( req.GetString( cfg + ".method" ) == "mcl" && req.IsString( cfg + ".mcl_configuration" ) )
+        if ( req.IsString( task + ".mcl_configuration" ) )
         {
-            mcl = req.GetString( cfg + ".mcl_configuration" );
+            mcl = req.GetString( task + ".mcl_configuration" );
             //! a GPU cell (allow_gpu) is already massively data-parallel on one
             //! device, so it is NOT split — the master prices it whole on its own
             //! GPU rather than fanning a fraction of the paths out to each slave.

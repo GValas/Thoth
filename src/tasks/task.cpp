@@ -19,10 +19,16 @@ void Task::SetResult( const string& Result )
     _result = Result;
 }
 
-//! base result block shared by every task: tag the block with its kind ("<kind>_result")
+//! base result block shared by every task: tag the block with its kind (ResultKind)
 //! and stamp the elapsed wall-clock time. Concrete tasks call this, then add their own fields.
 void Task::WriteResults()
 {
-    _cfg->Set( _result + ".kind", _kind + "_result" );
+    _cfg->Set( _result + ".kind", ResultKind() );
     _cfg->Set( _result + ".task_time", _task_time );
+}
+
+//! default result-block kind: the task's own kind suffixed with "_result"
+string Task::ResultKind() const
+{
+    return _kind + "_result";
 }

@@ -6,8 +6,8 @@ inline constexpr bool MC_USE_SOBOL = true;  //!< Sobol (vs pseudo-random) by def
 inline constexpr char MCL_NODE_PATH[] = ""; //!< node-dump file (empty: no dump)
 
 //! Monte-Carlo (Longstaff-Schwartz) engine parameters, grouped in their own
-//! YAML object (kind "mcl_configuration") and referenced from a
-//! pricer_configuration via its "mcl" field.
+//! YAML object (kind "mcl_configuration") and referenced directly from an
+//! !mcl_pricer via its "mcl_configuration" field (shareable across pricers).
 class MclConfiguration : public Object
 {
   public:

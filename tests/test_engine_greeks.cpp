@@ -17,10 +17,10 @@ std::string GreeksCfg( double spot, double strike, double vol_pct, double rate_p
 {
     std::ostringstream o;
     o << "root: pricer\n"
-      << "pricer: !pricer {today: 2000-01-01, book: book, currency: eur,"
-      << " configuration: cfg, correlation: cor,"
+      << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << ConfigRef( method ) << " correlation: cor,"
       << " indicators: [premium, delta, gamma, vega, rho, theta], result: res}\n"
-      << CfgBlock( method, 1, 30, 5 )
+      << CfgBlock( 1, 30, 5 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"

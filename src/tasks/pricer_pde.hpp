@@ -1,4 +1,5 @@
 #pragma once
+#include "pde_configuration.hpp"
 #include "pricer.hpp"
 
 class VarianceSwap;
@@ -27,6 +28,12 @@ class PricerPDE : public Pricer
 {
 
   private:
+    //! PDE grid parameters (precision preset / grid sizes / sigma factor), referenced
+    //! directly from the !pde_pricer node via its "pde_configuration" field and
+    //! resolved in Configure. Borrowed (owned by the ObjectManager), so it may be
+    //! shared by several pricers.
+    PdeConfiguration* _pde = nullptr;
+
     // market data
     double _s;      // spot
     double _v;      // vol
@@ -157,7 +164,7 @@ class PricerPDE : public Pricer
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
   protected:
-    void PreCheck() override; //!< require a PDE solution + a pde_configuration
+    void PreCheck() override; //!< require a PDE solution for every contract
     void PriceBook() override;
     //! price one contract (vanilla, knock-out, or knock-in via in/out parity)
     void PriceContract( Contract* Ctr ) override; //!< single-contract grid solve
@@ -165,6 +172,11 @@ class PricerPDE : public Pricer
     bool GridSpotGreeks() const override { return true; } //!< grid yields dV/dS directly
 
   public:
+    //! read the common pricer fields (Pricer::Configure) then resolve the required
+    //! "pde_configuration" reference for this engine's grid parameters. Public (like
+    //! the base) so the registry's factory can configure the freshly built object.
+    void Configure( ObjectReader& reader ) override;
+
     //! constructor, destructor
     PricerPDE( const string& ObjectName,
                YamlConfig& YamlConfig );
