@@ -24,13 +24,13 @@ Volatility::~Volatility() = default;
 
 //! optional calendar shared by every volatility: the field holds the name of a
 //! calendar object whose non_working_days_weight scales the vol (a second reader
-//! bound to that object reads its field).
-void Volatility::ConfigureCommon( ObjectReader& reader )
+//! bound to that object reads its field). Each concrete Configure calls this base first.
+void Volatility::Configure( ObjectReader& reader )
 {
     if ( reader.Has<string>( "calendar" ) )
     {
         ObjectReader calendar( reader.Manager(), reader.Get<string>( "calendar" ) );
-        SetNonWorkingDaysWeight( calendar.Get<double>( "non_working_days_weight" ) );
+        _non_working_days_weight = calendar.Get<double>( "non_working_days_weight" );
     }
 }
 
@@ -106,12 +106,6 @@ double Volatility::GetLocalVolatility( const double Strike,
     const double local_var = N / D;
     const double floor = 1e-8; //!< (0.01% vol)^2
     return sqrt( local_var > floor ? local_var : floor );
-}
-
-//! setter for the calendar weight applied to non-trading (weekend) days
-void Volatility::SetNonWorkingDaysWeight( double Weight )
-{
-    _non_working_days_weight = Weight;
 }
 
 //! calendar day-weight applied to the vol level. Variance accrues on trading days

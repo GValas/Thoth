@@ -23,20 +23,14 @@ SabrVolatility::~SabrVolatility() = default;
 //! read own fields (per-maturity SABR params), then the common calendar
 void SabrVolatility::Configure( ObjectReader& reader )
 {
-    SetMaturityList( reader.Get<vector<double>>( "maturities" ) );
-    SetAlphaList( reader.Get<vector<double>>( "alpha" ) );
-    SetBetaList( reader.Get<vector<double>>( "beta" ) );
-    SetRhoList( reader.Get<vector<double>>( "rho" ) );
-    SetNuList( reader.Get<vector<double>>( "nu" ) );
-    ConfigureCommon( reader );
+    Volatility::Configure( reader ); //!< common fields first (optional calendar)
+    //! each list is one SABR parameter sampled at the maturities in _maturity_list
+    _maturity_list = reader.Get<vector<double>>( "maturities" );
+    _alpha_list = reader.Get<vector<double>>( "alpha" );
+    _beta_list = reader.Get<vector<double>>( "beta" );
+    _rho_list = reader.Get<vector<double>>( "rho" );
+    _nu_list = reader.Get<vector<double>>( "nu" );
 }
-
-// setters: each list is one SABR parameter sampled at the maturities in _maturity_list
-void SabrVolatility::SetMaturityList( const vector<double>& MaturityList ) { _maturity_list = MaturityList; }
-void SabrVolatility::SetAlphaList( const vector<double>& AlphaList ) { _alpha_list = AlphaList; }
-void SabrVolatility::SetBetaList( const vector<double>& BetaList ) { _beta_list = BetaList; }
-void SabrVolatility::SetRhoList( const vector<double>& RhoList ) { _rho_list = RhoList; }
-void SabrVolatility::SetNuList( const vector<double>& NuList ) { _nu_list = NuList; }
 
 //! linear interpolation in time of one parameter list, flat-extrapolated beyond
 //! the first/last quoted maturity. @param Values the per-maturity samples (same

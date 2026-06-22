@@ -20,14 +20,8 @@ BsVolatility::~BsVolatility() = default;
 //! read own field (flat vol), then the common calendar
 void BsVolatility::Configure( ObjectReader& reader )
 {
-    SetVolatility( reader.Get<double>( "volatility" ) );
-    ConfigureCommon( reader );
-}
-
-//! setter: vols are quoted in percent in the YAML books, so store as a decimal
-void BsVolatility::SetVolatility( double BsVolatility )
-{
-    _volatility = BsVolatility / 100; //!< 20 (%) -> 0.20
+    Volatility::Configure( reader );                              //!< common fields first (optional calendar)
+    _volatility = reader.Get<double>( "volatility" ) / 100; //!< quoted percent -> decimal (20 -> 0.20)
 }
 
 //! implied vol at any (strike, forward, maturity) — all three are ignored since

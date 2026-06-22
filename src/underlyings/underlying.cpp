@@ -7,7 +7,7 @@
 
 //! base ctor: forward name + kind to Asset and null the not-yet-injected handles.
 //! _correlation is set later via SetCorrelation; _currency is set by the concrete
-//! shape (e.g. Composite::SetCompoCurrency) so the base leaves it null.
+//! shape (e.g. Composite::Configure) so the base leaves it null.
 Underlying::Underlying( const string& ObjectName,
                         const string& ObjectKind ) : Asset( ObjectName, ObjectKind )
 {

@@ -13,11 +13,11 @@
 Contract::Contract( const string& ObjectName,
                     const string& ObjectKind ) : Object( ObjectName, ObjectKind ) {}
 
-//! attributes common to every contract (resolved after the concrete part)
-void Contract::ConfigureCommon( ObjectReader& reader )
+//! attributes common to every contract; each concrete Configure calls this base first
+void Contract::Configure( ObjectReader& reader )
 {
-    SetUnderlying( *reader.Ref<Underlying>( "underlying" ) );
-    SetPremiumCurrency( *reader.Ref<Currency>( "premium_currency" ) );
+    _underlying = reader.Ref<Underlying>( "underlying" );
+    _premium_currency = reader.Ref<Currency>( "premium_currency" );
 
     //! force underlying currency for a basket / rainbow (its rebased spot is
     //! dimensionless and settled in the premium currency)
@@ -29,18 +29,6 @@ void Contract::ConfigureCommon( ObjectReader& reader )
 
 //! destructor
 Contract::~Contract() = default;
-
-//! setter (non-owning: the underlying is owned by the object registry)
-void Contract::SetUnderlying( Underlying& Underlying )
-{
-    _underlying = &Underlying;
-}
-
-//! setter (non-owning)
-void Contract::SetPremiumCurrency( Currency& PremiumCurrency )
-{
-    _premium_currency = &PremiumCurrency;
-}
 
 //! cascade the valuation date: currency (curve roll) and underlying (spot/vol roll)
 //! must be re-anchored to Today before the base Object records it

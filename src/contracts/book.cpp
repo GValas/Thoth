@@ -17,13 +17,7 @@ Book::~Book() = default;
 //! read the list of contracts (resolved as Contract references)
 void Book::Configure( ObjectReader& reader )
 {
-    SetOptionList( reader.Ref<vector<Contract>>( "options" ) );
-}
-
-//! setter
-void Book::SetOptionList( const vector<Contract*>& OptionList )
-{
-    _option_list = OptionList;
+    _option_list = reader.Ref<vector<Contract>>( "options" );
 }
 
 //! setter

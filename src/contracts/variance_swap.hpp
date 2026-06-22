@@ -20,11 +20,6 @@ class VarianceSwap : public Contract
     //! read own fields from the configuration (maturity / volatility_strike / notional)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter
-    void SetMaturityDate( const date& MaturityDate );
-    void SetVolatilityStrike( double VolatilityStrike );
-    void SetNotional( double Notional );
-
     //! getter
     date GetMaturityDate() const override;
     double GetVolatilityStrike() const { return _volatility_strike; }

@@ -19,8 +19,6 @@ class Currency : public MarketData
     //! read own field (the discount/yield curve referenced by name)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter — bind the discount/yield curve (by address, not owned)
-    void SetRate( YieldCurve& Rate );
     //! propagate the valuation date into the wrapped curve (and base Object)
     void SetToday( const date& Today ) override;
 

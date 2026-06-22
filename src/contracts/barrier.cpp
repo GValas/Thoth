@@ -19,6 +19,7 @@ Barrier::~Barrier() = default;
 //! read own fields, then the common contract attributes
 void Barrier::Configure( ObjectReader& reader )
 {
+    Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
     _strike = reader.Get<double>( "strike" );
     _maturity_date = reader.Get<date>( "maturity" );
     _type = ParseOptionType( reader.Get<string>( "type" ) );
@@ -27,7 +28,6 @@ void Barrier::Configure( ObjectReader& reader )
     _monitoring_period_days = reader.Get<int>( "monitoring_period_days", 0 );
     _barrier_up_level = reader.Get<double>( "barrier_up_level", 0 );
     _barrier_down_level = reader.Get<double>( "barrier_down_level", 0 );
-    ConfigureCommon( reader );
 }
 
 //! getter

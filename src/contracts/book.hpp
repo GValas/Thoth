@@ -26,8 +26,6 @@ class Book : public Object
     //! read own field (the list of contracts priced together)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter — bind the contracts priced together as one book
-    void SetOptionList( const vector<Contract*>& OptionList );
     //! setter — store the aggregated premium (PV)
     void SetPremium( double Premium );
     //! setter — store the premium's MC standard error

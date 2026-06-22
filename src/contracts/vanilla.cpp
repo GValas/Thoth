@@ -30,36 +30,13 @@ Vanilla::~Vanilla() = default;
 //! read own fields, then the common contract attributes
 void Vanilla::Configure( ObjectReader& reader )
 {
-    SetStrike( reader.Get<double>( "strike" ) );
-    SetExerciseMode( ParseExerciseMode( reader.Get<string>( "exercise" ) ) );
-    SetMaturityDate( reader.Get<date>( "maturity" ) );
-    SetType( ParseOptionType( reader.Get<string>( "type" ) ) );
-    ConfigureCommon( reader );
+    Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
+    _strike = reader.Get<double>( "strike" );
+    _exercise_mode = ParseExerciseMode( reader.Get<string>( "exercise" ) );
+    _maturity_date = reader.Get<date>( "maturity" );
+    _type = ParseOptionType( reader.Get<string>( "type" ) );
 }
 
-//! setter
-void Vanilla::SetStrike( const double Strike )
-{
-    _strike = Strike;
-}
-
-//! setter
-void Vanilla::SetMaturityDate( const date& MaturityDate )
-{
-    _maturity_date = MaturityDate;
-}
-
-//! setter
-void Vanilla::SetExerciseMode( ExerciseMode Mode )
-{
-    _exercise_mode = Mode;
-}
-
-//! setter
-void Vanilla::SetType( OptionType Type )
-{
-    _type = Type;
-}
 
 //! getter
 double Vanilla::GetStrike() const

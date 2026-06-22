@@ -29,16 +29,9 @@ class HestonVolatility : public Volatility
     //! read own fields (Heston + optional Bates jumps), then the common calendar
     void Configure( ObjectReader& reader ) override;
 
-    //! setters
-    void SetSpot( double Spot ) { _spot = Spot; }
-    void SetV0( double V0 ) { _v0 = V0; }
-    void SetKappa( double Kappa ) { _kappa = Kappa; }
-    void SetTheta( double Theta ) { _theta = Theta; }
-    void SetXi( double Xi ) { _xi = Xi; }
+    //! spot/vol correlation: set via the !correlation_matrix (the SetStochasticRho
+    //! hook below), not from this object's own YAML — so it keeps a setter.
     void SetRho( double Rho ) { _rho = Rho; }
-    void SetJumpIntensity( double Lambda ) { _jump_intensity = Lambda; }
-    void SetJumpMean( double Mu ) { _jump_mean = Mu; }
-    void SetJumpVol( double Sigma ) { _jump_vol = Sigma; }
 
     //! getters (used by the MCL nodes and the ANA/PDE Heston pricers). The vega
     //! bump (_vol_shift) raises the whole vol level, so it shifts the variance

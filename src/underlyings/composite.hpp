@@ -31,10 +31,6 @@ class Composite : public Underlying
     //! read own fields (wrapped underlying + the composite/settlement currency)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter — set the composite/settlement currency (stored in the base _currency).
-    void SetCompoCurrency( Currency& CompositeCurrency );
-    //! setter — set the wrapped foreign-currency underlying.
-    void SetUnderlying( Underlying& Underlying );
     //! inject correlation; overridden to also propagate it into the wrapped underlying.
     void SetCorrelation( Correlation* Correlation ) override;
 

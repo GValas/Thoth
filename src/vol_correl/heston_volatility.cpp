@@ -24,18 +24,18 @@ HestonVolatility::~HestonVolatility() = default;
 //! read own fields (Heston + optional Bates jumps), then the common calendar
 void HestonVolatility::Configure( ObjectReader& reader )
 {
-    SetSpot( reader.Get<double>( "spot" ) );
+    Volatility::Configure( reader ); //!< common fields first (optional calendar)
+    _spot = reader.Get<double>( "spot" );
     //! vols quoted in percent (like every vol) -> variances
-    SetV0( pow( reader.Get<double>( "init_vol" ) / 100.0, 2 ) );
-    SetTheta( pow( reader.Get<double>( "long_vol" ) / 100.0, 2 ) );
-    SetKappa( reader.Get<double>( "kappa" ) );
-    SetXi( reader.Get<double>( "vol_of_vol" ) );
+    _v0 = pow( reader.Get<double>( "init_vol" ) / 100.0, 2 );
+    _theta = pow( reader.Get<double>( "long_vol" ) / 100.0, 2 );
+    _kappa = reader.Get<double>( "kappa" );
+    _xi = reader.Get<double>( "vol_of_vol" );
     //! optional Bates jumps (absent -> 0 -> pure Heston). jump_mean / jump_vol
     //! are in log-return space; jump_intensity is the yearly jump frequency.
-    SetJumpIntensity( reader.Get<double>( "jump_intensity", 0 ) );
-    SetJumpMean( reader.Get<double>( "jump_mean", 0 ) );
-    SetJumpVol( reader.Get<double>( "jump_vol", 0 ) );
-    ConfigureCommon( reader );
+    _jump_intensity = reader.Get<double>( "jump_intensity", 0 );
+    _jump_mean = reader.Get<double>( "jump_mean", 0 );
+    _jump_vol = reader.Get<double>( "jump_vol", 0 );
 }
 
 //! coarse single-number proxy (instantaneous vol, vega-bumped): used only by

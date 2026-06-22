@@ -14,9 +14,6 @@ class BsVolatility : public Volatility
     //! read own field (flat vol), then the common calendar
     void Configure( ObjectReader& reader ) override;
 
-    //! setter: stores the quoted vol (percent) as a decimal
-    void SetVolatility( double BsVolatility );
-
     //! flat implied vol: ignores strike/forward/maturity, returns
     //! (vol + vega shift) * day-weight
     double GetImplicitVol( const double Strike,

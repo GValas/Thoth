@@ -21,11 +21,6 @@ class SimpleFixingData : public Object
     //! read own fields (dates + values + the underlying name) from the book
     void Configure( ObjectReader& reader ) override;
 
-    //! setter
-    void SetDateList( const vector<date>& DateList );
-    void SetValueList( la_vector* ValueList ); //!< takes ownership of the raw vector
-    void SetUnderlying( const string& Underlying );
-
     //! getter
     const vector<date> GetDateList();
     la_vector* GetValueList(); //!< borrowed pointer (still owned by this object)

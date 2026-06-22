@@ -16,30 +16,11 @@ VarianceSwap::~VarianceSwap() = default;
 //! read own fields, then the common contract attributes
 void VarianceSwap::Configure( ObjectReader& reader )
 {
-    SetMaturityDate( reader.Get<date>( "maturity" ) );
+    Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
+    _maturity_date = reader.Get<date>( "maturity" );
     //! volatility_strike is in percent (like every vol), stored as decimal
-    SetVolatilityStrike( reader.Get<double>( "volatility_strike" ) / 100.0 );
-    SetNotional( reader.Get<double>( "notional", 1 ) );
-    ConfigureCommon( reader );
-}
-
-//! setters
-//! setter — maturity / single settlement date
-void VarianceSwap::SetMaturityDate( const date& MaturityDate )
-{
-    _maturity_date = MaturityDate;
-}
-
-//! setter — strike as a volatility (decimal); squared to a variance strike at use
-void VarianceSwap::SetVolatilityStrike( double VolatilityStrike )
-{
-    _volatility_strike = VolatilityStrike;
-}
-
-//! setter — variance notional (PV scales linearly in it)
-void VarianceSwap::SetNotional( double Notional )
-{
-    _notional = Notional;
+    _volatility_strike = reader.Get<double>( "volatility_strike" ) / 100.0;
+    _notional = reader.Get<double>( "notional", 1 );
 }
 
 //! getter

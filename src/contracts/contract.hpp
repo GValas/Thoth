@@ -36,16 +36,12 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     int _idx_underlying = 0;           // underling position
     int _idx_contract = 0;             // contract position
 
-    //! read the attributes common to every contract (underlying + premium
-    //! currency, with the basket/rainbow currency override). Called by each
-    //! concrete contract's Configure after it has read its own fields.
-    void ConfigureCommon( ObjectReader& reader );
-
   public:
-    //! setter — bind the referenced underlying (non-owning)
-    void SetUnderlying( Underlying& underlying );
-    //! setter — bind the settlement / discounting currency (non-owning)
-    void SetPremiumCurrency( Currency& premium_currency );
+    //! read the attributes common to every contract (underlying + premium currency,
+    //! with the basket/rainbow currency override). Each concrete contract's Configure
+    //! calls this base first, then reads its own fields.
+    void Configure( ObjectReader& reader ) override;
+
     //! propagate the valuation date down to the currency and underlying, then base
     void SetToday( const date& Today ) override;
     //! setter — supply the correlation object used to build the quanto adjustment

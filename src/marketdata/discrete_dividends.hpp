@@ -20,11 +20,6 @@ class DiscreteDividends : public MarketData
     //! read own fields (ex-dates + cash amounts)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter — the ascending ex-dividend dates
-    void SetDates( const vector<date>& Dates );
-    //! setter — the cash amounts (index-aligned with the ex-dates)
-    void SetAmounts( const vector<double>& Amounts );
-
     //! getter — ex-dividend dates (used by Equity to time the escrow PV)
     const vector<date>& GetDates() const;
     //! getter — cash amounts per ex-date (Equity discounts these on its curve)

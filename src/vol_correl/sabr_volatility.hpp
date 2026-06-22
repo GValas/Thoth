@@ -25,13 +25,6 @@ class SabrVolatility : public Volatility
     //! read own fields (per-maturity SABR params), then the common calendar
     void Configure( ObjectReader& reader ) override;
 
-    //! setters
-    void SetMaturityList( const vector<double>& MaturityList );
-    void SetAlphaList( const vector<double>& AlphaList );
-    void SetBetaList( const vector<double>& BetaList );
-    void SetRhoList( const vector<double>& RhoList );
-    void SetNuList( const vector<double>& NuList );
-
     //! Hagan-2002 lognormal SABR implied vol at (Strike, Forward, MaturityDate);
     //! Strike <= 0 is a sentinel meaning "ATM" (use the forward as strike)
     double GetImplicitVol( const double Strike,

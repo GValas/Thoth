@@ -16,12 +16,6 @@ class Vanilla : public Contract
     //! read own fields from the configuration (strike / maturity / type / exercise)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter
-    void SetStrike( const double Strike );
-    void SetMaturityDate( const date& MaturityDate );
-    void SetExerciseMode( ExerciseMode Mode );
-    void SetType( OptionType Type );
-
     //! getter
     [[nodiscard]] double GetStrike() const;
     date GetMaturityDate() const override;

@@ -24,20 +24,8 @@ Composite::~Composite() = default;
 //! "equity" is the foreign-quoted asset; "composite_currency" is the settlement ccy.
 void Composite::Configure( ObjectReader& reader )
 {
-    SetUnderlying( *reader.Ref<Underlying>( "equity" ) );
-    SetCompoCurrency( *reader.Ref<Currency>( "composite_currency" ) );
-}
-
-//! setter — the composite/settlement currency is kept in the base _currency slot.
-void Composite::SetCompoCurrency( Currency& CompositeCurrency )
-{
-    _currency = &CompositeCurrency;
-}
-
-//! setter — the wrapped foreign-currency underlying.
-void Composite::SetUnderlying( Underlying& Underlying )
-{
-    _underlying = &Underlying;
+    _underlying = reader.Ref<Underlying>( "equity" );          //!< wrapped foreign-ccy underlying
+    _currency = reader.Ref<Currency>( "composite_currency" ); //!< settlement ccy (base _currency slot)
 }
 
 //! getter — the wrapped underlying.

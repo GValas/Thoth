@@ -19,27 +19,9 @@ SimpleFixingData::~SimpleFixingData() = default;
 //! lists are parallel: dates[i] is the observation date of values[i].
 void SimpleFixingData::Configure( ObjectReader& reader )
 {
-    SetDateList( reader.Get<vector<date>>( "dates" ) );
-    SetValueList( reader.LaVector( "values" ) ); //!< LaVector reader yields an owned raw vector
-    SetUnderlying( reader.Get<string>( "underlying" ) );
-}
-
-//! setter
-void SimpleFixingData::SetDateList( const vector<date>& DateList )
-{
-    _date_list = DateList;
-}
-
-//! setter
-void SimpleFixingData::SetValueList( la_vector* ValueList )
-{
-    _value_list = ValueList;
-}
-
-//! setter
-void SimpleFixingData::SetUnderlying( const string& Underlying )
-{
-    _underlying = Underlying;
+    _date_list = reader.Get<vector<date>>( "dates" );
+    _value_list = reader.LaVector( "values" ); //!< LaVector reader yields an owned raw vector
+    _underlying = reader.Get<string>( "underlying" );
 }
 
 //! getter

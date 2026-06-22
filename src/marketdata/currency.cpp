@@ -16,13 +16,7 @@ Currency::~Currency() = default;
 //! "rate"); the curve itself is a separate book object resolved here by reference
 void Currency::Configure( ObjectReader& reader )
 {
-    SetRate( *reader.Ref<YieldCurve>( "rate" ) );
-}
-
-//! setter — bind the discount/yield curve by address (shared book object, not owned)
-void Currency::SetRate( YieldCurve& Rate )
-{
-    _rate = &Rate;
+    _rate = reader.Ref<YieldCurve>( "rate" ); //!< shared book object, not owned
 }
 
 //! setter — date this Object first, then push the same date into the wrapped curve so
