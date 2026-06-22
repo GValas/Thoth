@@ -64,31 +64,6 @@ void QuantoAdjustmentNode::SetUdlSpotNode( MonteCarloNode* N )
 {
     _udl_spot_node = N;
 }
-
-//! sigma_S node.
-MonteCarloNode* QuantoAdjustmentNode::GetUdlVolNode()
-{
-    return _udl_vol_node;
-}
-
-//! sigma_FX node.
-MonteCarloNode* QuantoAdjustmentNode::GetFxVolNode()
-{
-    return _fx_vol_node;
-}
-
-//! rho(S, FX) node.
-MonteCarloNode* QuantoAdjustmentNode::GetUdlFxCorrelNode()
-{
-    return _udl_fx_correl_node;
-}
-
-//! diffused-spot node.
-MonteCarloNode* QuantoAdjustmentNode::GetUdlSpotNode()
-{
-    return _udl_spot_node;
-}
-
 //! Declare the four inputs (vols, correlation, spot), all at this date index.
 void QuantoAdjustmentNode::GetDateDependencies( size_t DateIndex,
                                                 vector<MonteCarloNode*>& NodeList,

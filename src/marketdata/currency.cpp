@@ -39,12 +39,6 @@ YieldCurve* Currency::GetRate() const
     return _rate;
 }
 
-MonteCarloNode* Currency::GetDiscFactorNode( NodeCollector& /*NC*/ )
-{
-    //! discount-factor node is not implemented (and currently unused)
-    ERR( "currency '" + _name + "' : GetDiscFactorNode not implemented" );
-}
-
 MonteCarloNode* Currency::GetRateNode( NodeCollector& NC )
 {
     //! term-structured zero-rate node: the drift and the discounting both follow the

@@ -52,32 +52,6 @@ void CompositeCorrelNode::SetVolSIJNode( MonteCarloNode* N )
 {
     _vol_S_IJ_node = N;
 }
-
-MonteCarloNode* CompositeCorrelNode::GetRhoSABNode()
-{
-    return _rho_S_AB_node;
-}
-
-MonteCarloNode* CompositeCorrelNode::GetRhoIJABNode()
-{
-    return _rho_IJ_AB_node;
-}
-
-MonteCarloNode* CompositeCorrelNode::GetVolSnode()
-{
-    return _vol_S_node;
-}
-
-MonteCarloNode* CompositeCorrelNode::GetVolIJNode()
-{
-    return _vol_IJ_node;
-}
-
-MonteCarloNode* CompositeCorrelNode::GetVolSIJNode()
-{
-    return _vol_S_IJ_node;
-}
-
 //! the composite correlation reads all five inputs (two sub-correlations, three vols)
 //! at the same date
 void CompositeCorrelNode::GetDateDependencies( size_t DateIndex,

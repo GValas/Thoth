@@ -23,7 +23,6 @@ class BrownianNode : public MonteCarloNode
     void SetNoiseNode( MonteCarloNode* NoiseNode ); //!< wire the driving N(0,1) noise node
 
     //! getter
-    MonteCarloNode* GetNoiseNode(); //!< the driving noise node (graph wiring / inspection)
 
     BrownianNode( const string& Name );
     ~BrownianNode() override;

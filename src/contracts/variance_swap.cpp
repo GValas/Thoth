@@ -161,9 +161,3 @@ set<date> VarianceSwap::GetFlowDates()
 {
     return GetFixingDates();
 }
-
-//! no early exercise: same single date
-set<date> VarianceSwap::GetAmericanExerciseDates()
-{
-    return GetFixingDates();
-}

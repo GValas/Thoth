@@ -79,14 +79,6 @@ set<date> Barrier::GetFlowDates()
     return s;
 }
 
-//! European-style: the single exercise opportunity is maturity
-set<date> Barrier::GetAmericanExerciseDates()
-{
-    set<date> s;
-    s.insert( _maturity_date );
-    return s;
-}
-
 //! terminal payoff is the vanilla one (the trailing payoff_vanilla flags select a
 //! plain, un-digital, un-capped call/put); the knock-out is enforced by the grid
 //! boundary (continuous monitoring), so no special handling is needed here.

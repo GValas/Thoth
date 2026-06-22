@@ -89,15 +89,6 @@ set<date> Vanilla::GetFlowDates()
     return s;
 }
 
-//! exercise opportunities: maturity (an American's intermediate dates are supplied
-//! by the engine's grid; this is the terminal one)
-set<date> Vanilla::GetAmericanExerciseDates()
-{
-    set<date> s;
-    s.insert( _maturity_date );
-    return s;
-}
-
 //! terminal call/put payoff max(phi(S-K),0); the trailing payoff_vanilla flags
 //! select a plain (un-digital, un-capped) vanilla
 double Vanilla::Intrinsic( const double Spot )

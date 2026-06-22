@@ -23,11 +23,6 @@ class CompositeCorrelNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    MonteCarloNode* GetRhoSABNode();  //!< rho(S, AB) input node
-    MonteCarloNode* GetRhoIJABNode(); //!< rho(IJ, AB) input node
-    MonteCarloNode* GetVolSnode();    //!< vol(S) input node
-    MonteCarloNode* GetVolIJNode();   //!< vol(IJ) input node
-    MonteCarloNode* GetVolSIJNode();  //!< composite vol(S.IJ) input node
 
     //! setter
     void SetRhoSABNode( MonteCarloNode* N );  //!< wire rho(S, AB)

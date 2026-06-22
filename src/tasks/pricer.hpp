@@ -90,7 +90,6 @@ class Pricer : public Task
 
     //! dates & underlyings
     set<date> GetFixingDates();
-    vector<double> GetCorrelationMatrix();
 
     //! init objects before pricing
     void InitPricing();

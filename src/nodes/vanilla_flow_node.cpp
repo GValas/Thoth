@@ -58,19 +58,6 @@ void VanillaFlowNode::SetSpotNode( MonteCarloNode* N )
 {
     _spot_node = N;
 }
-
-//! the maturity (flow) date index.
-size_t VanillaFlowNode::GetFlowDateIndex()
-{
-    return _flow_date_index;
-}
-
-//! the underlying spot node.
-MonteCarloNode* VanillaFlowNode::GetSpotNode()
-{
-    return _spot_node;
-}
-
 //! Depend on the spot only at the flow date — there is no cash flow on other dates,
 //! so no dependency is declared there.
 void VanillaFlowNode::GetDateDependencies( size_t DateIndex,

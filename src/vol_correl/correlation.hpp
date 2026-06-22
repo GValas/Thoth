@@ -53,11 +53,8 @@ class Correlation : public MarketData
     void SetSymmetricMatrix( la_vector* SymmetricMatrix );
     void SetForexList( const vector<Forex*>& ForexList );
     void SetUnderlyingList( const vector<string>& UnderlyingList );
-    void SetSubMatrix( const vector<string>& UnderlyingList,
-                       const vector<string>& ForexList );
 
     //! access to matrix (ExtractMatrix returns a freshly-built, caller-owned matrix)
-    la_matrix* ExtractCholeskyMatrix( const vector<string>& UnderlyingNames );
     LaMatrix ExtractMatrix( const vector<string>& UnderlyingNameList,
                             const vector<Forex*>& ForexList );
 

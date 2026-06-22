@@ -30,10 +30,6 @@ class QuantoAdjustmentNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    MonteCarloNode* GetUdlVolNode();      //!< sigma_S node
-    MonteCarloNode* GetFxVolNode();       //!< sigma_FX node
-    MonteCarloNode* GetUdlFxCorrelNode(); //!< rho(S, FX) node
-    MonteCarloNode* GetUdlSpotNode();     //!< diffused-spot node
 
     //! setter
     void SetUdlVolNode( MonteCarloNode* N );      //!< wire sigma_S

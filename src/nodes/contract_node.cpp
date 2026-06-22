@@ -55,22 +55,6 @@ void ContractNode::SetRateCurveNode( MonteCarloNode* N )
 {
     _rate_curve_node = N;
 }
-
-vector<size_t> ContractNode::GetFlowDateIndexList()
-{
-    return _flow_date_index_list;
-}
-
-vector<MonteCarloNode*> ContractNode::GetFlowNodeList()
-{
-    return _flow_node_list;
-}
-
-MonteCarloNode* ContractNode::GetRateCurveNode()
-{
-    return _rate_curve_node;
-}
-
 //! independent of the valuation DateIndex: each flow is needed at its own pay date,
 //! together with the rate curve at that date for discounting
 void ContractNode::GetDateDependencies( size_t /*DateIndex*/,

@@ -21,10 +21,6 @@ class DriftNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    MonteCarloNode* GetDomesticRateNode(); //!< r_dom node (graph wiring / inspection)
-    MonteCarloNode* GetForeignRateNode();  //!< r_for node
-    MonteCarloNode* GetRepoNode();         //!< repo node
-    MonteCarloNode* GetDividendNode();     //!< dividend-yield node
 
     //! setter
     void SetDomesticRateNode( MonteCarloNode* N ); //!< wire r_dom (+)

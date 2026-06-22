@@ -81,8 +81,6 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
     virtual set<date> GetFixingDates() = 0;
     //! flow dates: dates on which a cash flow settles (drive GetNode's sub-trees)
     virtual set<date> GetFlowDates() = 0;
-    //! candidate early-exercise dates (American LSM); maturity-only for European
-    virtual set<date> GetAmericanExerciseDates() = 0;
 
     //! PDE / analytic / GPU pricing facets are inherited from pricing_facets.hpp:
     //!   PdePriceable : PDE_HasSolution + barrier / accrued-variance flags

@@ -427,13 +427,6 @@ void Correlation::ComputeCholeskyMatrix( const vector<string>& SingleNameList )
     _cholesky_key = key; //!< mark the sub-set this factor is now valid for
 }
 
-//!
-la_matrix* Correlation::ExtractCholeskyMatrix( const vector<string>& /*UnderlyingNames*/ )
-{
-    //! not implemented (and currently unused)
-    ERR( "correlation '" + _name + "' : ExtractCholeskyMatrix not implemented" );
-}
-
 //! rebuild the full index _single_list = [ underlyings..., forex names... ],
 //! matching the row/column order ExtractMatrix and GetValue assume.
 void Correlation::SetSingleList()

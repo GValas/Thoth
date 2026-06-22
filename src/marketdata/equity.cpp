@@ -190,14 +190,6 @@ double Equity::GetForward( const date& MaturityDate ) const
     return spot * exp( -dt * ( div + qto ) ) / df;
 }
 
-//! implied vol at (Strike, MaturityDate) — delegates to Single, which supplies this
-//! equity's forward to the surface so a forward-measure (SABR) surface reads correctly
-double Equity::GetImplicitVol( const double Strike,
-                               const date& MaturityDate )
-{
-    return Single::GetImplicitVol( Strike, MaturityDate );
-}
-
 //! Dupire local vol at (Strike, MaturityDate): reconstruct the surface's drift inputs
 //! — the zero rate r and the carry yield q (repo + continuous dividends, each optional)
 //! — and hand them with spot to the volatility object's local-vol formula
@@ -216,13 +208,6 @@ double Equity::GetLocalVolatility( const double Strike,
         q += _continuous_dividends->GetCurveValue( MaturityDate );
     }
     return _volatility->GetLocalVolatility( Strike, MaturityDate, _spot, r, q );
-}
-
-//! mcl spot-diffusion node — delegates to Single::GetNode, which wires the drift and
-//! (via GetDividendNode below) the discrete-dividend escrow into the diffusion
-MonteCarloNode* Equity::GetNode( NodeCollector& NC )
-{
-    return Single::GetNode( NC );
 }
 
 //! mcl drift node — sums the term-structured rate node minus the dividend and repo

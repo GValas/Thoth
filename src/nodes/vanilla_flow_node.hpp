@@ -28,8 +28,6 @@ class VanillaFlowNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    size_t GetFlowDateIndex();     //!< the maturity date index
-    MonteCarloNode* GetSpotNode(); //!< the underlying spot node
 
     //! setter
     void SetStrike( double Strike );           //!< set K

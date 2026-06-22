@@ -19,7 +19,3 @@ double WeightedMean( const double* W, const double* X, std::size_t N );
 
 //! unbiased weighted variance about a known mean       == gsl_stats_wvariance_m
 double WeightedVarianceM( const double* W, const double* X, std::size_t N, double Mean );
-
-//! weighted standard deviation about the (internally computed) weighted mean
-//!                                                      == gsl_stats_wsd
-double WeightedSd( const double* W, const double* X, std::size_t N );

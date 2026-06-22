@@ -45,27 +45,6 @@ void DriftNode::SetDividendRateNode( MonteCarloNode* N )
 {
     _dividend_node = N;
 }
-
-MonteCarloNode* DriftNode::GetDomesticRateNode()
-{
-    return _domestic_rate_node;
-}
-
-MonteCarloNode* DriftNode::GetForeignRateNode()
-{
-    return _foreign_rate_node;
-}
-
-MonteCarloNode* DriftNode::GetRepoNode()
-{
-    return _repo_node;
-}
-
-MonteCarloNode* DriftNode::GetDividendNode()
-{
-    return _dividend_node;
-}
-
 //! declare only the legs that are actually wired, so the topological sort does not
 //! depend on absent rate curves (mirrors the null-guarded sum in ComputeValue)
 void DriftNode::GetDateDependencies( size_t DateIndex,

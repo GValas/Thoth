@@ -17,15 +17,9 @@ class Book : public Object
     double _premium = 0;
     double _premium_trust = 0;
 
-    //! greeks: aggregated value + MC standard error for each
+    //! greeks: aggregated value (delta / gamma; the rest are per-contract)
     double _delta = 0;
-    double _delta_trust = 0;
     double _gamma = 0;
-    double _gamma_trust = 0;
-    double _vega_bs = 0; //!< closed-form (Black-Scholes) vega
-    double _vega_trust = 0;
-    double _volga_bs = 0; //!< closed-form (Black-Scholes) volga
-    double _volga_trust = 0;
 
     //
   public:
@@ -51,15 +45,12 @@ class Book : public Object
     double GetPremiumTrust() const;
     double GetDelta() const;
     double GetGamma() const;
-    double GetVegaBS() const;
-    double GetVolgaBS() const;
 
     //! mcl — the BookNode summing the contract nodes (in their own currencies)
     MonteCarloNode* GetNode( NodeCollector& NC );
 
     //! access data — unions over the contracts
     set<date> GetFixingDates();
-    set<date> GetAmericanExerciseDates(); //! for american exercise
 
     //! the union of single names referenced by the book's contracts
     SingleSet GetSingleSet() const;

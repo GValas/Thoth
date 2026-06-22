@@ -68,18 +68,12 @@ class Equity : public Single
     //! carry (rate - continuous div - repo), all consistent with ANA/PDE/MCL
     double GetForward( const date& MaturityDate ) const override;
 
-    //! implicit vol — the implied vol at (Strike, MaturityDate); delegates to Single,
-    //! which feeds the forward to a forward-measure (SABR) surface
-    double GetImplicitVol( const double Strike,
-                           const date& MaturityDate );
-
     //! Dupire local vol at (Strike, MaturityDate), evaluated with this equity's spot,
     //! rate r and carry yield q (= repo + continuous dividends, each optional)
     double GetLocalVolatility( const double Strike,
                                const date& MaturityDate ) override;
 
-    //! mcl node — the spot-diffusion node (delegates to Single)
-    MonteCarloNode* GetNode( NodeCollector& NC ) override;
+    //! mcl nodes — drift (r - q - repo) and the discrete-dividend escrow
     MonteCarloNode* GetDriftNode( NodeCollector& NC ) override;
     MonteCarloNode* GetDividendNode( NodeCollector& NC ) override; //!< escrow node when discrete divs present
 

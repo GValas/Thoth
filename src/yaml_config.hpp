@@ -134,11 +134,9 @@ class YamlConfig
 
     //! list getters : the node must be a YAML sequence; each element is converted
     //! to the requested type (one typed error message on any failure).
-    vector<bool> GetBooleanList( const string& Path );
     vector<string> GetStringList( const string& Path );
     vector<double> GetDoubleList( const string& Path );
     la_vector* GetLaVector( const string& Path ); //!< caller owns the returned raw vector
-    vector<int> GetIntegerList( const string& Path );
     vector<date> GetDateList( const string& Path );
 
     //! unified typed read: ONE type -> getter switch over the named getters above, so
@@ -163,14 +161,10 @@ class YamlConfig
             return GetDate( Path );
         else if constexpr ( std::is_same_v<T, vector<double>> )
             return GetDoubleList( Path );
-        else if constexpr ( std::is_same_v<T, vector<int>> )
-            return GetIntegerList( Path );
         else if constexpr ( std::is_same_v<T, vector<date>> )
             return GetDateList( Path );
         else if constexpr ( std::is_same_v<T, vector<string>> )
             return GetStringList( Path );
-        else if constexpr ( std::is_same_v<T, vector<bool>> )
-            return GetBooleanList( Path );
         else
             static_assert( unsupported<T>, "YamlConfig::Get: unsupported type" );
     }
@@ -253,8 +247,6 @@ class YamlConfig
     bool IsInteger( const string& Path );
     bool IsStringList( const string& Path );
     bool IsDoubleList( const string& Path );
-    bool IsBooleanList( const string& Path );
-    bool IsIntegerList( const string& Path );
 
     //! local YAML tag of the node at Path, without the leading '!' (e.g. "equity"
     //! for `!equity`); "" if the node is missing or carries no local tag. Objects

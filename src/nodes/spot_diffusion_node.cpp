@@ -109,25 +109,6 @@ void SpotDiffusionNode::SetSpot( double Spot )
     _spot = Spot;
     _value_list[0] = _spot;
 }
-
-//! Brownian W node.
-MonteCarloNode* SpotDiffusionNode::GetBrownianNode()
-{
-    return _brownian_node;
-}
-
-//! drift node.
-MonteCarloNode* SpotDiffusionNode::GetDriftNode()
-{
-    return _drift_node;
-}
-
-//! vol node.
-MonteCarloNode* SpotDiffusionNode::GetLocalVolNode()
-{
-    return _local_vol_node;
-}
-
 //! Date 0 (the spot today) is identical on every path, so mark it constant; the
 //! engine then evaluates it once instead of per path.
 bool SpotDiffusionNode::IsConstant( size_t DateIndex )

@@ -27,8 +27,6 @@ class Currency : public MarketData
     //! getter — the wrapped discount/yield curve
     YieldCurve* GetRate() const;
 
-    //! mcl node — discount-factor leg (not implemented / currently unused)
-    MonteCarloNode* GetDiscFactorNode( NodeCollector& NC );
     //! mcl node — term-structured zero-rate leg feeding the drift and discounting
     MonteCarloNode* GetRateNode( NodeCollector& NC );
 

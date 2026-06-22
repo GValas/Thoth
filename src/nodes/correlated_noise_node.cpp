@@ -35,17 +35,6 @@ void CorrelatedNoiseNode::PushCholeskyNode( MonteCarloNode* N )
 {
     _cholesky_node_list.push_back( N );
 }
-
-vector<MonteCarloNode*> CorrelatedNoiseNode::GetNoiseNodeList()
-{
-    return _noise_node_list;
-}
-
-vector<MonteCarloNode*> CorrelatedNoiseNode::GetCholeskyNodeList()
-{
-    return _cholesky_node_list;
-}
-
 //! each term of the dot product needs its noise and its Cholesky coefficient at the
 //! same date
 void CorrelatedNoiseNode::GetDateDependencies( size_t DateIndex,

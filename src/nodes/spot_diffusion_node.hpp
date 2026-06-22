@@ -44,9 +44,6 @@ class SpotDiffusionNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getters
-    MonteCarloNode* GetLocalVolNode(); //!< per-step vol node
-    MonteCarloNode* GetBrownianNode(); //!< Brownian W node
-    MonteCarloNode* GetDriftNode();    //!< cumulative-carry drift node
 
     //! setters
     void SetLocalVolNode( MonteCarloNode* N ); //!< wire the (local/constant) vol

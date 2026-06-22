@@ -27,12 +27,6 @@ void BrownianNode::SetNoiseNode( MonteCarloNode* NoiseNode )
 {
     _noise_node = NoiseNode;
 }
-
-MonteCarloNode* BrownianNode::GetNoiseNode()
-{
-    return _noise_node;
-}
-
 //! W(0)=0 is path-independent, so the scheduler treats date 0 as a constant
 bool BrownianNode::IsConstant( size_t DateIndex )
 {

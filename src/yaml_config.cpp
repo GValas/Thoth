@@ -411,29 +411,6 @@ vector<double> YamlConfig::GetDoubleList( const string& Path )
                             { return n.as<double>(); } );
 }
 
-vector<int> YamlConfig::GetIntegerList( const string& Path )
-{
-    return GetList<int>( Path, "integer vector",
-                         []( const YAML::Node& n )
-                         {
-                             try
-                             {
-                                 return n.as<int>();
-                             }
-                             catch ( ... )
-                             {
-                                 return (int)n.as<double>(); //!< autoconvert float -> int
-                             }
-                         } );
-}
-
-vector<bool> YamlConfig::GetBooleanList( const string& Path )
-{
-    return GetList<bool>( Path, "boolean vector",
-                          []( const YAML::Node& n )
-                          { return n.as<bool>(); } );
-}
-
 //! read a YAML sequence of doubles into a freshly allocated la_vector and hand
 //! ownership to the caller (legacy raw-owning contract). Differs from
 //! GetDoubleList only in the return container.
@@ -496,20 +473,10 @@ bool YamlConfig::IsInteger( const string& Path )
     return Probe( [&]
                   { GetInteger( Path ); } );
 }
-bool YamlConfig::IsIntegerList( const string& Path )
-{
-    return Probe( [&]
-                  { GetIntegerList( Path ); } );
-}
 bool YamlConfig::IsBoolean( const string& Path )
 {
     return Probe( [&]
                   { GetBoolean( Path ); } );
-}
-bool YamlConfig::IsBooleanList( const string& Path )
-{
-    return Probe( [&]
-                  { GetBooleanList( Path ); } );
 }
 
 //! ----------------------------------------------------------------------

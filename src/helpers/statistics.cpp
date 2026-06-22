@@ -37,8 +37,3 @@ double WeightedVarianceM( const double* W, const double* X, std::size_t N, doubl
     //! unbiased weighting factor V1 / (V1^2 - V2), matching gsl_stats_wvariance_m
     return s * ( sw / ( sw * sw - sw2 ) );
 }
-
-double WeightedSd( const double* W, const double* X, std::size_t N )
-{
-    return std::sqrt( WeightedVarianceM( W, X, N, WeightedMean( W, X, N ) ) );
-}

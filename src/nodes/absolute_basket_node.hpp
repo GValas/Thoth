@@ -19,7 +19,6 @@ class AbsoluteBasketNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    vector<MonteCarloNode*> GetUnderlyingNodeList(); //!< the component spot nodes (graph wiring / inspection)
 
     //! setter
     void PushUnderlying( MonteCarloNode* N ); //!< append one component spot node (paired with PushWeight)

@@ -20,9 +20,6 @@ class CompositeVolNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    MonteCarloNode* GetRhoSXNode(); //!< rho(S, X) input node
-    MonteCarloNode* GetVolSNode();  //!< vol(S) input node
-    MonteCarloNode* GetVolXNode();  //!< vol(X) input node
 
     //! setter
     void SetRhoSXNode( MonteCarloNode* N ); //!< wire rho(S, X)

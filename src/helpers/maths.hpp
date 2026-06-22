@@ -120,42 +120,9 @@ void ext_la_matrix_to_near_positive( la_matrix* m,
 //! a unit-diagonal correlation matrix — shrinks correlations toward the identity.
 void ext_la_matrix_shift_to_epsilon( la_matrix* m,
                                      double eps );
-void ext_la_matrix_from_symmetric( la_matrix* m );
-void ext_la_matrix_to_symmetric( la_matrix* m );
-
 //! sum of all elements of v
 double ext_la_vector_sum( la_vector* v );
 
-//! weighted correlation cov / sqrt(var1*var2), given precomputed weighted means
-//! and variances. (Strided overload mirroring the GSL signature.)
-double ext_stats_wcorrelation_m_v( const double w[],
-                                   const double data1[],
-                                   const size_t stride1,
-                                   const double data2[],
-                                   const size_t stride2,
-                                   const size_t n,
-                                   const double wmean1,
-                                   const double wmean2,
-                                   const double wvar1,
-                                   const double wvar2 );
-
-//! computes the weighted covariance, given means
-double ext_stats_wcovariance_m_v( const double w[],
-                                  size_t wstride,
-                                  const double data1[],
-                                  size_t stride1,
-                                  const double data2[],
-                                  size_t stride2,
-                                  size_t n,
-                                  double wmean1,
-                                  double wmean2 );
-
-//! Flatten a full n x n matrix to its strict upper-triangle (the n(n-1)/2
-//! off-diagonal correlations), the compact storage used in config/transport.
-vector<double> ToSymmetricMatrix( const vector<double>& Matrix );
-//! Inverse of ToSymmetricMatrix: expand the n(n-1)/2 packed off-diagonals back to
-//! a full row-major n x n matrix with 1s on the diagonal.
-vector<double> FromSymmetricMatrix( const vector<double>& Matrix );
 LaMatrix ToLaMatrix( const vector<double>& Matrix ); //!< caller-owned (RAII)
 //! Flatten an la_matrix to a row-major std::vector.
 vector<double> FromLaMatrix( la_matrix* Matrix );
@@ -164,16 +131,3 @@ vector<double> FromLaMatrix( la_matrix* Matrix );
 //! evaluate at x_point (clamped to the data range). Natural = zero 2nd derivative
 //! at both ends (correct for a non-periodic PDE price profile). x_serie ascending.
 double InterpolateWithSpline( la_vector* x_serie, la_vector* y_serie, double x_point );
-
-//! computes the weighted correlation, given means and variances
-double ext_stats_wcorrelation_m_v( const double w[],
-                                   size_t wstride,
-                                   const double data1[],
-                                   size_t stride1,
-                                   const double data2[],
-                                   size_t stride2,
-                                   size_t n,
-                                   double wmean1,
-                                   double wmean2,
-                                   double wvariance1,
-                                   double wvariance2 );

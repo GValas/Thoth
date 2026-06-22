@@ -24,8 +24,6 @@ class BookNode : public MonteCarloNode
     void PushForexNode( MonteCarloNode* N );    //!< append the matching FX node (null = same currency)
 
     //! getter
-    vector<MonteCarloNode*> GetContractNodeList(); //!< the contract nodes (graph wiring / inspection)
-    vector<MonteCarloNode*> GetForexNodeList();    //!< the FX nodes, index-aligned with the contracts
 
     BookNode( const string& Name );
     ~BookNode() override;

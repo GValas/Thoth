@@ -20,8 +20,6 @@ class CorrelatedNoiseNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    vector<MonteCarloNode*> GetNoiseNodeList();    //!< the independent noise nodes (graph wiring)
-    vector<MonteCarloNode*> GetCholeskyNodeList(); //!< the Cholesky-row coefficient nodes
 
     //! setter
     void PushNoiseNode( MonteCarloNode* N );    //!< append one independent noise (paired with PushCholeskyNode)

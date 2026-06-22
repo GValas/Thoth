@@ -328,48 +328,6 @@ bool ext_la_matrix_is_positive( const la_matrix* m )
     return CholeskyDecomposeLower( A );
 }
 
-//! full n x n -> packed strict upper triangle (row-major), the n(n-1)/2
-//! off-diagonal entries; n is recovered as sqrt(size).
-vector<double> ToSymmetricMatrix( const vector<double>& Matrix )
-{
-    vector<double> v;
-    size_t n = (size_t)sqrt( (double)Matrix.size() );
-    for ( size_t i = 0; i < n - 1; i++ )
-    {
-        for ( size_t j = i + 1; j < n; j++ )
-        {
-            v.push_back( Matrix[i * n + j] );
-        }
-    }
-    return v;
-}
-
-//! symmetric to full matrix: expand the packed upper triangle back to n x n.
-vector<double> FromSymmetricMatrix( const vector<double>& Matrix )
-{
-    vector<double> v;
-    size_t n = Matrix.size();                   // packed size n(n-1)/2 ...
-    n = (size_t)( 1 + sqrt( 1 + 8. * n ) ) / 2; // ... inverted to the side length n
-    for ( size_t i = 0; i < n; i++ )
-    {
-        for ( size_t j = 0; j < n; j++ )
-        {
-            if ( i == j )
-            {
-                v.push_back( 1 ); //!< unit diagonal (correlation matrix)
-            }
-            else
-            {
-                //! map (i,j) to its packed index in the upper triangle, using the
-                //! larger-of-(i,j) row offset r(r-1)/2 plus the smaller column
-                size_t k = ( i > j ) ? i * ( i - 1 ) / 2 + j : j * ( j - 1 ) / 2 + i;
-                v.push_back( Matrix[k] );
-            }
-        }
-    }
-    return v;
-}
-
 //!
 double InterpolateWithSpline( la_vector* x_serie,
                               la_vector* y_serie,
@@ -470,59 +428,6 @@ la_matrix* ext_la_vector_to_matrix( const la_vector* v,
         }
     }
     return m;
-}
-
-//! computes the weighted correlation, given means and variances
-double ext_stats_wcorrelation_m_v( const double w[],
-                                   size_t wstride,
-                                   const double data1[],
-                                   size_t stride1,
-                                   const double data2[],
-                                   size_t stride2,
-                                   size_t n,
-                                   double wmean1,
-                                   double wmean2,
-                                   double wvariance1,
-                                   double wvariance2 )
-{
-    double cov = ext_stats_wcovariance_m_v( w,
-                                            wstride,
-                                            data1,
-                                            stride1,
-                                            data2,
-                                            stride2,
-                                            n,
-                                            wmean1,
-                                            wmean2 );
-
-    //! correlation = covariance / (sd1 * sd2)
-    return cov / sqrt( wvariance1 * wvariance2 );
-}
-
-//! computes the weighted covariance, given means
-double ext_stats_wcovariance_m_v( const double weights[],
-                                  size_t wstride,
-                                  const double data1[],
-                                  size_t stride1,
-                                  const double data2[],
-                                  size_t stride2,
-                                  size_t n,
-                                  double wmean1,
-                                  double wmean2 )
-{
-    double sum = 0;    //!< sum w (x1-m1)(x2-m2)
-    double sum_w2 = 0; //!< V2 = sum w^2
-    double sum_w = 0;  //!< V1 = sum w
-    for ( size_t k = 0; k < n; k++ )
-    {
-        double w = weights[k * wstride];
-        sum += w * ( data1[k * stride1] - wmean1 ) * ( data2[k * stride2] - wmean2 );
-        sum_w += w;
-        sum_w2 += w * w;
-    }
-    //! unbiased reliability weight V1/(V1^2 - V2) (matches gsl_stats_wcovariance_m)
-    double bias = sum_w / ( sum_w * sum_w - sum_w2 );
-    return sum * bias;
 }
 
 //! in-place lower-triangular Cholesky factorisation: A = L * L^T, with L written

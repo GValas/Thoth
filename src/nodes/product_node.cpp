@@ -8,13 +8,6 @@ ProductNode::ProductNode( const string& Name ) : MonteCarloNode( Name )
 }
 
 ProductNode::~ProductNode() = default;
-
-//! the factor children, in push order (copy).
-vector<MonteCarloNode*> ProductNode::GetNodeList()
-{
-    return _node_list;
-}
-
 //! append a factor child and its exponent, keeping the two parallel lists aligned.
 void ProductNode::PushNode( MonteCarloNode* N,
                             double Pow )

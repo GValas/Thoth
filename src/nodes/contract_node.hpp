@@ -20,9 +20,6 @@ class ContractNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    vector<size_t> GetFlowDateIndexList();     //!< the flow date indices (graph wiring / inspection)
-    vector<MonteCarloNode*> GetFlowNodeList(); //!< the flow nodes, index-aligned with the dates
-    MonteCarloNode* GetRateCurveNode();        //!< the discounting rate curve node
 
     //! setters
     //! append a flow node together with the date index on which it pays

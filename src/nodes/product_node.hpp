@@ -24,7 +24,6 @@ class ProductNode : public MonteCarloNode
                               vector<size_t>& DateList ) override;
 
     //! getter
-    vector<MonteCarloNode*> GetNodeList(); //!< the factor children (copy)
 
     //! setter
     //! append a factor child N with exponent Pow (paired into the two parallel lists)

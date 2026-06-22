@@ -47,7 +47,6 @@ class Vanilla : public Contract
     //! fixing dates (single observation at maturity)
     set<date> GetFixingDates() override;
     set<date> GetFlowDates() override;
-    set<date> GetAmericanExerciseDates() override;
 
     //! constructeur / destructeur
     Vanilla( const string& ObjectName );

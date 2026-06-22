@@ -39,17 +39,6 @@ void BookNode::PushForexNode( MonteCarloNode* N )
 {
     _forex_node_list.push_back( N );
 }
-
-vector<MonteCarloNode*> BookNode::GetContractNodeList()
-{
-    return _contract_node_list;
-}
-
-vector<MonteCarloNode*> BookNode::GetForexNodeList()
-{
-    return _forex_node_list;
-}
-
 //! the book at DateIndex reads each contract premium at DateIndex, and the FX node
 //! at DateIndex when one is attached for that contract (same-currency legs have none)
 void BookNode::GetDateDependencies( size_t DateIndex,

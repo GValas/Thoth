@@ -50,8 +50,3 @@ void AbsoluteBasketNode::GetDateDependencies( size_t DateIndex,
         DateList.push_back( DateIndex );
     }
 }
-
-vector<MonteCarloNode*> AbsoluteBasketNode::GetUnderlyingNodeList()
-{
-    return _underlying_node_list;
-}

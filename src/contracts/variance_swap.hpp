@@ -51,7 +51,6 @@ class VarianceSwap : public Contract
     //! dates (single payment at maturity)
     set<date> GetFixingDates() override;
     set<date> GetFlowDates() override;
-    set<date> GetAmericanExerciseDates() override;
 
     //! constructor / destructor
     VarianceSwap( const string& ObjectName );

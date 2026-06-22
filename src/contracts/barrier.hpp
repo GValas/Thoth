@@ -82,8 +82,6 @@ class Barrier : public Contract
     set<date> GetFixingDates() override;
     //! flow dates: the single settlement at maturity
     set<date> GetFlowDates() override;
-    //! no early exercise: maturity only
-    set<date> GetAmericanExerciseDates() override;
 
     //! constructeur / destructeur
     Barrier( const string& ObjectName );

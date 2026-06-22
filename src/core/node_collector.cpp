@@ -232,10 +232,7 @@ void NodeCollector::PriceNodes()
         size_t j = _date_index_list[i]; //!< the date index this entry evaluates at
         N->ComputeValue( j );           //!< the node's value for this draw at date j
         N->UpdateIndicators( j );       //!< update running stats (barrier hits, max/min, ...)
-        // double x = N->GetValue( j );
-        // cout << N->GetName() << "@" << to_simple_string( _date_list[j] )  << " = " << x << endl;
     }
-    // cout << " ------------------------- " << endl;
 }
 
 //! debug : the node graph reachable from Root as Graphviz dot text. One node per

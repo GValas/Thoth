@@ -90,18 +90,6 @@ double Book::GetGamma() const
     return _gamma;
 }
 
-//! getter
-double Book::GetVegaBS() const
-{
-    return _vega_bs;
-}
-
-//! getter
-double Book::GetVolgaBS() const
-{
-    return _volga_bs;
-}
-
 //! get fixing dates from each contract
 set<date> Book::GetFixingDates()
 {
@@ -109,18 +97,6 @@ set<date> Book::GetFixingDates()
     for ( Contract* c : _option_list )
     {
         set<date> s = c->GetFixingDates();
-        set_dates.insert( s.begin(), s.end() );
-    }
-    return set_dates;
-}
-
-//! return american exercise dates
-set<date> Book::GetAmericanExerciseDates()
-{
-    set<date> set_dates;
-    for ( Contract* c : _option_list )
-    {
-        set<date> s = c->GetAmericanExerciseDates();
         set_dates.insert( s.begin(), s.end() );
     }
     return set_dates;

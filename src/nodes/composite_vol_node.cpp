@@ -35,22 +35,6 @@ void CompositeVolNode::SetVolXNode( MonteCarloNode* N )
 {
     _vol_X_node = N;
 }
-
-MonteCarloNode* CompositeVolNode::GetRhoSXNode()
-{
-    return _rho_SX_node;
-}
-
-MonteCarloNode* CompositeVolNode::GetVolSNode()
-{
-    return _vol_S_node;
-}
-
-MonteCarloNode* CompositeVolNode::GetVolXNode()
-{
-    return _vol_X_node;
-}
-
 //! the composite vol reads the correlation and both component vols at the same date
 void CompositeVolNode::GetDateDependencies( size_t DateIndex,
                                             vector<MonteCarloNode*>& NodeList,
