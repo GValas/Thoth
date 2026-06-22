@@ -1,6 +1,5 @@
 #include "thoth.hpp"
 #include "barrier.hpp"
-#include "distributions.hpp"
 #include "enums.hpp"
 #include "object_reader.hpp"
 
@@ -127,9 +126,9 @@ bool Barrier::ANA_HasSolution()
            _underlying->IsGriddable();
 }
 
-//! Reiner-Rubinstein closed-form barrier price for a single spot value.
-//! Knock-out values are obtained from the knock-in ones through in/out parity
-//! (vanilla = knock_in + knock_out), so a single set of formulas is needed.
+//! Reiner-Rubinstein closed-form barrier price for a single spot value: decode this
+//! contract's flavour (call/put, down/up, in/out, active level) and delegate to the
+//! finance-module formula — mirroring how Vanilla::ANA_EvalPrice calls BS_*_Price.
 double Barrier::ANA_BarrierPrice( double S,
                                   double r,
                                   double b,
@@ -137,88 +136,12 @@ double Barrier::ANA_BarrierPrice( double S,
                                   double t,
                                   double df )
 {
-    //! decode the barrier flavour into the three booleans the formula needs
     bool is_call = ( _type == OptionType::Call );
     bool is_down = ( _barrier_type == BarrierType::DownAndOut ||
                      _barrier_type == BarrierType::DownAndIn );
     bool is_in = IsKnockIn( _barrier_type );
     double H = is_down ? _barrier_down_level : _barrier_up_level; //!< active barrier
-    double K = _strike;
-
-    //! vanilla reference (consistent with Vanilla::ANA_EvalPrice). Used both for the
-    //! degenerate fallback and to recover the knock-out via parity (vanilla = in+out)
-    double fwd = S * exp( b * t );
-    double vanilla = is_call ? BS_Call_Price( fwd, K, t, v, df )
-                             : BS_Put_Price( fwd, K, t, v, df );
-
-    //! degenerate inputs : the diffusion collapses, so a knock-in can never trigger
-    //! (value 0) and a knock-out is the full vanilla
-    if ( v <= 0 || t <= 0 || S <= 0 || H <= 0 )
-    {
-        return is_in ? 0.0 : vanilla;
-    }
-
-    //! barrier already breached at valuation: a knock-in is now a live vanilla, a
-    //! knock-out is dead (value 0)
-    bool breached = is_down ? ( S <= H ) : ( S >= H );
-    if ( breached )
-    {
-        return is_in ? vanilla : 0.0;
-    }
-
-    //! Reiner-Rubinstein building blocks (Haug, "Option Pricing Formulas").
-    //! phi = call/put sign, eta = down/up sign, mu the drift in log-moneyness units.
-    double phi = is_call ? 1.0 : -1.0;
-    double eta = is_down ? 1.0 : -1.0;
-    double sqt = v * sqrt( t );                  //!< total std dev to maturity
-    double mu = ( b - 0.5 * v * v ) / ( v * v ); //!< drift / variance (per-unit-time)
-
-    //! the four standardised log-distances; x* measure to the strike/barrier, y* are
-    //! their images reflected across the barrier (the method-of-images terms)
-    double x1 = log( S / K ) / sqt + ( 1 + mu ) * sqt;
-    double x2 = log( S / H ) / sqt + ( 1 + mu ) * sqt;
-    double y1 = log( H * H / ( S * K ) ) / sqt + ( 1 + mu ) * sqt;
-    double y2 = log( H / S ) / sqt + ( 1 + mu ) * sqt;
-
-    double Sbr = S * exp( ( b - r ) * t ); //!< S e^{(b-r)t} = fwd * df
-    double Kdf = K * df;
-    double pHS_p1 = pow( H / S, 2 * ( mu + 1 ) ); //!< image reflection weight (asset leg)
-    double pHS_m = pow( H / S, 2 * mu );          //!< image reflection weight (cash leg)
-
-    //! A,B = plain truncated-vanilla terms; C,D = their barrier-reflected images.
-    //! Each is asset leg (Sbr * N) minus cash leg (Kdf * N), in Haug's notation.
-    auto A = [&]()
-    { return phi * Sbr * NormalCdf( phi * x1 ) - phi * Kdf * NormalCdf( phi * ( x1 - sqt ) ); };
-    auto B = [&]()
-    { return phi * Sbr * NormalCdf( phi * x2 ) - phi * Kdf * NormalCdf( phi * ( x2 - sqt ) ); };
-    auto C = [&]()
-    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y1 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y1 - sqt ) ); };
-    auto D = [&]()
-    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y2 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y2 - sqt ) ); };
-
-    //! knock-in value (rebate = 0). The A/B/C/D combination depends on the barrier
-    //! type AND on whether the strike sits beyond the barrier (K vs H), which decides
-    //! how the payoff region intersects the reflected one — Haug's case table.
-    double knock_in;
-    if ( is_call && is_down )
-    {
-        knock_in = ( K > H ) ? C() : A() - B() + D();
-    }
-    else if ( is_call && !is_down ) //!< up
-    {
-        knock_in = ( K > H ) ? A() : B() - C() + D();
-    }
-    else if ( !is_call && is_down ) //!< down put
-    {
-        knock_in = ( K > H ) ? B() - C() + D() : A();
-    }
-    else //!< up put
-    {
-        knock_in = ( K > H ) ? A() - B() + D() : C();
-    }
-
-    //! knock-out by in/out parity: vanilla = knock_in + knock_out
-    return is_in ? knock_in : vanilla - knock_in;
+    return Barrier_Price( S, r, b, v, t, df, H, _strike, is_call, is_down, is_in );
 }
 
 //! closed-form barrier pricing (premium + finite-difference spot greeks)

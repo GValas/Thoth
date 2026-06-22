@@ -11,53 +11,13 @@
 //!   - 3 moments -> Shifted-Lognormal (SLN), which captures skew via a shift D
 //! LN_to_M4 computes the basket's raw moments from the per-asset forwards/vols and
 //! the correlation matrix; the M*_to_* routines invert moments back to proxy
-//! parameters; the *_Call/Put_Price routines then price under the proxy.
+//! parameters. The proxy closed-form prices (IG / LN / SLN call) live in finance.hpp
+//! alongside the other analytic option prices.
 //!
 //! The rest of the file is the dense-linear-algebra toolkit (Cholesky, tridiagonal
 //! solve, OLS, near-PD correlation repair, cubic spline, weighted stats) carried
 //! over from GSL, operating on the la_vector / la_matrix containers.
 //! ----------------------------------------------------------------------
-
-//! Inverse-gamma proxy call price (2-moment match). Alpha/Beta are the IG shape
-//! and scale from M2_to_IG. Forward-measure: df discounts the payoff.
-double IG_Call_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double Alpha,
-                      const double Beta );
-
-//! Lognormal proxy call price (2-moment match). Mu unused (the forward pins the
-//! mean); Var is the lognormal variance from M2_to_LN. = Black-76 in (Var) form.
-double LN_Call_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double Mu,
-                      const double Var );
-
-//! Lognormal proxy put price via put/call parity.
-double LN_Put_Price( const double Forward,
-                     const double Strike,
-                     const double DiscountFactor,
-                     const double Mu,
-                     const double Var );
-
-//! Shifted-lognormal proxy call price (3-moment match): the underlying is
-//! D + lognormal(Mu, Var), so the shift D injects skew. Mu/Var/D come from
-//! M3_to_SLN.
-double SLN_Call_Price( const double Forward,
-                       const double Strike,
-                       const double DiscountFactor,
-                       const double Mu,
-                       const double Var,
-                       const double D );
-
-//! Shifted-lognormal proxy put price via put/call parity.
-double SLN_Put_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double Mu,
-                      const double Var,
-                      const double D );
 
 //! Invert the first two raw moments (M1 mean, M2) to inverse-gamma (Alpha, Beta).
 void M2_to_IG( const double M1,

@@ -66,20 +66,6 @@ void LN_to_M4( la_vector* Fwds,
     }
 }
 
-//! inverse gamma call price: if 1/S ~ Gamma(Alpha, Beta) then S is inverse-gamma;
-//! the call is df*(F*G1 - K*G2) with G1, G2 gamma CDFs at 1/K under shifted shapes
-//! (the Alpha-1 shift comes from the extra S factor in the first integral).
-double IG_Call_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double Alpha,
-                      const double Beta )
-{
-    double G1 = GammaCdf( 1 / Strike, Alpha - 1, Beta );
-    double G2 = GammaCdf( 1 / Strike, Alpha, Beta );
-    return DiscountFactor * ( Forward * G1 - Strike * G2 );
-}
-
 //! method-of-moments inversion (M1, M2) -> inverse-gamma (Alpha shape, Beta scale)
 void M2_to_IG( const double M1,
                const double M2,
@@ -90,33 +76,6 @@ void M2_to_IG( const double M1,
     //! moment-matching equations (shape from the variance-to-mean ratio)
     Alpha = ( 2 * M2 - M1 * M1 ) / ( M2 - M1 * M1 );
     Beta = ( M2 - M1 * M1 ) / ( M2 * M1 );
-}
-
-//! lognormal call price = Black-76 with TOTAL variance Var (= sigma^2 T); here Var
-//! already aggregates the maturity, so d1/d2 use Var directly (no extra *T).
-double LN_Call_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double /*Mu*/,
-                      const double Var )
-{
-    //! d1 = [ln(F/K) + Var/2] / sqrt(Var), d2 = [ln(F/K) - Var/2] / sqrt(Var)
-    double d1 = ( log( Forward / Strike ) + Var / 2 ) / sqrt( Var );
-    double d2 = ( log( Forward / Strike ) - Var / 2 ) / sqrt( Var );
-    double Nd1 = NormalCdf( d1 );
-    double Nd2 = NormalCdf( d2 );
-    return DiscountFactor * ( Forward * Nd1 - Strike * Nd2 );
-}
-
-double LN_Put_Price( const double Forward,
-                     const double Strike,
-                     const double DiscountFactor,
-                     const double Mu,
-                     const double Var )
-{
-    //! put/call parity P = C - df*(F - K)
-    double c = LN_Call_Price( Forward, Strike, DiscountFactor, Mu, Var );
-    return c - DiscountFactor * ( Forward - Strike );
 }
 
 //! (M1, M2) -> lognormal total variance Var = ln(M2 / M1^2). Mu is implied by the
@@ -172,48 +131,6 @@ void M3_to_SLN( const double M1,
     D = E1 - z;                                         //!< the SLN shift
     Mu = log( z * z / sqrt( max( 0.0, E2 + z * z ) ) ); //!< lognormal log-mean
     Var = log( 1 + E2 / ( z * z ) );                    //!< lognormal log-variance
-}
-
-//! shifted lognormal call price
-double SLN_Call_Price( const double /*Forward*/,
-                       const double Strike,
-                       const double DiscountFactor,
-                       const double Mu,
-                       const double Var,
-                       const double D )
-{
-    //! shift already above the strike: the lognormal part (always > 0) keeps the
-    //! option in-the-money with certainty, so the price is the discounted forward
-    //! value D + E[lognormal] - K (E[lognormal] = exp(Mu + Var/2))
-    if ( D >= Strike )
-    {
-        return DiscountFactor * ( D + exp( Mu + 0.5 * Var ) - Strike );
-    }
-
-    else
-    {
-        //! otherwise a Black-76 on the SHIFTED strike (Strike - D): the lognormal
-        //! variable must exceed (Strike - D) for the option to pay
-        double v = sqrt( Var );
-        double d1 = ( -log( Strike - D ) + Mu + Var ) / v;
-        double d2 = d1 - v;
-        double Nd1 = NormalCdf( d1 );
-        double Nd2 = NormalCdf( d2 );
-        return DiscountFactor * ( exp( Mu + 0.5 * Var ) * Nd1 - ( Strike - D ) * Nd2 );
-    }
-}
-
-//! shifted lognormal put price
-double SLN_Put_Price( const double Forward,
-                      const double Strike,
-                      const double DiscountFactor,
-                      const double Mu,
-                      const double Var,
-                      const double D )
-{
-    //! put/call parity P = C - df*(F - K)
-    double c = SLN_Call_Price( Forward, Strike, DiscountFactor, Mu, Var, D );
-    return c - DiscountFactor * ( Forward - Strike );
 }
 
 //! test if matrix is square

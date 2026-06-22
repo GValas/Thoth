@@ -199,6 +199,97 @@ double BS_Volga( const double Forward,
     }
 }
 
+//! Reiner-Rubinstein continuously-monitored single-barrier price (zero rebate). See
+//! the header for the parameter contract. Knock-out is recovered from knock-in via
+//! in/out parity, so only the knock-in formulas are written out here.
+double Barrier_Price( const double S,
+                      const double r,
+                      const double b,
+                      const double v,
+                      const double t,
+                      const double df,
+                      const double H,
+                      const double K,
+                      const bool is_call,
+                      const bool is_down,
+                      const bool is_in )
+{
+    //! vanilla reference (the same BS_*_Price the deterministic-vol path uses). Used
+    //! both for the degenerate fallback and to recover the knock-out by parity.
+    double fwd = S * exp( b * t );
+    double vanilla = is_call ? BS_Call_Price( fwd, K, t, v, df )
+                             : BS_Put_Price( fwd, K, t, v, df );
+
+    //! degenerate inputs : the diffusion collapses, so a knock-in can never trigger
+    //! (value 0) and a knock-out is the full vanilla
+    if ( v <= 0 || t <= 0 || S <= 0 || H <= 0 )
+    {
+        return is_in ? 0.0 : vanilla;
+    }
+
+    //! barrier already breached at valuation: a knock-in is now a live vanilla, a
+    //! knock-out is dead (value 0)
+    bool breached = is_down ? ( S <= H ) : ( S >= H );
+    if ( breached )
+    {
+        return is_in ? vanilla : 0.0;
+    }
+
+    //! Reiner-Rubinstein building blocks (Haug, "Option Pricing Formulas").
+    //! phi = call/put sign, eta = down/up sign, mu the drift in log-moneyness units.
+    double phi = is_call ? 1.0 : -1.0;
+    double eta = is_down ? 1.0 : -1.0;
+    double sqt = v * sqrt( t );                  //!< total std dev to maturity
+    double mu = ( b - 0.5 * v * v ) / ( v * v ); //!< drift / variance (per-unit-time)
+
+    //! the four standardised log-distances; x* measure to the strike/barrier, y* are
+    //! their images reflected across the barrier (the method-of-images terms)
+    double x1 = log( S / K ) / sqt + ( 1 + mu ) * sqt;
+    double x2 = log( S / H ) / sqt + ( 1 + mu ) * sqt;
+    double y1 = log( H * H / ( S * K ) ) / sqt + ( 1 + mu ) * sqt;
+    double y2 = log( H / S ) / sqt + ( 1 + mu ) * sqt;
+
+    double Sbr = S * exp( ( b - r ) * t ); //!< S e^{(b-r)t} = fwd * df
+    double Kdf = K * df;
+    double pHS_p1 = pow( H / S, 2 * ( mu + 1 ) ); //!< image reflection weight (asset leg)
+    double pHS_m = pow( H / S, 2 * mu );          //!< image reflection weight (cash leg)
+
+    //! A,B = plain truncated-vanilla terms; C,D = their barrier-reflected images.
+    //! Each is asset leg (Sbr * N) minus cash leg (Kdf * N), in Haug's notation.
+    auto A = [&]()
+    { return phi * Sbr * NormalCdf( phi * x1 ) - phi * Kdf * NormalCdf( phi * ( x1 - sqt ) ); };
+    auto B = [&]()
+    { return phi * Sbr * NormalCdf( phi * x2 ) - phi * Kdf * NormalCdf( phi * ( x2 - sqt ) ); };
+    auto C = [&]()
+    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y1 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y1 - sqt ) ); };
+    auto D = [&]()
+    { return phi * Sbr * pHS_p1 * NormalCdf( eta * y2 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y2 - sqt ) ); };
+
+    //! knock-in value (rebate = 0). The A/B/C/D combination depends on the barrier
+    //! type AND on whether the strike sits beyond the barrier (K vs H), which decides
+    //! how the payoff region intersects the reflected one — Haug's case table.
+    double knock_in;
+    if ( is_call && is_down )
+    {
+        knock_in = ( K > H ) ? C() : A() - B() + D();
+    }
+    else if ( is_call && !is_down ) //!< up
+    {
+        knock_in = ( K > H ) ? A() : B() - C() + D();
+    }
+    else if ( !is_call && is_down ) //!< down put
+    {
+        knock_in = ( K > H ) ? B() - C() + D() : A();
+    }
+    else //!< up put
+    {
+        knock_in = ( K > H ) ? A() - B() + D() : C();
+    }
+
+    //! knock-out by in/out parity: vanilla = knock_in + knock_out
+    return is_in ? knock_in : vanilla - knock_in;
+}
+
 //! fair (annualised) variance: trapezoidal integral of the OTM-option strip
 //! g(K) = OTM(K)/K^2 over the caller-supplied strike grid (puts below the forward,
 //! calls above), scaled by 2/(T*df). The grid may be non-uniform.
@@ -414,4 +505,69 @@ double Heston_Put_Price( const double Forward,
     double c = Heston_Call_Price( Forward, Strike, TimeToMaturity, DiscountFactor,
                                   V0, Kappa, Theta, Xi, Rho, JumpIntensity, JumpMean, JumpVol );
     return c - DiscountFactor * ( Forward - Strike );
+}
+
+//! ----------------------------------------------------------------------
+//! analytic basket (moment-matched) proxy call prices. The moment computation and
+//! the moment -> proxy-parameter inversion live in maths.hpp (LN_to_M4 / M*_to_*);
+//! these take the resulting proxy parameters and return the closed-form price.
+//! ----------------------------------------------------------------------
+
+//! inverse gamma call price: if 1/S ~ Gamma(Alpha, Beta) then S is inverse-gamma;
+//! the call is df*(F*G1 - K*G2) with G1, G2 gamma CDFs at 1/K under shifted shapes
+//! (the Alpha-1 shift comes from the extra S factor in the first integral).
+double IG_Call_Price( const double Forward,
+                      const double Strike,
+                      const double DiscountFactor,
+                      const double Alpha,
+                      const double Beta )
+{
+    double G1 = GammaCdf( 1 / Strike, Alpha - 1, Beta );
+    double G2 = GammaCdf( 1 / Strike, Alpha, Beta );
+    return DiscountFactor * ( Forward * G1 - Strike * G2 );
+}
+
+//! lognormal call price = Black-76 with TOTAL variance Var (= sigma^2 T); here Var
+//! already aggregates the maturity, so d1/d2 use Var directly (no extra *T).
+double LN_Call_Price( const double Forward,
+                      const double Strike,
+                      const double DiscountFactor,
+                      const double /*Mu*/,
+                      const double Var )
+{
+    //! d1 = [ln(F/K) + Var/2] / sqrt(Var), d2 = [ln(F/K) - Var/2] / sqrt(Var)
+    double d1 = ( log( Forward / Strike ) + Var / 2 ) / sqrt( Var );
+    double d2 = ( log( Forward / Strike ) - Var / 2 ) / sqrt( Var );
+    double Nd1 = NormalCdf( d1 );
+    double Nd2 = NormalCdf( d2 );
+    return DiscountFactor * ( Forward * Nd1 - Strike * Nd2 );
+}
+
+//! shifted lognormal call price
+double SLN_Call_Price( const double /*Forward*/,
+                       const double Strike,
+                       const double DiscountFactor,
+                       const double Mu,
+                       const double Var,
+                       const double D )
+{
+    //! shift already above the strike: the lognormal part (always > 0) keeps the
+    //! option in-the-money with certainty, so the price is the discounted forward
+    //! value D + E[lognormal] - K (E[lognormal] = exp(Mu + Var/2))
+    if ( D >= Strike )
+    {
+        return DiscountFactor * ( D + exp( Mu + 0.5 * Var ) - Strike );
+    }
+
+    else
+    {
+        //! otherwise a Black-76 on the SHIFTED strike (Strike - D): the lognormal
+        //! variable must exceed (Strike - D) for the option to pay
+        double v = sqrt( Var );
+        double d1 = ( -log( Strike - D ) + Mu + Var ) / v;
+        double d2 = d1 - v;
+        double Nd1 = NormalCdf( d1 );
+        double Nd2 = NormalCdf( d2 );
+        return DiscountFactor * ( exp( Mu + 0.5 * Var ) * Nd1 - ( Strike - D ) * Nd2 );
+    }
 }
