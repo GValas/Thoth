@@ -2,6 +2,8 @@
 #include "underlying.hpp"
 #include "volatility.hpp"
 
+//! single.hpp — the single-name underlying (base of Equity / Forex).
+//!
 //! A single tradable name (base of Equity / Forex): an Asset with a spot and a
 //! volatility surface. Provides the implied / Dupire local vol and builds the MCL
 //! spot-diffusion node (constant-vol, or a local-vol grid for a SABR surface).
@@ -14,16 +16,21 @@ class Single : public Underlying
 {
 
   protected:
+    //! the volatility surface (flat BS, local/SABR, or stochastic/Heston); non-owning
     Volatility* _volatility;
+    //! current spot price of the name
     double _spot = 0;
 
   public:
     // setter
+    //! setter — the spot price
     void SetSpot( double Spot );
+    //! setter — bind the volatility surface (by address)
     void SetVolatility( Volatility& Volatility );
+    //! propagate the valuation date into the vol surface, then up the Asset chain
     void SetToday( const date& Today ) override;
 
-    //! getter
+    //! getter — current spot price
     double GetSpot() const override;
 
     //! the spot the MCL diffusion starts from. Defaults to the plain spot; an
@@ -41,9 +48,13 @@ class Single : public Underlying
     //! the PDE recover the observed spot (escrowed value + this) for early exercise.
     virtual double FutureDividendPv( const date& /*AsOf*/ ) const { return 0; }
 
+    //! getter — the bound volatility surface
     Volatility* GetVolatility() const;
+    //! Dupire local vol at (Strike, MaturityDate); supplied by the concrete name
+    //! (Equity reconstructs r and the carry yield; Forex returns its flat vol)
     virtual double GetLocalVolatility( const double Strike,
                                        const date& MaturityDate ) = 0;
+    //! implied vol at (Strike, MaturityDate); feeds the name's forward to the surface
     double GetImplicitVol( const double Strike,
                            const date& MaturityDate ) override;
 
@@ -84,7 +95,11 @@ class Single : public Underlying
     //! overrides it.
     virtual MonteCarloNode* GetDividendNode( NodeCollector& /*NC*/ ) { return nullptr; }
 
+    //! build the spot-diffusion node (GBM, Heston, or local-vol grid; wires drift,
+    //! noise, dividends and vol). The top-level MCL node for this name.
     virtual MonteCarloNode* GetNode( NodeCollector& NC );
+    //! a scalar vol node for the callers that need a single representative level
+    //! (quanto correction, composite vol/correl); an ATM constant for a local surface
     MonteCarloNode* GetVolNode( NodeCollector& NC );
 
     //! build a LocalVolatilityNode that samples the Dupire local-vol surface onto

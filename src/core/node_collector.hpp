@@ -2,6 +2,8 @@
 
 #include "nodes.hpp"
 
+//! node_collector.hpp — the Monte-Carlo node graph owner and evaluator interface.
+
 //! Owns and wires the Monte-Carlo node graph: builds/looks up nodes by name
 //! (GetOrCreate, with per-Greek-scenario suffixing), holds the diffusion-date
 //! schedule, topologically sorts the DAG (SortNodes) and evaluates it per path
@@ -10,11 +12,11 @@ class NodeCollector
 {
 
   private:
-    date _today;
-    set<date> _diffusion_dates;
-    vector<date> _date_list;
-    map<date, date> _previous_diffusion_dates;
-    map<date, size_t> _index_date_map;
+    date _today;                               //!< valuation date = first diffusion date
+    set<date> _diffusion_dates;                //!< the ascending schedule as provided
+    vector<date> _date_list;                   //!< index -> date (the array nodes step over)
+    map<date, date> _previous_diffusion_dates; //!< date -> immediately preceding date
+    map<date, size_t> _index_date_map;         //!< date -> index (reverse of _date_list)
 
     map<string, std::unique_ptr<MonteCarloNode>> _node_map; //!< owns every node
     map<string, BrownianNode*> _brownian_node_map;          //!< non-owning view
@@ -23,6 +25,9 @@ class NodeCollector
     bool _scenario_bumps_rate = false; //!< scenario bumps rates (rho)
     bool _scenario_bumps_vol = false;  //!< scenario bumps vols (vega)
 
+    //! the evaluation schedule produced by SortNodes and consumed by PriceNodes:
+    //! two parallel arrays forming a flat list of (node, date-index) work items in
+    //! topological order (every dependency precedes the node that reads it).
     //! (node,index)
     vector<MonteCarloNode*> _node_list;
     vector<size_t> _date_index_list;
@@ -39,6 +44,9 @@ class NodeCollector
     };
     vector<PathRecord> _records;
 
+    //! ownership sinks shared by the public New*Node helpers: PushNode adopts any
+    //! node into _node_map (and hands it the date schedule); PushBrownianNode also
+    //! adds the non-owning Brownian index. Private so all creation goes through New*.
     void PushNode( std::unique_ptr<MonteCarloNode> N );
     void PushBrownianNode( std::unique_ptr<BrownianNode> N );
 
@@ -125,9 +133,10 @@ class NodeCollector
 
     //! brownian is special: also indexed in the non-owning _brownian_node_map
     BrownianNode* NewBrownianNode( const string& Name );
-    ProductNode* NewProductNode( const string& Name );
+    ProductNode* NewProductNode( const string& Name ); //!< build a product (payoff) node
 
-    //! getter
+    //! getter — by name, nullptr on miss (no insertion, so a typo cannot pollute the
+    //! owning map with a null slot). _brownian variant returns the typed view.
     MonteCarloNode* GetNode( const string& Name );
     BrownianNode* GetBrownianNode( const string& Name );
 
@@ -140,10 +149,11 @@ class NodeCollector
         return dynamic_cast<T*>( GetNode( Name ) );
     }
 
-    //! log
+    //! log — number of owned nodes (graph size), for diagnostics
     size_t GetNodeNumber();
 
-    //!
+    //! the diffusion date immediately before AsOfDate (errors if AsOfDate is not a
+    //! known diffusion date) — used by diffusion nodes to step from the prior date.
     date PreviousDiffusionDate( const date& AsOfDate );
 
     //! debug : the node graph reachable from Root (the nodes priced for one tree)
@@ -152,13 +162,13 @@ class NodeCollector
     //! emitted in name order so the output is deterministic.
     string GraphDot( MonteCarloNode* Root ) const;
 
-    //! pricing
-    void SortNodes( MonteCarloNode& RootNode );
+    //! pricing — build the evaluation schedule, then run it per path
+    void SortNodes( MonteCarloNode& RootNode ); //!< single-root convenience overload
     //! topologically sort the union DAG reachable from several roots into one
     //! evaluation schedule (shared nodes appear once) — used so the base tree
     //! and every Greek-bump sub-tree are priced in a single path sweep.
     void SortNodes( const vector<MonteCarloNode*>& Roots );
-    void PriceNodes();
+    void PriceNodes(); //!< evaluate the sorted schedule for the current draw
 
     //! path recording (American / path-dependent) — opt-in, no effect when unused
     void StartRecording( MonteCarloNode* Node,
@@ -171,6 +181,8 @@ class NodeCollector
     vector<size_t> DiffusionIndicesUpTo( const date& Maturity ) const;
 
     //!
+    //! constructor / destructor — the destructor frees every owned node via the
+    //! unique_ptr in _node_map (the Brownian index is non-owning).
     NodeCollector();
     ~NodeCollector();
 };

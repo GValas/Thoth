@@ -13,6 +13,10 @@ DriftNode::DriftNode( const string& Name ) : MonteCarloNode( Name )
 
 DriftNode::~DriftNode() = default;
 
+//! risk-neutral log-drift = r_dom - r_for - repo - dividend. Each leg is optional:
+//! a null node contributes 0 (e.g. a non-FX equity has no foreign rate). The spot
+//! diffusion grows the log-spot at this rate; for term-structured curves the value
+//! here is the cumulative carry to the date (see HestonSpotNode / SpotDiffusionNode).
 void DriftNode::ComputeValue( size_t DateIndex )
 {
     _value_list[DateIndex] =
@@ -62,6 +66,8 @@ MonteCarloNode* DriftNode::GetDividendNode()
     return _dividend_node;
 }
 
+//! declare only the legs that are actually wired, so the topological sort does not
+//! depend on absent rate curves (mirrors the null-guarded sum in ComputeValue)
 void DriftNode::GetDateDependencies( size_t DateIndex,
                                      vector<MonteCarloNode*>& NodeList,
                                      vector<size_t>& DateList )

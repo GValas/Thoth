@@ -2,7 +2,9 @@
 #include "curve.hpp"
 #include "object_reader.hpp"
 
-//!
+//! curve.cpp — Curve implementation: pillar ingestion, rate interpolation, MCL node.
+
+//! constructor — forwards name/kind to MarketData; pillars are filled in Configure
 Curve::Curve( const string& ObjectName,
               const string& ObjectKind ) : MarketData( ObjectName, ObjectKind )
 {
@@ -11,21 +13,25 @@ Curve::Curve( const string& ObjectName,
 //! _value_list is owned by its LaVector wrapper; nothing to free by hand
 Curve::~Curve() = default;
 
-//! read the term-structure pillars (dates + values)
+//! read the term-structure pillars (dates + values) from the YAML fields "dates" and
+//! "values"; values are taken raw here and rescaled in SetValueList
 void Curve::Configure( ObjectReader& reader )
 {
     SetDateList( reader.Get<vector<date>>( "dates" ) );
     SetValueList( reader.LaVector( "values" ) );
 }
 
-//! setter
+//! setter — validate the dates are strictly ascending (CheckDateList errors otherwise)
+//! then store them as the curve abscissae
 void Curve::SetDateList( const vector<date>& DateList )
 {
     CheckDateList( DateList );
     _date_list = DateList;
 }
 
-//! setter
+//! setter — adopt the pillar values, then rescale from percent to decimal: the YAML
+//! quotes rates in percent (e.g. 3.0), so x 0.01 turns them into the decimal rates
+//! (0.03) the interpolation and exp(-r dt) discounting expect
 void Curve::SetValueList( la_vector* ValueList )
 {
     _value_list = ValueList;

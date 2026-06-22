@@ -17,8 +17,9 @@
 //! ----------------------------------------------------------------------
 class Rng
 {
-    std::uint64_t _s[4];
+    std::uint64_t _s[4]; //!< 256-bit xoshiro state (must not be all-zero)
 
+    //! 64-bit left bit-rotation by K (the xoshiro scrambler primitive)
     static inline std::uint64_t Rotl( std::uint64_t X, int K )
     {
         return ( X << K ) | ( X >> ( 64 - K ) );

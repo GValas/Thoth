@@ -1,11 +1,20 @@
+//! sabr_volatility.cpp — SABR implied-vol surface via Hagan's 2002 expansion.
+//!
+//! The SABR model is dF = alpha F^beta dW, d alpha = nu alpha dZ, d<W,Z> = rho dt.
+//! Hagan et al. give a closed-form asymptotic for the Black (lognormal) implied
+//! vol as a function of (F, K, T) and the 4 params (alpha, beta, rho, nu). Here
+//! those params are term-structured (one set per maturity, linearly interpolated)
+//! and the surface is consumed as a local-vol surface (Dupire) by the PDE pricer.
+
 #include "thoth.hpp"
 #include "sabr_volatility.hpp"
 #include "object_reader.hpp"
 
-//!
+//! constructor: SABR is exposed as a *local-vol* surface, so the PDE pricer runs
+//! it through GetLocalVolatility (Dupire) rather than reading a single number.
 SabrVolatility::SabrVolatility( const string& ObjectName ) : Volatility( ObjectName, KIND_SABR_VOLATILITY )
 {
-    _is_local = true;
+    _is_local = true; //!< Dupire-transformed by the PDE; no constant-vol MC node
 }
 
 //!
@@ -22,23 +31,27 @@ void SabrVolatility::Configure( ObjectReader& reader )
     ConfigureCommon( reader );
 }
 
+// setters: each list is one SABR parameter sampled at the maturities in _maturity_list
 void SabrVolatility::SetMaturityList( const vector<double>& MaturityList ) { _maturity_list = MaturityList; }
 void SabrVolatility::SetAlphaList( const vector<double>& AlphaList ) { _alpha_list = AlphaList; }
 void SabrVolatility::SetBetaList( const vector<double>& BetaList ) { _beta_list = BetaList; }
 void SabrVolatility::SetRhoList( const vector<double>& RhoList ) { _rho_list = RhoList; }
 void SabrVolatility::SetNuList( const vector<double>& NuList ) { _nu_list = NuList; }
 
-//! linear interpolation in time, flat beyond the first/last maturity
+//! linear interpolation in time of one parameter list, flat-extrapolated beyond
+//! the first/last quoted maturity. @param Values the per-maturity samples (same
+//! length/order as _maturity_list), @param T target time in years.
 double SabrVolatility::Interp( const vector<double>& Values, double T ) const
 {
     if ( T <= _maturity_list.front() )
     {
-        return Values.front();
+        return Values.front(); //!< flat before the first pillar
     }
     if ( T >= _maturity_list.back() )
     {
-        return Values.back();
+        return Values.back(); //!< flat after the last pillar
     }
+    //! find the bracketing pillars [i-1, i] and lerp with weight w in [0,1)
     for ( size_t i = 1; i < _maturity_list.size(); i++ )
     {
         if ( T <= _maturity_list[i] )
@@ -47,7 +60,7 @@ double SabrVolatility::Interp( const vector<double>& Values, double T ) const
             return Values[i - 1] + w * ( Values[i] - Values[i - 1] );
         }
     }
-    return Values.back();
+    return Values.back(); //!< unreachable (T < back() guaranteed above)
 }
 
 //! Hagan (2002) lognormal SABR implied volatility
@@ -70,15 +83,19 @@ double SabrVolatility::GetImplicitVol( const double Strike,
     double rho = Interp( _rho_list, T ) + ParamShift( "rho" );
     double nu = Interp( _nu_list, T ) + ParamShift( "nu" );
 
-    double one_mb = 1.0 - beta;
-    double log_fk = log( F / K );
-    double fk_pow = pow( F * K, one_mb / 2.0 );
+    //! Hagan building blocks. The implied vol factorises as
+    //!   sigma_B(K,F) = (alpha / den) * (z / x(z)) * (1 + [...] T)
+    double one_mb = 1.0 - beta;                 //!< (1 - beta), recurs throughout
+    double log_fk = log( F / K );               //!< log-moneyness
+    double fk_pow = pow( F * K, one_mb / 2.0 ); //!< (F K)^{(1-beta)/2}
 
-    //! denominator series in log(F/K)
+    //! leading denominator: the (1-beta) series in log(F/K) (Hagan eq. for the
+    //! "geometric-mean" pre-factor); -> fk_pow as K -> F (ATM)
     double den = fk_pow * ( 1.0 + one_mb * one_mb / 24.0 * log_fk * log_fk +
                             one_mb * one_mb * one_mb * one_mb / 1920.0 * log_fk * log_fk * log_fk * log_fk );
 
-    //! z / x(z) -> 1 as z -> 0 (ATM limit)
+    //! the z / x(z) wing factor captures the skew from vol-of-vol; z/x(z) -> 1 as
+    //! z -> 0, so guard the ATM limit explicitly to avoid 0/0.
     double z = ( nu / alpha ) * fk_pow * log_fk;
     double zxz = 1.0;
     if ( fabs( z ) > 1e-12 )
@@ -87,13 +104,14 @@ double SabrVolatility::GetImplicitVol( const double Strike,
         zxz = z / xz;
     }
 
-    //! time-correction factor
+    //! time-correction bracket (multiplies T): three O(T) terms — CEV curvature
+    //! (beta), the alpha-nu-rho cross term (skew), and the pure vol-of-vol term.
     double corr = 1.0 + ( one_mb * one_mb / 24.0 * alpha * alpha / pow( F * K, one_mb ) +
                           0.25 * rho * beta * nu * alpha / fk_pow +
                           ( 2.0 - 3.0 * rho * rho ) / 24.0 * nu * nu ) *
                             T;
 
-    //! + vega bump shift (parallel shift of the implied surface), if any
+    //! assemble Hagan's vol, then add the parallel vega bump (0 in normal pricing)
     return ( alpha / den ) * zxz * corr + _vol_shift;
 }
 

@@ -4,6 +4,12 @@
 #include "enums.hpp"
 #include "object_reader.hpp"
 
+//! Barrier option implementation: configuration, monitoring schedule, the
+//! Reiner-Rubinstein closed form (continuous monitoring, in/out parity) and the
+//! Monte-Carlo flow node (with a Broadie-Glasserman-Kou continuity correction for
+//! continuous monitoring on a discrete diffusion grid).
+
+//! constructor — tags the contract with the barrier KIND
 Barrier::Barrier( const string& ObjectName ) : Contract( ObjectName, KIND_BARRIER )
 {
 }
@@ -48,6 +54,10 @@ set<date> Barrier::GetMonitoringDates()
     return s;
 }
 
+//! spot observations the diffusion must produce. Maturity is always needed for the
+//! terminal payoff; a discrete barrier additionally needs every monitoring date so
+//! the engine can test the level there. (Continuous monitoring uses every diffusion
+//! date and so does not enlarge this set.)
 set<date> Barrier::GetFixingDates()
 {
     set<date> s;
@@ -61,6 +71,7 @@ set<date> Barrier::GetFixingDates()
     return s;
 }
 
+//! the only cash flow settles at maturity
 set<date> Barrier::GetFlowDates()
 {
     set<date> s;
@@ -68,6 +79,7 @@ set<date> Barrier::GetFlowDates()
     return s;
 }
 
+//! European-style: the single exercise opportunity is maturity
 set<date> Barrier::GetAmericanExerciseDates()
 {
     set<date> s;
@@ -75,7 +87,8 @@ set<date> Barrier::GetAmericanExerciseDates()
     return s;
 }
 
-//! terminal payoff is the vanilla one; the knock-out is enforced by the grid
+//! terminal payoff is the vanilla one (the trailing payoff_vanilla flags select a
+//! plain, un-digital, un-capped call/put); the knock-out is enforced by the grid
 //! boundary (continuous monitoring), so no special handling is needed here.
 double Barrier::Intrinsic( const double spot )
 {
@@ -90,21 +103,25 @@ bool Barrier::PDE_HasSolution()
     return _underlying->IsGriddable();
 }
 
+//! a Barrier always is one (trivially true; lets the PDE engine branch on type)
 bool Barrier::PDE_IsBarrier()
 {
     return true;
 }
 
+//! knock-in vs knock-out (the engine prices KO and applies in/out parity for KI)
 bool Barrier::PDE_IsKnockIn()
 {
     return IsKnockIn( _barrier_type );
 }
 
+//! up barrier (H above spot) vs down barrier (H below spot)
 bool Barrier::PDE_IsUpBarrier()
 {
     return IsUpBarrier( _barrier_type );
 }
 
+//! the active level H: the up level for an up barrier, else the down level
 double Barrier::PDE_BarrierLevel()
 {
     return PDE_IsUpBarrier() ? _barrier_up_level : _barrier_down_level;
@@ -128,37 +145,44 @@ double Barrier::ANA_BarrierPrice( double S,
                                   double t,
                                   double df )
 {
+    //! decode the barrier flavour into the three booleans the formula needs
     bool is_call = ( _type == OptionType::Call );
     bool is_down = ( _barrier_type == BarrierType::DownAndOut ||
                      _barrier_type == BarrierType::DownAndIn );
     bool is_in = IsKnockIn( _barrier_type );
-    double H = is_down ? _barrier_down_level : _barrier_up_level;
+    double H = is_down ? _barrier_down_level : _barrier_up_level; //!< active barrier
     double K = _strike;
 
-    //! vanilla reference (consistent with Vanilla::ANA_EvalPrice)
+    //! vanilla reference (consistent with Vanilla::ANA_EvalPrice). Used both for the
+    //! degenerate fallback and to recover the knock-out via parity (vanilla = in+out)
     double fwd = S * exp( b * t );
     double vanilla = is_call ? BS_Call_Price( fwd, K, t, v, df )
                              : BS_Put_Price( fwd, K, t, v, df );
 
-    //! degenerate inputs : fall back to the vanilla / parity value
+    //! degenerate inputs : the diffusion collapses, so a knock-in can never trigger
+    //! (value 0) and a knock-out is the full vanilla
     if ( v <= 0 || t <= 0 || S <= 0 || H <= 0 )
     {
         return is_in ? 0.0 : vanilla;
     }
 
-    //! barrier already breached at valuation
+    //! barrier already breached at valuation: a knock-in is now a live vanilla, a
+    //! knock-out is dead (value 0)
     bool breached = is_down ? ( S <= H ) : ( S >= H );
     if ( breached )
     {
         return is_in ? vanilla : 0.0;
     }
 
-    //! Reiner-Rubinstein building blocks (Haug, "Option Pricing Formulas")
+    //! Reiner-Rubinstein building blocks (Haug, "Option Pricing Formulas").
+    //! phi = call/put sign, eta = down/up sign, mu the drift in log-moneyness units.
     double phi = is_call ? 1.0 : -1.0;
     double eta = is_down ? 1.0 : -1.0;
-    double sqt = v * sqrt( t );
-    double mu = ( b - 0.5 * v * v ) / ( v * v );
+    double sqt = v * sqrt( t );                  //!< total std dev to maturity
+    double mu = ( b - 0.5 * v * v ) / ( v * v ); //!< drift / variance (per-unit-time)
 
+    //! the four standardised log-distances; x* measure to the strike/barrier, y* are
+    //! their images reflected across the barrier (the method-of-images terms)
     double x1 = log( S / K ) / sqt + ( 1 + mu ) * sqt;
     double x2 = log( S / H ) / sqt + ( 1 + mu ) * sqt;
     double y1 = log( H * H / ( S * K ) ) / sqt + ( 1 + mu ) * sqt;
@@ -166,9 +190,11 @@ double Barrier::ANA_BarrierPrice( double S,
 
     double Sbr = S * exp( ( b - r ) * t ); //!< S e^{(b-r)t} = fwd * df
     double Kdf = K * df;
-    double pHS_p1 = pow( H / S, 2 * ( mu + 1 ) );
-    double pHS_m = pow( H / S, 2 * mu );
+    double pHS_p1 = pow( H / S, 2 * ( mu + 1 ) ); //!< image reflection weight (asset leg)
+    double pHS_m = pow( H / S, 2 * mu );          //!< image reflection weight (cash leg)
 
+    //! A,B = plain truncated-vanilla terms; C,D = their barrier-reflected images.
+    //! Each is asset leg (Sbr * N) minus cash leg (Kdf * N), in Haug's notation.
     auto A = [&]()
     { return phi * Sbr * NormalCdf( phi * x1 ) - phi * Kdf * NormalCdf( phi * ( x1 - sqt ) ); };
     auto B = [&]()
@@ -178,7 +204,9 @@ double Barrier::ANA_BarrierPrice( double S,
     auto D = [&]()
     { return phi * Sbr * pHS_p1 * NormalCdf( eta * y2 ) - phi * Kdf * pHS_m * NormalCdf( eta * ( y2 - sqt ) ); };
 
-    //! knock-in value (rebate = 0)
+    //! knock-in value (rebate = 0). The A/B/C/D combination depends on the barrier
+    //! type AND on whether the strike sits beyond the barrier (K vs H), which decides
+    //! how the payoff region intersects the reflected one — Haug's case table.
     double knock_in;
     if ( is_call && is_down )
     {
@@ -197,6 +225,7 @@ double Barrier::ANA_BarrierPrice( double S,
         knock_in = ( K > H ) ? A() - B() + D() : C();
     }
 
+    //! knock-out by in/out parity: vanilla = knock_in + knock_out
     return is_in ? knock_in : vanilla - knock_in;
 }
 
@@ -210,14 +239,19 @@ void Barrier::ANA_EvalPrice()
     double s = _underlying->GetSpot();
     double v = _underlying->GetImplicitVol( _strike, _maturity_date );
 
-    //! risk-free rate and cost-of-carry implied by the discount factor & forward
+    //! back out the constant r and cost-of-carry b that reproduce the market df and
+    //! forward (r from df = e^{-rt}, b from fwd = s e^{bt}); the closed form is
+    //! parametrised in (r, b) rather than (df, fwd)
     double r = ( t > 0 ) ? -log( df ) / t : 0.0;
     double b = ( t > 0 && s > 0 ) ? log( f / s ) / t : 0.0;
 
     //! premium
     _valuation.premium = ANA_BarrierPrice( s, r, b, v, t, df );
 
-    //! delta & gamma by central finite difference on the spot
+    //! delta & gamma by central finite difference on the spot (the closed form has
+    //! no clean analytic Greeks across the case table, so bump-and-revalue). The
+    //! bump is symmetric (+/- half a bump) so delta is second-order accurate; gamma
+    //! divides by the half-bump squared.
     double s_up = s * ( 1 + GREEK_SPOT_BUMP / 2 );
     double s_dw = s * ( 1 - GREEK_SPOT_BUMP / 2 );
     double p_up = ANA_BarrierPrice( s_up, r, b, v, t, df );
@@ -227,6 +261,8 @@ void Barrier::ANA_EvalPrice()
                        ( s * GREEK_SPOT_BUMP / 2 * s * GREEK_SPOT_BUMP / 2 );
 }
 
+//! Build the Monte-Carlo flow node: a vanilla payoff at maturity, gated by the
+//! barrier monitored over a list of diffusion-date indices.
 MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
                                       const date& /*AsOfDate*/ )
 {
@@ -235,6 +271,7 @@ MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
         _name + node_name::FLOW,
         [&]( BarrierFlowNode* C )
         {
+            //! terminal vanilla payoff (floored at 0) observed on the spot node
             C->SetFloor( 0 );
             C->SetType( _type );
             C->SetStrike( _strike );
@@ -261,13 +298,17 @@ MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
                 //! is moved towards the spot by exp(-/+ 0.5826 * vol * sqrt(dt))).
                 monitor = NC.DiffusionIndicesUpTo( _maturity_date );
                 double t = YearFraction( _today, _maturity_date );
+                //! average step dt = T / (#monitor dates - 1); guard the single-date case
                 size_t steps = ( monitor.size() > 1 ) ? monitor.size() - 1 : 1;
                 double dt = t / (double)steps;
                 double vol = _underlying->GetImplicitVol( _strike, _maturity_date );
-                const double beta = 0.5826;
+                const double beta = 0.5826; //!< -zeta(1/2)/sqrt(2pi), the BGK constant
+                //! shift up barriers DOWN and down barriers UP towards the spot, so the
+                //! discrete-grid KO probability matches the continuous one
                 H *= exp( ( is_up ? -1.0 : 1.0 ) * beta * vol * sqrt( dt ) );
             }
 
+            //! hand the (possibly corrected) level + flavour + monitoring grid to the node
             C->SetBarrierLevel( H );
             C->SetIsUp( is_up );
             C->SetIsIn( PDE_IsKnockIn() );

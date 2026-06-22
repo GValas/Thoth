@@ -149,16 +149,22 @@ static string ClusterPrice( const string& Body,
         skip[k] = skip[k - 1] + npaths[k - 1];
     }
 
+    //! build one request body per slave by mutating the shared `req` in place and
+    //! dumping a snapshot each iteration. Per slave: its path count, a distinct
+    //! seed (k) for pseudo-random streams, and a Sobol skip so the quasi-random
+    //! sub-sequences are disjoint and the union reproduces the single-box run.
     vector<string> bodies( N );
     for ( int k = 0; k < N; k++ )
     {
         req.Set( mcl + ".paths", std::to_string( npaths[k] ) );
         req.Set( mcl + ".seed", std::to_string( k ) );
         req.Set( mcl + ".sobol_skip", std::to_string( skip[k] ) );
-        bodies[k] = req.Dump();
+        bodies[k] = req.Dump(); //!< snapshot now; the next iteration overwrites req
     }
 
-    //! dispatch concurrently
+    //! dispatch concurrently : one thread per slave POSTs its body and stores the
+    //! response (or its exception) into a per-index slot, so the threads never
+    //! touch the same element and need no locking. Errors are rethrown after join.
     LOG( "CLU", "dispatching " + std::to_string( total ) + " paths across " +
                     std::to_string( N ) + " slave(s)" );
     vector<string> responses( N );
@@ -166,7 +172,7 @@ static string ClusterPrice( const string& Body,
     vector<std::thread> threads;
     for ( int k = 0; k < N; k++ )
     {
-        threads.emplace_back( [&, k]()
+        threads.emplace_back( [&, k]() //!< capture k by value : each thread owns its index
                               {
             try { responses[k] = PostToSlave( Slaves[k], bodies[k], TaskName ); }
             catch ( ... ) { errs[k] = std::current_exception(); } } );
@@ -232,7 +238,7 @@ static string ClusterPrice( const string& Body,
     for ( int k = 0; k < N; k++ )
     {
         YamlConfig r( YamlConfig::from_string_t{}, responses[k] );
-        const double w = (double)npaths[k] / (double)total;
+        const double w = (double)npaths[k] / (double)total; //!< this slave's path-share weight
         for ( const string& key : keys )
         {
             const string path = result + "." + key;
@@ -312,7 +318,10 @@ static string ClusterPriceSequence( const string& Body,
     return out.Dump();
 }
 
-//! cluster master : POST /price splits + dispatches to slaves, GET /health
+//! cluster master : POST /price splits + dispatches to slaves, GET /health.
+//! Blocks in server.listen() until killed or a bind failure (returns 1 then).
+//! Unlike the plain server it does NOT stream/cancel : a cluster price holds
+//! price_mutex and runs to completion, since the heavy work is on the slaves.
 int RunClusterMaster( int Port,
                       const vector<string>& Slaves )
 {
@@ -328,14 +337,19 @@ int RunClusterMaster( int Port,
 
     server.Post( "/price", [Slaves]( const httplib::Request& req, httplib::Response& res )
                  {
+        //! same X-Task-Name convention as the plain server (absent -> book root)
         const string task_name = req.has_header( "X-Task-Name" )
                                  ? req.get_header_value( "X-Task-Name" )
                                  : string( ROOT_NODE );
         const string client = req.remote_addr + ":" + std::to_string( req.remote_port );
         LOG( "CLU", "client " + client + " connected (price request)" );
 
+        //! serialise : one cluster pricing at a time (the slave fan-out already
+        //! uses the whole pool, and the master's own on-device pricing is non-reentrant)
         std::lock_guard<std::mutex> lock( price_mutex );
         string result;
+        //! failures (slave unreachable, slave error, split logic) become an
+        //! "error: ..." body — the same prefix convention the client detects.
         try { result = ClusterPrice( req.body, task_name, Slaves ); }
         catch ( const std::exception& e ) { result = string( "error: " ) + e.what() + "\n"; }
         catch ( ... ) { result = "error: unknown cluster failure\n"; }

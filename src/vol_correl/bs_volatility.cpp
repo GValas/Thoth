@@ -1,11 +1,18 @@
+//! bs_volatility.cpp — flat Black-Scholes volatility surface.
+//!
+//! A single constant vol, independent of strike and maturity, scaled only by the
+//! calendar day-weight. Being constant it is *exact* in every engine (no Dupire
+//! approximation), and feeds the analytic / PDE / Monte-Carlo pricers identically.
+
 #include "thoth.hpp"
 #include "bs_volatility.hpp"
 #include "object_reader.hpp"
 
-//! constructor
+//! constructor: register as a BS-vol kind; deterministic so not a local-vol
+//! surface (no Dupire build) — the constant vol is consumed directly.
 BsVolatility::BsVolatility( const string& ObjectName ) : Volatility( ObjectName, KIND_BS_VOLATILITY )
 {
-    _is_local = false;
+    _is_local = false; //!< flat surface: PDE uses the vol as-is, not via GetLocalVolatility
 }
 
 BsVolatility::~BsVolatility() = default;
@@ -17,13 +24,15 @@ void BsVolatility::Configure( ObjectReader& reader )
     ConfigureCommon( reader );
 }
 
-//! setter
+//! setter: vols are quoted in percent in the YAML books, so store as a decimal
 void BsVolatility::SetVolatility( double BsVolatility )
 {
-    _volatility = BsVolatility / 100;
+    _volatility = BsVolatility / 100; //!< 20 (%) -> 0.20
 }
 
-//! implicit vol (+ vega bump shift, if any)
+//! implied vol at any (strike, forward, maturity) — all three are ignored since
+//! the surface is flat. Returns (quoted vol + parallel vega bump) re-scaled by
+//! the calendar day-weight; _vol_shift is 0 in normal pricing.
 double BsVolatility::GetImplicitVol( const double /*Strike*/,
                                      const double /*Forward*/,
                                      const date& /*MaturityDate*/ )

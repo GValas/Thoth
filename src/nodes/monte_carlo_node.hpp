@@ -39,29 +39,36 @@ class MonteCarloNode
 
   public:
     //! constant
+    //! true if the value is path-independent at this date (evaluated once, not per path)
     virtual bool IsConstant( size_t DateIndex );
 
     //! setter
+    //! bind the diffusion schedule and precompute the per-date year-fractions
     void SetDateList( const vector<date>& DateList );
 
     //! getter
-    const string& GetName() const;
-    double GetIndicatorValue( size_t DateIndex );
-    double GetIndicatorTrust( size_t DateIndex );
+    const string& GetName() const;                //!< stable identifier / ordering key
+    double GetIndicatorValue( size_t DateIndex ); //!< MC mean estimate at this date (sum / count)
+    double GetIndicatorTrust( size_t DateIndex ); //!< MC standard error of that mean
 
+    //! current path's value at this date; virtual so ConstantNode can short-circuit
     inline virtual double GetValue( size_t DateIndex )
     {
         return _value_list[DateIndex];
     }
 
     //! actions
+    //! fold this path's value into the running statistics (no-op for non-indicators)
     void UpdateIndicators( size_t DateIndex );
+    //! fill _value_list[DateIndex] from this node's children — the core per-node step
     virtual void ComputeValue( size_t DateIndex ) = 0;
 
     //! return (node, dates) mandatory for value computation
+    //! declare the (child, date) edges needed to compute DateIndex (drives the topo sort)
     virtual void GetDateDependencies( size_t DateIndex,
                                       vector<MonteCarloNode*>& NodeList,
                                       vector<size_t>& DateList ) = 0;
+    //! the same edges as a de-duplicated, name-ordered set
     node_set GetChildNodes( size_t DateIndex );
 
     //! constructor, destructor

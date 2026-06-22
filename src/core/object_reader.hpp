@@ -2,6 +2,11 @@
 #include "object_manager.hpp"
 #include <type_traits>
 
+//! object_reader.hpp — the typed field-reading facade handed to Object::Configure.
+//! It turns "this object reads itself from YAML" into a handful of type-dispatched
+//! templates (Get/Has/Ref) over its own node, decoupling deserialisation from both
+//! the ObjectManager and the registry.
+
 //! trait: is T a vector<...>? Lets Ref<T> fold the scalar and list reference reads
 //! into one template (a member variable template cannot be partially specialised, so
 //! this lives at namespace scope).
@@ -27,9 +32,10 @@ inline constexpr bool is_vector<vector<U>> = true;
 //! virtual interface could not express correctly.
 class ObjectReader
 {
-    ObjectManager& _m;
-    string _n; //!< the object's name (dotted-path prefix)
+    ObjectManager& _m; //!< the manager, for field access (yml()) and reference resolution
+    string _n;         //!< the object's name (dotted-path prefix)
 
+    //! qualify a bare field name into the object's full YAML path ("<name>.<field>")
     string Path( const string& Field ) const { return _n + OBJECT_SEPARATOR + Field; }
 
     //! the four field categories below dispatch on the requested C++ type instead of
@@ -41,6 +47,7 @@ class ObjectReader
     static constexpr bool unsupported = false;
 
   public:
+    //! bind the reader to one object (by name) and the manager that holds the config
     ObjectReader( ObjectManager& Manager, string ObjectName )
         : _m( Manager ), _n( std::move( ObjectName ) )
     {
@@ -100,7 +107,9 @@ class ObjectReader
             static_assert( unsupported<T>, "ObjectReader::Get: unsupported scalar type" );
     }
 
-    //! the la_vector view is a raw pointer (not a vector<T>), so it stays named
+    //! the la_vector view is a raw pointer (not a vector<T>), so it stays named —
+    //! a zero-copy view onto the YAML-backed buffer rather than a value type that
+    //! could be folded into the Get<T> type switch above.
     la_vector* LaVector( const string& f ) { return _m.yml().GetLaVector( Path( f ) ); }
 
     //! --- presence of an optional field, scalar (Has<string>("calendar")) or list
@@ -134,17 +143,20 @@ class ObjectReader
     {
         if constexpr ( reader_detail::is_vector<T> )
         {
+            //! list reference: read the field as a list of names, then get-or-build
+            //! each as the element type, yielding a vector of pointers (vector<E*>).
             using E = typename T::value_type; //!< T = vector<E> -> vector<E*>
             return _m.GetList<E>( _m.yml().GetStringList( Path( f ) ) );
         }
         else
         {
+            //! scalar reference: the field holds one name; get-or-build it as a T*.
             return _m.Get<T>( _m.yml().GetString( Path( f ) ) );
         }
     }
 
     //! --- escape hatch for the few irreducible cases (e.g. a factory that picks a
     //! concrete subclass before configuring) ---
-    ObjectManager& Manager() { return _m; }
-    const string& Name() const { return _n; }
+    ObjectManager& Manager() { return _m; }   //!< raw access when the facade is too narrow
+    const string& Name() const { return _n; } //!< the bound object's name / path prefix
 };

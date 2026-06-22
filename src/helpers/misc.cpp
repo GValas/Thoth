@@ -67,6 +67,9 @@ int ParseInt( const string& tok )
 vector<string> SplitToString( const string& str,
                               const string& sep )
 {
+    //! i = next separator position, j = start of the current field. Each found
+    //! separator closes a field; the trailing field after the last separator is
+    //! pushed unconditionally (so an empty input yields one empty token).
     vector<string> vSplit;
     size_t i = 0, j = 0;
     i = str.find( sep, i );
@@ -131,6 +134,8 @@ string ReplaceString( const string& source,
                       const string& find,
                       const string& replace )
 {
+    //! repeatedly find-and-replace from the front until no occurrence remains
+    //! (note: this can rescan the replacement text, fine for the literal uses here)
     size_t j;
     string s = source;
     for ( ; ( j = s.find( find ) ) != string::npos; )
@@ -188,7 +193,7 @@ void CheckDateList( const vector<date>& DateList )
 {
     for ( size_t i = 1; i < DateList.size(); i++ )
     {
-        if ( DateList[i] < DateList[i - 1] )
+        if ( DateList[i] < DateList[i - 1] ) //!< only flags a strict decrease (ties allowed)
         {
             ERR( " date_list must be strictly croissant " );
         }

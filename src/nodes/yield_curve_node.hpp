@@ -19,11 +19,13 @@ class YieldCurveNode : public MonteCarloNode
 {
 
   private:
-    Curve* _curve = nullptr;
-    bool _filled = false;
+    Curve* _curve = nullptr; //!< the zero curve sampled per diffusion date (non-owning)
+    bool _filled = false;    //!< true once the whole value vector has been populated
 
   public:
+    //! fill the entire zero-rate vector on first call, then no-op (path-independent).
     void ComputeValue( size_t DateIndex ) override;
+    //! leaf node (reads the curve, not other nodes): declares no dependencies.
     void GetDateDependencies( size_t DateIndex,
                               vector<MonteCarloNode*>& NodeList,
                               vector<size_t>& DateList ) override;

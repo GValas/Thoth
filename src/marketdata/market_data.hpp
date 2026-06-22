@@ -1,6 +1,9 @@
 #pragma once
 #include "object.hpp"
 
+//! market_data.hpp — the market-data base class and the bump-and-revalue risk-factor
+//! contract every pricing input shares.
+//!
 //! risk-factor names for the bump-and-revalue Greeks (MarketData::ApplyShift). Model
 //! parameters (a Heston/SABR alpha, kappa, ...) are passed as their own plain name.
 inline constexpr char RISK_FACTOR_VOL[] = "vol";   //!< parallel volatility bump (vega)

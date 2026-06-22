@@ -5,8 +5,11 @@
 
 namespace
 {
+//! process-wide cancellation flag. relaxed ordering is sufficient: this is a lone
+//! flag with no other memory it must synchronise against — the worker only needs
+//! to observe the latest value eventually, not establish a happens-before edge.
 std::atomic<bool> g_cancel{ false };
-}
+} // namespace
 
 namespace cancellation
 {

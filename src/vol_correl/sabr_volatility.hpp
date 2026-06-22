@@ -32,7 +32,8 @@ class SabrVolatility : public Volatility
     void SetRhoList( const vector<double>& RhoList );
     void SetNuList( const vector<double>& NuList );
 
-    //!
+    //! Hagan-2002 lognormal SABR implied vol at (Strike, Forward, MaturityDate);
+    //! Strike <= 0 is a sentinel meaning "ATM" (use the forward as strike)
     double GetImplicitVol( const double Strike,
                            const double Forward,
                            const date& MaturityDate ) override;

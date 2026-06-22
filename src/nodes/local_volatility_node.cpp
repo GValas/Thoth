@@ -26,6 +26,8 @@ void LocalVolatilityNode::ComputeValue( size_t DateIndex )
     const size_t prev = ( DateIndex > 0 ) ? DateIndex - 1 : 0;
     const double s = _spot_node->GetValue( prev );
 
+    //! map spot to a fractional grid index: grid point i sits at log-spot = (offset+i)*ln_step,
+    //! so i = log(s)/ln_step - offset; the fractional part is the interpolation weight
     const double f = log( s ) / ln_step - (double)offset; //!< fractional grid index
     const size_t last = v->size - 1;
     if ( f <= 0.0 )
@@ -77,6 +79,8 @@ void LocalVolatilityNode::SetSpotNode( MonteCarloNode* SpotNode )
     _spot_node = SpotNode;
 }
 
+//! the three Push* setters are called once per diffusion date in build order, so the
+//! three parallel vectors stay index-aligned with the date schedule
 void LocalVolatilityNode::PushLnStep( double LnStep )
 {
     _ln_step_list.push_back( LnStep );
@@ -87,6 +91,8 @@ void LocalVolatilityNode::PushOffset( long Offset )
     _offset_list.push_back( Offset );
 }
 
+//! takes ownership of the raw la_vector (wrapped in the RAII LaVector member),
+//! freed by the default destructor
 void LocalVolatilityNode::PushVolVector( la_vector* VolVector )
 {
     _vol_vector_list.push_back( VolVector );

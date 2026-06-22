@@ -41,12 +41,15 @@ string GraphTreeKey( const string& Tag )
 }
 } // namespace
 
+//! the diffusion tree, node collector and path generator are all built lazily in
+//! PriceBook (so each re-price gets a clean tree); only the RNG is held as a member
 PricerMCL::PricerMCL( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
     //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom from the config seed
 }
 
+//! unique_ptr members (progress bar, path generator) clean themselves up
 PricerMCL::~PricerMCL() = default;
 
 //! diffusion dates
@@ -147,11 +150,16 @@ bool PricerMCL::BookIsGpuSupported()
     return true;
 }
 
+//! GPU mode prices each contract independently on the device, so its Greeks are
+//! per-contract bump-and-revalue; the CPU path keeps MCL's book-level single-tree
+//! Greeks (a correlated diffusion can't isolate one contract).
 bool PricerMCL::GreeksPerContract() const
 {
     return _use_gpu;
 }
 
+//! price one contract on the GPU (GBM European vanilla). Used only in _use_gpu
+//! mode, by the per-contract loop and its bump-and-revalue Greeks.
 void PricerMCL::PriceContract( Contract* Ctr )
 {
     GpuGbmParams p;
@@ -401,13 +409,17 @@ void PricerMCL::ComputeGreeks()
     _premium = _book->GetPremium();
 }
 
+//! turn the per-underlying independent white noises into correlated Brownian
+//! increments: each underlying's Brownian draws a CorrelatedNoiseNode that is the
+//! Cholesky-weighted sum of all the white noises (L * Z), reproducing the target
+//! correlation matrix. Single-asset books skip this (no correlation to impose).
 void PricerMCL::CorrelateBrownianNodes()
 {
     //! more than 1 asset : correlation of noises
     if ( _single_set.size() > 1 )
     {
 
-        //! compute cholesky matrix
+        //! compute cholesky matrix : L with L L^T = correlation (so L*Z is correlated)
         ComputeCholeskyMatrix();
 
         //! correlated noises = sum product
@@ -425,7 +437,9 @@ void PricerMCL::CorrelateBrownianNodes()
                 string node_name = ( *u )->GetName() + node_name::NOISE;
                 CorrelatedNoiseNode* correlated_noise_node = _collector.NewNode<CorrelatedNoiseNode>( node_name );
 
-                //! link to other white_noises
+                //! correlated noise for u = sum_v L[u][v] * white_noise[v]; the
+                //! Cholesky factor is lower-triangular, so the zero entries above the
+                //! diagonal are skipped (no node wired for them)
                 for ( v = _single_set.begin();
                       v != _single_set.end();
                       v++ )
@@ -450,11 +464,17 @@ void PricerMCL::CorrelateBrownianNodes()
     }
 }
 
+//! build the payoff side of the DAG: ask the book for its node, which recursively
+//! builds each contract's payoff / diffusion nodes on top of the Brownian nodes
+//! created above. The returned node is the book root whose indicator 0 is the price.
 void PricerMCL::CreateContractualNodes()
 {
     _root = _book->GetNode( _collector );
 }
 
+//! create the random-source leaves of the DAG: one white-noise node per underlying
+//! (plus, for stochastic-vol, an independent variance noise and, for Bates, a jump
+//! source), and a Brownian node for the local-vol underlyings that consume one.
 void PricerMCL::CreateBrownianNodes()
 {
 
@@ -534,6 +554,11 @@ void PricerMCL::SetupQuasiRandom()
     }
 }
 
+//! factorise the correlation matrix over the diffused underlyings (L L^T = C), in a
+//! deterministic name order so the resulting Cholesky factor — and hence the
+//! correlated draws — are reproducible across runs and Greek bumps. Equity / index
+//! names are ordered before the FX names so the FX block sits last (its triangular
+//! dependence on the equity block is then well defined).
 void PricerMCL::ComputeCholeskyMatrix()
 {
     vector<string> single_name_list;
@@ -545,7 +570,7 @@ void PricerMCL::ComputeCholeskyMatrix()
     {
         if ( ( *s )->IsForex() )
         {
-            fx_name_list.push_back( ( *s )->GetName() );
+            fx_name_list.push_back( ( *s )->GetName() ); //!< FX names go last
         }
         else
         {
@@ -556,10 +581,14 @@ void PricerMCL::ComputeCholeskyMatrix()
     _correlation->ComputeCholeskyMatrix( single_name_list );
 }
 
-//!
+//! build the whole node DAG for one PriceBook call: diffusion dates, the noise /
+//! Brownian leaves, their correlation, the contract payoff nodes, the optional
+//! Greek-bump sub-trees and American recordings — then topologically sort every
+//! root into one schedule so a single path sweep prices price and Greeks together.
+//! Also captures the debug node graph and logs the build summary.
 void PricerMCL::Tree_Init()
 {
-    //! node collector
+    //! node collector : establish the diffusion-date grid the nodes are scheduled on
     InitDates();
     _collector.SetDiffusionDates( _diffusion_dates );
 
@@ -641,6 +670,10 @@ void PricerMCL::Tree_Init()
     }
 }
 
+//! the Monte-Carlo path sweep: draw `paths` correlated paths, evaluate the whole
+//! scheduled DAG on each (PriceNodes accumulates the running mean / variance into
+//! every indicator node) and record the American spot paths. Drives the shared
+//! progress bar, which it leaves open for the American LSM post-pass to finish.
 void PricerMCL::Tree_Run()
 {
     //! report resident memory before the (potentially large) path loop starts
@@ -1110,9 +1143,12 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
     return std::max( mean, Contract->Intrinsic( s0_set ) );
 }
 
+//! harvest the swept results: the book root's indicator 0 is the MC mean premium
+//! (trust = its standard error); each contract node carries its own; and each Greek
+//! scenario root carries the bumped book premium for ComputeGreeks to difference.
 void PricerMCL::Tree_Read()
 {
-    // read results in tree
+    // read results in tree : book root indicator 0 = mean premium, trust = std error
     MonteCarloNode* N = _root;
     _book->SetPremium( N->GetIndicatorValue( 0 ) );
     _book->SetPremiumTrust( N->GetIndicatorTrust( 0 ) );

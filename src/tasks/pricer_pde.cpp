@@ -19,6 +19,8 @@ static constexpr double HESTON_SMAX_SIGMA_FACTOR = 5.0; //!< ... or S0 * exp(fac
 static constexpr int BATES_JUMP_QUAD_POINTS = 40;       //!< trapezoid points for the jump-size integral
 static constexpr double BATES_JUMP_SIGMA_SPAN = 6.0;    //!< jump-size grid spans muJ +/- span * sigJ
 
+//! a finite-difference pricer is just a Pricer; the grid state is built per
+//! contract in InitGrid, so nothing to initialise here
 PricerPDE::PricerPDE( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {
@@ -26,6 +28,10 @@ PricerPDE::PricerPDE( const string& ObjectName,
 
 PricerPDE::~PricerPDE() = default;
 
+//! read the option value at the transformed coordinate x off a solved grid layer Uy
+//! by cubic-spline interpolation across the (uniform-in-x) grid nodes. Used to
+//! evaluate the premium / bumped spots at x_0 and at the central-difference spot
+//! bumps, which fall between grid nodes after the sinh coordinate change.
 double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 {
     // x_vector (owned locally, freed on return)
@@ -164,7 +170,11 @@ void PricerPDE::PriceContract( Contract* Ctr )
     Ctr->Result().gamma = res.gamma;
 }
 
-//! init grid
+//! set up the grid for one contract: read the market (escrowed spot, ATM vol, carry
+//! and discount rates, with the quanto correction), size the (s, t) domain from the
+//! sigma factor, build the sinh coordinate change, set the boundary values (with
+//! barrier handling), and precompute the escrowed-dividend PV and discrete-monitoring
+//! step set. Called fresh before each SolveGrid (including the in/out-parity legs).
 void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
 {
 
@@ -264,18 +274,21 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     }
 
     // transformation settings -> more points around X_0
+    //! _cc controls the sinh stretch strength (smaller -> denser clustering at X_0).
+    //! Solving asinh on the domain ends fixes _aa/_bb so that x in [0,1] maps exactly
+    //! onto X in [X_min, X_max] with X_0 sitting where the points are densest.
     _cc = .02;                                        //.02 / .05
     _c1 = asinh( ( _x_min_orig - _x_0_orig ) / _cc ); // particular case !!! [0,1] <-> [X_min, X_max]
     _c2 = asinh( ( _x_max_orig - _x_0_orig ) / _cc );
     _aa = _c2 - _c1;
     _bb = _c1;
 
-    // transformed grid
-    _x_0 = Psi( _x_0_orig );
+    // transformed grid : uniform in x, so the spatial step _h and time step _k are constant
+    _x_0 = Psi( _x_0_orig ); //!< spot in transformed coords (where we read the price)
     _x_min = Psi( _x_min_orig );
     _x_max = Psi( _x_max_orig );
-    _h = ( _x_max - _x_min ) / (double)_j;
-    _k = _t_max / (double)_n;
+    _h = ( _x_max - _x_min ) / (double)_j; //!< uniform space step (du)
+    _k = _t_max / (double)_n;              //!< uniform time step (dt)
     _u_up = _v_up;
     _u_dw = _v_dw;
 
@@ -328,7 +341,11 @@ void PricerPDE::ApplyDiscreteBarrier( la_vector* U )
     }
 }
 
-//!
+//! solve the 1-D transformed grid backward in time (Crank-Nicolson, theta = 1/2):
+//! seed the terminal layer with the payoff, then march from maturity to today,
+//! solving the tridiagonal system T_0 * U_0 = T_1 * U_1 at each step, projecting onto
+//! the intrinsic for American exercise and zeroing the knocked region at discrete
+//! barrier dates. Returns the premium and spot delta/gamma read off the solved layer.
 PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 {
 
@@ -356,16 +373,18 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // la_matrix_set_col (V, N, U_1);
     // PrintList(U_1);
 
-    // diagonals
+    // diagonals of the implicit matrix T_0 (constant in time, so assembled once).
+    // Rows 0 and _j are pinned to the identity (Dirichlet boundaries), interior rows
+    // take the three T_0 stencil entries.
     la_vector_set( diag_u, 0, 0 );
     la_vector_set( diag_m, 0, 1 );
     la_vector_set( diag_m, _j, 1 );
     la_vector_set( diag_d, _j - 1, 0 );
     for ( int j = 1; j < _j; j++ )
     {
-        la_vector_set( diag_u, j, T_0( j, j + 1 ) );
-        la_vector_set( diag_m, j, T_0( j, j ) );
-        la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) );
+        la_vector_set( diag_u, j, T_0( j, j + 1 ) );     //!< super-diagonal
+        la_vector_set( diag_m, j, T_0( j, j ) );         //!< main diagonal
+        la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) ); //!< sub-diagonal
     }
     // PrintList(diag_u);
     // PrintList(diag_m);
@@ -536,48 +555,63 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
     Ctr->Result().gamma = 0;
 }
 
+//! coordinate change X = Phi(x): a sinh stretch that clusters grid points around
+//! the spot X_0 (where accuracy matters most) while still reaching the far wings
 inline double PricerPDE::Phi( double x )
 {
     return _x_0_orig + _cc * sinh( _aa * x + _bb );
 }
+//! first derivative dX/dx of the stretch (the Jacobian used to transform the PDE)
 inline double PricerPDE::Phi_x( double x )
 {
     return _cc * _aa * cosh( _aa * x + _bb );
 }
+//! second derivative d2X/dx2 of the stretch (enters the transformed drift b(x))
 inline double PricerPDE::Phi_xx( double x )
 {
     return _cc * _aa * _aa * sinh( _aa * x + _bb );
 }
+//! inverse map x = Psi(X): from a spot level back to the uniform x grid coordinate
 inline double PricerPDE::Psi( double X )
 {
     return ( asinh( ( X - _x_0_orig ) / _cc ) - _bb ) / _aa;
 }
+//! diffusion coefficient of the Black-Scholes operator in X: 0.5 sigma^2 S^2 (the
+//! sign is carried so V_t = A V_XX + B V_X + C V matches the backward convention)
 double PricerPDE::A( double x )
 {
     return -.5 * _v * _v * x * x;
 }
+//! drift coefficient: -r S (carry r, in the underlying currency)
 double PricerPDE::B( double x )
 {
     return -_r * x;
 }
+//! reaction (discount) coefficient: the premium-currency discount rate r_disc...
 double PricerPDE::C( double /*x*/ )
 {
     //! variance-swap solve accumulates expected variance (an undiscounted
     //! expectation), so there is no reaction/discount term there.
     return _variance_mode ? 0.0 : _r_disc;
 }
+//! transformed diffusion a(x) = A(Phi(x)) / Phi_x^2 (chain rule on V_XX -> u_xx)
 inline double PricerPDE::a( double x )
 {
     return A( Phi( x ) ) / Phi_x( x ) / Phi_x( x );
 }
+//! transformed drift b(x): the chain rule mixes A's curvature into the drift via
+//! Phi_xx, hence the second term
 inline double PricerPDE::b( double x )
 {
     return B( Phi( x ) ) / Phi_x( x ) - A( Phi( x ) ) * Phi_xx( x ) / Phi_x( x ) / Phi_x( x ) / Phi_x( x );
 }
+//! transformed reaction c(x) = C(Phi(x)) (the discount is coordinate-independent)
 inline double PricerPDE::c( double x )
 {
     return C( Phi( x ) );
 }
+//! spatial operator L as a tridiagonal stencil: only the three diagonals are
+//! non-zero (i==j, i==j-1, i==j+1); everything else is 0
 inline double PricerPDE::L( int i, int j )
 {
     if ( i == j )
@@ -597,26 +631,32 @@ inline double PricerPDE::L( int i, int j )
         return 0;
     }
 }
+//! super-diagonal (coupling to u(j+1)): central drift b/2h + diffusion a/h^2
 inline double PricerPDE::L_u( int j )
 {
     return b( j * _h ) / 2 / _h + a( j * _h ) / _h / _h;
 }
+//! main diagonal (coupling to u(j)): reaction c minus the diffusion's -2a/h^2
 inline double PricerPDE::L_m( int j )
 {
     return c( j * _h ) - 2 * a( j * _h ) / _h / _h;
 }
+//! sub-diagonal (coupling to u(j-1)): -drift b/2h + diffusion a/h^2
 inline double PricerPDE::L_d( int j )
 {
     return -b( j * _h ) / 2 / _h + a( j * _h ) / _h / _h;
 }
+//! identity stencil (Kronecker delta) used to assemble the Crank-Nicolson matrices
 inline double PricerPDE::I( int i, int j )
 {
     return ( i == j ) ? 1 : 0;
 }
+//! left-hand (implicit) matrix T_0 = I + k(1-theta)L applied to the new layer U_0
 inline double PricerPDE::T_0( int i, int j )
 {
     return I( i, j ) + _k * ( 1 - _theta ) * L( i, j );
 }
+//! right-hand (explicit) matrix T_1 = I - k*theta*L applied to the known layer U_1
 inline double PricerPDE::T_1( int i, int j )
 {
     return I( i, j ) - _k * _theta * L( i, j );

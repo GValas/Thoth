@@ -1,5 +1,8 @@
 #pragma once
-//! aggregates every Monte-Carlo node type
+//! Umbrella header: aggregates every Monte-Carlo node type (plus the shared
+//! node-name suffixes) so a graph builder or consumer can pull in the whole node
+//! catalogue with a single include instead of tracking each header. Add new node
+//! headers here when introducing a node kind.
 #include "node_names.hpp"
 #include "barrier_flow_node.hpp"
 #include "book_node.hpp"

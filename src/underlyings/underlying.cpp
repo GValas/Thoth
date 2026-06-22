@@ -1,7 +1,13 @@
 #include "thoth.hpp"
 #include "underlying.hpp"
 
-//!
+//! underlying.cpp — base-class plumbing for Underlying. Only the non-pure members
+//! live here: construction, the correlation setter/getter. All pricing behaviour is
+//! pure-virtual and supplied by the concrete shapes (Single/Composite/Basket/...).
+
+//! base ctor: forward name + kind to Asset and null the not-yet-injected handles.
+//! _correlation is set later via SetCorrelation; _currency is set by the concrete
+//! shape (e.g. Composite::SetCompoCurrency) so the base leaves it null.
 Underlying::Underlying( const string& ObjectName,
                         const string& ObjectKind ) : Asset( ObjectName, ObjectKind )
 {
@@ -9,7 +15,7 @@ Underlying::Underlying( const string& ObjectName,
     _currency = nullptr;
 }
 
-//!
+//! nothing owned here (correlation/currency are non-owning references), so default.
 Underlying::~Underlying() = default;
 ////
 //////! setter
@@ -19,7 +25,9 @@ Underlying::~Underlying() = default;
 ////}
 ////
 
-//! setter
+//! setter — store the shared correlation matrix. Base implementation only records
+//! the handle; multi-asset / composite shapes override to first propagate it to
+//! their sub-underlyings, then call this base to record their own copy.
 void Underlying::SetCorrelation( Correlation* Correlation )
 {
     _correlation = Correlation;
@@ -31,7 +39,7 @@ void Underlying::SetCorrelation( Correlation* Correlation )
 //     return _currency;
 // }
 
-//! getter
+//! getter — the injected correlation matrix (nullptr until SetCorrelation runs).
 Correlation* Underlying::GetCorrelation() const
 {
     return _correlation;

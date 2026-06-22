@@ -1,9 +1,18 @@
 #pragma once
+//! Project-wide magic numbers and config-string literals, gathered in one place
+//! so the contracts, pricers and config parser share a single source of truth.
+
 // misc
+//! calendar days per year — the ACT/365 day-count denominator (see YearFraction)
 inline constexpr double NB_OF_DAYS_A_YEAR = 365;
+//! business (trading) days per year — used when a quantity is quoted/accrued on a
+//! trading-day basis rather than calendar time (e.g. variance-swap conventions)
 inline constexpr double NB_OF_BUSINESS_DAYS_A_YEAR = 260;
 
+//! significant digits when serialising a double to a string (ToString) — wide
+//! enough to round-trip prices/vols without dumping full binary noise
 inline constexpr int DECIMAL_PRECISION = 9;
+//! name of the root node in the object/config tree
 inline constexpr char ROOT_NODE[] = "root";
 
 //! the relative spot bump for delta/gamma (1%). One canonical value, used two
@@ -14,9 +23,14 @@ inline constexpr char ROOT_NODE[] = "root";
 inline constexpr double GREEK_SPOT_BUMP = 0.01;
 
 // pricer_configuration - mcl
+//! Monte-Carlo / cluster (mcl): weight given to a non-working (calendar, non-
+//! trading) day when accumulating time/variance. 1.0 = treat it like any other
+//! day (no calendar-vs-trading-day down-weighting).
 inline constexpr double NON_WORKING_DAYS_WEIGHT = 1.;
 
-//! contracts
+//! contracts — canonical config-string spellings, parsed once into the strongly
+//! typed enums in enums.hpp. Keeping the literals here (not inline in the parser)
+//! lets the YAML loader and the enum parser agree on exactly one spelling each.
 inline constexpr char TYPE_CALL[] = "call";
 inline constexpr char TYPE_PUT[] = "put";
 inline constexpr char EXERCISE_MODE_AMERICAN[] = "american";

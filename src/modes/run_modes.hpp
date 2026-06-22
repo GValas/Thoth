@@ -1,10 +1,14 @@
 #pragma once
 #include "thoth.hpp"
 
-//! Application entry points, one per run mode (see thoth.cpp / main). Each returns
-//! a process exit code. Split across run_batch.cpp / run_server.cpp /
+//! ----------------------------------------------------------------------------
+//! run_modes.hpp : the contract between thoth.cpp's CLI dispatch and the four run
+//! modes. Application entry points, one per run mode (see thoth.cpp / main). Each
+//! returns a process exit code. Split across run_batch.cpp / run_server.cpp /
 //! run_client.cpp / run_cluster.cpp so each mode is a focused translation unit;
-//! main() in thoth.cpp only parses the command line and dispatches.
+//! main() in thoth.cpp only parses the command line and dispatches. ExecuteYaml
+//! is the one shared helper (server + cluster master both reuse it).
+//! ----------------------------------------------------------------------------
 
 //! launch a single pricing task from files (-batch <input> <output> [task])
 int RunBatch( const string& InputFile, const string& OutputFile, const string& TaskName );

@@ -14,15 +14,17 @@ class BsVolatility : public Volatility
     //! read own field (flat vol), then the common calendar
     void Configure( ObjectReader& reader ) override;
 
-    //! setter
+    //! setter: stores the quoted vol (percent) as a decimal
     void SetVolatility( double BsVolatility );
 
-    //!
+    //! flat implied vol: ignores strike/forward/maturity, returns
+    //! (vol + vega shift) * day-weight
     double GetImplicitVol( const double Strike,
                            const double Forward,
                            const date& MaturityDate ) override;
 
-    //! mcl node
+    //! MCL node: a ConstantNode carrying the same (vol + shift) * day-weight, so
+    //! the simulated diffusion matches the analytic / PDE vol
     MonteCarloNode* GetNode( NodeCollector& NC ) override;
 
     //! constructor & destructor

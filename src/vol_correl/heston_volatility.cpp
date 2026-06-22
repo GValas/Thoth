@@ -1,7 +1,18 @@
+//! heston_volatility.cpp — Heston / Bates stochastic-volatility surface.
+//!
+//! Stores the scalar Heston parameters (v0, kappa, theta, xi, rho) plus optional
+//! lognormal Bates jumps, reading vols quoted in percent and squaring them into
+//! variances. The actual stochastic diffusion is built by the engines (they read
+//! StochasticParams()); this object mainly configures, exposes and bump-shifts the
+//! parameters. GetImplicitVol is only a coarse sqrt(v0) proxy for legacy callers.
+
 #include "thoth.hpp"
 #include "heston_volatility.hpp"
 #include "object_reader.hpp"
 
+//! constructor: register as the Heston kind. _is_local = false because Heston is
+//! genuinely stochastic (IsStochastic() == true) — the engine builds a variance
+//! diffusion, not a Dupire local-vol surface.
 HestonVolatility::HestonVolatility( const string& ObjectName )
     : Volatility( ObjectName, KIND_HESTON_VOLATILITY )
 {

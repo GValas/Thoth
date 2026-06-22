@@ -4,9 +4,15 @@
 #include "object_reader.hpp"
 #include "single.hpp" //!< Volatility / StochasticVolParams (MonoVol helper)
 
+//! Vanilla option implementation: configuration, schedule, the analytic European
+//! closed form (Black-Scholes, or the Heston characteristic-function price under
+//! stochastic vol), the GPU-GBM parameter gate and the Monte-Carlo flow node.
+
 namespace
 {
-//! the single's volatility if the underlying is a mono (one single), else null
+//! the single's volatility iff the underlying is a mono (exactly one single name),
+//! else null. Used to detect a stochastic-vol (Heston) model and to route to the
+//! single-asset closed form / GPU kernel.
 Volatility* MonoVol( Underlying* u )
 {
     SingleSet s = u->GetSingleSet();
@@ -67,6 +73,7 @@ date Vanilla::GetMaturityDate() const
     return _maturity_date;
 }
 
+//! single spot fixing at maturity
 set<date> Vanilla::GetFixingDates()
 {
     set<date> s;
@@ -74,6 +81,7 @@ set<date> Vanilla::GetFixingDates()
     return s;
 }
 
+//! single cash flow at maturity
 set<date> Vanilla::GetFlowDates()
 {
     set<date> s;
@@ -81,6 +89,8 @@ set<date> Vanilla::GetFlowDates()
     return s;
 }
 
+//! exercise opportunities: maturity (an American's intermediate dates are supplied
+//! by the engine's grid; this is the terminal one)
 set<date> Vanilla::GetAmericanExerciseDates()
 {
     set<date> s;
@@ -88,19 +98,21 @@ set<date> Vanilla::GetAmericanExerciseDates()
     return s;
 }
 
-//!
+//! terminal call/put payoff max(phi(S-K),0); the trailing payoff_vanilla flags
+//! select a plain (un-digital, un-capped) vanilla
 double Vanilla::Intrinsic( const double Spot )
 {
     return payoff_vanilla( Spot, _strike, _type, false, 0, true, 0 );
 }
 
-//! pde solution is possible
+//! pde solution is possible iff the underlying admits a spot grid
 bool Vanilla::PDE_HasSolution()
 {
     return _underlying->IsGriddable();
 }
 
-//! analytical formula is possible
+//! analytical formula is possible only for European exercise on a griddable underlying
+//! (American has no closed form -> PDE/MCL only)
 bool Vanilla::ANA_HasSolution()
 {
     return ( _exercise_mode == ExerciseMode::European ) &&
@@ -110,7 +122,8 @@ bool Vanilla::ANA_HasSolution()
 //! bs formula
 void Vanilla::ANA_EvalPrice()
 {
-    //! bs inputs*
+    //! bs inputs: year fraction, discount factor, drift-carrying forward, implied
+    //! vol at this strike/maturity, and the strike itself
     double t = YearFraction( _today, _maturity_date );
     double df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
     double f = _underlying->GetForward( _maturity_date, _premium_currency );
@@ -134,6 +147,7 @@ void Vanilla::ANA_EvalPrice()
         return;
     }
 
+    //! deterministic-vol Black-Scholes: closed-form premium + delta per option type
     //! call
     if ( _type == OptionType::Call )
     {
@@ -147,7 +161,7 @@ void Vanilla::ANA_EvalPrice()
         _valuation.delta = BS_Put_Delta( f, k, t, v, df );
     }
 
-    //! common greeks
+    //! greeks that are sign-independent of call/put (gamma, vega, volga)
     _valuation.gamma = BS_Gamma( f, k, t, v, df );
     _valuation.vega_bs = BS_Vega( f, k, t, v, df );
     _valuation.volga_bs = BS_Volga( f, k, t, v, df );
@@ -172,6 +186,7 @@ bool Vanilla::GPU_GbmParams( GpuGbmParams& Out )
         return false; //!< stochastic vol needs the QE / CF path, not lognormal GBM
     }
 
+    //! fill the GBM scalars (same conventions as ANA_EvalPrice) for the GPU kernel
     Out.t = YearFraction( _today, _maturity_date );
     Out.df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
     Out.forward = _underlying->GetForward( _maturity_date, _premium_currency );
@@ -181,12 +196,14 @@ bool Vanilla::GPU_GbmParams( GpuGbmParams& Out )
     return true;
 }
 
-//
+//! American iff configured so (drives the LSM / PDE early-exercise path)
 bool Vanilla::IsAmerican()
 {
     return _exercise_mode == ExerciseMode::American;
 }
 
+//! Build (or fetch) the Monte-Carlo flow node: a call/put payoff (floored at 0)
+//! on the spot node, settling at maturity.
 MonteCarloNode* Vanilla::GetFlowNode( NodeCollector& NC,
                                       const date& /*AsOfDate*/ )
 {

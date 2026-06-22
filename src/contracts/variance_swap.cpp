@@ -2,6 +2,10 @@
 #include "variance_swap.hpp"
 #include "object_reader.hpp"
 
+//! Variance-swap implementation: configuration, the model-free static-replication
+//! fair-variance (Demeterfi-Derman-Kamal-Zou) closed form, and the Monte-Carlo flow
+//! node that compares realized to strike variance.
+
 //! constructor
 VarianceSwap::VarianceSwap( const string& ObjectName ) : Contract( ObjectName, KIND_VARIANCE_SWAP )
 {
@@ -20,16 +24,19 @@ void VarianceSwap::Configure( ObjectReader& reader )
 }
 
 //! setters
+//! setter — maturity / single settlement date
 void VarianceSwap::SetMaturityDate( const date& MaturityDate )
 {
     _maturity_date = MaturityDate;
 }
 
+//! setter — strike as a volatility (decimal); squared to a variance strike at use
 void VarianceSwap::SetVolatilityStrike( double VolatilityStrike )
 {
     _volatility_strike = VolatilityStrike;
 }
 
+//! setter — variance notional (PV scales linearly in it)
 void VarianceSwap::SetNotional( double Notional )
 {
     _notional = Notional;
@@ -57,6 +64,7 @@ static constexpr int VARSWAP_STRIP_POINTS = 800;
 
 void VarianceSwap::ANA_EvalPrice()
 {
+    //! year fraction, discount factor and the drift-carrying forward at maturity
     double t = YearFraction( _today, _maturity_date );
     double df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
     double fwd = _underlying->GetForward( _maturity_date, _premium_currency );
@@ -68,6 +76,8 @@ void VarianceSwap::ANA_EvalPrice()
     //! its resolution where the integrand has mass (near the forward) instead of
     //! wasting points in the far upper wing a linear-K grid over-samples — tighter
     //! integration for the same point count, and strikes stay strictly positive.
+    //! half-width of the log-strike strip = span ATM standard deviations to maturity;
+    //! dlogk is the uniform log-strike step over 2*span (geometric strike spacing)
     double sigma_atm = _underlying->GetImplicitVol( fwd, _maturity_date );
     double span = VARSWAP_STRIP_SIGMA_SPAN * sigma_atm * sqrt( t );
     double dlogk = 2.0 * span / VARSWAP_STRIP_POINTS;
@@ -78,17 +88,20 @@ void VarianceSwap::ANA_EvalPrice()
     vols.reserve( VARSWAP_STRIP_POINTS + 1 );
     for ( int i = 0; i <= VARSWAP_STRIP_POINTS; i++ )
     {
+        //! k = F * e^{-span + i*dlogk} sweeps geometrically from F e^{-span} to F e^{+span}
         double k = fwd * exp( -span + i * dlogk );
         strikes.push_back( k );
         vols.push_back( _underlying->GetImplicitVol( k, _maturity_date ) );
     }
 
+    //! integrate the 1/K^2-weighted OTM strip into the fair variance, then assemble
+    //! PV = notional * DF * (fair_var - strike_var); vega is reported w.r.t. vol
     double k_fair = VarSwap_FairVariance( fwd, t, df, strikes, vols );
-    double k_var = _volatility_strike * _volatility_strike;
+    double k_var = _volatility_strike * _volatility_strike; //!< strike vol -> strike variance
 
     _valuation.premium = VarSwap_Price( _notional, df, k_fair, k_var );
     _valuation.vega_bs = VarSwap_Vega( _notional, df, k_fair );
-    _valuation.delta = 0;
+    _valuation.delta = 0; //!< first-order spot-neutral by construction (model-free strip)
     _valuation.gamma = 0;
 }
 
@@ -112,12 +125,15 @@ double VarianceSwap::Intrinsic( const double /*Spot*/ )
     return 0.0;
 }
 
+//! variance swaps settle only at maturity: no early exercise
 bool VarianceSwap::IsAmerican()
 {
     return false;
 }
 
-//! Monte-Carlo flow: realized variance of the simulated path vs the strike
+//! Monte-Carlo flow: realized variance of the simulated path vs the strike.
+//! Build (or fetch) a VarianceSwapFlowNode wired to the spot node, the strike
+//! variance (vol^2) and the notional, settling at maturity.
 MonteCarloNode* VarianceSwap::GetFlowNode( NodeCollector& NC,
                                            const date& /*AsOfDate*/ )
 {
@@ -131,7 +147,8 @@ MonteCarloNode* VarianceSwap::GetFlowNode( NodeCollector& NC,
                                                  } );
 }
 
-//! single payment at maturity
+//! single payment at maturity (the realized variance is accumulated by the flow
+//! node over the diffusion grid; only the settlement date is exposed here)
 set<date> VarianceSwap::GetFixingDates()
 {
     set<date> s;
@@ -139,11 +156,13 @@ set<date> VarianceSwap::GetFixingDates()
     return s;
 }
 
+//! same single date as the fixing
 set<date> VarianceSwap::GetFlowDates()
 {
     return GetFixingDates();
 }
 
+//! no early exercise: same single date
 set<date> VarianceSwap::GetAmericanExerciseDates()
 {
     return GetFixingDates();

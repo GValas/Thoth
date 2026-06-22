@@ -2,7 +2,12 @@
 #include "equity.hpp"
 #include "object_reader.hpp"
 
-//! constructor
+//! equity.cpp — Equity implementation: carry/dividend forwards, local vol, MCL nodes.
+//! Central theme: one carry yield and one dividend-escrow PV, reused across the ANA
+//! forward, the PDE carry and the MCL drift/dividend nodes so the engines agree.
+
+//! constructor — null out the optional curves (repo / continuous dividends); the
+//! discrete-dividend pointer defaults to null in the header. All are wired in Configure
 Equity::Equity( const string& ObjectName ) : Single( ObjectName, KIND_EQUITY )
 {
     _continuous_dividends = nullptr;
@@ -11,7 +16,9 @@ Equity::Equity( const string& ObjectName ) : Single( ObjectName, KIND_EQUITY )
 
 Equity::~Equity() = default;
 
-//! read spot / volatility / currency and the optional dividend & repo schedules
+//! read spot / volatility / currency and the optional dividend & repo schedules. The
+//! three dividend/repo blocks are independently optional — each is wired only if the
+//! YAML carries the matching reference, so an equity may have any subset of carries
 void Equity::Configure( ObjectReader& reader )
 {
     SetSpot( reader.Get<double>( "spot" ) );
@@ -31,31 +38,31 @@ void Equity::Configure( ObjectReader& reader )
     }
 }
 
-//! setter
+//! setter — bind the optional repo curve (non-owning)
 void Equity::SetRepo( RepoCurve* Repo )
 {
     _repo = Repo;
 }
 
-//! setter
+//! setter — bind the optional continuous dividend-yield curve (non-owning)
 void Equity::SetContinuousDividends( ContinuousDividendsCurve* ContinuousDividends )
 {
     _continuous_dividends = ContinuousDividends;
 }
 
-//! setter
+//! setter — bind the optional discrete cash-dividend schedule (non-owning)
 void Equity::SetDiscreteDividends( DiscreteDividends* DiscreteDividends )
 {
     _discrete_dividends = DiscreteDividends;
 }
 
-//! getter
+//! getter — repo curve (may be null)
 RepoCurve* Equity::GetRepo()
 {
     return _repo;
 }
 
-//! getter
+//! getter — continuous dividend-yield curve (may be null)
 ContinuousDividendsCurve* Equity::GetContinuousDividends()
 {
     return _continuous_dividends;
@@ -71,9 +78,12 @@ double Equity::DiscreteDividendsPv( const date& UpTo ) const
     }
     const vector<date>& dates = _discrete_dividends->GetDates();
     const vector<double>& amounts = _discrete_dividends->GetAmounts();
-    YieldCurve* rate = Asset::_currency->GetRate();
+    YieldCurve* rate = Asset::_currency->GetRate(); //!< discount on the equity's own curve
 
     double pv = 0;
+    //! sum only the dividends whose ex-date falls strictly after today and on/before
+    //! UpTo; each is discounted to today (DF(today) = 1) so pv is an as-of-today PV.
+    //! min(dates,amounts) guards a mismatched schedule.
     for ( size_t i = 0; i < dates.size() && i < amounts.size(); i++ )
     {
         if ( dates[i] > Object::_today && dates[i] <= UpTo )
@@ -107,6 +117,7 @@ double Equity::FutureDividendPv( const date& AsOf ) const
     const double df_asof = rate->GetDiscountFactor( AsOf );
 
     double pv = 0;
+    //! PV-as-of-today of every dividend strictly after AsOf...
     for ( size_t i = 0; i < dates.size() && i < amounts.size(); i++ )
     {
         if ( dates[i] > AsOf )
@@ -114,16 +125,19 @@ double Equity::FutureDividendPv( const date& AsOf ) const
             pv += amounts[i] * rate->GetDiscountFactor( dates[i] );
         }
     }
+    //! ...then divide by DF(AsOf) to re-express it as a forward value as of AsOf
+    //! (DF(d)/DF(AsOf) = the forward discount from d back to AsOf). Guard a zero DF.
     return ( df_asof > 0 ) ? pv / df_asof : pv;
 }
 
-//! getter
+//! getter — current spot (delegates to Single, which holds _spot)
 double Equity::GetSpot() const
 {
     return Single::GetSpot();
 }
 
-//!
+//! true when the bound vol object is a local-vol surface (Dupire/SABR), which routes
+//! pricing through the local-vol grid rather than a constant-vol step
 bool Equity::UseLocalVol()
 {
     return _volatility->_is_local;
@@ -139,11 +153,14 @@ double Equity::DividendRepoYield( const date& MaturityDate ) const
     return y;
 }
 
-//!
+//! escrowed-dividend forward F(T) = (S - PV[discrete divs <= T]) * exp(-q*T) / DF(T):
+//! the spot, netted of the PV of cash dividends due before T, grown at the risk-free
+//! rate (the 1/DF factor) less the continuous carry q (= dividend yield + repo). The
+//! quanto term qto is currently disabled (kept here for reference).
 double Equity::GetForward( const date& MaturityDate ) const
 {
-    double dt = YearFraction( Object::_today, MaturityDate );
-    double df = Asset::_currency->GetRate()->GetDiscountFactor( MaturityDate );
+    double dt = YearFraction( Object::_today, MaturityDate );                   //!< T in years
+    double df = Asset::_currency->GetRate()->GetDiscountFactor( MaturityDate ); //!< DF(T)
     //! continuous carry yield: dividend yield + repo (the same quantity the MCL
     //! drift node and the PDE carry subtract, so the three engines agree)
     double div = DividendRepoYield( MaturityDate );
@@ -173,14 +190,17 @@ double Equity::GetForward( const date& MaturityDate ) const
     return spot * exp( -dt * ( div + qto ) ) / df;
 }
 
-//! implicit vol
+//! implied vol at (Strike, MaturityDate) — delegates to Single, which supplies this
+//! equity's forward to the surface so a forward-measure (SABR) surface reads correctly
 double Equity::GetImplicitVol( const double Strike,
                                const date& MaturityDate )
 {
     return Single::GetImplicitVol( Strike, MaturityDate );
 }
 
-//! local vol
+//! Dupire local vol at (Strike, MaturityDate): reconstruct the surface's drift inputs
+//! — the zero rate r and the carry yield q (repo + continuous dividends, each optional)
+//! — and hand them with spot to the volatility object's local-vol formula
 double Equity::GetLocalVolatility( const double Strike,
                                    const date& MaturityDate )
 {
@@ -198,11 +218,15 @@ double Equity::GetLocalVolatility( const double Strike,
     return _volatility->GetLocalVolatility( Strike, MaturityDate, _spot, r, q );
 }
 
+//! mcl spot-diffusion node — delegates to Single::GetNode, which wires the drift and
+//! (via GetDividendNode below) the discrete-dividend escrow into the diffusion
 MonteCarloNode* Equity::GetNode( NodeCollector& NC )
 {
     return Single::GetNode( NC );
 }
 
+//! mcl drift node — sums the term-structured rate node minus the dividend and repo
+//! curve nodes (each optional), reproducing (r - q - repo) along the diffusion dates
 MonteCarloNode* Equity::GetDriftNode( NodeCollector& NC )
 {
     auto init = [&]( DriftNode* D )

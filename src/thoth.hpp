@@ -1,11 +1,22 @@
 #pragma once
 
-//! standard libs
+//! ----------------------------------------------------------------------------
+//! thoth.hpp : the project's umbrella / precompiled-style header. Almost every
+//! translation unit includes this first, so it gathers the common third-party
+//! and standard-library includes, the curated `using` imports that let the code
+//! write bare names (string, vector, date, ...), and the in-repo headers that
+//! define the shared vocabulary (constants, enums, RAII helpers, math/finance
+//! utilities). Keeping this single header authoritative means individual .cpp
+//! files declare only what is genuinely local to them.
+//! ----------------------------------------------------------------------------
+
+//! C standard library (math + process/IO primitives used throughout)
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
-//! stl libs
+//! C++ standard library : containers, streams, smart pointers, algorithms — the
+//! full set the engine leans on, included once here for every TU.
 #include <algorithm>
 #include <climits>
 #include <ctime>
@@ -75,7 +86,14 @@ using boost::gregorian::from_simple_string;
 using boost::gregorian::to_iso_extended_string;
 using boost::gregorian::to_simple_string;
 
-//! constants
+//! in-repo shared vocabulary, pulled in for every TU via this umbrella header:
+//!   constants    : numeric/financial constants and global tags (e.g. ROOT_NODE)
+//!   enums        : engine-wide enumerations (option type, method, ...)
+//!   raii         : scope-guard / resource wrappers
+//!   object_sets  : the registry of object kinds the YAML books can declare
+//!   finance      : day-count, discounting and other market conventions
+//!   maths        : numerical helpers (interpolation, roots, distributions, ...)
+//!   misc         : logging (LOG/ERR), timing (WallClockSeconds/TaskTime), ToString
 #include "constants.hpp"
 #include "enums.hpp"
 #include "raii.hpp"

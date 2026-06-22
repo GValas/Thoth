@@ -1,3 +1,15 @@
+//! ----------------------------------------------------------------------------
+//! run_server.cpp : the `-server` run mode — the HTTP pricing daemon. Exposes
+//! three endpoints over httplib:
+//!   POST /price    : YAML book in -> YAML result out (the actual work)
+//!   GET  /health   : liveness probe ("ok")
+//!   GET  /progress : "<current> <total> <active>" for the in-flight pricing,
+//!                    which the cluster master polls to draw a global bar
+//! Pricing is intentionally serialised (the numeric core keeps process-global
+//! state and is not re-entrant) and streamed back via a chunked provider so the
+//! server can detect a client disconnect mid-pricing and cancel the work.
+//! ----------------------------------------------------------------------------
+
 #include "run_modes.hpp"
 #include "cancellation.hpp"
 #include "object_manager.hpp"
@@ -12,6 +24,8 @@
 
 //! execute an in-memory YAML request (any task, not only pricing) and return the
 //! YAML result (throws on error). Shared with the cluster master (run_cluster.cpp).
+//! Runs the same four-stage pipeline as RunBatch but entirely in memory (no files):
+//! build the object graph for TaskName, execute, serialise, return as a string.
 string ExecuteYaml( const string& YamlRequest, const string& TaskName )
 {
     ObjectManager manager( YamlConfig::from_string_t{}, YamlRequest );
@@ -21,7 +35,9 @@ string ExecuteYaml( const string& YamlRequest, const string& TaskName )
     return manager.ResultYaml();
 }
 
-//! HTTP pricing server : POST /price (YAML in -> YAML out), GET /health
+//! HTTP pricing server : POST /price (YAML in -> YAML out), GET /health,
+//! GET /progress. Blocks in server.listen() until the process is killed or the
+//! bind fails. Returns 1 on bind failure, otherwise does not return.
 int RunHttpServer( int Port )
 {
     httplib::Server server;
@@ -53,6 +69,7 @@ int RunHttpServer( int Port )
                  {
         //! copy what the worker needs : the provider runs after this returns
         const string body = req.body;
+        //! optional X-Task-Name header selects the task; absent -> price the book root
         const string task_name = req.has_header( "X-Task-Name" )
                                  ? req.get_header_value( "X-Task-Name" )
                                  : string( ROOT_NODE );
@@ -78,6 +95,10 @@ int RunHttpServer( int Port )
                 }
                 cancellation::Reset();
 
+                //! price on a worker thread so this provider thread stays free to
+                //! watch the socket; any error is turned into an "error: ..." body
+                //! (the client/cluster detects failure from that prefix, since a
+                //! chunked response status is always 200).
                 string result;
                 std::atomic<bool> done{ false };
                 std::thread worker( [&]()
@@ -85,7 +106,7 @@ int RunHttpServer( int Port )
                     try { result = ExecuteYaml( body, task_name ); }
                     catch ( const std::exception& e ) { result = string( "error: " ) + e.what() + "\n"; }
                     catch ( ... ) { result = "error: unknown failure\n"; }
-                    done.store( true );
+                    done.store( true ); //!< signal the poll loop below that pricing finished
                 } );
 
                 //! poll the connection while the worker prices

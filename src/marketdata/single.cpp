@@ -2,7 +2,11 @@
 #include "single.hpp"
 #include "correlation.hpp"
 
-//! constructor
+//! single.cpp — Single implementation: spot/vol accessors, the spot-diffusion node
+//! graph (GBM / Heston / local-vol grid) and the contract-diffusion (Mono) role.
+
+//! constructor — null the vol pointer; spot defaults to 0 in the header and both are
+//! wired by the concrete name's Configure
 Single::Single( const string& ObjectName,
                 const string& ObjectKind ) : Underlying( ObjectName, ObjectKind )
 {
@@ -12,32 +16,33 @@ Single::Single( const string& ObjectName,
 //! destructor
 Single::~Single() = default;
 
-//! setter
+//! setter — bind the volatility surface by address (shared book object, not owned)
 void Single::SetVolatility( Volatility& Volatility )
 {
     _volatility = &Volatility;
 }
 
-//! setter
+//! setter — date the vol surface first (so a term-structured surface is aligned),
+//! then push the date up the Asset chain (which dates the currency/curve)
 void Single::SetToday( const date& Today )
 {
     _volatility->SetToday( Today );
     Asset::SetToday( Today );
 }
 
-//! setter
+//! setter — the spot price
 void Single::SetSpot( double Spot )
 {
     _spot = Spot;
 }
 
-//! getter
+//! getter — the bound volatility surface
 Volatility* Single::GetVolatility() const
 {
     return _volatility;
 }
 
-//! getter
+//! getter — current spot price
 double Single::GetSpot() const
 {
     return _spot;

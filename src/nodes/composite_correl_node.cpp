@@ -9,6 +9,12 @@ CompositeCorrelNode::CompositeCorrelNode( const string& Name ) : MonteCarloNode(
 
 CompositeCorrelNode::~CompositeCorrelNode() = default;
 
+//! correlation of a composite leg S.IJ with another factor AB. Since the composite
+//! log-return is the sum log S + log IJ, its covariance with AB is the sum of the
+//! two covariances, and normalising by the composite vol gives the correlation:
+//!   rho(S.IJ, AB) = ( rho(S,AB).v(S) + rho(IJ,AB).v(IJ) ) / v(S.IJ)
+//! where the denominator v(S.IJ) already satisfies
+//!   v^2(S.IJ) = v^2(IJ) + v^2(S) + 2.rho(S,IJ).v(S).v(IJ)
 void CompositeCorrelNode::ComputeValue( size_t DateIndex )
 {
     // rho(S.IJ, AB) = ( rho(S,AB).v(S) + rho(IJ,AB).v(IJ) ) / v(S.IJ)
@@ -17,7 +23,7 @@ void CompositeCorrelNode::ComputeValue( size_t DateIndex )
     double rho_ij_ab = _rho_IJ_AB_node->GetValue( DateIndex );
     double vol_ij = _vol_IJ_node->GetValue( DateIndex );
     double vol_s = _vol_S_node->GetValue( DateIndex );
-    double vol_s_ij = _vol_S_IJ_node->GetValue( DateIndex );
+    double vol_s_ij = _vol_S_IJ_node->GetValue( DateIndex ); //!< composite vol, the normaliser
     _value_list[DateIndex] = ( rho_s_ab * vol_s + rho_ij_ab * vol_ij ) / vol_s_ij;
 }
 
@@ -72,6 +78,8 @@ MonteCarloNode* CompositeCorrelNode::GetVolSIJNode()
     return _vol_S_IJ_node;
 }
 
+//! the composite correlation reads all five inputs (two sub-correlations, three vols)
+//! at the same date
 void CompositeCorrelNode::GetDateDependencies( size_t DateIndex,
                                                vector<MonteCarloNode*>& NodeList,
                                                vector<size_t>& DateList )

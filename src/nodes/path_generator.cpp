@@ -3,6 +3,12 @@
 #include "sobol_generator.hpp"
 #include "distributions.hpp"
 
+//! Construct the path generator for a fixed diffusion schedule. Builds the
+//! Brownian-bridge schedule once, sizes the Sobol generator (capped at the
+//! embedded dimension count), pre-skips the requested cluster offset, and
+//! allocates the per-factor scratch buffers reused on every NextPath().
+//! _m = number of bridge points = (#diffusion dates) - 1, since date 0 = today
+//! carries W = 0 and is not a bridge point.
 PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool UseSobol, Rng* RandomGenerator,
                               uint64_t SobolSkip )
     : _t( Times ), _m( (int)Times.size() - 1 ), _factors( Factors ), _use_sobol( UseSobol ), _rng( RandomGenerator )
@@ -23,6 +29,9 @@ PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool Use
         }
     }
 
+    //! reusable buffers (allocated once, refilled each path): _noise[f] indexed by
+    //! diffusion date with index 0 unused (W=0 there); _z[f] the standard normals
+    //! over the _m bridge steps; _u the Sobol uniforms; _w one factor's bridge path.
     _noise.assign( _factors, vector<double>( _m + 1, 0.0 ) );
     _z.assign( _factors, vector<double>( _m, 0.0 ) );
     _u.assign( _sobol_dim, 0.0 );
@@ -32,6 +41,11 @@ PathGenerator::PathGenerator( const vector<double>& Times, int Factors, bool Use
 PathGenerator::~PathGenerator() = default;
 
 //! QuantLib-style Brownian bridge schedule over the _m points at times _t[1.._m].
+//! Precomputes, for each build step i, which point is being set (_bridge_index),
+//! its already-set left/right anchors (_left_index/_right_index), the linear
+//! interpolation weights (_left_weight/_right_weight) and the conditional standard
+//! deviation (_std_dev) of the bridge increment. Pure function of the time grid,
+//! so it is path-independent and run once. No-op when there are no steps.
 void PathGenerator::BuildBridgeSchedule()
 {
     _bridge_index.assign( _m, 0 );
@@ -50,11 +64,16 @@ void PathGenerator::BuildBridgeSchedule()
     { return _t[k + 1]; };
 
     vector<int> map( _m, 0 ); //!< 0 = not yet set, else 1-based build order
+    //! step 0 fixes the endpoint (the most important dimension) directly from a
+    //! single normal: W(T) = sqrt(T) * Z, no left/right anchors.
     map[_m - 1] = 1;
     _bridge_index[0] = _m - 1;
     _std_dev[0] = sqrt( bt( _m - 1 ) ); //!< endpoint: W = sqrt(T) * Z
     _left_weight[0] = _right_weight[0] = 0.0;
 
+    //! subsequent steps insert the midpoint of the largest not-yet-filled gap, so
+    //! the coarse structure of the path is decided by the low Sobol dimensions and
+    //! the fine detail by the high ones (variance front-loading).
     int j = 0;
     for ( int i = 1; i < _m; i++ )
     {
@@ -65,7 +84,7 @@ void PathGenerator::BuildBridgeSchedule()
         int k = j;
         while ( !map[k] )
         {
-            k++; //!< next set point to the right
+            k++; //!< next set point to the right (the gap's right anchor)
         }
         int l = j + ( ( k - 1 - j ) >> 1 ); //!< midpoint to set now
         map[l] = i + 1;
@@ -74,16 +93,24 @@ void PathGenerator::BuildBridgeSchedule()
         _right_index[i] = k;
         if ( j != 0 )
         {
+            //! interior gap: condition on both anchors W(j-1) and W(k). Mean is the
+            //! time-linear interpolation; variance is the Brownian-bridge conditional
+            //! variance (t_l - t_{j-1})(t_k - t_l)/(t_k - t_{j-1}).
             _left_weight[i] = ( bt( k ) - bt( l ) ) / ( bt( k ) - bt( j - 1 ) );
             _right_weight[i] = ( bt( l ) - bt( j - 1 ) ) / ( bt( k ) - bt( j - 1 ) );
             _std_dev[i] = sqrt( ( bt( l ) - bt( j - 1 ) ) * ( bt( k ) - bt( l ) ) / ( bt( k ) - bt( j - 1 ) ) );
         }
         else
         {
+            //! left edge (j == 0): no left anchor since W(0) = 0 at today, so the
+            //! mean uses only the right anchor and the variance reduces to
+            //! t_l (t_k - t_l)/t_k.
             _left_weight[i] = ( bt( k ) - bt( l ) ) / bt( k );
             _right_weight[i] = bt( l ) / bt( k );
             _std_dev[i] = sqrt( bt( l ) * ( bt( k ) - bt( l ) ) / bt( k ) );
         }
+        //! continue scanning past the just-closed right anchor; wrap to restart the
+        //! left-to-right sweep for the next round of gaps.
         j = k + 1;
         if ( j >= _m )
         {
@@ -92,6 +119,10 @@ void PathGenerator::BuildBridgeSchedule()
     }
 }
 
+//! Advance to the next path: draw a fresh block of standard normals, run the
+//! Brownian bridge for every factor, and refill the _noise buffers with the
+//! normalized increments the NoiseNodes read. Side effect: mutates _u, _z, _w and
+//! _noise, and advances the Sobol/pseudo-random streams. No-op for an empty grid.
 void PathGenerator::NextPath()
 {
     if ( _m == 0 )
@@ -129,12 +160,17 @@ void PathGenerator::NextPath()
     for ( int f = 0; f < _factors; f++ )
     {
         const vector<double>& z = _z[f];
+        //! step 0: place the endpoint W(T) = sqrt(T) * Z directly.
         _w[_bridge_index[0]] = _std_dev[0] * z[0];
         for ( int i = 1; i < _m; i++ )
         {
             int li = _left_index[i];
             int ri = _right_index[i];
             int bi = _bridge_index[i];
+            //! conditional draw: mean = interpolation of the two anchors, plus the
+            //! independent bridge increment _std_dev[i] * z[i]. The li != 0 / else
+            //! split mirrors the interior-gap vs left-edge cases of the schedule
+            //! (left anchor is W[li-1] because _w is 0-based over points 1.._m).
             if ( li != 0 )
             {
                 _w[bi] = _left_weight[i] * _w[li - 1] + _right_weight[i] * _w[ri] + _std_dev[i] * z[i];
@@ -145,7 +181,10 @@ void PathGenerator::NextPath()
             }
         }
 
-        //! W at diffusion index 0 is 0; _w[k] is W at diffusion index k+1
+        //! convert the bridge path W into the normalized increments the downstream
+        //! BrownianNode expects: n[i] = (W_i - W_{i-1}) / sqrt(dt_i). W at diffusion
+        //! index 0 is 0; _w[k] holds W at diffusion index k+1. A zero-length step
+        //! yields 0 to avoid a divide-by-zero on coincident dates.
         vector<double>& n = _noise[f];
         double prev = 0.0;
         for ( int i = 1; i <= _m; i++ )

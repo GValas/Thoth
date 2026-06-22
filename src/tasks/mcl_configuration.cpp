@@ -2,12 +2,13 @@
 #include "mcl_configuration.hpp"
 #include "object_reader.hpp"
 
-//!
+//! pure parameter object (kind KIND_MCL_CONFIGURATION): fields are populated later
+//! by Configure, nothing to set up here
 MclConfiguration::MclConfiguration( const string& ObjectName ) : Object( ObjectName, KIND_MCL_CONFIGURATION )
 {
 }
 
-//!
+//! no owned resources
 MclConfiguration::~MclConfiguration() = default;
 
 //! read the engine parameters, then guard against degenerate grids

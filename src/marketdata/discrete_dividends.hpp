@@ -1,6 +1,8 @@
 #pragma once
 #include "market_data.hpp"
 
+//! discrete_dividends.hpp — the discrete cash-dividend schedule (a data holder).
+//!
 //! A schedule of discrete cash dividends: an (ex-date, amount) list in the equity's
 //! currency. Priced by the escrowed-dividend model — the holder (Equity) subtracts
 //! the present value of the dividends due before a horizon from the spot when it
@@ -18,12 +20,14 @@ class DiscreteDividends : public MarketData
     //! read own fields (ex-dates + cash amounts)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter
+    //! setter — the ascending ex-dividend dates
     void SetDates( const vector<date>& Dates );
+    //! setter — the cash amounts (index-aligned with the ex-dates)
     void SetAmounts( const vector<double>& Amounts );
 
-    //! getter
+    //! getter — ex-dividend dates (used by Equity to time the escrow PV)
     const vector<date>& GetDates() const;
+    //! getter — cash amounts per ex-date (Equity discounts these on its curve)
     const vector<double>& GetAmounts() const;
 
     //! constructor, destructor

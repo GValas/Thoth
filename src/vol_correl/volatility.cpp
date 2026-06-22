@@ -1,8 +1,18 @@
+//! volatility.cpp — abstract volatility-surface base.
+//!
+//! Holds the calendar day-weight shared by every concrete surface (bs / sabr /
+//! heston) and provides the model-independent Dupire local-volatility transform
+//! (GetLocalVolatility): given an implied surface it builds the local vol the PDE
+//! diffusion must use, by finite-differencing the implied surface in strike and
+//! time. Concrete surfaces only supply GetImplicitVol; the Dupire algebra lives
+//! here so every kind reuses it.
+
 #include "thoth.hpp"
 #include "volatility.hpp"
 #include "object_reader.hpp"
 
-//!
+//! constructor: seed the day-weight with the project default (overridden later if
+//! the YAML names a calendar with its own non_working_days_weight)
 Volatility::Volatility( const string& ObjectName,
                         const string& ObjectKind ) : MarketData( ObjectName, ObjectKind )
 {
@@ -24,7 +34,18 @@ void Volatility::ConfigureCommon( ObjectReader& reader )
     }
 }
 
+//! Dupire local volatility at (K, T) derived from the implied surface.
 //!
+//! Implements Dupire's formula in its implied-vol (rather than call-price) form:
+//! given the implied-vol surface V(K,T) it returns the instantaneous local vol
+//! sigma_loc(K,T) that reproduces the same European prices in a 1-factor PDE.
+//! All the V-derivatives below are computed by central finite differences on
+//! GetImplicitVol, so this works for any concrete surface (notably SABR).
+//!
+//! @param Strike, MaturityDate   the (K, T) grid node the PDE asks for
+//! @param Spot, RiskFreeRate, ContinuousDividend   diffusion inputs; the forward
+//!        F(tau) = S e^{(r-q)tau} enters the moneyness and the time-derivative term
+//! @return sigma_loc = sqrt(local variance), floored to stay real (see below)
 double Volatility::GetLocalVolatility( const double Strike,
                                        const date& MaturityDate,
                                        const double Spot,
@@ -32,13 +53,13 @@ double Volatility::GetLocalVolatility( const double Strike,
                                        const double ContinuousDividend )
 {
 
-    //! faster naming conventions
+    //! faster naming conventions (match the textbook Dupire notation)
     double S = Spot;
     double K = Strike;
     double r = RiskFreeRate;
     double q = ContinuousDividend;
     date t = MaturityDate;
-    double T = YearFraction( _today, t );
+    double T = YearFraction( _today, t ); //!< time to maturity in years
 
     //! finite-difference bumps: dK in strike units, dT in years (must match the
     //! ±1 calendar-day shift used for the time bumps below)
@@ -50,25 +71,30 @@ double Volatility::GetLocalVolatility( const double Strike,
     double F_Td = S * exp( ( r - q ) * YearFraction( _today, t - days( 1 ) ) );
     double F_Tu = S * exp( ( r - q ) * YearFraction( _today, t + days( 1 ) ) );
 
-    // mid vol
+    // mid (central) implied vol at the node
     double V = GetImplicitVol( K, F, t );
 
-    // derivatives
+    // surrounding samples for the central differences: ±dK in strike, ±1 day in
+    // time (each time sample uses the forward to *its own* bumped maturity)
     double V_Kd = GetImplicitVol( K - dK, F, t );
     double V_Ku = GetImplicitVol( K + dK, F, t );
     double V_Td = GetImplicitVol( K, F_Td, t - days( 1 ) );
     double V_Tu = GetImplicitVol( K, F_Tu, t + days( 1 ) );
 
-    // calculus
+    // assemble Dupire's implied-vol formula
+    //   sigma_loc^2 = N / D, with
+    //   N = sigma^2 + 2 sigma T (dsigma/dT + (r-q) K dsigma/dK)
+    //   D = (1 + K d1 sqrt(T) dsigma/dK)^2
+    //       + K^2 T sigma (d2sigma/dK2 - d1 (dsigma/dK)^2 sqrt(T))
     double sT = sqrt( T );
     double V2 = V * V;
-    double d1 = ( log( S / K ) + ( r - q + .5 * V2 ) * T ) / V / sT;
-    double dVdK = ( V_Ku - V_Kd ) / ( 2 * dK );
-    double dVdK2 = ( V_Ku + V_Kd - 2 * V ) / ( dK * dK );
-    double dVdT = ( V_Tu - V_Td ) / ( 2 * dT );
-    double N = 2 * V * T * ( dVdT + ( r - q ) * K * dVdK ) + V2;
-    double D1 = 1 + K * d1 * dVdK * sT;
-    double D = D1 * D1 + K * K * T * V * ( dVdK2 - d1 * dVdK * dVdK * sT );
+    double d1 = ( log( S / K ) + ( r - q + .5 * V2 ) * T ) / V / sT;        //!< Black d1 at the node
+    double dVdK = ( V_Ku - V_Kd ) / ( 2 * dK );                             //!< first strike slope
+    double dVdK2 = ( V_Ku + V_Kd - 2 * V ) / ( dK * dK );                   //!< strike convexity (skew curvature)
+    double dVdT = ( V_Tu - V_Td ) / ( 2 * dT );                             //!< calendar slope
+    double N = 2 * V * T * ( dVdT + ( r - q ) * K * dVdK ) + V2;            //!< numerator (calendar + drift terms)
+    double D1 = 1 + K * d1 * dVdK * sT;                                     //!< inner bracket of the skew term
+    double D = D1 * D1 + K * K * T * V * ( dVdK2 - d1 * dVdK * dVdK * sT ); //!< denominator (skew + convexity)
 
     //! Dupire local variance. The implied surface is not guaranteed arbitrage-free
     //! everywhere (Hagan's SABR expansion develops a small calendar/butterfly
@@ -82,12 +108,16 @@ double Volatility::GetLocalVolatility( const double Strike,
     return sqrt( local_var > floor ? local_var : floor );
 }
 
-//! setter
+//! setter for the calendar weight applied to non-trading (weekend) days
 void Volatility::SetNonWorkingDaysWeight( double Weight )
 {
     _non_working_days_weight = Weight;
 }
 
+//! calendar day-weight applied to the vol level. Variance accrues on trading days
+//! at full rate and on the 2 weekend days at _non_working_days_weight; over a
+//! 7-day week the average variance fraction is (5 + 2*w)/7, so the vol multiplier
+//! is its square root. Weight = 1 makes this 1 (no calendar effect).
 double Volatility::GetDayWeight()
 {
     return sqrt( ( 5. + 2. * _non_working_days_weight ) / 7. );

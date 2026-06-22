@@ -2,6 +2,9 @@
 #include "currency.hpp"
 #include "object_reader.hpp"
 
+//! currency.cpp — Currency implementation: curve wiring, dating, MCL rate node.
+
+//! constructor — tag as a currency kind; the rate curve is wired in Configure
 Currency::Currency( const string& ObjectName ) : MarketData( ObjectName, KIND_CURRENCY )
 {
     _rate = nullptr;
@@ -9,26 +12,28 @@ Currency::Currency( const string& ObjectName ) : MarketData( ObjectName, KIND_CU
 
 Currency::~Currency() = default;
 
-//! read the discount (yield) curve this currency wraps
+//! read the discount (yield) curve this currency wraps (referenced by the YAML field
+//! "rate"); the curve itself is a separate book object resolved here by reference
 void Currency::Configure( ObjectReader& reader )
 {
     SetRate( *reader.Ref<YieldCurve>( "rate" ) );
 }
 
-//! setter
+//! setter — bind the discount/yield curve by address (shared book object, not owned)
 void Currency::SetRate( YieldCurve& Rate )
 {
     _rate = &Rate;
 }
 
-//! setter
+//! setter — date this Object first, then push the same date into the wrapped curve so
+//! its discount factors are computed from the right valuation date
 void Currency::SetToday( const date& Today )
 {
     Object::SetToday( Today );
     _rate->SetToday( Today );
 }
 
-//! getter
+//! getter — the wrapped discount/yield curve
 YieldCurve* Currency::GetRate() const
 {
     return _rate;

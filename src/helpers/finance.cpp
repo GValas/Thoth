@@ -14,10 +14,11 @@ double payoff_vanilla( const double spot,
                        const bool has_floor,
                        const double floor )
 {
-    //! vanilla part
+    //! vanilla part : signed intrinsic (not yet floored at 0; a payoff floor of 0
+    //! is applied only if the caller passes has_floor with floor==0)
     double vanilla = ( type == OptionType::Call ) ? ( spot - strike ) : ( strike - spot );
 
-    //! cap/floor
+    //! cap/floor : clamp the intrinsic into [floor, cap] when requested
     if ( has_cap )
     {
         vanilla = min( vanilla, cap );
@@ -66,13 +67,16 @@ double BS_Call_Price( const double Forward,
                       const double Volatility,
                       const double DiscountFactor )
 {
+    //! degenerate cases (no vol, no time, non-positive F/K): the lognormal is a
+    //! point mass at F, so the price is the discounted intrinsic
     if ( Volatility <= 0 || TimeToMaturity == 0 || Strike <= 0 || Forward <= 0 )
     {
         return DiscountFactor * max( Forward - Strike, 0.0 );
     }
     else
     {
-        double v_sqr_t = Volatility * sqrt( TimeToMaturity );
+        double v_sqr_t = Volatility * sqrt( TimeToMaturity ); //!< total vol sigma*sqrt(T)
+        //! d1 = [ln(F/K) + sigma^2 T/2] / (sigma sqrt(T)), d2 = d1 - sigma sqrt(T)
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double d2 = d1 - v_sqr_t;
         double Nd1 = NormalCdf( d1 );
@@ -88,6 +92,7 @@ double BS_Put_Price( const double Forward,
                      const double Volatility,
                      const double DiscountFactor )
 {
+    //! put = call - df*(F - K)  (forward-measure put/call parity)
     double c = BS_Call_Price( Forward, Strike, TimeToMaturity, Volatility, DiscountFactor );
     double p = c - DiscountFactor * ( Forward - Strike );
     return p;
@@ -100,6 +105,8 @@ double BS_Call_Delta( const double Forward,
                       const double Volatility,
                       const double DiscountFactor )
 {
+    //! degenerate: the option is either fully in or out of the money, so the
+    //! forward delta is df (ITM) or 0 (OTM)
     if ( Volatility <= 0 || TimeToMaturity == 0 || Strike <= 0 || Forward <= 0 )
     {
         return ( Forward > Strike ? DiscountFactor : 0 );
@@ -109,7 +116,7 @@ double BS_Call_Delta( const double Forward,
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double Nd1 = NormalCdf( d1 );
-        return DiscountFactor * Nd1;
+        return DiscountFactor * Nd1; //!< forward delta = df * N(d1)
     }
 }
 
@@ -120,6 +127,7 @@ double BS_Put_Delta( const double Forward,
                      const double Volatility,
                      const double DiscountFactor )
 {
+    //! put delta = call delta - 1 (differentiating parity w.r.t. the forward)
     double c = BS_Call_Delta( Forward, Strike, TimeToMaturity, Volatility, DiscountFactor );
     double p = c - 1;
     return p;
@@ -142,6 +150,7 @@ double BS_Vega( const double Forward,
         double v_sqr_t = Volatility * sqr_t;
         double d2 = log( Forward / Strike ) / v_sqr_t - 0.5 * v_sqr_t;
         double Fd2 = NormalPdf( d2 );
+        //! vega = df * K * sqrt(T) * phi(d2) (equivalently df * F * sqrt(T) * phi(d1))
         return DiscountFactor * Strike * sqr_t * Fd2;
     }
 }
@@ -162,6 +171,7 @@ double BS_Gamma( const double Forward,
         double v_sqr_t = Volatility * sqrt( TimeToMaturity );
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double Fd1 = NormalPdf( d1 );
+        //! gamma = df * phi(d1) / (F * sigma * sqrt(T))
         return DiscountFactor * Fd1 / Forward / v_sqr_t;
     }
 }
@@ -183,6 +193,8 @@ double BS_Volga( const double Forward,
         double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
         double d2 = d1 - v_sqr_t;
         double Fd1 = NormalPdf( d1 );
+        //! volga = vega * d1 * d2 / sigma = df*F*phi(d1)*sqrt(T) * d1*d2
+        //! (here vega*sqrt(T)*... is regrouped as F*phi(d1)*v_sqr_t*d1*d2)
         return DiscountFactor * Forward * Fd1 * v_sqr_t * d1 * d2;
     }
 }
@@ -247,7 +259,8 @@ double BS_Call_ImplicitVol( const double Forward,
                             const double DiscountFactor )
 {
 
-    //! vol start point
+    //! Newton-Raphson: vol_{k+1} = vol_k + (target_price - BS(vol_k)) / vega(vol_k).
+    //! vega is the derivative dPrice/dvol, so this is the standard Newton step.
     double vega, vol_error, vol = INITIAL_IMPLICIT_VOL;
     int i = 0;
     do
@@ -260,8 +273,9 @@ double BS_Call_ImplicitVol( const double Forward,
         else
         {
             vol_error = Price - BS_Call_Price( Forward, Strike, TimeToMaturity, vol, DiscountFactor );
-            vol += vol_error / vega;
+            vol += vol_error / vega; //!< Newton update
         }
+        //! stop once the PRICE residual is within tolerance, or the iteration cap hits
     } while ( abs( vol_error ) > IMPLICIT_VOL_MAX_ERROR && ++i < IMPLICIT_VOL_MAX_ITERATIONS );
 
     return vol;
@@ -273,6 +287,9 @@ namespace
 {
 using cdouble = std::complex<double>;
 
+//! Bundle of Heston/Bates parameters threaded through the CF integrand.
+//! F forward, K strike, T maturity (years); v0 spot variance, kappa mean-reversion
+//! speed, theta long-run variance, xi vol-of-vol, rho spot/variance correlation.
 struct HestonParams
 {
     double F, K, T, v0, kappa, theta, xi, rho;
@@ -287,18 +304,26 @@ double heston_integrand( double phi, void* params )
     const HestonParams& h = *static_cast<HestonParams*>( params );
     const cdouble I( 0.0, 1.0 );
 
+    //! uj, bj are the standard Heston P1/P2 coefficients (Heston 1993): the j=1
+    //! measure shifts the drift by -rho*xi (b1 = kappa - rho*xi), j=2 keeps kappa.
     const double uj = ( h.j == 1 ) ? 0.5 : -0.5;
     const double bj = ( h.j == 1 ) ? ( h.kappa - h.rho * h.xi ) : h.kappa;
     const double a = h.kappa * h.theta;
     const double xi2 = h.xi * h.xi;
 
-    const cdouble rxi = h.rho * h.xi * I * phi;
+    const cdouble rxi = h.rho * h.xi * I * phi; //!< rho*xi*i*phi, recurring subterm
+    //! d = sqrt((rho*xi*i*phi - bj)^2 - xi^2*(2*uj*i*phi - phi^2)) — the CF discriminant
     const cdouble d = std::sqrt( ( rxi - bj ) * ( rxi - bj ) - xi2 * ( 2.0 * uj * I * phi - phi * phi ) );
+    //! g uses the (bj - rxi - d) numerator: the "Little Heston Trap" (Albrecher et
+    //! al.) form that keeps the complex log on the principal, continuous branch and
+    //! avoids the discontinuities of the original (+d) parametrisation
     const cdouble g = ( bj - rxi - d ) / ( bj - rxi + d ); //!< little-Heston-trap
     const cdouble edt = std::exp( -d * h.T );
 
+    //! C(T,phi) and D(T,phi) : the affine exponents of the Heston CF
     const cdouble C = ( a / xi2 ) * ( ( bj - rxi - d ) * h.T - 2.0 * std::log( ( 1.0 - g * edt ) / ( 1.0 - g ) ) );
     const cdouble D = ( bj - rxi - d ) / xi2 * ( ( 1.0 - edt ) / ( 1.0 - g * edt ) );
+    //! characteristic function f_j(phi) = exp(C + D*v0 + i*phi*ln F)
     cdouble f = std::exp( C + D * h.v0 + I * phi * std::log( h.F ) );
 
     //! Bates : multiply by the closed-form jump characteristic function. The two
@@ -365,6 +390,8 @@ double Heston_Call_Price( const double Forward,
     }
     HestonParams h{ Forward, Strike, TimeToMaturity, V0, Kappa, Theta, Xi, Rho,
                     JumpIntensity, JumpMean, JumpVol, 1 };
+    //! same delta-/exercise-probability decomposition as Black-Scholes:
+    //! C = df * (F*P1 - K*P2), with P1, P2 the two CF probabilities
     double P1 = heston_probability( h, 1 );
     double P2 = heston_probability( h, 2 );
     return DiscountFactor * ( Forward * P1 - Strike * P2 );
@@ -383,7 +410,7 @@ double Heston_Put_Price( const double Forward,
                          const double JumpMean,
                          const double JumpVol )
 {
-    //! put/call parity
+    //! put/call parity (model-independent): P = C - df*(F - K)
     double c = Heston_Call_Price( Forward, Strike, TimeToMaturity, DiscountFactor,
                                   V0, Kappa, Theta, Xi, Rho, JumpIntensity, JumpMean, JumpVol );
     return c - DiscountFactor * ( Forward - Strike );

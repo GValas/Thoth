@@ -7,25 +7,28 @@
 class ContractNode : public MonteCarloNode
 {
   private:
-    vector<size_t> _flow_date_index_list;
-    vector<MonteCarloNode*> _flow_node_list;
-    MonteCarloNode* _rate_curve_node = nullptr;
+    vector<size_t> _flow_date_index_list;       //!< flow date index per flow node (parallel to _flow_node_list)
+    vector<MonteCarloNode*> _flow_node_list;    //!< payoff/flow nodes paying on those dates
+    MonteCarloNode* _rate_curve_node = nullptr; //!< zero-rate curve used to discount each flow
 
   public:
+    //! contract premium = sum of each flow discounted from its flow date to DateIndex
     void ComputeValue( size_t DateIndex ) override;
+    //! each flow (read at its own flow date) and the rate curve at that date are children
     void GetDateDependencies( size_t DateIndex,
                               vector<MonteCarloNode*>& NodeList,
                               vector<size_t>& DateList ) override;
 
     //! getter
-    vector<size_t> GetFlowDateIndexList();
-    vector<MonteCarloNode*> GetFlowNodeList();
-    MonteCarloNode* GetRateCurveNode();
+    vector<size_t> GetFlowDateIndexList();     //!< the flow date indices (graph wiring / inspection)
+    vector<MonteCarloNode*> GetFlowNodeList(); //!< the flow nodes, index-aligned with the dates
+    MonteCarloNode* GetRateCurveNode();        //!< the discounting rate curve node
 
     //! setters
+    //! append a flow node together with the date index on which it pays
     void PushFlowNode( MonteCarloNode* N,
                        size_t FlowDateIndex );
-    void SetRateCurveNode( MonteCarloNode* N );
+    void SetRateCurveNode( MonteCarloNode* N ); //!< wire the discounting zero-rate curve
 
     ContractNode( const string& Name );
     ~ContractNode() override;

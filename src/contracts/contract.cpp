@@ -4,6 +4,11 @@
 #include "currency.hpp"
 #include "object_reader.hpp"
 
+//! Contract base implementation: common configuration (underlying + premium
+//! currency resolution), the canonical Monte-Carlo node assembly (contract node =
+//! sum of per-date flow nodes) and the quanto-aware underlying spot node. Concrete
+//! contracts add their own payoff flow nodes, dates and pricing-facet predicates.
+
 //! constructor (members are initialised in-class)
 Contract::Contract( const string& ObjectName,
                     const string& ObjectKind ) : Object( ObjectName, ObjectKind ) {}
@@ -25,19 +30,20 @@ void Contract::ConfigureCommon( ObjectReader& reader )
 //! destructor
 Contract::~Contract() = default;
 
-//! setter
+//! setter (non-owning: the underlying is owned by the object registry)
 void Contract::SetUnderlying( Underlying& Underlying )
 {
     _underlying = &Underlying;
 }
 
-//! setter
+//! setter (non-owning)
 void Contract::SetPremiumCurrency( Currency& PremiumCurrency )
 {
     _premium_currency = &PremiumCurrency;
 }
 
-//! setter
+//! cascade the valuation date: currency (curve roll) and underlying (spot/vol roll)
+//! must be re-anchored to Today before the base Object records it
 void Contract::SetToday( const date& Today )
 {
     _premium_currency->SetToday( Today );
@@ -63,6 +69,9 @@ void Contract::SetCorrelation( Correlation* Correlation )
     _correlation = Correlation;
 }
 
+//! Build (or fetch the cached) ContractNode: the discounted sum of this contract's
+//! cash flows. One flow node per flow date, each keyed by its date index, plus the
+//! premium-currency rate curve node used to discount them.
 MonteCarloNode* Contract::GetNode( NodeCollector& NC )
 {
     //! option node is a sum-product over its flow nodes
@@ -78,9 +87,13 @@ MonteCarloNode* Contract::GetNode( NodeCollector& NC )
         } );
 }
 
+//! The spot node the payoff observes. When the underlying settles in a different
+//! currency than the premium (a quanto), the spot must be drift-adjusted; otherwise
+//! the bare spot node is returned.
 MonteCarloNode* Contract::GetUnderlyingNode( NodeCollector& NC )
 {
-    //! misc
+    //! misc: underlying vs contract currency, and a node name that encodes the
+    //! quanto target so the quanto-adjusted node never collides with the bare one
     string udl_ccy = _underlying->GetCurrency()->GetName();
     string ctr_ccy = _premium_currency->GetName();
     string node_name = _underlying->GetName() + node_name::SPOT;
@@ -99,6 +112,8 @@ MonteCarloNode* Contract::GetUnderlyingNode( NodeCollector& NC )
         node_name,
         [&]( QuantoAdjustmentNode* Q )
         {
+            //! quanto drift = -rho_{S,FX} * sigma_S * sigma_FX: feed the node the
+            //! spot, the spot/FX correlation, the spot vol and the FX vol it needs
             Q->SetUdlSpotNode( _underlying->GetNode( NC ) );
             Q->SetUdlFxCorrelNode( _underlying->GetCorrelNode( NC, udl_ccy, ctr_ccy ) );
             Q->SetUdlVolNode( _underlying->GetVolNode( NC ) );
@@ -106,6 +121,7 @@ MonteCarloNode* Contract::GetUnderlyingNode( NodeCollector& NC )
         } );
 }
 
+//! the single names backing this contract (delegated to the underlying)
 SingleSet Contract::GetSingleSet() const
 {
     return _underlying->GetSingleSet();

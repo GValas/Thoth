@@ -99,13 +99,17 @@ class Volatility : public MarketData
                                    const double Forward,
                                    const date& MaturityDate ) = 0;
 
+    //! Dupire local vol at (Strike, MaturityDate): finite-differences this
+    //! surface's GetImplicitVol in strike and time and applies Dupire's formula.
+    //! Model-independent — defined once in the base for every concrete kind.
     double GetLocalVolatility( const double Strike,
                                const date& MaturityDate,
                                const double Spot,
                                const double RiskFreeRate,
                                const double ContinuousDividend );
 
-    //! mcl node
+    //! mcl node: the constant/diffusion node the Monte-Carlo tree reads its vol
+    //! from. Pure virtual — each kind supplies its own (or errors if MC-unsupported).
     virtual MonteCarloNode* GetNode( NodeCollector& NC ) = 0;
 
     //! constructor & destructor

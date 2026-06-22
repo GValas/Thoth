@@ -3,6 +3,11 @@
 #include "object_reader.hpp"
 #include "single.hpp" //!< complete Single for the aggregated SingleSet
 
+//! Book implementation: configuration, premium/Greek accessors, the date and name
+//! unions the engines need, and the Monte-Carlo BookNode that sums the contract
+//! sub-trees. The aggregated premium/Greeks are written by the pricing engines via
+//! the setters and read back by the output reader.
+
 //! constructor (members are initialised in-class)
 Book::Book( const string& ObjectName ) : Object( ObjectName, KIND_BOOK ) {}
 
@@ -45,7 +50,8 @@ void Book::SetGamma( double Gamma )
     _gamma = Gamma;
 }
 
-//! setter
+//! cascade the valuation date: the book has no state of its own to roll, so it
+//! just re-anchors each contract (which in turn rolls its currency and underlying)
 void Book::SetToday( const date& Today )
 {
     for ( Contract* c : _option_list )
@@ -132,7 +138,9 @@ SingleSet Book::GetSingleSet() const
     return s;
 }
 
-//! list of currency names
+//! list of currency names: per contract, its premium (settlement) currency plus
+//! every currency its underlying's legs are quoted in (so the engine builds all the
+//! needed rate / FX curves)
 CurrencySet Book::GetCurrencySet() const
 {
     CurrencySet s;
@@ -145,6 +153,7 @@ CurrencySet Book::GetCurrencySet() const
     return s;
 }
 
+//! Build (or fetch) the BookNode: the Monte-Carlo aggregate of all contract nodes.
 MonteCarloNode* Book::GetNode( NodeCollector& NC )
 {
     return NC.GetOrCreate<BookNode>(

@@ -2,12 +2,13 @@
 #include "pde_configuration.hpp"
 #include "object_reader.hpp"
 
-//!
+//! pure parameter object (kind KIND_PDE_CONFIGURATION): grid sizes are filled in by
+//! Configure from the precision preset, nothing to set up here
 PdeConfiguration::PdeConfiguration( const string& ObjectName ) : Object( ObjectName, KIND_PDE_CONFIGURATION )
 {
 }
 
-//!
+//! no owned resources
 PdeConfiguration::~PdeConfiguration() = default;
 
 //! read the vanilla precision preset (maps to default grid sizes), then apply any

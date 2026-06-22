@@ -3,6 +3,7 @@
 #include "cancellation.hpp"
 #include "progress_bar.hpp"
 
+//! a closed-form pricer is just a Pricer; no engine state to initialise
 PricerANA::PricerANA( const string& ObjectName,
                       YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig )
 {

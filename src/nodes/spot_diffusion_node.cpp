@@ -3,6 +3,8 @@
 
 //************************************************************************/
 
+//! Construct with all inputs unwired and the spot zeroed; the graph builder sets
+//! the children and the spot before the first path.
 SpotDiffusionNode::SpotDiffusionNode( const string& Name ) : MonteCarloNode( Name )
 {
     _local_vol_node = nullptr;
@@ -13,6 +15,9 @@ SpotDiffusionNode::SpotDiffusionNode( const string& Name ) : MonteCarloNode( Nam
 
 SpotDiffusionNode::~SpotDiffusionNode() = default;
 
+//! Fill this date's spot. Side effect: writes _value_list[DateIndex]. Date 0 is the
+//! observed spot today; later dates advance the previous value by one log-Euler GBM
+//! step (with optional escrowed-dividend handling and Milstein correction).
 void SpotDiffusionNode::ComputeValue( size_t DateIndex )
 {
     //! diffusion value
@@ -67,57 +72,73 @@ void SpotDiffusionNode::ComputeValue( size_t DateIndex )
     }
 }
 
+//! wire the per-step vol node (constant-vol or local-vol surface).
 void SpotDiffusionNode::SetLocalVolNode( MonteCarloNode* N )
 {
     _local_vol_node = N;
 }
 
+//! enable the log-space Milstein correction, reading d(vol)/d(lnS) from Lv.
 void SpotDiffusionNode::EnableMilstein( LocalVolatilityNode* Lv )
 {
     _milstein_lv = Lv;
 }
 
+//! wire the drift node (cumulative net carry per date).
 void SpotDiffusionNode::SetDriftNode( MonteCarloNode* N )
 {
     _drift_node = N;
 }
 
+//! wire the Brownian W node supplying the per-step increment.
 void SpotDiffusionNode::SetBrownianNode( MonteCarloNode* N )
 {
     _brownian_node = N;
 }
 
+//! attach the optional discrete-dividend escrow node (future-dividend PV per date).
 void SpotDiffusionNode::SetDividendNode( MonteCarloNode* N )
 {
     _dividend_node = N;
 }
 
+//! set the spot today; also writes date 0 directly so it is available before the
+//! first ComputeValue pass.
 void SpotDiffusionNode::SetSpot( double Spot )
 {
     _spot = Spot;
     _value_list[0] = _spot;
 }
 
+//! Brownian W node.
 MonteCarloNode* SpotDiffusionNode::GetBrownianNode()
 {
     return _brownian_node;
 }
 
+//! drift node.
 MonteCarloNode* SpotDiffusionNode::GetDriftNode()
 {
     return _drift_node;
 }
 
+//! vol node.
 MonteCarloNode* SpotDiffusionNode::GetLocalVolNode()
 {
     return _local_vol_node;
 }
 
+//! Date 0 (the spot today) is identical on every path, so mark it constant; the
+//! engine then evaluates it once instead of per path.
 bool SpotDiffusionNode::IsConstant( size_t DateIndex )
 {
     return ( DateIndex == 0 );
 }
 
+//! Declare the inputs the step at DateIndex needs. Date 0 has none (it is the fixed
+//! spot). A later step reads vol/drift/Brownian at this date, the drift and Brownian
+//! at the previous date (for the differenced carry and dW), this node itself at the
+//! previous date (the GBM recursion), and the dividend PV at both dates if escrowed.
 void SpotDiffusionNode::GetDateDependencies( size_t DateIndex,
                                              vector<MonteCarloNode*>& NodeList,
                                              vector<size_t>& DateList )

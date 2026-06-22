@@ -21,7 +21,9 @@ class LocalVolatilityNode : public MonteCarloNode
     MonteCarloNode* _spot_node;
 
   public:
+    //! sigma_loc(S_{i-1}, t_i): clamped linear interpolation on this date's log-spot grid
     void ComputeValue( size_t DateIndex ) override;
+    //! depends only on the spot of the previous step (the state the surface is sampled at)
     void GetDateDependencies( size_t DateIndex,
                               vector<MonteCarloNode*>& NodeList,
                               vector<size_t>& DateList ) override;
@@ -30,10 +32,10 @@ class LocalVolatilityNode : public MonteCarloNode
     //! difference on the grid — the state-derivative the Milstein step needs
     double LogSpotDerivative( size_t DateIndex );
 
-    void SetSpotNode( MonteCarloNode* SpotNode );
-    void PushLnStep( double LnStep );
-    void PushOffset( long Offset );
-    void PushVolVector( la_vector* VolVector );
+    void SetSpotNode( MonteCarloNode* SpotNode ); //!< wire the spot path the surface is read along
+    void PushLnStep( double LnStep );             //!< append a date's log-spot grid spacing (build order)
+    void PushOffset( long Offset );               //!< append a date's grid offset (first point's log-spot index)
+    void PushVolVector( la_vector* VolVector );   //!< append a date's sampled local-vol vector (ownership taken)
 
     LocalVolatilityNode( const string& Name );
     ~LocalVolatilityNode() override;

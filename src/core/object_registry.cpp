@@ -69,10 +69,15 @@ ObjectManager::Factory MakeConfigurable()
     return []( ObjectManager& m, const string& n ) -> Object*
     {
         std::unique_ptr<T> o;
+        //! detect the two construction shapes at compile time: a task that owns its
+        //! YamlConfig takes (name, cfg); a plain object takes just (name). One factory
+        //! covers both, so the registry never needs a separate task variant.
         if constexpr ( std::is_constructible_v<T, const string&, YamlConfig&> )
             o = std::make_unique<T>( n, m.yml() );
         else
             o = std::make_unique<T>( n );
+        //! register BEFORE configuring: Add returns a stable pointer, so references
+        //! resolved during Configure (which may cycle back to this object) find it.
         return ConfigureObject( m, m.collector().Add( std::move( o ) ) );
     };
 }
@@ -83,6 +88,8 @@ ObjectManager::Factory MakeConfigurable()
 //! like every other migrated object.
 Object* BuildPricer( ObjectManager& m, const string& n )
 {
+    //! the pricer points to a PricerConfiguration whose _method selects the engine;
+    //! resolve it first (get-or-build) so we can branch on the chosen method.
     PricerConfiguration* PC = m.Get<PricerConfiguration>( m.yml().GetString( n + ".configuration" ) );
     std::unique_ptr<Pricer> p;
     if ( PC->_method == PRICING_METHOD_MCL )
@@ -149,15 +156,19 @@ map<string, ObjectManager::Factory> MakeRegistry()
 }
 } // namespace
 
-//! dispatch a name's kind tag to its factory (single registry, built once)
+//! dispatch a name's kind tag to its factory (single registry, built once).
+//! Defined here because this is the only TU that knows every concrete type; the
+//! ObjectManager calls Build on a cache miss and stays type-agnostic.
 Object* ObjectManager::Build( const string& ObjectName )
 {
+    //! function-local static: the table is constructed once on first use and reused
+    //! for every subsequent build (no per-call rebuild, no global init-order issue).
     static const map<string, Factory> registry = MakeRegistry();
-    const string kind = _yml.GetTag( ObjectName );
+    const string kind = _yml.GetTag( ObjectName ); //!< the !kind tag on the YAML node
     auto entry = registry.find( kind );
     if ( entry != registry.end() )
     {
-        return entry->second( *this, ObjectName );
+        return entry->second( *this, ObjectName ); //!< create + register + configure
     }
-    ERR( "unknown kind : " + kind );
+    ERR( "unknown kind : " + kind ); //!< no factory for this tag -> configuration error
 }

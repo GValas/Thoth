@@ -1,27 +1,34 @@
 #pragma once
 #include "object.hpp"
 
-//! A simple time series of past fixings (dates + values) for one underlying.
+//! ----------------------------------------------------------------------------
+//! SimpleFixingData : the historical (already-observed) fixings of one
+//! underlying, as two parallel arrays (date[i] -> value[i]) plus the name of the
+//! underlying they belong to. Path-dependent instruments (Asians, barriers,
+//! variance swaps...) read these to pick up fixings that fall before the
+//! valuation date, where there is nothing left to diffuse and the realised value
+//! must be used instead of a simulated one.
+//! ----------------------------------------------------------------------------
 class SimpleFixingData : public Object
 {
 
   private:
-    vector<date> _date_list;
-    LaVector _value_list;
-    string _underlying;
+    vector<date> _date_list; //!< observation dates, parallel to _value_list
+    LaVector _value_list;    //!< realised fixing levels (RAII linalg vector)
+    string _underlying;      //!< name of the underlying these fixings belong to
 
   public:
-    //! read own fields (dates + values + the underlying name)
+    //! read own fields (dates + values + the underlying name) from the book
     void Configure( ObjectReader& reader ) override;
 
     //! setter
     void SetDateList( const vector<date>& DateList );
-    void SetValueList( la_vector* ValueList );
+    void SetValueList( la_vector* ValueList ); //!< takes ownership of the raw vector
     void SetUnderlying( const string& Underlying );
 
     //! getter
     const vector<date> GetDateList();
-    la_vector* GetValueList();
+    la_vector* GetValueList(); //!< borrowed pointer (still owned by this object)
     string GetUnderlying();
 
     //! constructor, destructor

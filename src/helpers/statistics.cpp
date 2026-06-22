@@ -14,7 +14,7 @@ double Sum( const double* X, std::size_t N )
 
 double WeightedMean( const double* W, const double* X, std::size_t N )
 {
-    double sw = 0.0, swx = 0.0;
+    double sw = 0.0, swx = 0.0; //!< sw = sum of weights, swx = sum of w*x
     for ( std::size_t i = 0; i < N; i++ )
     {
         sw += W[i];
@@ -25,7 +25,7 @@ double WeightedMean( const double* W, const double* X, std::size_t N )
 
 double WeightedVarianceM( const double* W, const double* X, std::size_t N, double Mean )
 {
-    double sw = 0.0, sw2 = 0.0, s = 0.0;
+    double sw = 0.0, sw2 = 0.0, s = 0.0; //!< V1=sum w, V2=sum w^2, s=sum w*(x-mean)^2
     for ( std::size_t i = 0; i < N; i++ )
     {
         const double w = W[i];

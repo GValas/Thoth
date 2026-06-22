@@ -6,6 +6,10 @@
 #include <functional>
 #include <map>
 
+//! object_manager.hpp — orchestrates loading, building, running and emitting a book.
+//! It owns the YamlConfig and the ObjectCollector, and is the get-or-build entry
+//! point (Get<T>/GetList<T>) that the per-type factories use to resolve references.
+
 //! ROOT_NODE is defined in Constants.hpp (inline constexpr)
 
 //! Builds the object graph from the parsed YAML.
@@ -51,7 +55,9 @@ class ObjectManager
     template <class T>
     T* Get( const string& ObjectName )
     {
-        CheckObject( ObjectName );
+        CheckObject( ObjectName ); //!< error early if the name is not an object node
+        //! fast path: already built and registered — return the cached pointer,
+        //! viewed as T (so the same object can be shared across many references).
         if ( T* cached = _collector.Get<T>( ObjectName ) )
         {
             return cached;
@@ -65,7 +71,8 @@ class ObjectManager
         ERR( "object '" + ObjectName + "' has an unexpected type for this reference" );
     }
 
-    //! map a list of names through Get<T>
+    //! map a list of names through Get<T> — get-or-build each referenced object as
+    //! a T*, preserving order (used for list-valued references, e.g. basket members).
     template <class T>
     vector<T*> GetList( const vector<string>& ObjectNameList )
     {
@@ -79,14 +86,14 @@ class ObjectManager
     }
 
   private:
-    YamlConfig _yml;
-    Task* _task_node = nullptr;
-    string _task_name;
-    ObjectCollector _collector;
+    YamlConfig _yml;            //!< owned config tree (fields, tags, results)
+    Task* _task_node = nullptr; //!< the resolved root task; null until ReadObjects
+    string _task_name;          //!< name of the task being executed
+    ObjectCollector _collector; //!< owns every built object (keyed by name)
 
     //! an object exists iff it carries a kind tag (e.g. `name: !equity { ... }`)
     bool IsObject( const string& Path );
-    void CheckObject( const string& ObjectName );
+    void CheckObject( const string& ObjectName ); //!< IsObject + ERR on miss
 
     //! dispatch ObjectName's kind tag to its factory. Defined in
     //! object_registry.cpp, the single translation unit aware of every type.

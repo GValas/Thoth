@@ -87,7 +87,10 @@ class YamlConfig
     bool IsPath( const string& Path );
 
   public:
-    //! get methods
+    //! get methods. Each typed getter resolves a dotted path and converts the
+    //! leaf; the single-argument form ERRs (throws) on a missing/ill-typed node,
+    //! while the (Path, ElseValue) overload returns the default in that case —
+    //! used for optional fields. Integers/doubles auto-convert (libconfig parity).
     int GetInteger( const string& Path );
     int GetInteger( const string& Path,
                     const int ElseValue );
@@ -107,10 +110,12 @@ class YamlConfig
     bool GetBoolean( const string& Path,
                      const bool ElseValue );
 
+    //! list getters : the node must be a YAML sequence; each element is converted
+    //! to the requested type (one typed error message on any failure).
     vector<bool> GetBooleanList( const string& Path );
     vector<string> GetStringList( const string& Path );
     vector<double> GetDoubleList( const string& Path );
-    la_vector* GetLaVector( const string& Path );
+    la_vector* GetLaVector( const string& Path ); //!< caller owns the returned raw vector
     vector<int> GetIntegerList( const string& Path );
     vector<date> GetDateList( const string& Path );
 
@@ -136,6 +141,8 @@ class YamlConfig
             PathNode( Path ) = Value; //!< double / int / long / bool / string scalar
     }
 
+    //! raw-buffer writers : flatten a C array / la_* container into a YAML
+    //! sequence at Path (la_matrix is stored row-major as one flat list).
     void SetDoubleList( const string& Path,
                         const double* Value,
                         size_t size );
@@ -144,7 +151,8 @@ class YamlConfig
     void SetLaVector( const string& Path,
                       const la_vector* Value );
 
-    //! object existence
+    //! object existence / type tests : true iff the node at Path exists and parses
+    //! as the named type (a throw from the matching getter means false).
     bool IsString( const string& Path );
     bool IsDouble( const string& Path );
     bool IsBoolean( const string& Path );

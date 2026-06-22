@@ -1,9 +1,20 @@
 #pragma once
 #include "thoth.hpp"
 
+//! object.hpp — the common base of every configurable domain object.
+//!
+//! Every pricer, instrument, underlying, market-data and configuration entity in
+//! the engine derives from Object. It carries the three universal attributes
+//! (name, kind tag, valuation date) and the self-deserialisation hook
+//! Configure(), so the registry can treat all types uniformly (create the bare
+//! object by kind tag, then let it read its own fields/references).
+
 class ObjectReader; //!< field reader passed to Configure (see object_reader.hpp)
 
-//! constants
+//! Kind tags: the string each object carries in YAML (`name: !equity { ... }`)
+//! and the key the registry (object_registry.cpp) dispatches on to pick a
+//! factory. One constant per concrete type keeps the spelling in a single place,
+//! shared between the YAML tag, the registry table and any code that tests kind.
 inline constexpr char KIND_BARRIER[] = "barrier";
 inline constexpr char KIND_VARIANCE_SWAP[] = "variance_swap";
 inline constexpr char KIND_BOOK[] = "book";
@@ -30,22 +41,31 @@ inline constexpr char KIND_SIMPLE_FIXING_DATA[] = "simple_fixing_data";
 inline constexpr char KIND_VANILLA[] = "vanilla";
 inline constexpr char KIND_YIELD_CURVE[] = "yield_curve";
 
+//! Base class of every domain object in the engine.
 //!
+//! Responsibilities: hold the identity (name + kind tag) and the valuation date,
+//! and expose the polymorphic Configure() hook used by the registry to populate a
+//! freshly created object from its YAML node. It is intentionally minimal — all
+//! type-specific state and behaviour live in the derived classes.
+//!
+//! Invariant: a name is globally unique (the collector keys objects by name), and
+//! the kind tag matches the registry entry that built the object.
 class Object
 {
 
   protected:
     //! attributes
-    string _name;
-    string _kind;
-    date _today;
+    string _name; //!< globally unique identifier; also the YAML path prefix
+    string _kind; //!< kind tag, one of the KIND_* constants above
+    date _today;  //!< valuation ("as-of") date, propagated by the collector
 
   public:
     //! getter
-    const string& GetName() const;
-    const string& GetKind() const;
+    const string& GetName() const; //!< the unique name
+    const string& GetKind() const; //!< the kind tag (a KIND_* value)
 
-    //! setter
+    //! setter — propagate the valuation date. virtual so a type with date-derived
+    //! cached state can recompute it; the base just stores _today.
     virtual void SetToday( const date& Today );
 
     //! read this object's own fields / references from the configuration. The
@@ -55,6 +75,9 @@ class Object
     virtual void Configure( ObjectReader& /*reader*/ ) {}
 
     //! constructor, destructor
+    //! ObjectName / ObjectKind seed the immutable identity; _today is set later
+    //! (after construction) via SetToday. virtual destructor so the collector can
+    //! own derived objects through unique_ptr<Object>.
     Object( const string& ObjectName,
             const string& ObjectKind );
     virtual ~Object();

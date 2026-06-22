@@ -14,10 +14,17 @@
 //! doubles interconvert (mirroring libconfig's setAutoConvert(true)).
 //! ----------------------------------------------------------------------
 
+//! ----------------------------------------------------------------------------
+//! Anonymous-namespace helpers : path navigation/splitting and the post-emit text
+//! rewriters that make yaml-cpp's output read like the hand-written sample books
+//! (short tags, blank lines between top-level blocks, literal blocks for embedded
+//! multi-line scalars, alphabetical key order). All are file-local.
+//! ----------------------------------------------------------------------------
 namespace
 {
 //! navigate a dotted path with const (non-mutating) access; the returned
 //! node is undefined-safe: a missing segment yields an exception below.
+//! Recurses one path segment per call; i == parts.size() is the base case.
 YAML::Node Descend( const YAML::Node& node,
                     const vector<string>& parts,
                     size_t i )
@@ -34,6 +41,8 @@ YAML::Node Descend( const YAML::Node& node,
     return Descend( child, parts, i + 1 );
 }
 
+//! split "object.attribute.leaf" into its dot-separated segments. Always returns
+//! at least one element (a path with no dot becomes a single segment).
 vector<string> SplitDots( const string& Path )
 {
     vector<string> parts;
@@ -106,11 +115,15 @@ YAML::Node SortKeysAlpha( const YAML::Node& Node )
     return Node; //!< scalar (tag/style preserved by copy)
 }
 
+//! insert a blank line before each top-level object block (a line starting at
+//! column 0), so the emitted YAML reads like the hand-written sample files. The
+//! very first block keeps no leading blank line. Scans the text line by line
+//! tracking byte offsets (no copying into a vector of lines).
 static string SpaceTopLevelBlocks( const string& Yaml )
 {
     string out;
-    out.reserve( Yaml.size() + Yaml.size() / 16 );
-    bool first = true;
+    out.reserve( Yaml.size() + Yaml.size() / 16 ); //!< ~one extra newline per 16 bytes
+    bool first = true;                             //!< suppress the blank line before block #1
     size_t start = 0;
     while ( start <= Yaml.size() )
     {
@@ -226,7 +239,8 @@ static string BlockifyMultilineScalars( const string& Yaml )
 }
 } // namespace
 
-//! contructor
+//! file constructor : load the book from InputCfgFile and remember OutputCfgFile
+//! for WriteFile(). Stays in file mode (_write_file defaults true).
 YamlConfig::YamlConfig( const string& InputCfgFile,
                         const string& OutputCfgFile )
     : _out_yml( OutputCfgFile )
@@ -243,11 +257,13 @@ YamlConfig::YamlConfig( const string& InputCfgFile,
     }
 }
 
-//! in-memory constructor (HTTP request body)
+//! in-memory constructor (HTTP request body) : parse a YAML string instead of a
+//! file. The from_string_t tag disambiguates it from the file constructor (both
+//! take a string). String mode never writes to disk.
 YamlConfig::YamlConfig( from_string_t,
                         const string& YamlContent )
 {
-    _write_file = false;
+    _write_file = false; //!< no output file in string/HTTP mode
     try
     {
         _root = YAML::Load( YamlContent );
@@ -258,9 +274,13 @@ YamlConfig::YamlConfig( from_string_t,
     }
 }
 
-//! emit the config tree (with admin info) as a YAML string
+//! emit the config tree (with admin info) as a YAML string. Pipeline: stamp the
+//! system_information block, sort keys alphabetically, force top-level maps to
+//! block style, let yaml-cpp emit, then post-process the text (tags, multi-line
+//! scalars, blank lines) — see the nested call at the bottom.
 string YamlConfig::Dump()
 {
+    //! stamp run metadata so every emitted document records when/which build wrote it
     Set( "system_information.last_update", GetSysInfoLastUpdate() );
     Set( "system_information.version", GetSysInfoVersion() );
 
@@ -282,6 +302,9 @@ string YamlConfig::Dump()
 
     YAML::Emitter emitter;
     emitter << root;
+    //! text post-processing, applied innermost-first: ShortenTags ("!<!eq>"->"!eq"),
+    //! then BlockifyMultilineScalars (quoted "\n" scalars -> literal |- blocks),
+    //! then SpaceTopLevelBlocks (blank line between top-level objects).
     return SpaceTopLevelBlocks( BlockifyMultilineScalars( ShortenTags( emitter.c_str() ) ) );
 }
 
@@ -318,6 +341,8 @@ YAML::Node YamlConfig::LookUp( const string& Path ) const
 //! getters
 //! ----------------------------------------------------------------------
 
+//! scalar getters : resolve Path then convert; on a missing node or a failed
+//! conversion they ERR (which throws) with a type-specific message.
 bool YamlConfig::GetBoolean( const string& Path )
 {
     try
@@ -335,7 +360,7 @@ string YamlConfig::GetString( const string& Path )
     try
     {
         YAML::Node n = LookUp( Path );
-        if ( !n.IsScalar() )
+        if ( !n.IsScalar() ) //!< reject maps/sequences : only a scalar is a string
             throw std::runtime_error( "not a scalar" );
         return n.as<string>();
     }
@@ -345,6 +370,7 @@ string YamlConfig::GetString( const string& Path )
     }
 }
 
+//! a date is stored as an ISO/simple-string scalar; parse it via boost.gregorian
 date YamlConfig::GetDate( const string& Path )
 {
     try
@@ -455,6 +481,9 @@ vector<bool> YamlConfig::GetBooleanList( const string& Path )
                           { return n.as<bool>(); } );
 }
 
+//! read a YAML sequence of doubles into a freshly allocated la_vector and hand
+//! ownership to the caller (legacy raw-owning contract). Differs from
+//! GetDoubleList only in the return container.
 la_vector* YamlConfig::GetLaVector( const string& Path )
 {
     YAML::Node s;
@@ -566,6 +595,8 @@ void YamlConfig::SetLaVector( const string& Path,
 //! paths / misc
 //! ----------------------------------------------------------------------
 
+//! split at the FIRST separator into "object" / "attribute" (only the two-level
+//! object.attribute shape the setters use; deeper dotted paths go through LookUp).
 void YamlConfig::SplitPath( const string& Path,
                             string& ObjectName,
                             string& AttributeName )
@@ -575,6 +606,7 @@ void YamlConfig::SplitPath( const string& Path,
     AttributeName = Path.substr( i + 1 );
 }
 
+//! true if Path contains a separator (i.e. addresses an attribute, not a top-level object)
 bool YamlConfig::IsPath( const string& Path )
 {
     return Path.find_first_of( OBJECT_SEPARATOR ) != string::npos;
@@ -621,7 +653,8 @@ string YamlConfig::GetTag( const string& Path )
     return "";
 }
 
-//! get objects by kind
+//! every top-level object whose local tag equals `kind` (e.g. all "!equity"
+//! objects), in document order. Used to enumerate objects of a given type.
 vector<string> YamlConfig::GetObjectsByKind( const string& kind )
 {
     vector<string> s;
@@ -646,13 +679,16 @@ vector<string> YamlConfig::GetObjectsByKind( const string& kind )
     return s;
 }
 
+//! immediate child keys of the map at Path, in document order; empty if Path is
+//! missing or not a map. Lets a consumer walk a result block (the cluster
+//! aggregator) without knowing its field names up front.
 vector<string> YamlConfig::GetChildKeys( const string& Path )
 {
     vector<string> s;
     try
     {
         YAML::Node n = LookUp( Path );
-        if ( !n.IsMap() )
+        if ( !n.IsMap() ) //!< scalars/sequences have no named children -> empty
         {
             return s;
         }
@@ -671,6 +707,9 @@ vector<string> YamlConfig::GetChildKeys( const string& Path )
 //! get-with-default overloads
 //! ----------------------------------------------------------------------
 
+//! get-with-default overloads : probe with the matching Is* test, return the
+//! parsed value if present/well-typed, else ElseValue. The Is* probe is what
+//! makes these non-throwing for optional fields.
 int YamlConfig::GetInteger( const string& Path,
                             const int ElseValue )
 {
@@ -680,7 +719,7 @@ int YamlConfig::GetInteger( const string& Path,
 long YamlConfig::GetLong( const string& Path,
                           const long ElseValue )
 {
-    return IsInteger( Path ) ? GetLong( Path ) : ElseValue;
+    return IsInteger( Path ) ? GetLong( Path ) : ElseValue; //!< IsInteger gates both 32/64-bit reads
 }
 
 double YamlConfig::GetDouble( const string& Path,

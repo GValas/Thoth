@@ -16,41 +16,45 @@ Pricer::~Pricer() = default;
 //! by the registry, which drives the type off the configuration's method)
 void Pricer::Configure( ObjectReader& reader )
 {
-    SetCurrency( *reader.Ref<Currency>( "currency" ) );
-    SetBook( *reader.Ref<Book>( "book" ) );
-    SetToday( reader.Get<date>( "today" ) );
-    SetConfiguration( *reader.Ref<PricerConfiguration>( "configuration" ) );
-    SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) );
-    SetResult( reader.Get<string>( "result" ) );
+    SetCurrency( *reader.Ref<Currency>( "currency" ) );                      //!< reporting currency
+    SetBook( *reader.Ref<Book>( "book" ) );                                  //!< the contracts to price
+    SetToday( reader.Get<date>( "today" ) );                                 //!< valuation date
+    SetConfiguration( *reader.Ref<PricerConfiguration>( "configuration" ) ); //!< method + engine params
+    SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) );   //!< premium / Greeks to compute
+    SetResult( reader.Get<string>( "result" ) );                             //!< where to write the output block
+    //! correlation is optional (single-asset single-ccy books need none); resolved
+    //! by reference when present
     if ( reader.Has<string>( "correlation" ) )
     {
         SetCorrelation( reader.Ref<Correlation>( "correlation" ) );
     }
+    //! debug switches are optional (default: all off)
     if ( reader.Has<string>( "debug_configuration" ) )
     {
         SetDebugConfiguration( reader.Ref<DebugConfiguration>( "debug_configuration" ) );
     }
 }
 
-// setter
+// setter : the book of contracts this pricer values (borrowed, owned by the manager)
 void Pricer::SetBook( Book& Book )
 {
     _book = &Book;
 }
 
-// setter
+// setter : optional correlation matrix (needed for multi-asset diffusion, quanto and
+// FX premium conversion; may stay null for a single-currency single-asset book)
 void Pricer::SetCorrelation( Correlation* Correlation )
 {
     _correlation = Correlation;
 }
 
-// setter
+// setter : the engine-parameter bundle (method + mcl/pde sub-configs)
 void Pricer::SetConfiguration( PricerConfiguration& Configuration )
 {
     _configuration = &Configuration;
 }
 
-// setter
+// setter : record the requested indicators and derive the per-greek flags from them
 void Pricer::SetIndicatorRequestList( const vector<string>& IndicatorRequestList )
 {
     _indicator_request_list = IndicatorRequestList;
@@ -82,18 +86,21 @@ void Pricer::SetIndicatorRequestList( const vector<string>& IndicatorRequestList
     }
 }
 
-// setter
+// setter : the book (reporting) currency every premium / Greek is converted into
 void Pricer::SetCurrency( Currency& Currency )
 {
     _currency = &Currency;
 }
 
-//! getter
+//! getter : the valuation date (the as-of date the whole book is priced at)
 date Pricer::GetToday() const
 {
     return _today;
 }
 
+//! top-level orchestration shared by every engine: validate once, price the base
+//! scenario, then layer the requested Greeks on top. The concrete engine supplies
+//! PriceBook / ComputeGreeks / GreeksPerContract.
 void Pricer::Execute()
 {
     //! validate the book / configuration once for the chosen engine
@@ -459,7 +466,10 @@ void Pricer::ComputeGreeks()
     _quiet_pricing = false;
 }
 
-//!
+//! log the book-level result line and serialise everything into the YAML result
+//! block: premium + trust, optional node graphs, book-level Greeks, model-parameter
+//! Greeks, and the per-contract premiums (plus per-contract Greeks for the
+//! per-contract engines).
 void Pricer::WriteResults()
 {
 

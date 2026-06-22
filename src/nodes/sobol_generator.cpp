@@ -7,11 +7,18 @@ namespace
 constexpr double SCALE = 1.0 / 4294967296.0;
 } // namespace
 
+//! Highest dimension count the embedded Joe-Kuo dataset can drive: the FILE_DIMS
+//! tabulated dimensions plus the implicit first dimension built without a table.
 unsigned SobolGenerator::MaxDimension()
 {
     return sobol_jk::FILE_DIMS + 1; //!< +1 for the implicit first dimension
 }
 
+//! Build the direction-number tables for the first Dimension dimensions (clamped to
+//! MaxDimension). For each dimension d this fills _v[d][0..BITS-1], the 32-bit
+//! direction numbers that the Gray-code recurrence XORs in Next(). All coordinates
+//! _x start at 0 (the skipped all-zero point); the first real point is drawn on the
+//! first Next().
 SobolGenerator::SobolGenerator( unsigned Dimension ) : _dim( Dimension )
 {
     if ( _dim > MaxDimension() )
@@ -47,10 +54,15 @@ SobolGenerator::SobolGenerator( unsigned Dimension ) : _dim( Dimension )
         }
         else
         {
+            //! seed the first s direction numbers from the tabulated m_1..m_s
+            //! (m_i is an odd integer < 2^i; shifting left aligns it to the top bit).
             for ( unsigned i = 0; i < s; i++ )
             {
                 V[i] = (uint32_t)m[i] << ( BITS - 1 - i );
             }
+            //! extend with the primitive-polynomial recurrence: each further V is the
+            //! XOR of V[i-s] (also shifted down by s) with the V[i-k] selected by the
+            //! polynomial coefficient bits packed in A.
             for ( unsigned i = s; i < BITS; i++ )
             {
                 V[i] = V[i - s] ^ ( V[i - s] >> s );
@@ -63,6 +75,8 @@ SobolGenerator::SobolGenerator( unsigned Dimension ) : _dim( Dimension )
     }
 }
 
+//! Produce the next quasi-random point in [0,1)^dim. Side effect: advances _x and
+//! increments _count. Resizes Point to _dim and writes each coordinate.
 void SobolGenerator::Next( vector<double>& Point )
 {
     Point.resize( _dim );
@@ -75,6 +89,8 @@ void SobolGenerator::Next( vector<double>& Point )
         c++;
     }
 
+    //! one XOR per dimension with the flipped direction number, then scale the
+    //! 32-bit integer coordinate down into [0,1).
     for ( unsigned d = 0; d < _dim; d++ )
     {
         _x[d] ^= _v[d][c];
@@ -83,6 +99,9 @@ void SobolGenerator::Next( vector<double>& Point )
     _count++;
 }
 
+//! Discard the next Count points, advancing the integer state without scaling or
+//! emitting coordinates. Side effect: advances _x and _count by Count. Used so each
+//! cluster slave consumes a disjoint block of the same Sobol sequence.
 void SobolGenerator::Skip( uint64_t Count )
 {
     //! advance the Gray-code state without materialising the points

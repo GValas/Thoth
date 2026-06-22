@@ -9,6 +9,9 @@ CompositeVolNode::CompositeVolNode( const string& Name ) : MonteCarloNode( Name 
 
 CompositeVolNode::~CompositeVolNode() = default;
 
+//! the quanto/composite product S*X has log-return log S + log X, whose variance is
+//! the sum of variances plus twice the covariance — the standard "vol of a product":
+//!   v^2(SX) = v^2(S) + v^2(X) + 2 rho(S,X) v(S) v(X)
 void CompositeVolNode::ComputeValue( size_t DateIndex )
 {
     //! v^2(SX) = v^2(S) + v^2(X) + 2 rho(S,X) v(S) v(X)
@@ -48,6 +51,7 @@ MonteCarloNode* CompositeVolNode::GetVolXNode()
     return _vol_X_node;
 }
 
+//! the composite vol reads the correlation and both component vols at the same date
 void CompositeVolNode::GetDateDependencies( size_t DateIndex,
                                             vector<MonteCarloNode*>& NodeList,
                                             vector<size_t>& DateList )
