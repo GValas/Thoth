@@ -97,10 +97,10 @@ class Single : public Underlying
 
     //! build the spot-diffusion node (GBM, Heston, or local-vol grid; wires drift,
     //! noise, dividends and vol). The top-level MCL node for this name.
-    virtual MonteCarloNode* GetNode( NodeCollector& NC );
+    MonteCarloNode* GetNode( NodeCollector& NC ) override;
     //! a scalar vol node for the callers that need a single representative level
     //! (quanto correction, composite vol/correl); an ATM constant for a local surface
-    MonteCarloNode* GetVolNode( NodeCollector& NC );
+    MonteCarloNode* GetVolNode( NodeCollector& NC ) override;
 
     //! build a LocalVolatilityNode that samples the Dupire local-vol surface onto
     //! a per-diffusion-date log-spot grid (used for a local-vol surface like SABR);
