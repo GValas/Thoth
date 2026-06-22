@@ -50,8 +50,8 @@ void Sequence::WriteResults()
 {
     if ( !_result.empty() )
     {
-        _cfg->Set( _result + ".kind", _kind + "_result" );
-        _cfg->Set( _result + ".task_time", _task_time );
-        _cfg->Set( _result + ".tasks", _task_names );
+        WriteResult( "kind", _kind + "_result" );
+        WriteResult( "task_time", _task_time );
+        WriteResult( "tasks", _task_names );
     }
 }

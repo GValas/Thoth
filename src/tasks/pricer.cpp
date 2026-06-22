@@ -501,8 +501,8 @@ void Pricer::WriteResults()
 
     //! write cfg results
     Task::WriteResults();
-    _cfg->Set( _result + ".premium", _premium );
-    _cfg->Set( _result + ".premium_trust", _book->GetPremiumTrust() );
+    WriteResult( "premium", _premium );
+    WriteResult( "premium_trust", _book->GetPremiumTrust() );
 
     //! debug node graph : one Graphviz .dot per MC tree (base + Greek scenarios),
     //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph). The
@@ -510,66 +510,66 @@ void Pricer::WriteResults()
     //! stays readable (no \n / \" escapes).
     for ( const auto& [tree, dot] : _tree_graphs )
     {
-        _cfg->Set( _result + "." + tree + "_mcl_graph", dot );
+        WriteResult( tree + "_mcl_graph", dot );
     }
 
     //! requested Greeks (book level), computed by bump-and-revalue
     if ( _request_delta )
     {
-        _cfg->Set( _result + ".delta", _delta );
+        WriteResult( "delta", _delta );
     }
     if ( _request_gamma )
     {
-        _cfg->Set( _result + ".gamma", _gamma );
+        WriteResult( "gamma", _gamma );
     }
     if ( _request_vega )
     {
-        _cfg->Set( _result + ".vega", _vega );
+        WriteResult( "vega", _vega );
     }
     if ( _request_rho )
     {
-        _cfg->Set( _result + ".rho", _rho );
+        WriteResult( "rho", _rho );
     }
     if ( _request_theta )
     {
-        _cfg->Set( _result + ".theta", _theta );
+        WriteResult( "theta", _theta );
     }
     //! model-parameter Greeks (book level), keyed vega_<param>
     for ( const auto& [param, value] : _param_greeks )
     {
-        _cfg->Set( _result + ".vega_" + param, value );
+        WriteResult( "vega_" + param, value );
     }
 
     //! per-contract premium (and, for the per-contract engines, per-contract
-    //! Greeks attributed to each option)
+    //! Greeks attributed to each option), keyed <contract>_<metric>
     const bool per_contract_greeks = GreeksPerContract();
     for ( Contract* c : _book->GetOptionList() )
     {
-        const string p = _result + "." + c->GetName();
-        _cfg->Set( p + "_premium", c->Result().premium );
-        _cfg->Set( p + "_premium_trust", c->Result().premium_trust );
+        const string n = c->GetName();
+        WriteResult( n + "_premium", c->Result().premium );
+        WriteResult( n + "_premium_trust", c->Result().premium_trust );
 
         if ( per_contract_greeks )
         {
             if ( _request_delta )
             {
-                _cfg->Set( p + "_delta", c->Result().delta );
+                WriteResult( n + "_delta", c->Result().delta );
             }
             if ( _request_gamma )
             {
-                _cfg->Set( p + "_gamma", c->Result().gamma );
+                WriteResult( n + "_gamma", c->Result().gamma );
             }
             if ( _request_vega )
             {
-                _cfg->Set( p + "_vega", c->Result().vega );
+                WriteResult( n + "_vega", c->Result().vega );
             }
             if ( _request_rho )
             {
-                _cfg->Set( p + "_rho", c->Result().rho );
+                WriteResult( n + "_rho", c->Result().rho );
             }
             if ( _request_theta )
             {
-                _cfg->Set( p + "_theta", c->Result().theta );
+                WriteResult( n + "_theta", c->Result().theta );
             }
         }
     }

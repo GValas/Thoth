@@ -23,8 +23,8 @@ void Task::SetResult( const string& Result )
 //! and stamp the elapsed wall-clock time. Concrete tasks call this, then add their own fields.
 void Task::WriteResults()
 {
-    _cfg->Set( _result + ".kind", ResultKind() );
-    _cfg->Set( _result + ".task_time", _task_time );
+    WriteResult( "kind", ResultKind() );
+    WriteResult( "task_time", _task_time );
 }
 
 //! default result-block kind: the task's own kind suffixed with "_result"

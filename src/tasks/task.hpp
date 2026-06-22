@@ -21,6 +21,15 @@ class Task : public Object
     //! "pricer_result" so the result schema does not fork per engine kind.
     virtual string ResultKind() const;
 
+    //! write one field into this task's result block — the write-side mirror of
+    //! ObjectReader::Get<T>: it prefixes _result so callers pass a bare field name
+    //! (and the typed Set<T> dispatch lives once in YamlConfig).
+    template <class T>
+    void WriteResult( const string& Field, const T& Value )
+    {
+        _cfg->Set( _result + OBJECT_SEPARATOR + Field, Value );
+    }
+
   public:
     //! setter (target object for this task's result block, read from "result")
     void SetResult( const string& Result );
