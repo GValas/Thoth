@@ -86,28 +86,22 @@ double Barrier::Intrinsic( const double spot )
     return payoff_vanilla( spot, _strike, _type, false, 0, true, 0 );
 }
 
-//! a Barrier always is one (trivially true; lets the PDE engine branch on type)
-bool Barrier::PDE_IsBarrier()
-{
-    return true;
-}
-
-//! knock-in vs knock-out (the engine prices KO and applies in/out parity for KI)
-bool Barrier::PDE_IsKnockIn()
-{
-    return IsKnockIn( _barrier_type );
-}
-
 //! up barrier (H above spot) vs down barrier (H below spot)
-bool Barrier::PDE_IsUpBarrier()
+bool Barrier::IsUp() const
 {
     return IsUpBarrier( _barrier_type );
 }
 
-//! the active level H: the up level for an up barrier, else the down level
-double Barrier::PDE_BarrierLevel()
+//! knock-in vs knock-out (engines price KO and apply in/out parity for KI)
+bool Barrier::IsIn() const
 {
-    return PDE_IsUpBarrier() ? _barrier_up_level : _barrier_down_level;
+    return IsKnockIn( _barrier_type );
+}
+
+//! the active level H: the up level for an up barrier, else the down level
+double Barrier::Level() const
+{
+    return IsUp() ? _barrier_up_level : _barrier_down_level;
 }
 
 //! Build the Monte-Carlo flow node: a vanilla payoff at maturity, gated by the
@@ -127,8 +121,8 @@ MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
             C->SetSpotNode( GetUnderlyingNode( NC ) );
             C->SetFlowDateIndex( NC.GetDateIndex( _maturity_date ) );
 
-            bool is_up = PDE_IsUpBarrier();
-            double H = PDE_BarrierLevel();
+            bool is_up = IsUp();
+            double H = Level();
 
             vector<size_t> monitor;
             if ( IsDiscrete() )
@@ -160,7 +154,7 @@ MonteCarloNode* Barrier::GetFlowNode( NodeCollector& NC,
             //! hand the (possibly corrected) level + flavour + monitoring grid to the node
             C->SetBarrierLevel( H );
             C->SetIsUp( is_up );
-            C->SetIsIn( PDE_IsKnockIn() );
+            C->SetIsIn( IsIn() );
             C->SetMonitorIndexList( monitor );
         } );
 }

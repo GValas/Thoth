@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "pricer_pde.hpp"
+#include "barrier.hpp"
 #include "cancellation.hpp"
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
@@ -72,108 +73,93 @@ void PricerPDE::PriceBook()
     PriceBookByContract();
 }
 
-//! single-contract grid solve hook used by the per-contract loop and its Greeks
-//! price one contract: vanilla, knock-out, or knock-in (= vanilla - knock-out)
+//! single-contract grid solve hook used by the per-contract loop and its Greeks:
+//! dispatch on the contract type to the matching grid solve.
 void PricerPDE::PriceContract( Contract* Ctr )
 {
-
-    //! variance swap : expected-accumulated-variance grid solve (sets premium).
-    //! The polymorphic predicate guarantees the contract is a VarianceSwap, so the
-    //! solve can take it as the concrete type (no RTTI capability test).
-    if ( Ctr->PDE_IsAccruedVariance() )
+    if ( auto* vs = dynamic_cast<VarianceSwap*>( Ctr ) )
     {
-        SolveVarianceSwap( static_cast<VarianceSwap*>( Ctr ) );
+        SolveVarianceSwap( vs ); //!< expected-accumulated-variance grid (sets premium)
+    }
+    else if ( auto* bar = dynamic_cast<Barrier*>( Ctr ) )
+    {
+        PriceBarrier( bar );
+    }
+    else
+    {
+        PriceVanilla( Ctr );
+    }
+}
+
+//! plain / Heston vanilla (no barrier): a single full-domain grid solve.
+void PricerPDE::PriceVanilla( Contract* Ctr )
+{
+    //! Heston stochastic vol : 2-D (S, v) ADI grid; otherwise the 1-D spot grid
+    if ( UnderlyingIsHeston( Ctr ) )
+    {
+        StoreResult( Ctr, SolveHestonGrid( Ctr ) );
         return;
     }
+    InitGrid( Ctr, false );
+    StoreResult( Ctr, SolveGrid( Ctr ) );
+}
 
-    //! Heston stochastic vol vanilla : 2-D (S, v) ADI grid
-    if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston( Ctr ) )
+//! knock-in by in/out parity (vanilla - knock-out); a knock-out returns KnockOut as is.
+PricerPDE::GridResult PricerPDE::KnockInParity( Barrier* Ctr, const GridResult& KnockOut )
+{
+    if ( !Ctr->IsIn() )
     {
-        GridResult r = SolveHestonGrid( Ctr );
-        Result( Ctr ).premium = r.premium;
-        Result( Ctr ).delta = r.delta;
-        Result( Ctr ).gamma = r.gamma;
-        return;
+        return KnockOut;
     }
+    InitGrid( Ctr, false ); //!< the unbarriered vanilla
+    GridResult vanilla = SolveGrid( Ctr );
+    GridResult res;
+    res.premium = vanilla.premium - KnockOut.premium;
+    res.delta = vanilla.delta - KnockOut.delta;
+    res.gamma = vanilla.gamma - KnockOut.gamma;
+    return res;
+}
 
-    //! plain vanilla : single full-domain solve
-    if ( !Ctr->PDE_IsBarrier() )
-    {
-        InitGrid( Ctr, false );
-        GridResult r = SolveGrid( Ctr );
-        Result( Ctr ).premium = r.premium;
-        Result( Ctr ).delta = r.delta;
-        Result( Ctr ).gamma = r.gamma;
-        return;
-    }
-
-    //! discrete monitoring : full-domain solve, the knocked region zeroed only at
-    //! the scheduled dates (no initial-breach shortcut: monitoring starts after
-    //! today). Knock-in by in/out parity (vanilla - knock-out).
-    if ( Ctr->PDE_IsDiscreteBarrier() )
+//! barrier: solve the knock-out, then knock-in by in/out parity. Continuous
+//! monitoring shortcuts a barrier already breached at valuation.
+void PricerPDE::PriceBarrier( Barrier* Ctr )
+{
+    //! discrete monitoring : full-domain solve, the knocked region zeroed only at the
+    //! scheduled dates (monitoring starts after today, so no initial-breach shortcut).
+    if ( Ctr->IsDiscrete() )
     {
         InitGrid( Ctr, true );
-        GridResult ko = SolveGrid( Ctr );
-
-        GridResult res;
-        if ( Ctr->PDE_IsKnockIn() )
-        {
-            InitGrid( Ctr, false );
-            GridResult va = SolveGrid( Ctr );
-            res.premium = va.premium - ko.premium;
-            res.delta = va.delta - ko.delta;
-            res.gamma = va.gamma - ko.gamma;
-        }
-        else
-        {
-            res = ko;
-        }
-
-        Result( Ctr ).premium = res.premium;
-        Result( Ctr ).delta = res.delta;
-        Result( Ctr ).gamma = res.gamma;
+        StoreResult( Ctr, KnockInParity( Ctr, SolveGrid( Ctr ) ) );
         return;
     }
 
-    //! barrier already breached at valuation : knock-in = vanilla, knock-out = 0
-    double H = Ctr->PDE_BarrierLevel();
-    double spot = Ctr->GetUnderlying()->GetSpot();
-    bool breached = Ctr->PDE_IsUpBarrier() ? ( spot >= H ) : ( spot <= H );
-
-    GridResult res;
-    if ( breached )
+    //! continuous monitoring, already breached at valuation : knock-in = vanilla,
+    //! knock-out = 0.
+    const double H = Ctr->Level();
+    const double spot = Ctr->GetUnderlying()->GetSpot();
+    if ( Ctr->IsUp() ? ( spot >= H ) : ( spot <= H ) )
     {
-        if ( Ctr->PDE_IsKnockIn() )
+        GridResult res; //!< knocked out -> stays zero
+        if ( Ctr->IsIn() )
         {
             InitGrid( Ctr, false );
             res = SolveGrid( Ctr ); //!< full vanilla
         }
-        //! else knocked out : res stays zero
-    }
-    else
-    {
-        //! knock-out on the clamped (live-region) domain
-        InitGrid( Ctr, true );
-        GridResult ko = SolveGrid( Ctr );
-
-        if ( Ctr->PDE_IsKnockIn() )
-        {
-            //! knock-in by in/out parity : vanilla - knock-out
-            InitGrid( Ctr, false );
-            GridResult va = SolveGrid( Ctr );
-            res.premium = va.premium - ko.premium;
-            res.delta = va.delta - ko.delta;
-            res.gamma = va.gamma - ko.gamma;
-        }
-        else
-        {
-            res = ko;
-        }
+        StoreResult( Ctr, res );
+        return;
     }
 
-    Result( Ctr ).premium = res.premium;
-    Result( Ctr ).delta = res.delta;
-    Result( Ctr ).gamma = res.gamma;
+    //! live : knock-out on the clamped (live-region) domain, knock-in by parity.
+    InitGrid( Ctr, true );
+    StoreResult( Ctr, KnockInParity( Ctr, SolveGrid( Ctr ) ) );
+}
+
+//! copy a grid solve's premium + spot Greeks into the contract's result entry.
+void PricerPDE::StoreResult( Contract* Ctr, const GridResult& R )
+{
+    Result( Ctr ).premium = R.premium;
+    Result( Ctr ).delta = R.delta;
+    Result( Ctr ).gamma = R.gamma;
 }
 
 //! set up the grid for one contract: read the market (escrowed spot, ATM vol, carry
@@ -235,12 +221,13 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     _j = _pde->_custom_n_s;
     _is_american = Ctr->IsAmerican();
 
-    //! barrier handling
-    if ( ApplyBarrier && Ctr->PDE_IsBarrier() )
+    //! barrier handling (null for a non-barrier contract; flavour read off the type)
+    Barrier* bar = dynamic_cast<Barrier*>( Ctr );
+    if ( ApplyBarrier && bar )
     {
-        bool is_up = Ctr->PDE_IsUpBarrier();
-        double H = Ctr->PDE_BarrierLevel();
-        if ( Ctr->PDE_IsDiscreteBarrier() )
+        bool is_up = bar->IsUp();
+        double H = bar->Level();
+        if ( bar->IsDiscrete() )
         {
             //! discrete: keep the full domain (the knocked region survives between
             //! monitoring dates) and hold the knocked-side boundary at zero.
@@ -320,10 +307,10 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! (step i is at year-fraction i*k from today). The knocked region is zeroed
     //! at these steps in SolveGrid.
     _discrete_monitor_steps.clear();
-    if ( ApplyBarrier && Ctr->PDE_IsBarrier() && Ctr->PDE_IsDiscreteBarrier() )
+    if ( ApplyBarrier && bar && bar->IsDiscrete() )
     {
-        _barrier_is_up = Ctr->PDE_IsUpBarrier();
-        _barrier_level = Ctr->PDE_BarrierLevel();
+        _barrier_is_up = bar->IsUp();
+        _barrier_level = bar->Level();
         for ( const date& d : Ctr->GetFixingDates() ) //!< == the monitoring schedule
         {
             int step = (int)lround( YearFraction( _today, d ) / _k );

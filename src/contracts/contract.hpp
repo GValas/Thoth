@@ -1,26 +1,24 @@
 #pragma once
 #include "underlying.hpp"
 #include "valuation.hpp"
-#include "pricing_facets.hpp"
 
 //! Abstract base for every priced instrument (vanilla, barrier, variance swap...).
 //!
-//! A Contract bundles three things:
+//! A Contract bundles two things:
 //!   1. the *trade definition* — its underlying, premium (settlement) currency and
 //!      payoff/exercise schedule, read from YAML in the concrete Configure();
 //!   2. the *canonical Monte-Carlo node graph* — GetNode() builds a ContractNode
 //!      from per-flow-date sub-trees (GetFlowNode), shared/deduplicated through the
-//!      NodeCollector so a whole book reuses common spot/vol/rate nodes;
-//!   3. the *PDE flavour flags* (PdePriceable, see pricing_facets.hpp) — barrier /
-//!      variance-swap description flags a grid solve reads.
+//!      NodeCollector so a whole book reuses common spot/vol/rate nodes.
 //! A contract is a pure *description*: it holds no priced result, and it does not
 //! decide which engine can price it — whether a PDE / closed form / GPU kernel
 //! applies is an engine decision (PricerPDE / PricerANA / PricerMCL inspect the
-//! contract + underlying). The pricing engines (tasks) keep the premium + Greeks
-//! themselves (Pricer::Result). Concrete contracts supply the payoff (Intrinsic /
-//! GetFlowNode), the schedule (the Get*Dates getters) and the facet flags; the
-//! common plumbing lives here.
-class Contract : public Object, public PdePriceable
+//! contract + underlying, down-casting to the concrete type for any per-flavour
+//! detail, e.g. a Barrier's level). The pricing engines (tasks) keep the premium +
+//! Greeks themselves (Pricer::Result). Concrete contracts supply the payoff
+//! (Intrinsic / GetFlowNode) and the schedule (the Get*Dates getters); the common
+//! plumbing lives here.
+class Contract : public Object
 {
 
   protected:
@@ -72,11 +70,6 @@ class Contract : public Object, public PdePriceable
     virtual set<date> GetFixingDates() = 0;
     //! flow dates: dates on which a cash flow settles (drive GetNode's sub-trees)
     virtual set<date> GetFlowDates() = 0;
-
-    //! PDE flavour flags are inherited from pricing_facets.hpp:
-    //!   PdePriceable : barrier / accrued-variance flavour flags (engine steering)
-    //! Whether a PDE / closed form actually applies is decided by PricerPDE /
-    //! PricerANA (they inspect the contract + underlying), not by the contract.
 
     //! constructor — ObjectName is the trade id, ObjectKind the contract KIND tag
     Contract( const string& ObjectName,

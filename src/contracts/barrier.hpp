@@ -46,17 +46,12 @@ class Barrier : public Contract
         return false;
     }
 
-    //! pde barrier flags steering the grid solve (continuous: Dirichlet boundary;
-    //! discrete: zero the knocked region at scheduled dates; knock-in by parity)
-    bool PDE_IsBarrier() override;
-    bool PDE_IsKnockIn() override;
-    bool PDE_IsUpBarrier() override;
-    bool PDE_IsDiscreteBarrier() override
-    {
-        return IsDiscrete();
-    }
-    //! the active barrier level H (up vs down depending on the type)
-    double PDE_BarrierLevel() override;
+    //! barrier flavour read by the engines that price it (PDE grid / MCL flow node):
+    //! up vs down, knock-in vs knock-out, and the active level H. Continuous vs
+    //! discrete monitoring is IsDiscrete() above.
+    [[nodiscard]] bool IsUp() const;
+    [[nodiscard]] bool IsIn() const;
+    [[nodiscard]] double Level() const;
 
     //! fixing dates: maturity, plus every monitoring date when discretely monitored
     set<date> GetFixingDates() override;

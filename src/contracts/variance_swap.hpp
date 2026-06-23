@@ -33,11 +33,6 @@ class VarianceSwap : public Contract
     double Intrinsic( const double spot ) override;
     bool IsAmerican() override;
 
-    //! pde: the fair variance is solved on the spot grid as the expected
-    //! accumulated variance (a backward PDE with a local-variance source); the
-    //! pricer assembles PV = notional * DF * (fair_var - strike_var).
-    bool PDE_IsAccruedVariance() override { return true; }
-
     //! dates (single payment at maturity)
     set<date> GetFixingDates() override;
     set<date> GetFlowDates() override;

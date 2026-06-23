@@ -2,6 +2,7 @@
 #include "pde_configuration.hpp"
 #include "pricer.hpp"
 
+class Barrier;
 class VarianceSwap;
 
 /*
@@ -146,6 +147,14 @@ class PricerPDE : public Pricer
     //! for continuous monitoring, or the discrete-step zeroing set up here.
     void InitGrid( Contract*, bool ApplyBarrier );
     GridResult SolveGrid( Contract* );
+
+    //! per-type pricing the dispatcher PriceContract routes to: a plain / Heston
+    //! vanilla, and a barrier (knock-out grid solve + knock-in by in/out parity).
+    //! StoreResult copies a grid solve's premium + spot Greeks into the result entry.
+    void PriceVanilla( Contract* Ctr );
+    void PriceBarrier( Barrier* Ctr );
+    GridResult KnockInParity( Barrier* Ctr, const GridResult& KnockOut );
+    void StoreResult( Contract* Ctr, const GridResult& R );
 
     //! Heston stochastic vol : a 2-D (S, v) Douglas-ADI finite-difference solve
     //! (cross term explicit, S- and v-sweeps implicit). European + American.
