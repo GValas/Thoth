@@ -2,9 +2,9 @@
 #include "contract.hpp"
 #include "object.hpp"
 
-//! A book: the list of contracts priced together, holding the aggregated premium
-//! and Greeks (in the book currency) and exposing the union of fixing / exercise
-//! dates and the single-name / currency sets the engines need.
+//! A book: the set of contracts priced together. A pure description — it holds no
+//! priced result (the engine/Pricer owns premium + Greeks); it exposes the union of
+//! fixing / exercise dates and the single-name / currency sets the engines need.
 class Book : public Object
 {
     //
@@ -13,39 +13,19 @@ class Book : public Object
     ContractSet _contract_set;     //!< contracts priced together (non-owning)
     Currency* _currency = nullptr; //!< book reporting currency
 
-    //! premium: aggregated PV and its Monte-Carlo standard error ("trust")
-    double _premium = 0;
-    double _premium_trust = 0;
-
-    //! greeks: aggregated value (delta / gamma; the rest are per-contract)
-    double _delta = 0;
-    double _gamma = 0;
-
     //
   public:
     //! read own field (the list of contracts priced together)
     void Configure( ObjectReader& reader ) override;
 
-    //! setter — store the aggregated premium (PV)
-    void SetPremium( double Premium );
-    //! setter — store the premium's MC standard error
-    void SetPremiumTrust( double PremiumTrust );
-    //! setter — store the aggregated delta
-    void SetDelta( double Delta );
-    //! setter — store the aggregated gamma
-    void SetGamma( double Gamma );
     //! cascade the valuation date to every contract in the book
     void SetToday( const date& Today ) override;
-    //! re-anchor on Today and clear all accumulators (book premium + Greeks and every
-    //! contract's Result) so a re-price starts clean — engines aggregate additively.
+    //! re-anchor before a (re-)price: cascade today + correlation to every contract
+    //! (the book holds no result state — the Pricer owns and clears the results).
     void Reset( const date& Today, Correlation* Correl );
 
     //! getter
     const ContractSet& GetContractSet() const;
-    double GetPremium() const;
-    double GetPremiumTrust() const;
-    double GetDelta() const;
-    double GetGamma() const;
 
     //! mcl — the BookNode summing the contract nodes (in their own currencies)
     MonteCarloNode* GetNode( NodeCollector& NC );

@@ -1,0 +1,201 @@
+root: test
+
+# Three European vanilla options priced by all three engines (PDE, MCL, ANA):
+# 3 PDE + 3 MCL + 3 analytic pricers = 9 cells, run in one process by the
+# !sequence task. Each writes its own <name>_result block; with a server running
+# `scripts/run_local_client_matrix.sh samples/test.yaml` tabulates them. All cells
+# share the same spot-100, flat-30%-vol, flat-8%-rate market so the three engines
+# are directly comparable per option (they should agree to MC error).
+#
+#   option            strike  maturity     methods
+#   van_call_atm      100     1y           pde  mcl  ana   (BS ref ~= 15.71)
+#   van_put_otm        90     1y           pde  mcl  ana
+#   van_call_itm      110     1.5y         pde  mcl  ana
+
+test: !sequence
+  result: test_result
+  tasks:
+    #! 3 PDE
+    - van_call_atm_pde
+    - van_put_otm_pde
+    - van_call_itm_pde
+    #! 3 MCL (Monte-Carlo) + the ATM call also on the GPU engine (CPU fallback off-CUDA)
+    - van_call_atm_mcl
+    - van_call_atm_mcl_gpu
+    - van_put_otm_mcl
+    - van_call_itm_mcl
+    #! 3 analytic (closed-form Black-Scholes)
+    - van_call_atm_ana
+    - van_put_otm_ana
+    - van_call_itm_ana
+
+# --- shared engine configurations -------------------------------------------
+shared_mcl: !mcl_configuration
+  max_day_step: 1
+  min_day_step: -1
+  paths: 50000
+  vol_year_step: 0.01
+  use_sobol: true
+  allow_gpu: false
+
+# same as shared_mcl but with GPU acceleration requested: runs on the device on a
+# CUDA build (single-asset European-vanilla GBM is GPU-supported), transparently on
+# the CPU mcl engine otherwise — identical numbers, so the cell is always valid.
+shared_mcl_gpu: !mcl_configuration
+  max_day_step: 1
+  min_day_step: -1
+  paths: 50000
+  vol_year_step: 0.01
+  use_sobol: true
+  allow_gpu: true
+
+shared_pde: !pde_configuration
+  vanilla_precision: high
+
+# --- pricers (3 per option: pde / mcl / ana) --------------------------------
+# ATM call
+van_call_atm_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_call_atm
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_atm_pde_result
+van_call_atm_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_call_atm
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_atm_mcl_result
+van_call_atm_mcl_gpu: !mcl_pricer
+  today: 2000-01-01
+  book: book_call_atm
+  currency: eur
+  mcl_configuration: shared_mcl_gpu
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_atm_mcl_gpu_result
+van_call_atm_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_call_atm
+  currency: eur
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_atm_ana_result
+
+# OTM put
+van_put_otm_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_put_otm
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_put_otm_pde_result
+van_put_otm_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_put_otm
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_put_otm_mcl_result
+van_put_otm_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_put_otm
+  currency: eur
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_put_otm_ana_result
+
+# ITM call (longer maturity)
+van_call_itm_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_call_itm
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_itm_pde_result
+van_call_itm_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_call_itm
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_itm_mcl_result
+van_call_itm_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_call_itm
+  currency: eur
+  correlation: correl
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: van_call_itm_ana_result
+
+# --- books (one contract each) ----------------------------------------------
+book_call_atm: !book
+  contracts: [van_call_atm]
+book_put_otm: !book
+  contracts: [van_put_otm]
+book_call_itm: !book
+  contracts: [van_call_itm]
+
+# --- contracts (three European vanillas) ------------------------------------
+van_call_atm: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
+
+van_put_otm: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 90
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: put
+  exercise: european
+
+van_call_itm: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 110
+  is_absolute_strike: true
+  maturity: 2001-06-30
+  nominal: 1
+  type: call
+  exercise: european
+
+# --- shared market data -----------------------------------------------------
+# equity with no repo and no dividends (both optional -> treated as 0)
+eq: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+
+vol: !bs_volatility
+  volatility: 30
+  calendar: volatility_calendar
+
+volatility_calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: eur_rate
+
+eur_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [8, 8]
+
+correl: !correlation_matrix
+  underlyings: [eq]
+  matrix: [1]

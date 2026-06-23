@@ -39,9 +39,8 @@ class VarianceSwap : public Contract
     bool PDE_HasSolution() override;
     bool PDE_IsAccruedVariance() override { return true; }
 
-    //! analytical (flat-vol fair variance)
+    //! analytical (static-replication fair variance); the formula lives in PricerANA
     bool ANA_HasSolution() override;
-    void ANA_EvalPrice() override;
 
     //! dates (single payment at maturity)
     set<date> GetFixingDates() override;

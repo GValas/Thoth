@@ -22,30 +22,6 @@ void Book::Configure( ObjectReader& reader )
     _contract_set.insert( contracts.begin(), contracts.end() );
 }
 
-//! setter
-void Book::SetPremium( double Premium )
-{
-    _premium = Premium;
-}
-
-//! setter
-void Book::SetPremiumTrust( double PremiumTrust )
-{
-    _premium_trust = PremiumTrust;
-}
-
-//! setter
-void Book::SetDelta( double Delta )
-{
-    _delta = Delta;
-}
-
-//! setter
-void Book::SetGamma( double Gamma )
-{
-    _gamma = Gamma;
-}
-
 //! cascade the valuation date: the book has no state of its own to roll, so it
 //! just re-anchors each contract (which in turn rolls its currency and underlying)
 void Book::SetToday( const date& Today )
@@ -56,17 +32,14 @@ void Book::SetToday( const date& Today )
     }
 }
 
-//! re-anchor on Today and zero every accumulator before a (re-)price: the book's
-//! own aggregated premium / Greeks, then each contract's date + Result (Reset).
+//! re-anchor the book before a (re-)price: cascade the valuation date and the
+//! correlation to every contract (and its underlying). The book holds no priced
+//! state of its own — the engine (Pricer) owns and clears the results.
 void Book::Reset( const date& Today, Correlation* Correl )
 {
-    _premium = 0;
-    _premium_trust = 0;
-    _delta = 0;
-    _gamma = 0;
     for ( Contract* c : _contract_set )
     {
-        c->Reset( Today );
+        c->SetToday( Today );
         c->SetCorrelation( Correl );
         c->GetUnderlying()->SetCorrelation( Correl );
     }
@@ -76,30 +49,6 @@ void Book::Reset( const date& Today, Correlation* Correl )
 const ContractSet& Book::GetContractSet() const
 {
     return _contract_set;
-}
-
-//! getter
-double Book::GetPremium() const
-{
-    return _premium;
-}
-
-//! getter
-double Book::GetPremiumTrust() const
-{
-    return _premium_trust;
-}
-
-//! getter
-double Book::GetDelta() const
-{
-    return _delta;
-}
-
-//! getter
-double Book::GetGamma() const
-{
-    return _gamma;
 }
 
 //! get fixing dates from each contract

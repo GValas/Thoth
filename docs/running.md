@@ -91,7 +91,7 @@ git commit is baked in and printed in the banner) and then runs it. All three
 print a `usage:` line on bad arguments. Default output paths are
 `<input>.out.yaml`, which are gitignored.
 
-### `run_docker_server.sh [--gpu] [--slaves <n>] [--port <port>] [--arch <cc>]`
+### `scripts/run_docker_server.sh [--gpu] [--slaves <n>] [--port <port>] [--arch <cc>]`
 
 Build and serve the HTTP pricing service, publishing it on the host `--port`
 (default `8080`; the container always listens on `8080` inside).
@@ -107,13 +107,13 @@ Build and serve the HTTP pricing service, publishing it on the host `--port`
   Ada / RTX 40-series).
 
 ```bash
-./run_docker_server.sh                       # single CPU server, host port 8080
-./run_docker_server.sh --port 7777           # single CPU server, host port 7777
-./run_docker_server.sh --slaves 4            # cluster: 4 slaves + master on 8080
-./run_docker_server.sh --gpu --arch 86       # single GPU server, sm_86 (Ampere)
+./scripts/run_docker_server.sh                       # single CPU server, host port 8080
+./scripts/run_docker_server.sh --port 7777           # single CPU server, host port 7777
+./scripts/run_docker_server.sh --slaves 4            # cluster: 4 slaves + master on 8080
+./scripts/run_docker_server.sh --gpu --arch 86       # single GPU server, sm_86 (Ampere)
 ```
 
-### `run_docker_batch.sh <input.yaml> [output.yaml]`
+### `scripts/run_docker_batch.sh <input.yaml> [output.yaml]`
 
 Build and price one YAML file in batch inside a container. The output defaults to
 `<input>.out.yaml` next to the input. The input directory is bind-mounted
@@ -121,14 +121,14 @@ read-only, the output directory read-write, and `--user` maps the container to
 the invoking host user so the result is owned by you (not root).
 
 ```bash
-./run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
-./run_docker_batch.sh samples/simple_call.yaml /tmp/out.yaml
+./scripts/run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
+./scripts/run_docker_batch.sh samples/simple_call.yaml /tmp/out.yaml
 ```
 
 ### Posting to a running server
 
 Use the built-in client (`thoth -client <url> <input.yaml>`) for a single book, or
-`run_local_client_matrix.sh <input.yaml> [--port N] [--raw out.yaml]` to post a
+`scripts/run_local_client_matrix.sh <input.yaml> [--port N] [--raw out.yaml]` to post a
 `!sequence` book and print a per-product table (method, time, premium, Greeks).
 Both send `Content-Type: application/x-yaml`, required for bodies over ~8 KB (the
 default form content type is capped by the HTTP library at 8 KB).
@@ -137,7 +137,7 @@ default form content type is capped by the HTTP library at 8 KB).
 # with a server (or cluster) already up on 8080:
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml --exec-name simple_call_pricing
-./run_local_client_matrix.sh samples/matrix.yaml --port 7777
+./scripts/run_local_client_matrix.sh samples/matrix.yaml --port 7777
 ```
 
 ## End-to-end examples
@@ -148,15 +148,15 @@ cmake -B build && cmake --build build -j
 ./build/thoth -batch samples/simple_call.yaml /tmp/out.yaml
 
 # 2) Dockerised server + client
-./run_docker_server.sh --port 8080 &                  # leave it running
+./scripts/run_docker_server.sh --port 8080 &                  # leave it running
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 
 # 3) Dockerised cluster: split an MCL book across 2 slaves
-./run_docker_server.sh --port 8090 --slaves 2 &
+./scripts/run_docker_server.sh --port 8090 --slaves 2 &
 ./build/thoth -client http://localhost:8090 samples/simple_call.yaml
 
 # 4) Run the full pricer/product matrix in one process
-./run_docker_batch.sh samples/matrix.yaml             # -> samples/matrix.out.yaml
+./scripts/run_docker_batch.sh samples/matrix.yaml             # -> samples/matrix.out.yaml
 ```
 
 ## Notes

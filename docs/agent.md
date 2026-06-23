@@ -47,7 +47,7 @@ The canonical commands (from `CLAUDE.md` and `README.md`):
 ```bash
 cmake -B build && cmake --build build -j      # -> ./build/thoth (+ thoth_tests)
 ctest --test-dir build --output-on-failure    # doctest suite (tests/)
-./format.sh                                    # clang-format over src/ and tests/
+./scripts/format.sh                                    # clang-format over src/ and tests/
 ```
 
 - **Build** produces `./build/thoth` and the `thoth_tests` binary in one pass.
@@ -56,8 +56,8 @@ ctest --test-dir build --output-on-failure    # doctest suite (tests/)
   barriers, dividends, multi-asset and engine-vs-engine agreement, variance
   swaps, baskets, composites, the SABR surface, Sobol QMC, the `!sequence` task,
   determinism and config parsing. Run them with `ctest` after every change.
-- **Formatting** is enforced. `./format.sh` formats in place;
-  `./format.sh --check` reports unformatted files and is **the CI gate** — run
+- **Formatting** is enforced. `./scripts/format.sh` formats in place;
+  `./scripts/format.sh --check` reports unformatted files and is **the CI gate** — run
   it before committing. The style lives in `.clang-format` (Allman braces,
   `ColumnLimit 0`). `clang-format` is preinstalled in the devcontainer.
 
@@ -86,8 +86,9 @@ tests/           doctest regression suite
 samples/         runnable YAML books (simple_call, matrix)
 docs/            design notes & guides (this file lives here)
 CMakeLists.txt   build
-format.sh        clang-format wrapper (--check is the CI gate)
-run_docker_*.sh  Docker batch/server wrappers; run_local_client_matrix.sh posts a !sequence + tabulates
+scripts/         shell wrappers (run from the project root):
+  format.sh        clang-format wrapper (--check is the CI gate)
+  run_docker_*.sh  Docker batch/server wrappers; run_local_client_matrix.sh posts a !sequence + tabulates
 ```
 
 See `README.md` *Repository layout* for the full wrapper-by-wrapper table.
@@ -174,7 +175,7 @@ Example: adding a new product (e.g. a new instrument) or a new volatility kind.
    ```bash
    cmake --build build -j
    ctest --test-dir build --output-on-failure
-   ./format.sh --check
+   ./scripts/format.sh --check
    ```
 
 7. **Commit** only when asked, on a branch if needed, with the README synced and

@@ -18,8 +18,8 @@ Pricer::~Pricer() = default;
 //! by the registry straight off the YAML tag: !mcl_pricer / !pde_pricer / !ana_pricer)
 void Pricer::Configure( ObjectReader& reader )
 {
-    SetCurrency( *reader.Ref<Currency>( "currency" ) );                    //!< reporting currency
-    SetBook( *reader.Ref<Book>( "book" ) );                                //!< the contracts to price
+    SetCurrency( reader.Ref<Currency>( "currency" ) );                     //!< reporting currency
+    SetBook( reader.Ref<Book>( "book" ) );                                 //!< the contracts to price
     SetToday( reader.Get<date>( "today" ) );                               //!< valuation date
     SetIndicatorRequestList( reader.Get<vector<string>>( "indicators" ) ); //!< premium / Greeks to compute
     SetResult( reader.Get<string>( "result" ) );                           //!< where to write the output block
@@ -37,9 +37,9 @@ void Pricer::Configure( ObjectReader& reader )
 }
 
 // setter : the book of contracts this pricer values (borrowed, owned by the manager)
-void Pricer::SetBook( Book& Book )
+void Pricer::SetBook( Book* Book )
 {
-    _book = &Book;
+    _book = Book;
 }
 
 // setter : optional correlation matrix (needed for multi-asset diffusion, quanto and
@@ -82,9 +82,9 @@ void Pricer::SetIndicatorRequestList( const vector<string>& IndicatorRequestList
 }
 
 // setter : the book (reporting) currency every premium / Greek is converted into
-void Pricer::SetCurrency( Currency& Currency )
+void Pricer::SetCurrency( Currency* Currency )
 {
-    _currency = &Currency;
+    _currency = Currency;
 }
 
 //! getter : the valuation date (the as-of date the whole book is priced at)
@@ -107,7 +107,6 @@ void Pricer::Execute()
     //! per-contract engines (PDE, ANA) PriceBook already folds in each
     //! contract's Greeks inside its contract loop, so ComputeGreeks is skipped.
     PriceBook();
-    _premium = _book->GetPremium();
 
     //! optional Greeks by book-level bump-and-revalue (MCL); restores the base book
     const bool greeks = _request_delta || _request_gamma || _request_vega ||
@@ -135,7 +134,12 @@ void Pricer::Execute()
 void Pricer::ComputeParamGreeks()
 {
     _quiet_pricing = true;
-    const double p0 = _premium;
+    const double p0 = _book_result.premium;
+
+    //! preserve the base book result (premium + already-computed Greeks): every
+    //! PriceBook below runs InitPricing, which zeroes the book aggregate, so it is
+    //! restored from this snapshot once the param-Greek sweep is done.
+    const Valuation base_result = _book_result;
 
     //! snapshot the surfaces once: PriceBook -> InitPricing rebuilds _single_set,
     //! but the Single / Volatility objects themselves persist across re-prices.
@@ -162,7 +166,7 @@ void Pricer::ComputeParamGreeks()
             v->ApplyShift( param, GREEK_PARAM_BUMP );
         }
         PriceBook();
-        const double pu = _book->GetPremium();
+        const double pu = _book_result.premium;
         for ( Volatility* v : vols )
         {
             v->ApplyShift( param, 0 ); //!< restore
@@ -170,9 +174,10 @@ void Pricer::ComputeParamGreeks()
         _param_greeks[param] = ( pu - p0 ) / GREEK_PARAM_BUMP;
     }
 
-    //! restore the book to the base scenario so the premium output is unbumped
+    //! restore the book to the base scenario so the per-contract premiums are
+    //! unbumped, then restore the book aggregate (premium + Greeks) from the snapshot
     PriceBook();
-    _premium = _book->GetPremium();
+    _book_result = base_result;
     _quiet_pricing = false;
 }
 
@@ -213,8 +218,8 @@ void Pricer::PriceBookByContract( const string& Label )
     const bool greeks = _request_delta || _request_gamma || _request_vega ||
                         _request_rho || _request_theta;
 
-    //! pricer-level Greek totals are summed over contracts here (reset first)
-    _delta = _gamma = _vega = _rho = _theta = 0;
+    //! the book aggregate (premium + every Greek) is zeroed by InitPricing above;
+    //! AggregateContract folds in premium/delta/gamma, vega/rho/theta are summed below.
 
     long done = 0;
     //! disable the bar during an inner bump-revalue (ComputeParamGreeks reprices the
@@ -231,16 +236,14 @@ void Pricer::PriceBookByContract( const string& Label )
             ComputeContractGreeks( c );
         }
 
-        AggregateContract( c ); //!< premium (+ bump delta/gamma) -> book totals
+        AggregateContract( c ); //!< premium (+ bump delta/gamma) -> book aggregate
 
         //! book-currency Greek totals (delta/gamma already folded into the book
-        //! by AggregateContract; vega/rho/theta live at pricer level)
+        //! aggregate by AggregateContract; vega/rho/theta summed here)
         const double fx = FxToBook( c );
-        _delta += c->Result().delta * fx;
-        _gamma += c->Result().gamma * fx;
-        _vega += c->Result().vega * fx;
-        _rho += c->Result().rho * fx;
-        _theta += c->Result().theta * fx;
+        _book_result.vega += Result( c ).vega * fx;
+        _book_result.rho += Result( c ).rho * fx;
+        _book_result.theta += Result( c ).theta * fx;
 
         bar.Update( ++done );
     }
@@ -359,7 +362,7 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
 //! sees the unbumped premium).
 void Pricer::ComputeContractGreeks( Contract* Ctr )
 {
-    const double p0 = Ctr->Result().premium;
+    const double p0 = Result( Ctr ).premium;
 
     //! for a multi-asset underlying on a grid engine (PDE), the basket "spot" is a
     //! fixed rebased 100 that a per-component bump can't move, so the bump would
@@ -380,7 +383,7 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
         _request_delta && !grid_spot, _request_gamma && !grid_spot,
         _request_vega, _request_rho, _request_theta,
         [this, Ctr]
-        { PriceContract( Ctr ); return Ctr->Result().premium; },
+        { PriceContract( Ctr ); return Result( Ctr ).premium; },
         [this, Ctr]( const date& d )
         { _today = d; Ctr->SetToday( d ); },
         [] {} );
@@ -391,12 +394,12 @@ void Pricer::ComputeContractGreeks( Contract* Ctr )
     PriceContract( Ctr );
     if ( !grid_spot )
     {
-        Ctr->Result().delta = g.delta;
-        Ctr->Result().gamma = g.gamma;
+        Result( Ctr ).delta = g.delta;
+        Result( Ctr ).gamma = g.gamma;
     }
-    Ctr->Result().vega = g.vega;
-    Ctr->Result().rho = g.rho;
-    Ctr->Result().theta = g.theta;
+    Result( Ctr ).vega = g.vega;
+    Result( Ctr ).rho = g.rho;
+    Result( Ctr ).theta = g.theta;
 }
 
 //! bump-and-revalue Greeks. Every scenario re-runs PriceBook with one market
@@ -410,7 +413,7 @@ void Pricer::ComputeGreeks()
     //! shows as a single line instead of N repeated re-price blocks.
     _quiet_pricing = true;
 
-    const double p0 = _premium;
+    const double p0 = _book_result.premium;
 
     //! count the bump scenarios up front to size the Greek progress bar:
     //! delta = 1 / underlying, gamma = 2 / underlying, vega/rho/theta = 1 each,
@@ -440,23 +443,24 @@ void Pricer::ComputeGreeks()
         p0, singles, _currency_set,
         _request_delta, _request_gamma, _request_vega, _request_rho, _request_theta,
         [this]
-        { PriceBook(); return _book->GetPremium(); },
+        { PriceBook(); return _book_result.premium; },
         [this]( const date& d )
         { _today = d; },
         [&]
         { greek_bar.Update( ++greek_done ); } );
 
-    _delta = g.delta;
-    _gamma = g.gamma;
-    _vega = g.vega;
-    _rho = g.rho;
-    _theta = g.theta;
-
-    //! restore the book to the base scenario so the premium output is unbumped
+    //! restore the book to the base scenario so the premium output is unbumped.
+    //! Do this BEFORE storing the Greeks: PriceBook -> InitPricing zeroes the book
+    //! aggregate, so Greeks written earlier would be wiped.
     PriceBook();
     greek_bar.Update( ++greek_done );
     greek_bar.Done();
-    _premium = _book->GetPremium();
+
+    _book_result.delta = g.delta;
+    _book_result.gamma = g.gamma;
+    _book_result.vega = g.vega;
+    _book_result.rho = g.rho;
+    _book_result.theta = g.theta;
 
     _quiet_pricing = false;
 }
@@ -472,37 +476,37 @@ void Pricer::WriteResults()
     string greeks;
     if ( _request_delta )
     {
-        greeks += ", delta = " + ToString( _delta );
+        greeks += ", delta = " + ToString( _book_result.delta );
     }
     if ( _request_gamma )
     {
-        greeks += ", gamma = " + ToString( _gamma );
+        greeks += ", gamma = " + ToString( _book_result.gamma );
     }
     if ( _request_vega )
     {
-        greeks += ", vega = " + ToString( _vega );
+        greeks += ", vega = " + ToString( _book_result.vega );
     }
     if ( _request_rho )
     {
-        greeks += ", rho = " + ToString( _rho );
+        greeks += ", rho = " + ToString( _book_result.rho );
     }
     if ( _request_theta )
     {
-        greeks += ", theta = " + ToString( _theta );
+        greeks += ", theta = " + ToString( _book_result.theta );
     }
     for ( const auto& [param, value] : _param_greeks )
     {
         greeks += ", vega_" + param + " = " + ToString( value );
     }
     LOG( "BPR",
-         "book price = " + ToString( _premium ) + ", " +
-             "book trust = " + ToString( _book->GetPremiumTrust() ) + greeks + ", " +
+         "book price = " + ToString( _book_result.premium ) + ", " +
+             "book trust = " + ToString( _book_result.premium_trust ) + greeks + ", " +
              "book time = " + ToString( _task_time ) + "sec" );
 
     //! write cfg results
     Task::WriteResults();
-    WriteResult( "premium", _premium );
-    WriteResult( "premium_trust", _book->GetPremiumTrust() );
+    WriteResult( "premium", _book_result.premium );
+    WriteResult( "premium_trust", _book_result.premium_trust );
 
     //! debug node graph : one Graphviz .dot per MC tree (base + Greek scenarios),
     //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph). The
@@ -516,23 +520,23 @@ void Pricer::WriteResults()
     //! requested Greeks (book level), computed by bump-and-revalue
     if ( _request_delta )
     {
-        WriteResult( "delta", _delta );
+        WriteResult( "delta", _book_result.delta );
     }
     if ( _request_gamma )
     {
-        WriteResult( "gamma", _gamma );
+        WriteResult( "gamma", _book_result.gamma );
     }
     if ( _request_vega )
     {
-        WriteResult( "vega", _vega );
+        WriteResult( "vega", _book_result.vega );
     }
     if ( _request_rho )
     {
-        WriteResult( "rho", _rho );
+        WriteResult( "rho", _book_result.rho );
     }
     if ( _request_theta )
     {
-        WriteResult( "theta", _theta );
+        WriteResult( "theta", _book_result.theta );
     }
     //! model-parameter Greeks (book level), keyed vega_<param>
     for ( const auto& [param, value] : _param_greeks )
@@ -546,30 +550,30 @@ void Pricer::WriteResults()
     for ( Contract* c : _book->GetContractSet() )
     {
         const string n = c->GetName();
-        WriteResult( n + "_premium", c->Result().premium );
-        WriteResult( n + "_premium_trust", c->Result().premium_trust );
+        WriteResult( n + "_premium", Result( c ).premium );
+        WriteResult( n + "_premium_trust", Result( c ).premium_trust );
 
         if ( per_contract_greeks )
         {
             if ( _request_delta )
             {
-                WriteResult( n + "_delta", c->Result().delta );
+                WriteResult( n + "_delta", Result( c ).delta );
             }
             if ( _request_gamma )
             {
-                WriteResult( n + "_gamma", c->Result().gamma );
+                WriteResult( n + "_gamma", Result( c ).gamma );
             }
             if ( _request_vega )
             {
-                WriteResult( n + "_vega", c->Result().vega );
+                WriteResult( n + "_vega", Result( c ).vega );
             }
             if ( _request_rho )
             {
-                WriteResult( n + "_rho", c->Result().rho );
+                WriteResult( n + "_rho", Result( c ).rho );
             }
             if ( _request_theta )
             {
-                WriteResult( n + "_theta", c->Result().theta );
+                WriteResult( n + "_theta", Result( c ).theta );
             }
         }
     }
@@ -599,13 +603,13 @@ double Pricer::FxToBook( Contract* Ctr )
                                     Ctr->GetPremiumCurrency()->GetName() );
 }
 
-//! add a priced contract's premium/delta/gamma to the book (with FX conversion)
+//! add a priced contract's premium/delta/gamma to the book aggregate (FX-converted)
 void Pricer::AggregateContract( Contract* Ctr )
 {
     double fx = FxToBook( Ctr );
-    _book->SetPremium( _book->GetPremium() + Ctr->Result().premium * fx );
-    _book->SetDelta( _book->GetDelta() + Ctr->Result().delta * fx );
-    _book->SetGamma( _book->GetGamma() + Ctr->Result().gamma * fx );
+    _book_result.premium += Result( Ctr ).premium * fx;
+    _book_result.delta += Result( Ctr ).delta * fx;
+    _book_result.gamma += Result( Ctr ).gamma * fx;
 }
 
 //! verify every contract in the book supports the engine's pricing method
@@ -626,8 +630,7 @@ void Pricer::CheckAllowed( const std::function<bool( Contract* )>& HasSolution,
 void Pricer::InitPricing()
 {
 
-    //! set today and clear all accumulators (book premium/Greeks + every contract's
-    //! Result) so re-pricing does not double-count (the engines aggregate additively).
+    //! re-anchor the book (cascade today + correlation to every contract)
     _book->Reset( _today, _correlation );
     _currency->SetToday( _today );
 
@@ -635,6 +638,17 @@ void Pricer::InitPricing()
     _single_set = _book->GetSingleSet();
     _currency_set = _book->GetCurrencySet();
     _contract_set = _book->GetContractSet();
+
+    //! clear all priced state (the financial objects hold none — it lives here):
+    //! a fresh book aggregate and a zeroed Valuation per contract, so re-pricing
+    //! does not double-count (the engines aggregate additively) and Result().at()
+    //! always resolves.
+    _book_result = Valuation{};
+    _contract_results.clear();
+    for ( Contract* c : _contract_set )
+    {
+        _contract_results[c->GetName()] = Valuation{};
+    }
 
     //! set underlyings today -> redundant
     for ( auto& s : _single_set )

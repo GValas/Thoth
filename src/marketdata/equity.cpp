@@ -22,8 +22,8 @@ Equity::~Equity() = default;
 void Equity::Configure( ObjectReader& reader )
 {
     SetSpot( reader.Get<double>( "spot" ) );
-    SetVolatility( *reader.Ref<Volatility>( "volatility" ) );
-    SetCurrency( *reader.Ref<Currency>( "currency" ) );
+    SetVolatility( reader.Ref<Volatility>( "volatility" ) );
+    SetCurrency( reader.Ref<Currency>( "currency" ) );
     if ( reader.Has<string>( "continuous_dividends" ) )
     {
         SetContinuousDividends( reader.Ref<ContinuousDividendsCurve>( "continuous_dividends" ) );

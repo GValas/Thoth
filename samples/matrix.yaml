@@ -2,7 +2,7 @@ root: matrix
 
 # Full pricer/product matrix, run in one process by the !sequence task. Every
 # priceable (product, method) combination below is launched one after another;
-# each writes its own <name>_result block. run_local_client_matrix.sh prints the
+# each writes its own <name>_result block. scripts/run_local_client_matrix.sh prints the
 # premiums + Greeks as a table. All cases share the same 1y, spot-100, flat-30%-vol,
 # flat-8%-rate market so the numbers are directly comparable across engines.
 #

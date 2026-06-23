@@ -15,9 +15,9 @@ Asset::~Asset() = default;
 
 //! setter — bind the pricing currency by address (Currency is a shared singleton, so
 //! we keep a non-owning pointer)
-void Asset::SetCurrency( Currency& Currency )
+void Asset::SetCurrency( Currency* Currency )
 {
-    _currency = &Currency;
+    _currency = Currency;
 }
 
 //! setter — push the valuation date into the pricing currency first (so its discount

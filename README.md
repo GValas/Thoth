@@ -209,9 +209,9 @@ cmake -B build -DTHOTH_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89   # 89 = Ada
 cmake --build build -j
 ```
 
-Or build/run the GPU Docker image via `./run_docker_server.sh --gpu` (needs the
+Or build/run the GPU Docker image via `./scripts/run_docker_server.sh --gpu` (needs the
 NVIDIA Container Toolkit). The CPU and GPU images come from the **same**
-parameterised `Dockerfile`, and the same `run_docker_server.sh` wrapper runs
+parameterised `Dockerfile`, and the same `scripts/run_docker_server.sh` wrapper runs
 both: `--gpu` swaps in the `nvidia/cuda` base images and `ENABLE_CUDA=ON` through
 `--build-arg` and attaches the host GPU with `--gpus all` (`--arch` sets the
 compute capability, default 89). Without CUDA the `mcl` engine still builds and an
@@ -247,8 +247,8 @@ ctest --test-dir build --output-on-failure
 
 ### Formatting
 
-`./format.sh` runs clang-format (style in `.clang-format`) over `src/` and
-`tests/`; `./format.sh --check` fails on unformatted files (CI gate).
+`./scripts/format.sh` runs clang-format (style in `.clang-format`) over `src/` and
+`tests/`; `./scripts/format.sh --check` fails on unformatted files (CI gate).
 `clang-format` is preinstalled in the devcontainer (and the production build
 image); for a manual setup, `sudo apt-get install -y clang-format`.
 
@@ -264,7 +264,7 @@ to `main` and mirrors the local checks above on `ubuntu-24.04`:
 - **sanitizers** — a Debug build with `-DTHOTH_SANITIZE=ON`
   (AddressSanitizer + UndefinedBehaviorSanitizer) running the full `ctest`, to
   catch memory / UB bugs the Release build hides;
-- **format** — `./format.sh --check` with `clang-format-18` (the version that
+- **format** — `./scripts/format.sh --check` with `clang-format-18` (the version that
   produced `.clang-format`).
 
 Both hardening switches are off by default in `CMakeLists.txt`, so a plain local
@@ -290,7 +290,7 @@ so debug with a small book or a reduced `paths`.
 ./build/thoth -batch <input.yaml> <output.yaml> [task_name]
 # or build the production image and price in a container — the result is written
 # next to the input as <input>.out.yaml, owned by the invoking user:
-./run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
+./scripts/run_docker_batch.sh samples/simple_call.yaml          # -> samples/simple_call.out.yaml
 ```
 
 The output YAML is the input config with the computed `*_result` blocks added.
@@ -301,7 +301,7 @@ put, quanto, composite, basket / best-of / worst-of, up/down & in/out, continuou
 discrete barriers, American Heston, variance swap, Heston, Bates, and **SABR
 local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL) in one
 process — price it like any other book (`-batch`, or post it to a server with the
-built-in `-client`). `run_local_client_matrix.sh` posts it and prints a
+built-in `-client`). `scripts/run_local_client_matrix.sh` posts it and prints a
 per-product table (method, time, premium and every Greek) — see below.
 
 `samples/big_option.yaml` is a single feature-dense option (an American, USD-quanto
@@ -315,34 +315,40 @@ graph); pipe it to `dot -Tpng` to view it.
 (random strike / type / maturity, seed 42) on one equity, priced in a single MCL
 sweep with all Greeks. Its `mcl_configuration` sets `allow_gpu`, so the whole book
 runs on the GPU GBM kernel on a CUDA build (CPU fallback otherwise). The helper
-`build_run.sh [--gpu] [input.yaml]` builds (with `-DTHOTH_ENABLE_CUDA=ON` when
+`scripts/build_run.sh [--gpu] [input.yaml]` builds (with `-DTHOTH_ENABLE_CUDA=ON` when
 `--gpu` is passed) and prices it.
+
+`samples/test.yaml` is a small cross-engine sanity book: three European vanillas
+(ATM call, OTM put, ITM call) on one equity, each priced by PDE, MCL and ANA — plus
+the ATM call also on the GPU MCL engine (`allow_gpu`, CPU fallback off-CUDA) — as a
+`!sequence`, so the three engines agree per option to MC error. Tabulate it with
+`scripts/run_local_client_matrix.sh samples/test.yaml`.
 
 ### HTTP pricing service
 
 ```bash
 ./build/thoth -server 8080                       # POST /price, GET /health
 # or build the image and serve from a container:
-./run_docker_server.sh --port 8080
+./scripts/run_docker_server.sh --port 8080
 
 curl --data-binary @samples/simple_call.yaml localhost:8080/price
 # the built-in client:
 ./build/thoth -client http://localhost:8080 samples/simple_call.yaml
 # post a !sequence book (e.g. the matrix) and print a per-product table — method,
 # time spent, premium and every Greek (--raw keeps the full YAML response):
-./run_local_client_matrix.sh samples/matrix.yaml --port 8080
+./scripts/run_local_client_matrix.sh samples/matrix.yaml --port 8080
 ```
 
 `POST /price` takes a YAML body and returns the YAML result; an optional
 `X-Task-Name` header selects which object to run (default: the `root` object).
 Send `Content-Type: application/x-yaml` for bodies over ~8 KB (the built-in client
-and `run_local_client_matrix.sh` already do); the default form content type is
+and `scripts/run_local_client_matrix.sh` already do); the default form content type is
 capped by the HTTP library.
 
 Requests are serialised (the engine shares global progress/cancellation state): the server logs
 the client IP on arrival and again if a request has to wait. If a client
 disconnects mid-pricing the run is cancelled, freeing the server instead of
-finishing a result nobody will read. `run_docker_server.sh` passes `docker run -t`, so
+finishing a result nobody will read. `scripts/run_docker_server.sh` passes `docker run -t`, so
 the server console shows the live single-line progress bar; captured later via
 `docker logs` (no live TTY) it reads as one bar line every 10%.
 
@@ -358,12 +364,12 @@ aggregate the results:
 ./build/thoth -cluster 8090 http://localhost:8091 http://localhost:8092
 # or the Docker wrapper with --slaves: one container per slave + a master, all on a
 # private network (Ctrl-C, or the master exiting, tears the whole cluster down):
-./run_docker_server.sh --port 8090 --slaves 2
+./scripts/run_docker_server.sh --port 8090 --slaves 2
 # then POST a book to the master (single-MCL-pricer books get path-split):
 ./build/thoth -client http://localhost:8090 samples/simple_call.yaml
 # a !sequence (e.g. the matrix) is dispatched cell by cell — each MCL cell is
 # path-split across the slaves in turn, ANA/PDE cells compute on the master:
-./run_local_client_matrix.sh samples/matrix.yaml --port 8090
+./scripts/run_local_client_matrix.sh samples/matrix.yaml --port 8090
 ```
 
 The master splits `paths` as evenly as possible (capping the fan-out at `paths`
@@ -491,16 +497,19 @@ the model-parameter `vega_<param>` Greeks, across PDE / MCL / ANA) in one proces
 src/             C++ sources (engine, instruments, market data, IO)
 tests/           doctest regression suite
 samples/         example YAML configs
+docs/            design notes
 Dockerfile       production image (multi-stage; CPU by default, GPU via build-args)
 .devcontainer/   VS Code dev container
 .vscode/         editor tasks + gdb debug configs
 .github/workflows/ CI (build + ctest + clang-format gate)
 CMakeLists.txt   build
-format.sh                 clang-format wrapper (--check for CI)
-run_docker_batch.sh       build the image and price one YAML in batch: <input.yaml> [output.yaml]
-run_docker_server.sh      build the image and serve over HTTP ([--gpu] CUDA/--gpus all; [--slaves N] master + N slave cluster)
-run_docker_common.sh      shared helpers (image build, input/output paths) — sourced, not run
-run_local_client_matrix.sh POST a !sequence book to a running server and tabulate it: <input.yaml> [--port N] [--raw out.yaml]
+scripts/         shell wrappers (run from the project root, e.g. ./scripts/format.sh):
+  build_run.sh                build (optionally --gpu) and batch-price a book, node-graph dump on
+  format.sh                   clang-format wrapper (--check for CI)
+  run_docker_batch.sh         build the image and price one YAML in batch: <input.yaml> [output.yaml]
+  run_docker_server.sh        build the image and serve over HTTP ([--gpu] CUDA/--gpus all; [--slaves N] master + N slave cluster)
+  run_docker_common.sh        shared helpers (image build, input/output paths) — sourced, not run
+  run_local_client_matrix.sh  POST a !sequence book to a running server and tabulate it: <input.yaml> [--port N] [--raw out.yaml]
 ```
 
 ---

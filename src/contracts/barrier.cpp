@@ -119,61 +119,11 @@ double Barrier::PDE_BarrierLevel()
 }
 
 //! a closed-form (Reiner-Rubinstein) solution exists for a single, continuously
-//! monitored barrier on an equity-like underlying.
+//! monitored barrier on an equity-like underlying. The formula lives in PricerANA.
 bool Barrier::ANA_HasSolution()
 {
     return ( _barrier_monitoring_type == BarrierMonitoring::Continuous ) &&
            _underlying->IsGriddable();
-}
-
-//! Reiner-Rubinstein closed-form barrier price for a single spot value: decode this
-//! contract's flavour (call/put, down/up, in/out, active level) and delegate to the
-//! finance-module formula — mirroring how Vanilla::ANA_EvalPrice calls BS_*_Price.
-double Barrier::ANA_BarrierPrice( double S,
-                                  double r,
-                                  double b,
-                                  double v,
-                                  double t,
-                                  double df )
-{
-    bool is_call = ( _type == OptionType::Call );
-    bool is_down = ( _barrier_type == BarrierType::DownAndOut ||
-                     _barrier_type == BarrierType::DownAndIn );
-    bool is_in = IsKnockIn( _barrier_type );
-    double H = is_down ? _barrier_down_level : _barrier_up_level; //!< active barrier
-    return Barrier_Price( S, r, b, v, t, df, H, _strike, is_call, is_down, is_in );
-}
-
-//! closed-form barrier pricing (premium + finite-difference spot greeks)
-void Barrier::ANA_EvalPrice()
-{
-    //! market data (same conventions as Vanilla::ANA_EvalPrice)
-    double t = YearFraction( _today, _maturity_date );
-    double df = _premium_currency->GetRate()->GetDiscountFactor( _maturity_date );
-    double f = _underlying->GetForward( _maturity_date, _premium_currency );
-    double s = _underlying->GetSpot();
-    double v = _underlying->GetImplicitVol( _strike, _maturity_date );
-
-    //! back out the constant r and cost-of-carry b that reproduce the market df and
-    //! forward (r from df = e^{-rt}, b from fwd = s e^{bt}); the closed form is
-    //! parametrised in (r, b) rather than (df, fwd)
-    double r = ( t > 0 ) ? -log( df ) / t : 0.0;
-    double b = ( t > 0 && s > 0 ) ? log( f / s ) / t : 0.0;
-
-    //! premium
-    _valuation.premium = ANA_BarrierPrice( s, r, b, v, t, df );
-
-    //! delta & gamma by central finite difference on the spot (the closed form has
-    //! no clean analytic Greeks across the case table, so bump-and-revalue). The
-    //! bump is symmetric (+/- half a bump) so delta is second-order accurate; gamma
-    //! divides by the half-bump squared.
-    double s_up = s * ( 1 + GREEK_SPOT_BUMP / 2 );
-    double s_dw = s * ( 1 - GREEK_SPOT_BUMP / 2 );
-    double p_up = ANA_BarrierPrice( s_up, r, b, v, t, df );
-    double p_dw = ANA_BarrierPrice( s_dw, r, b, v, t, df );
-    _valuation.delta = ( p_up - p_dw ) / ( s * GREEK_SPOT_BUMP );
-    _valuation.gamma = ( p_up + p_dw - 2 * _valuation.premium ) /
-                       ( s * GREEK_SPOT_BUMP / 2 * s * GREEK_SPOT_BUMP / 2 );
 }
 
 //! Build the Monte-Carlo flow node: a vanilla payoff at maturity, gated by the

@@ -35,7 +35,7 @@ Découvertes d'exploration qui structurent l'archi :
 
 Basculent dans **`pricer/`** (tout le C++ + son tooling) :
 `CMakeLists.txt`, `Dockerfile`, `.dockerignore`, `.clang-format`, `.clang-tidy`, `TODO.md`,
-`build_run.sh`, `format.sh`, `run_docker_*.sh`, `run_local_client_matrix.sh`,
+`scripts/build_run.sh`, `scripts/format.sh`, `run_docker_*.sh`, `scripts/run_local_client_matrix.sh`,
 et les dossiers `src/`, `tests/`, `samples/`, `schema/`, `docs/`. L'actuel `README.md`
 devient **`pricer/README.md`** (doc détaillée du moteur).
 
@@ -51,7 +51,7 @@ Les dossiers de build (`build*/`, gitignored) ne sont pas déplacés, juste rég
 - `.devcontainer/` et `.vscode/` : tâches/chemins build pointant vers la racine → `pricer/`.
 - `.gitignore` racine : règles de build → `pricer/build*/`, plus `web/**/node_modules`,
   `web/bff/data/*.sqlite`, `web/frontend/dist`.
-- Scripts `run_docker_*.sh` / `build_run.sh` : chemins relatifs (samples, Dockerfile) à
+- Scripts `run_docker_*.sh` / `scripts/build_run.sh` : chemins relatifs (samples, Dockerfile) à
   revérifier une fois sous `pricer/`.
 - **`CLAUDE.md`** : sections *Build & test* et *Layout* (les commandes deviennent
   `cmake -B pricer/build …`, et `src/ tests/ samples/` → `pricer/src/ …`). Le **mandat
@@ -87,7 +87,7 @@ Thoth/
 ├── pricer/                     # ── MOTEUR C++ (déplacé tel quel, git mv) ──
 │   ├── CMakeLists.txt  Dockerfile  .clang-format  .clang-tidy  TODO.md
 │   ├── README.md               # doc détaillée du moteur (ex-README racine)
-│   ├── build_run.sh  format.sh  run_docker_*.sh  run_local_client_matrix.sh
+│   ├── scripts/  (build_run.sh  format.sh  run_docker_*.sh  run_local_client_matrix.sh)
 │   ├── src/
 │   │   ├── thoth.cpp           # main : -batch | -server | -client | -cluster
 │   │   ├── run_server.cpp      # POST /price, GET /health, GET /progress ← contrat BFF

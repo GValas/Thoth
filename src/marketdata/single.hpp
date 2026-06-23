@@ -26,7 +26,7 @@ class Single : public Underlying
     //! setter — the spot price
     void SetSpot( double Spot );
     //! setter — bind the volatility surface (by address)
-    void SetVolatility( Volatility& Volatility );
+    void SetVolatility( Volatility* Volatility );
     //! propagate the valuation date into the vol surface, then up the Asset chain
     void SetToday( const date& Today ) override;
 

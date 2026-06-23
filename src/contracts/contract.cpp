@@ -23,7 +23,7 @@ void Contract::Configure( ObjectReader& reader )
     //! dimensionless and settled in the premium currency)
     if ( _underlying->GetKind() == KIND_BASKET || _underlying->GetKind() == KIND_RAINBOW )
     {
-        _underlying->SetCurrency( *_premium_currency );
+        _underlying->SetCurrency( _premium_currency );
     }
 }
 
@@ -37,15 +37,6 @@ void Contract::SetToday( const date& Today )
     _premium_currency->SetToday( Today );
     _underlying->SetToday( Today );
     Object::SetToday( Today );
-}
-
-//! re-anchor on Today and wipe the priced result: a fresh Valuation zeroes the
-//! premium and every Greek, so engines that aggregate via Result() += ... do not
-//! double-count across re-prices.
-void Contract::Reset( const date& Today )
-{
-    SetToday( Today );
-    _valuation = Valuation{};
 }
 
 //! getter

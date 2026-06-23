@@ -61,23 +61,10 @@ class Barrier : public Contract
     //! the active barrier level H (up vs down depending on the type)
     double PDE_BarrierLevel() override;
 
-    //! analytical — Reiner-Rubinstein closed form (continuous monitoring only)
+    //! analytical — a Reiner-Rubinstein closed form exists (continuous monitoring
+    //! only); the formula itself lives in PricerANA.
     bool ANA_HasSolution() override;
-    void ANA_EvalPrice() override;
 
-  private:
-    //! closed-form (Reiner-Rubinstein) price of the barrier for a given spot,
-    //! continuous monitoring, no rebate. r is the risk-free rate, b the
-    //! cost-of-carry, v the volatility, t the year fraction to maturity and
-    //! df = exp(-r t) the discount factor.
-    double ANA_BarrierPrice( double Spot,
-                             double r,
-                             double b,
-                             double v,
-                             double t,
-                             double df );
-
-  public:
     //! fixing dates: maturity, plus every monitoring date when discretely monitored
     set<date> GetFixingDates() override;
     //! flow dates: the single settlement at maturity

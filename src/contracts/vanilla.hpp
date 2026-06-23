@@ -18,6 +18,7 @@ class Vanilla : public Contract
 
     //! getter
     [[nodiscard]] double GetStrike() const;
+    [[nodiscard]] OptionType GetType() const;
     date GetMaturityDate() const override;
 
     //! mcl node — a VanillaFlowNode (call/put payoff at maturity)
@@ -31,9 +32,8 @@ class Vanilla : public Contract
     //! pde — available iff the underlying is griddable (also prices American)
     bool PDE_HasSolution() override;
 
-    //! analytical — European closed form (Black-Scholes, or Heston for stoch vol)
+    //! analytical — a European closed form exists (the math lives in PricerANA)
     bool ANA_HasSolution() override;
-    void ANA_EvalPrice() override;
 
     //! gpu monte-carlo (mcl_gpu) — only for European, single-asset, deterministic-vol GBM
     bool GPU_GbmParams( GpuGbmParams& Out ) override;

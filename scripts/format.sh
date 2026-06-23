@@ -8,8 +8,9 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-# Resolve project root (this script's directory) so it works from anywhere.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve project root (this script lives in scripts/, so go up one) so it works
+# from anywhere.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 if ! command -v clang-format >/dev/null 2>&1; then

@@ -49,11 +49,12 @@ struct PdePriceable
     virtual ~PdePriceable() = default;
 };
 
-//! Analytic (closed-form) pricing view.
+//! Analytic (closed-form) pricing view: only the capability predicate — the
+//! closed-form evaluation itself lives in PricerANA (the task), keyed off the
+//! contract type, so the instrument stays a pure description.
 struct AnaPriceable
 {
     [[nodiscard]] virtual bool ANA_HasSolution() = 0;
-    virtual void ANA_EvalPrice() = 0;
 
     virtual ~AnaPriceable() = default;
 };

@@ -21,7 +21,7 @@ class Asset : public Object
 
   public:
     //! setter — bind the pricing currency (stored by address, not owned)
-    void SetCurrency( Currency& Currency );
+    void SetCurrency( Currency* Currency );
     //! propagate the valuation date down into the pricing currency (and its curve)
     //! before delegating to the base Object, so every date-dependent input is aligned
     void SetToday( const date& Today ) override;

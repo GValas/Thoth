@@ -32,10 +32,11 @@ sync above is part of that same commit.
 ```bash
 cmake -B build && cmake --build build -j      # -> ./build/thoth (+ thoth_tests)
 ctest --test-dir build --output-on-failure    # doctest suite
-./format.sh            # clang-format over src/ and tests/ (--check is the CI gate)
+./scripts/format.sh            # clang-format over src/ and tests/ (--check is the CI gate)
 ```
 
 ## Layout
 
 `src/` engine + instruments + market data; `tests/` doctest suite; `samples/`
-runnable YAML books; `docs/` design notes. See `README.md` for the full picture.
+runnable YAML books; `docs/` design notes; `scripts/` shell wrappers (run from the
+project root, e.g. `./scripts/format.sh`). See `README.md` for the full picture.

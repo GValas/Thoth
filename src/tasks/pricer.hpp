@@ -4,6 +4,7 @@
 #include "debug_configuration.hpp"
 #include "single.hpp"
 #include "task.hpp"
+#include "valuation.hpp"
 #include <functional>
 #include <map>
 
@@ -78,13 +79,19 @@ class Pricer : public Task
     //! parameter on every underlying whose vol surface exposes it.
     vector<string> _param_greek_list;
 
-    //! computed book-level results (book currency)
-    double _premium = 0;
-    double _delta = 0; //!< dPremium / dSpot
-    double _gamma = 0; //!< d2Premium / dSpot2
-    double _vega = 0;  //!< premium change per 1 vol point (0.01 of vol)
-    double _rho = 0;   //!< premium change per 1% (0.01) parallel rate move
-    double _theta = 0; //!< premium change over one calendar day (usually < 0)
+    //! computed results (book currency). The financial objects (Contract / Book)
+    //! are pure descriptions — all priced state lives here on the task: the
+    //! per-contract Valuations keyed by contract name, plus the aggregated book
+    //! Valuation. The map is pre-populated in InitPricing, so Result().at() always
+    //! resolves; the engines write premium / Greeks through Result(Ctr).
+    map<string, Valuation> _contract_results;
+    Valuation _book_result;
+
+    //! per-contract priced result, keyed by contract name (replaces the old
+    //! Contract::Result()). Hard-fails on a missing key (an engine bug), which is
+    //! why InitPricing pre-populates an entry for every contract in the book.
+    Valuation& Result( Contract* Ctr ) { return _contract_results.at( Ctr->GetName() ); }
+    const Valuation& Result( Contract* Ctr ) const { return _contract_results.at( Ctr->GetName() ); }
 
     //! vega_<param> results, keyed by parameter name (book currency, per unit param)
     map<string, double> _param_greeks;
@@ -195,11 +202,11 @@ class Pricer : public Task
     void Configure( ObjectReader& reader ) override;
 
     // setter
-    void SetBook( Book& Book );
+    void SetBook( Book* Book );
     void SetCorrelation( Correlation* Correlation );
     void SetDebugConfiguration( DebugConfiguration* Debug ) { _debug = Debug; }
     void SetIndicatorRequestList( const vector<string>& IndicatorRequestList );
-    void SetCurrency( Currency& Currency );
+    void SetCurrency( Currency* Currency );
 
     //! getter
     date GetToday() const;

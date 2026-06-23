@@ -87,9 +87,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
     if ( !Ctr->PDE_IsBarrier() && UnderlyingIsHeston( Ctr ) )
     {
         GridResult r = SolveHestonGrid( Ctr );
-        Ctr->Result().premium = r.premium;
-        Ctr->Result().delta = r.delta;
-        Ctr->Result().gamma = r.gamma;
+        Result( Ctr ).premium = r.premium;
+        Result( Ctr ).delta = r.delta;
+        Result( Ctr ).gamma = r.gamma;
         return;
     }
 
@@ -98,9 +98,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
     {
         InitGrid( Ctr, false );
         GridResult r = SolveGrid( Ctr );
-        Ctr->Result().premium = r.premium;
-        Ctr->Result().delta = r.delta;
-        Ctr->Result().gamma = r.gamma;
+        Result( Ctr ).premium = r.premium;
+        Result( Ctr ).delta = r.delta;
+        Result( Ctr ).gamma = r.gamma;
         return;
     }
 
@@ -126,9 +126,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
             res = ko;
         }
 
-        Ctr->Result().premium = res.premium;
-        Ctr->Result().delta = res.delta;
-        Ctr->Result().gamma = res.gamma;
+        Result( Ctr ).premium = res.premium;
+        Result( Ctr ).delta = res.delta;
+        Result( Ctr ).gamma = res.gamma;
         return;
     }
 
@@ -168,9 +168,9 @@ void PricerPDE::PriceContract( Contract* Ctr )
         }
     }
 
-    Ctr->Result().premium = res.premium;
-    Ctr->Result().delta = res.delta;
-    Ctr->Result().gamma = res.gamma;
+    Result( Ctr ).premium = res.premium;
+    Result( Ctr ).delta = res.delta;
+    Result( Ctr ).gamma = res.gamma;
 }
 
 //! set up the grid for one contract: read the market (escrowed spot, ATM vol, carry
@@ -553,9 +553,9 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
     const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( _maturity );
-    Ctr->Result().premium = Ctr->GetNotional() * df * ( fair_var - k_var );
-    Ctr->Result().delta = 0;
-    Ctr->Result().gamma = 0;
+    Result( Ctr ).premium = Ctr->GetNotional() * df * ( fair_var - k_var );
+    Result( Ctr ).delta = 0;
+    Result( Ctr ).gamma = 0;
 }
 
 //! coordinate change X = Phi(x): a sinh stretch that clusters grid points around

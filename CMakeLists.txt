@@ -32,7 +32,7 @@ endif()
 # OFF by default so the CPU-only build (this devcontainer / CI) needs no CUDA
 # toolkit; the engine then falls back to the CPU MCL engine at run time. Turn on
 # with -DTHOTH_ENABLE_CUDA=ON on a machine with nvcc + an NVIDIA GPU (see the
-# GPU build-args in Dockerfile / "run_docker_server.sh --gpu").
+# GPU build-args in Dockerfile / "scripts/run_docker_server.sh --gpu").
 option(THOTH_ENABLE_CUDA "Build the CUDA GPU Monte-Carlo engine (needs nvcc + an NVIDIA GPU)" OFF)
 if(THOTH_ENABLE_CUDA)
     enable_language(CUDA)

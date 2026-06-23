@@ -14,17 +14,14 @@
 //!   3. the *optional pricing facets* (PdePriceable / AnaPriceable / GpuPriceable,
 //!      see pricing_facets.hpp) — alternative routes a given engine may take when
 //!      the underlying supports them.
-//! The pricing engines write the premium + Greeks into Result() (a Valuation); book
-//! aggregation and the output reader read it back. Concrete contracts supply the
-//! payoff (Intrinsic / GetFlowNode), the schedule (the Get*Dates getters) and the
-//! facet predicates; the common plumbing lives here.
+//! A contract is a pure *description*: it holds no priced result. The pricing
+//! engines (tasks) keep the premium + Greeks themselves (Pricer::Result). Concrete
+//! contracts supply the payoff (Intrinsic / GetFlowNode), the schedule (the
+//! Get*Dates getters) and the facet predicates; the common plumbing lives here.
 class Contract : public Object, public PdePriceable, public AnaPriceable, public GpuPriceable
 {
 
   protected:
-    //! the priced result (premium + Greeks); engines write it via Result()
-    Valuation _valuation;
-
     //! attributes
     Underlying* _underlying = nullptr;     //!< what the payoff references (single / basket / rainbow)
     Currency* _premium_currency = nullptr; //!< settlement currency; discounting & forward measure
@@ -44,9 +41,6 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
 
     //! propagate the valuation date down to the currency and underlying, then base
     void SetToday( const date& Today ) override;
-    //! re-anchor on Today and clear the priced result (premium + every Greek) so a
-    //! re-price starts from a clean slate — the engines accumulate into Result().
-    void Reset( const date& Today );
     //! setter — supply the correlation object used to build the quanto adjustment
     void SetCorrelation( Correlation* Correlation );
 
@@ -56,10 +50,6 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
 
     //! the set of single names this contract's underlying decomposes into
     SingleSet GetSingleSet() const;
-
-    //! the priced result (premium + Greeks): engines fill it, aggregation reads it
-    Valuation& Result() { return _valuation; }
-    const Valuation& Result() const { return _valuation; }
 
     //! mcl nodes (the contract's canonical definition)
     //! the contract node: a discounted sum-product over its per-date flow nodes
@@ -83,7 +73,7 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
 
     //! PDE / analytic / GPU pricing facets are inherited from pricing_facets.hpp:
     //!   PdePriceable : PDE_HasSolution + barrier / accrued-variance flags
-    //!   AnaPriceable : ANA_HasSolution / ANA_EvalPrice
+    //!   AnaPriceable : ANA_HasSolution (the closed form itself lives in PricerANA)
     //!   GpuPriceable : GPU_GbmParams
 
     //! constructor — ObjectName is the trade id, ObjectKind the contract KIND tag

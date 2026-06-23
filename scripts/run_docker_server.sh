@@ -36,10 +36,11 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)" #!< project root (this script lives in scripts/)
 cd "$ROOT"
 # shellcheck source=run_docker_common.sh
-source "$ROOT/run_docker_common.sh"
+source "$SCRIPT_DIR/run_docker_common.sh"
 
 PORT=8080
 GPU=0

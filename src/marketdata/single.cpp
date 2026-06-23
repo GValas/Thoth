@@ -17,9 +17,9 @@ Single::Single( const string& ObjectName,
 Single::~Single() = default;
 
 //! setter — bind the volatility surface by address (shared book object, not owned)
-void Single::SetVolatility( Volatility& Volatility )
+void Single::SetVolatility( Volatility* Volatility )
 {
-    _volatility = &Volatility;
+    _volatility = Volatility;
 }
 
 //! setter — date the vol surface first (so a term-structured surface is aligned),

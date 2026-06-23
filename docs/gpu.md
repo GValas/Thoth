@@ -103,12 +103,12 @@ only differences are the base images (`nvidia/cuda:<tag>-devel/-runtime-ubuntu24
 and the `ENABLE_CUDA=ON` / `CUDA_ARCH=<cc>` build args. The wrapper handles this:
 
 ```bash
-./run_docker_server.sh --gpu                 # GPU server, sm_89 (default)
-./run_docker_server.sh --gpu --arch 86       # GPU server, sm_86 (Ampere)
-./run_docker_server.sh --gpu --slaves 4      # GPU cluster: master + 4 GPU slaves
+./scripts/run_docker_server.sh --gpu                 # GPU server, sm_89 (default)
+./scripts/run_docker_server.sh --gpu --arch 86       # GPU server, sm_86 (Ampere)
+./scripts/run_docker_server.sh --gpu --slaves 4      # GPU cluster: master + 4 GPU slaves
 ```
 
-`--gpu` makes `run_docker_common.sh`'s `thoth_build_image --gpu <arch>` build the
+`--gpu` makes `scripts/run_docker_common.sh`'s `thoth_build_image --gpu <arch>` build the
 `thoth-gpu` image (CUDA tag `12.6.3`) and adds `--gpus all` to every `docker run`
 so the host GPU(s) are attached. NVIDIA only ships a 24.04 CUDA base from 12.6
 onward; 12.6 is binary-compatible (same `libcudart.so.12`). `--arch` sets the
@@ -141,8 +141,8 @@ their plain `mcl` / `ana` / `pde` siblings, so the same product is priced on the
 device and on the CPU side by side and the prices agree:
 
 ```bash
-./run_docker_server.sh --gpu
-./run_local_client_matrix.sh samples/matrix.yaml --port 8080   # MCL_GPU rows in the table
+./scripts/run_docker_server.sh --gpu
+./scripts/run_local_client_matrix.sh samples/matrix.yaml --port 8080   # MCL_GPU rows in the table
 ```
 
 On a CPU-only build (or a host with no GPU) those cells run on the CPU MCL engine

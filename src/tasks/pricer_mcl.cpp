@@ -178,8 +178,8 @@ void PricerMCL::PriceContract( Contract* Ctr )
 
     const gpu::GbmResult r = gpu::PriceEuropeanGbm( p.forward, p.strike, p.t, p.vol,
                                                     p.df, p.is_call, paths, seed );
-    Ctr->Result().premium = r.premium;
-    Ctr->Result().premium_trust = r.trust;
+    Result( Ctr ).premium = r.premium;
+    Result( Ctr ).premium_trust = r.trust;
 }
 
 //! price the whole book by Monte-Carlo. Re-runnable: the node tree is rebuilt
@@ -198,10 +198,10 @@ void PricerMCL::PriceBook()
         double var = 0;
         for ( Contract* c : _book->GetContractSet() )
         {
-            const double t = c->Result().premium_trust * FxToBook( c );
+            const double t = Result( c ).premium_trust * FxToBook( c );
             var += t * t;
         }
-        _book->SetPremiumTrust( std::sqrt( var ) );
+        _book_result.premium_trust = std::sqrt( var );
         return;
     }
 
@@ -323,13 +323,20 @@ void PricerMCL::ComputeGreeks()
         return;
     }
 
-    const double p0 = _premium;
+    const double p0 = _book_result.premium;
+
+    //! accumulate into locals: the theta reprice below runs PriceBook -> InitPricing,
+    //! which zeroes the book aggregate, so the Greeks are written into _book_result
+    //! only at the very end (after that reprice).
+    double delta = 0;
+    double gamma = 0;
+    double vega = 0;
+    double rho = 0;
+    double theta = 0;
 
     //! delta / gamma : summed over the per-underlying spot bumps
     if ( _request_delta || _request_gamma )
     {
-        double delta = 0;
-        double gamma = 0;
         for ( Single* s : _single_set )
         {
             const double spot = s->GetSpot();
@@ -346,18 +353,16 @@ void PricerMCL::ComputeGreeks()
                          ( h * h );
             }
         }
-        _delta = delta;
-        _gamma = gamma;
     }
 
     //! vega / rho : one-sided, per 1 vol point / per 1% rate move
     if ( _request_vega )
     {
-        _vega = ( _scenario_premium.at( "@V+" ) - p0 ) / GREEK_VOL_BUMP * 0.01;
+        vega = ( _scenario_premium.at( "@V+" ) - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
     if ( _request_rho )
     {
-        _rho = ( _scenario_premium.at( "@R+" ) - p0 ) / GREEK_RATE_BUMP * 0.01;
+        rho = ( _scenario_premium.at( "@R+" ) - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
     //! theta : roll today one calendar day forward and reprice (base-only tree;
@@ -370,14 +375,14 @@ void PricerMCL::ComputeGreeks()
         const date base_today = _today;
 
         //! snapshot the base outputs (the roll reprice overwrites them)
-        const double book_premium = _book->GetPremium();
-        const double book_trust = _book->GetPremiumTrust();
+        const double book_premium = _book_result.premium;
+        const double book_trust = _book_result.premium_trust;
         vector<double> contract_premium;
         vector<double> contract_trust;
         for ( Contract* c : _book->GetContractSet() )
         {
-            contract_premium.push_back( c->Result().premium );
-            contract_trust.push_back( c->Result().premium_trust );
+            contract_premium.push_back( Result( c ).premium );
+            contract_trust.push_back( Result( c ).premium_trust );
         }
 
         _quiet_pricing = true; //!< suppress the status lines / node-graph dump...
@@ -387,7 +392,7 @@ void PricerMCL::ComputeGreeks()
         _graph_tree_tag = "theta"; //!< capture the rolled tree's node graph
         PriceBook();               //!< the single extra graph
         _graph_tree_tag.clear();
-        const double p1 = _book->GetPremium();
+        const double p1 = _book_result.premium;
         _today = base_today;
         _suppress_scenarios = false;
         _theta_pass = false;
@@ -396,20 +401,26 @@ void PricerMCL::ComputeGreeks()
         //! restore the base scenario (dates + premiums) without repricing
         _book->SetToday( base_today );
         _currency->SetToday( base_today );
-        _book->SetPremium( book_premium );
-        _book->SetPremiumTrust( book_trust );
+        _book_result.premium = book_premium;
+        _book_result.premium_trust = book_trust;
         size_t i = 0;
         for ( Contract* c : _book->GetContractSet() )
         {
-            c->Result().premium = contract_premium[i];
-            c->Result().premium_trust = contract_trust[i];
+            Result( c ).premium = contract_premium[i];
+            Result( c ).premium_trust = contract_trust[i];
             i++;
         }
 
-        _theta = p1 - p0;
+        theta = p1 - p0;
     }
 
-    _premium = _book->GetPremium();
+    //! write the Greeks now — after theta's reprice (which zeroed the aggregate) and
+    //! its premium/trust restore — so none of them get wiped.
+    _book_result.delta = delta;
+    _book_result.gamma = gamma;
+    _book_result.vega = vega;
+    _book_result.rho = rho;
+    _book_result.theta = theta;
 }
 
 //! turn the per-underlying independent white noises into correlated Brownian
@@ -904,8 +915,8 @@ void PricerMCL::PriceAmerican()
         //! base premium = apply the frozen policy to the base paths
         double trust = 0;
         double premium = ApplyAmericanPolicy( c, S0, tau, r, policy, trust );
-        c->Result().premium = premium;
-        c->Result().premium_trust = trust;
+        Result( c ).premium = premium;
+        Result( c ).premium_trust = trust;
         std::ostringstream oss;
         oss << "american '" << c->GetName() << "' (LSM, frozen boundary) premium = " << premium;
         LOG( LogLabel(), oss.str() );
@@ -949,9 +960,9 @@ void PricerMCL::PriceAmerican()
     double book_premium = 0;
     for ( Contract* c : _book->GetContractSet() )
     {
-        book_premium += c->Result().premium * fx_of( c );
+        book_premium += Result( c ).premium * fx_of( c );
     }
-    _book->SetPremium( book_premium );
+    _book_result.premium = book_premium;
 
     //! finalise the shared bar now that the American premium is known (the sweep
     //! left it open). Shows the American book premium, not the European readback.
@@ -1153,13 +1164,13 @@ void PricerMCL::Tree_Read()
 {
     // read results in tree : book root indicator 0 = mean premium, trust = std error
     MonteCarloNode* N = _root;
-    _book->SetPremium( N->GetIndicatorValue( 0 ) );
-    _book->SetPremiumTrust( N->GetIndicatorTrust( 0 ) );
+    _book_result.premium = N->GetIndicatorValue( 0 );
+    _book_result.premium_trust = N->GetIndicatorTrust( 0 );
     for ( Contract* c : _book->GetContractSet() )
     {
         N = _collector.GetNode( c->GetName() );
-        c->Result().premium = N->GetIndicatorValue( 0 );
-        c->Result().premium_trust = N->GetIndicatorTrust( 0 );
+        Result( c ).premium = N->GetIndicatorValue( 0 );
+        Result( c ).premium_trust = N->GetIndicatorTrust( 0 );
     }
 
     //! per-bump book premium (single-tree Greeks): read each scenario root's

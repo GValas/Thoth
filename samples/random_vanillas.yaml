@@ -5,7 +5,7 @@ root: random_vanillas
 # maturities ~U[0.5y, 4y]. Reproducible: generated with seed 42.
 # GPU-priceable: European single-asset vanillas are GPU GBM-eligible and the
 # mcl_configuration sets allow_gpu, so on a CUDA build the whole book runs on the
-# device (CPU fallback otherwise). e.g. ./build_run.sh samples/random_vanillas.yaml --gpu
+# device (CPU fallback otherwise). e.g. ./scripts/build_run.sh samples/random_vanillas.yaml --gpu
 
 random_vanillas: !mcl_pricer
   today: 2000-01-01

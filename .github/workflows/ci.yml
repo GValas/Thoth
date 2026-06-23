@@ -1,7 +1,7 @@
 name: CI
 
 # Build + test + formatting gate for the engine. Mirrors the local commands in
-# CLAUDE.md / README (cmake build, ctest, ./format.sh --check) so a green CI means
+# CLAUDE.md / README (cmake build, ctest, ./scripts/format.sh --check) so a green CI means
 # the same checks a developer runs by hand have passed.
 
 on:
@@ -83,4 +83,4 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
 
       - name: Check formatting
-        run: ./format.sh --check
+        run: ./scripts/format.sh --check

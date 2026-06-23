@@ -15,11 +15,11 @@ Forex::~Forex() = default;
 //! read the currency pair, with an optional volatility and spot
 void Forex::Configure( ObjectReader& reader )
 {
-    SetBaseCurrency( *reader.Ref<Currency>( "base_currency" ) );
-    SetUnderlyingCurrency( *reader.Ref<Currency>( "underlying_currency" ) );
+    SetBaseCurrency( reader.Ref<Currency>( "base_currency" ) );
+    SetUnderlyingCurrency( reader.Ref<Currency>( "underlying_currency" ) );
     if ( reader.Has<string>( "volatility" ) )
     {
-        SetVolatility( *reader.Ref<Volatility>( "volatility" ) );
+        SetVolatility( reader.Ref<Volatility>( "volatility" ) );
     }
     if ( reader.Has<double>( "spot" ) )
     {
@@ -28,14 +28,14 @@ void Forex::Configure( ObjectReader& reader )
 }
 
 //! setter — bind the underlying (foreign) currency by address
-void Forex::SetUnderlyingCurrency( Currency& UnderlyingCurrency )
+void Forex::SetUnderlyingCurrency( Currency* UnderlyingCurrency )
 {
-    _underlying_currency = &UnderlyingCurrency;
+    _underlying_currency = UnderlyingCurrency;
 }
 
 //! setter — the base (domestic) currency is the Asset's pricing currency, so route it
 //! through Asset::SetCurrency rather than a separate field
-void Forex::SetBaseCurrency( Currency& BaseCurrency )
+void Forex::SetBaseCurrency( Currency* BaseCurrency )
 {
     SetCurrency( BaseCurrency );
 }

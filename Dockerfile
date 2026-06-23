@@ -21,7 +21,7 @@
 #         --build-arg RUNTIME_BASE=nvidia/cuda:12.6.3-runtime-ubuntu24.04 \
 #         --build-arg ENABLE_CUDA=ON --build-arg CUDA_ARCH=89 .
 #     docker run --rm --gpus all -p 8080:8080 thoth-gpu             # GPU HTTP server
-#     # Prefer the wrapper: ./run_docker_server.sh --gpu
+#     # Prefer the wrapper: ./scripts/run_docker_server.sh --gpu
 #
 # Books that are not GPU-supported (or use any other method) still price on the
 # CPU even in the GPU image.

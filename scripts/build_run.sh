@@ -8,7 +8,8 @@
 #   --gpu   build the CUDA GPU Monte-Carlo engine (-DTHOTH_ENABLE_CUDA=ON; needs
 #           nvcc + an NVIDIA GPU). Without it, the CPU-only build is used.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+# this script lives in scripts/; run from the project root (one level up)
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 #! --gpu -> configure with CUDA enabled; the remaining argument is the input book
 CMAKE_GPU=()

@@ -24,9 +24,9 @@ class Forex : public Single
     void Configure( ObjectReader& reader ) override;
 
     //! setter — bind the underlying (foreign) currency
-    void SetUnderlyingCurrency( Currency& UnderlyingCurrency );
+    void SetUnderlyingCurrency( Currency* UnderlyingCurrency );
     //! setter — bind the base (domestic) currency (stored as Asset::_currency)
-    void SetBaseCurrency( Currency& BaseCurrency );
+    void SetBaseCurrency( Currency* BaseCurrency );
 
     //! getter — this underlying is an FX leg (drives the MCL correlation/Cholesky split)
     bool IsForex() const override { return true; }
