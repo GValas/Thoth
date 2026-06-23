@@ -36,6 +36,14 @@ class ProgressBar
     //! disturb the cluster master's aggregate progress, which tracks the split.
     ProgressBar( const string& Label, long Total, bool Enabled = true, bool PublishGlobal = true );
 
+    //! idle bar: a no-op until Start() configures it. Lets a Task own one as a member
+    //! (constructed with the task) and (re)begin it per execution phase.
+    ProgressBar() = default;
+
+    //! (re)begin a run: set the label / total / visibility and reset the render state.
+    //! The same bar object can be Started for several successive phases.
+    void Start( const string& Label, long Total, bool Enabled = true, bool PublishGlobal = true );
+
     void Update( long Current );
     //! lazy variant : InfoFn is only evaluated when the bar actually redraws
     void Update( long Current, const std::function<string()>& InfoFn );
@@ -47,11 +55,11 @@ class ProgressBar
     void Render( long Current, const string& Info, bool Final );
 
     string _label;
-    long _total;
-    bool _enabled;
-    bool _publish_global;
-    bool _tty;
-    time_t _start;
-    int _last_percent;  //!< last drawn percent (throttles redraws to 1% steps)
-    size_t _last_width; //!< displayed columns of the last TTY line, to clear leftovers
+    long _total = 1;
+    bool _enabled = false; //!< idle until Start(); Update/Done no-op meanwhile
+    bool _publish_global = false;
+    bool _tty = false;
+    time_t _start = 0;
+    int _last_percent = -1; //!< last drawn percent (throttles redraws to 1% steps)
+    size_t _last_width = 0; //!< displayed columns of the last TTY line, to clear leftovers
 };
