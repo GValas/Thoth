@@ -8,8 +8,8 @@
 //! dispatches on the contract type and evaluates the matching formula (Black-Scholes
 //! or Heston for vanillas, Reiner-Rubinstein for barriers, the Demeterfi-Derman-
 //! Kamal-Zou static-replication strip for variance swaps) into the pricer's result.
-//! Whether a contract HAS a closed form is still asked of the contract
-//! (ANA_HasSolution, a capability predicate); no PDE grid is solved.
+//! Whether a contract HAS a closed form is decided here too (PreCheck inspects the
+//! contract type + its underlying), not asked of the contract; no PDE grid is solved.
 
 class Vanilla;
 class Barrier;

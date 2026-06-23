@@ -45,7 +45,7 @@ string GraphTreeKey( const string& Tag )
 //! the diffusion tree, node collector and path generator are all built lazily in
 //! PriceBook (so each re-price gets a clean tree); only the RNG is held as a member
 PricerMCL::PricerMCL( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_MCL_PRICER )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_MCL_PRICER, "GPU" )
 {
     //! _rng (xoshiro256++) is seeded per run in SetupQuasiRandom from the config seed
 }
@@ -194,7 +194,7 @@ void PricerMCL::PriceBook()
     if ( _use_gpu )
     {
         Pricer::InitPricing();
-        PriceBookByContract( "GPU" );
+        PriceBookByContract();
         double var = 0;
         for ( Contract* c : _book->GetContractSet() )
         {

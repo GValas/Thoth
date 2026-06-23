@@ -9,7 +9,11 @@
 //! the subclass (KIND_MCL_PRICER / KIND_PDE_PRICER / KIND_ANA_PRICER).
 Pricer::Pricer( const string& ObjectName,
                 YamlConfig& YamlConfig,
-                const string& ObjectKind ) : Task( ObjectName, YamlConfig, ObjectKind ) {}
+                const string& ObjectKind,
+                const string& ProgressLabel )
+    : Task( ObjectName, YamlConfig, ObjectKind ), _progress_label( ProgressLabel )
+{
+}
 
 //! destructor
 Pricer::~Pricer() = default;
@@ -211,7 +215,7 @@ void Pricer::PriceContract( Contract* Ctr )
 //! bar over the contracts, each step pricing a contract and (when requested)
 //! its bump-and-revalue Greeks. The book/pricer totals are accumulated as each
 //! contract completes, so the bar reflects the real per-contract work.
-void Pricer::PriceBookByContract( const string& Label )
+void Pricer::PriceBookByContract()
 {
     Pricer::InitPricing();
 
@@ -225,7 +229,7 @@ void Pricer::PriceBookByContract( const string& Label )
     //! disable the bar during an inner bump-revalue (ComputeParamGreeks reprices the
     //! whole book per parameter): otherwise each reprice redraws a full "<engine> 100%"
     //! line. The base price (Execute) runs with _quiet_pricing = false, so it shows.
-    ProgressBar bar( Label, (long)_book->GetContractSet().size(), !_quiet_pricing );
+    ProgressBar bar( _progress_label, (long)_book->GetContractSet().size(), !_quiet_pricing );
     for ( Contract* c : _book->GetContractSet() )
     {
         cancellation::CancellationPoint(); //!< abort promptly if the client disconnected

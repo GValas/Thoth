@@ -29,21 +29,6 @@ date VarianceSwap::GetMaturityDate() const
     return _maturity_date;
 }
 
-//! closed form for equity-like underlyings (flat or smile-ATM vol surface). The
-//! static-replication fair-variance math (Demeterfi-Derman-Kamal-Zou) lives in
-//! PricerANA; this only reports that a closed form exists.
-bool VarianceSwap::ANA_HasSolution()
-{
-    return _underlying->IsGriddable();
-}
-
-//! priced on the spot grid via the expected-accumulated-variance PDE (the pricer
-//! routes a variance swap to SolveVarianceGrid). Same underlyings as the analytic.
-bool VarianceSwap::PDE_HasSolution()
-{
-    return _underlying->IsGriddable();
-}
-
 //! the variance PDE has a zero terminal condition and its own (remaining-variance)
 //! boundaries — there is no terminal spot payoff here, so this is just 0.
 double VarianceSwap::Intrinsic( const double /*Spot*/ )

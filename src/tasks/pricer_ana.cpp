@@ -10,7 +10,7 @@
 
 //! a closed-form pricer is just a Pricer; no engine state to initialise
 PricerANA::PricerANA( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_ANA_PRICER )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_ANA_PRICER, "ANA" )
 {
 }
 
@@ -32,13 +32,34 @@ Volatility* MonoVol( Underlying* u )
 //! trapezoid points discretise it. The grid is integrated by VarSwap_FairVariance.
 constexpr double VARSWAP_STRIP_SIGMA_SPAN = 6.0;
 constexpr int VARSWAP_STRIP_POINTS = 800;
+
+//! whether this engine has a closed form for the contract: an engine decision, made
+//! here by inspecting the (pure-description) contract + its underlying, not asked of
+//! the contract. European vanilla / continuous barrier / variance swap, each on a
+//! griddable (equity-like) underlying; everything else (American, discrete barrier,
+//! exotic underlying) falls to PDE / MCL.
+bool AnaHasSolution( Contract* c )
+{
+    if ( Vanilla* v = dynamic_cast<Vanilla*>( c ) )
+    {
+        return !v->IsAmerican() && v->GetUnderlying()->IsGriddable();
+    }
+    if ( Barrier* b = dynamic_cast<Barrier*>( c ) )
+    {
+        return !b->IsDiscrete() && b->GetUnderlying()->IsGriddable(); //!< continuous only
+    }
+    if ( VarianceSwap* s = dynamic_cast<VarianceSwap*>( c ) )
+    {
+        return s->GetUnderlying()->IsGriddable();
+    }
+    return false;
+}
 } // namespace
 
-//! check that closed-form resolution is allowed for every contract
+//! check a closed form is available for every contract (engine decision, see above)
 void PricerANA::PreCheck()
 {
-    CheckAllowed( []( Contract* c )
-                  { return c->ANA_HasSolution(); }, "ANA (closed-form)" );
+    CheckAllowed( AnaHasSolution, "ANA (closed-form)" );
 }
 
 //! price the whole book by closed-form. One progress bar over the contracts;
@@ -46,7 +67,7 @@ void PricerANA::PreCheck()
 //! Greeks (see Pricer::PriceBookByContract).
 void PricerANA::PriceBook()
 {
-    PriceBookByContract( "ANA" );
+    PriceBookByContract();
 }
 
 //! single-contract closed-form price hook used by the per-contract loop / Greeks.
@@ -67,7 +88,7 @@ void PricerANA::PriceContract( Contract* Ctr )
     }
     else
     {
-        //! PreCheck (ANA_HasSolution) rejects any contract without a closed form,
+        //! PreCheck (AnaHasSolution) rejects any contract without a closed form,
         //! so an unhandled type here is an internal inconsistency.
         ERR( "ANA pricing '" + _name + "': contract '" + Ctr->GetName() +
              "' has no closed-form evaluator" );

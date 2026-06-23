@@ -29,12 +29,6 @@ class Vanilla : public Contract
     double Intrinsic( const double spot ) override;
     bool IsAmerican() override;
 
-    //! pde — available iff the underlying is griddable (also prices American)
-    bool PDE_HasSolution() override;
-
-    //! analytical — a European closed form exists (the math lives in PricerANA)
-    bool ANA_HasSolution() override;
-
     //! gpu monte-carlo (mcl_gpu) — only for European, single-asset, deterministic-vol GBM
     bool GPU_GbmParams( GpuGbmParams& Out ) override;
 

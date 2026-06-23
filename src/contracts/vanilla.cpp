@@ -78,21 +78,6 @@ double Vanilla::Intrinsic( const double Spot )
     return payoff_vanilla( Spot, _strike, _type, false, 0, true, 0 );
 }
 
-//! pde solution is possible iff the underlying admits a spot grid
-bool Vanilla::PDE_HasSolution()
-{
-    return _underlying->IsGriddable();
-}
-
-//! analytical formula is possible only for European exercise on a griddable underlying
-//! (American has no closed form -> PDE/MCL only). The closed form itself lives in
-//! PricerANA; this only reports that one exists.
-bool Vanilla::ANA_HasSolution()
-{
-    return ( _exercise_mode == ExerciseMode::European ) &&
-           _underlying->IsGriddable();
-}
-
 //! gpu monte-carlo (mcl_gpu): genuine single-asset GBM only — a European equity
 //! vanilla with a deterministic implied vol. The forward-measure scalars mirror the
 //! analytic BS inputs (PricerANA), so the GPU MC reproduces the BS price within MC

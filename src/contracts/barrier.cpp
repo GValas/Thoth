@@ -86,14 +86,6 @@ double Barrier::Intrinsic( const double spot )
     return payoff_vanilla( spot, _strike, _type, false, 0, true, 0 );
 }
 
-//! the PDE prices a single barrier on an equity-like underlying: continuous
-//! monitoring by a Dirichlet boundary, discrete monitoring by zeroing the
-//! knocked region at the scheduled dates (knock-in by in/out parity).
-bool Barrier::PDE_HasSolution()
-{
-    return _underlying->IsGriddable();
-}
-
 //! a Barrier always is one (trivially true; lets the PDE engine branch on type)
 bool Barrier::PDE_IsBarrier()
 {
@@ -116,14 +108,6 @@ bool Barrier::PDE_IsUpBarrier()
 double Barrier::PDE_BarrierLevel()
 {
     return PDE_IsUpBarrier() ? _barrier_up_level : _barrier_down_level;
-}
-
-//! a closed-form (Reiner-Rubinstein) solution exists for a single, continuously
-//! monitored barrier on an equity-like underlying. The formula lives in PricerANA.
-bool Barrier::ANA_HasSolution()
-{
-    return ( _barrier_monitoring_type == BarrierMonitoring::Continuous ) &&
-           _underlying->IsGriddable();
 }
 
 //! Build the Monte-Carlo flow node: a vanilla payoff at maturity, gated by the

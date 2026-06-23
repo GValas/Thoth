@@ -40,6 +40,10 @@ class Pricer : public Task
     vector<string> _indicator_request_list;
     Currency* _currency = nullptr;
 
+    //! engine's short tag for the per-contract progress bar ("ANA"/"PDE"/"GPU"); a
+    //! per-class constant fixed by each subclass through the constructor.
+    string _progress_label;
+
     //! Graphviz .dot of each MC tree built by the MCL engine, keyed by the tree it
     //! prices ("premium" for the base tree, "delta"/"gamma"/"vega"/"rho" for the
     //! Greek-bump scenario trees). Filled when debug generate_nodes_graph is on;
@@ -126,9 +130,9 @@ class Pricer : public Task
     virtual bool GridSpotGreeks() const { return false; }
 
     //! shared contract loop for the per-contract engines: prices each contract,
-    //! computes its Greeks (when requested) by bumping only that contract's
-    //! market, and advances a single progress bar over the contracts.
-    void PriceBookByContract( const string& Label );
+    //! computes its Greeks (when requested) by bumping only that contract's market,
+    //! and advances a single progress bar (labelled by _progress_label) over them.
+    void PriceBookByContract();
 
     //! delta/gamma/vega/rho/theta produced by one bump-and-revalue sweep
     struct BumpGreeks
@@ -211,12 +215,14 @@ class Pricer : public Task
     //! getter
     date GetToday() const;
 
-    //! constructor & destructor. ObjectKind is the concrete engine kind passed up by
-    //! the PricerMCL / PricerPDE / PricerANA subclass (the registry picks the subclass
-    //! straight off the YAML tag, so each one knows its own kind).
+    //! constructor & destructor. ObjectKind is the concrete engine kind and
+    //! ProgressLabel its short per-contract-bar tag — both passed up by the
+    //! PricerMCL / PricerPDE / PricerANA subclass (the registry picks the subclass
+    //! straight off the YAML tag, so each one knows its own kind / label).
     Pricer( const string& ObjectName,
             YamlConfig& YamlConfig,
-            const string& ObjectKind );
+            const string& ObjectKind,
+            const string& ProgressLabel );
     ~Pricer() override;
 
     //!

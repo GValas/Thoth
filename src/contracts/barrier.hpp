@@ -46,9 +46,6 @@ class Barrier : public Contract
         return false;
     }
 
-    //! pde — a grid solve is available iff the underlying is griddable
-    bool PDE_HasSolution() override;
-
     //! pde barrier flags steering the grid solve (continuous: Dirichlet boundary;
     //! discrete: zero the knocked region at scheduled dates; knock-in by parity)
     bool PDE_IsBarrier() override;
@@ -60,10 +57,6 @@ class Barrier : public Contract
     }
     //! the active barrier level H (up vs down depending on the type)
     double PDE_BarrierLevel() override;
-
-    //! analytical — a Reiner-Rubinstein closed form exists (continuous monitoring
-    //! only); the formula itself lives in PricerANA.
-    bool ANA_HasSolution() override;
 
     //! fixing dates: maturity, plus every monitoring date when discretely monitored
     set<date> GetFixingDates() override;

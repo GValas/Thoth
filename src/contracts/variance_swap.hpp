@@ -36,11 +36,7 @@ class VarianceSwap : public Contract
     //! pde: the fair variance is solved on the spot grid as the expected
     //! accumulated variance (a backward PDE with a local-variance source); the
     //! pricer assembles PV = notional * DF * (fair_var - strike_var).
-    bool PDE_HasSolution() override;
     bool PDE_IsAccruedVariance() override { return true; }
-
-    //! analytical (static-replication fair variance); the formula lives in PricerANA
-    bool ANA_HasSolution() override;
 
     //! dates (single payment at maturity)
     set<date> GetFixingDates() override;

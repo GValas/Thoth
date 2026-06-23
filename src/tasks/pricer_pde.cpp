@@ -23,7 +23,7 @@ static constexpr double BATES_JUMP_SIGMA_SPAN = 6.0;    //!< jump-size grid span
 //! a finite-difference pricer is just a Pricer; the grid state is built per
 //! contract in InitGrid, so nothing to initialise here
 PricerPDE::PricerPDE( const string& ObjectName,
-                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_PDE_PRICER )
+                      YamlConfig& YamlConfig ) : Pricer( ObjectName, YamlConfig, KIND_PDE_PRICER, "PDE" )
 {
 }
 
@@ -57,8 +57,11 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 //! is resolved as a required reference in Configure, so it is always non-null here)
 void PricerPDE::PreCheck()
 {
+    //! the grid solve applies to any contract whose underlying admits a spot grid;
+    //! an engine decision made here from the (pure-description) underlying, not asked
+    //! of the contract.
     CheckAllowed( []( Contract* c )
-                  { return c->PDE_HasSolution(); }, "PDE" );
+                  { return c->GetUnderlying()->IsGriddable(); }, "PDE" );
 }
 
 //! solve the grid for every contract (re-runnable for the Greeks bumps)
@@ -66,7 +69,7 @@ void PricerPDE::PriceBook()
 {
     //! one progress bar over the contracts; each step prices the contract and,
     //! when requested, its bump-and-revalue Greeks (see Pricer::PriceBookByContract).
-    PriceBookByContract( "PDE" );
+    PriceBookByContract();
 }
 
 //! single-contract grid solve hook used by the per-contract loop and its Greeks

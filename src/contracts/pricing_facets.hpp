@@ -27,14 +27,13 @@ struct GpuGbmParams
     bool is_call = true;
 };
 
-//! PDE-engine view: whether a grid solve applies, plus the barrier / variance-swap
-//! flavour flags that steer it. Non-barrier, non-variance contracts keep the
-//! defaults; only the relevant contract overrides each flag.
+//! PDE-engine view: the barrier / variance-swap flavour flags that steer the grid
+//! solve. These describe *what the trade is* (read by the PDE engine), so they live
+//! on the contract; whether the grid solve *applies* is an engine decision made in
+//! PricerPDE. Non-barrier, non-variance contracts keep the defaults; only the
+//! relevant contract overrides each flag.
 struct PdePriceable
 {
-    //! a grid solve is possible for this contract on its underlying
-    [[nodiscard]] virtual bool PDE_HasSolution() = 0;
-
     //! knock-out / knock-in barrier (continuous or discrete monitoring)
     [[nodiscard]] virtual bool PDE_IsBarrier() { return false; }
     [[nodiscard]] virtual bool PDE_IsKnockIn() { return false; }
@@ -47,16 +46,6 @@ struct PdePriceable
     [[nodiscard]] virtual bool PDE_IsAccruedVariance() { return false; }
 
     virtual ~PdePriceable() = default;
-};
-
-//! Analytic (closed-form) pricing view: only the capability predicate — the
-//! closed-form evaluation itself lives in PricerANA (the task), keyed off the
-//! contract type, so the instrument stays a pure description.
-struct AnaPriceable
-{
-    [[nodiscard]] virtual bool ANA_HasSolution() = 0;
-
-    virtual ~AnaPriceable() = default;
 };
 
 //! GPU Monte-Carlo view: fill Out and return true iff this contract is a
