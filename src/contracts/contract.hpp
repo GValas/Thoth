@@ -44,6 +44,9 @@ class Contract : public Object, public PdePriceable, public AnaPriceable, public
 
     //! propagate the valuation date down to the currency and underlying, then base
     void SetToday( const date& Today ) override;
+    //! re-anchor on Today and clear the priced result (premium + every Greek) so a
+    //! re-price starts from a clean slate — the engines accumulate into Result().
+    void Reset( const date& Today );
     //! setter — supply the correlation object used to build the quanto adjustment
     void SetCorrelation( Correlation* Correlation );
 

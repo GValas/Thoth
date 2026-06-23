@@ -28,7 +28,7 @@ std::string BatesCfg( const std::string& method, double lambda, double mu, doubl
       << " jump_intensity: " << lambda << ", jump_mean: " << mu << ", jump_vol: " << sigma
       << ", calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq, eq_var], matrix: [1, -0.7, -0.7, 1]}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100, maturity: 2000-12-31,"
       << " type: " << type << ", exercise: european}\n";
     return o.str();

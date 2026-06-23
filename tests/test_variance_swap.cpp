@@ -28,7 +28,7 @@ std::string VarSwapCfg( double vol_pct, double rate_pct, double strike_vol_pct,
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
-      << "book: !book {options: [vs]}\n"
+      << "book: !book {contracts: [vs]}\n"
       << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
       << " maturity: 2000-12-31, volatility_strike: " << strike_vol_pct
       << ", notional: " << notional << "}\n";

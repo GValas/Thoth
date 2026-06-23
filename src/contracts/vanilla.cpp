@@ -37,7 +37,6 @@ void Vanilla::Configure( ObjectReader& reader )
     _type = ParseOptionType( reader.Get<string>( "type" ) );
 }
 
-
 //! getter
 double Vanilla::GetStrike() const
 {

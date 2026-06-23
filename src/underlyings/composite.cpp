@@ -24,7 +24,7 @@ Composite::~Composite() = default;
 //! "equity" is the foreign-quoted asset; "composite_currency" is the settlement ccy.
 void Composite::Configure( ObjectReader& reader )
 {
-    _underlying = reader.Ref<Underlying>( "equity" );          //!< wrapped foreign-ccy underlying
+    _underlying = reader.Ref<Underlying>( "equity" );         //!< wrapped foreign-ccy underlying
     _currency = reader.Ref<Currency>( "composite_currency" ); //!< settlement ccy (base _currency slot)
 }
 

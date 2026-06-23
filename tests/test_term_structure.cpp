@@ -30,7 +30,7 @@ std::string TsCfg( const std::string& method )
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 25, calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2003-01-01, nominal: 1,"
       << " type: call, exercise: european}\n";

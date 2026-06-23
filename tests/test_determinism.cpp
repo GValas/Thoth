@@ -36,7 +36,7 @@ TEST_CASE( "multi-asset correlated book is bit-reproducible" )
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n"
       << "o_b: !vanilla {underlying: eq_b, premium_currency: eur, strike: 90,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n"
-      << "book: !book {options: [o_a, o_b]}\n";
+      << "book: !book {contracts: [o_a, o_b]}\n";
     std::string cfg = o.str();
 
     auto a = Price( cfg );

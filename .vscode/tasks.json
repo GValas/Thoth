@@ -4,9 +4,11 @@
     {
       // Debug build (separate dir so the optimized Release build/ is untouched).
       // -g -O0 via CMAKE_BUILD_TYPE=Debug -> breakpoints land on the right lines.
+      // THOTH_ENABLE_CUDA=ON so gpu::Available() uses the real device (not the
+      // CPU stub) -> allow_gpu books actually price on the GPU under the debugger.
       "label": "cmake: build debug",
       "type": "shell",
-      "command": "cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build-debug -j --target thoth",
+      "command": "cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DTHOTH_ENABLE_CUDA=ON && cmake --build build-debug -j --target thoth",
       "group": "build",
       "problemMatcher": ["$gcc"]
     }

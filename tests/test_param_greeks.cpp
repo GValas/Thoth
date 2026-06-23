@@ -34,7 +34,7 @@ std::string HestonCfg( const std::string& indicators )
       << "h: !heston_volatility {spot: 100, init_vol: 30, long_vol: 20, kappa: 1.5,"
       << " vol_of_vol: 40, jump_intensity: 0, jump_mean: 0, jump_vol: 0, calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq, eq_var], matrix: [1, -0.7, -0.7, 1]}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " maturity: 2000-12-31, type: call, exercise: european}\n";
     return o.str();
@@ -56,7 +56,7 @@ std::string SabrCfg( const std::string& indicators )
       << "s: !sabr_volatility {maturities: [5.0], alpha: [0.30], beta: [1.0],"
       << " rho: [-0.3], nu: [0.4], calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " maturity: 2000-12-31, type: call, exercise: european}\n";
     return o.str();

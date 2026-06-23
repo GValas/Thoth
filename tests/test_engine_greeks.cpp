@@ -28,7 +28,7 @@ std::string GreeksCfg( double spot, double strike, double vol_pct, double rate_p
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: " << spot << ", volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
       << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
       << ", exercise: european}\n";

@@ -16,7 +16,7 @@ DiscreteDividends::~DiscreteDividends() = default;
 //! read own fields — the ex-dividend dates and their cash amounts (index-aligned)
 void DiscreteDividends::Configure( ObjectReader& reader )
 {
-    _dates = reader.Get<vector<date>>( "dates" );     //!< ex-dividend dates (ascending)
+    _dates = reader.Get<vector<date>>( "dates" );       //!< ex-dividend dates (ascending)
     _amounts = reader.Get<vector<double>>( "amounts" ); //!< per-date cash, index-aligned
 }
 

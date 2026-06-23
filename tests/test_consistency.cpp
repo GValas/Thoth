@@ -99,7 +99,7 @@ TEST_CASE( "book premium is the sum of its contracts" )
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n"
       << "c2: !vanilla {underlying: eq, premium_currency: eur, strike: 110,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n"
-      << "book: !book {options: [c1, c2]}\n";
+      << "book: !book {contracts: [c1, c2]}\n";
 
     auto res = Price( o.str() );
     double total = Premium( res );

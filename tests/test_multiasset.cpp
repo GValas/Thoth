@@ -43,7 +43,7 @@ std::string MultiAssetCfg( int draws )
             opts << ( opts.tellp() ? ", " : "" ) << id;
         }
     }
-    o << "book: !book {options: [" << opts.str() << "]}\n";
+    o << "book: !book {contracts: [" << opts.str() << "]}\n";
     return o.str();
 }
 } // namespace

@@ -220,8 +220,8 @@ void Pricer::PriceBookByContract( const string& Label )
     //! disable the bar during an inner bump-revalue (ComputeParamGreeks reprices the
     //! whole book per parameter): otherwise each reprice redraws a full "<engine> 100%"
     //! line. The base price (Execute) runs with _quiet_pricing = false, so it shows.
-    ProgressBar bar( Label, (long)_book->GetOptionList().size(), !_quiet_pricing );
-    for ( Contract* c : _book->GetOptionList() )
+    ProgressBar bar( Label, (long)_book->GetContractSet().size(), !_quiet_pricing );
+    for ( Contract* c : _book->GetContractSet() )
     {
         cancellation::CancellationPoint(); //!< abort promptly if the client disconnected
 
@@ -543,7 +543,7 @@ void Pricer::WriteResults()
     //! per-contract premium (and, for the per-contract engines, per-contract
     //! Greeks attributed to each option), keyed <contract>_<metric>
     const bool per_contract_greeks = GreeksPerContract();
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         const string n = c->GetName();
         WriteResult( n + "_premium", c->Result().premium );
@@ -612,7 +612,7 @@ void Pricer::AggregateContract( Contract* Ctr )
 void Pricer::CheckAllowed( const std::function<bool( Contract* )>& HasSolution,
                            const string& MethodLabel )
 {
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !HasSolution( c ) )
         {
@@ -626,60 +626,34 @@ void Pricer::CheckAllowed( const std::function<bool( Contract* )>& HasSolution,
 void Pricer::InitPricing()
 {
 
-    //! set today
-    _book->SetToday( _today );
+    //! set today and clear all accumulators (book premium/Greeks + every contract's
+    //! Result) so re-pricing does not double-count (the engines aggregate additively).
+    _book->Reset( _today, _correlation );
     _currency->SetToday( _today );
-
-    //! reset book accumulators so re-pricing does not double-count (the engines
-    //! aggregate via SetPremium(GetPremium() + ...))
-    _book->SetPremium( 0 );
-    _book->SetPremiumTrust( 0 );
-    _book->SetDelta( 0 );
-    _book->SetGamma( 0 );
-
-    //! set correlation to underlyings (and reset per-contract accumulators)
-    vector<Contract*> option_list = _book->GetOptionList();
-    vector<Contract*>::iterator c;
-    for ( c = option_list.begin();
-          c != option_list.end();
-          c++ )
-    {
-        ( *c )->SetCorrelation( _correlation );
-        ( *c )->GetUnderlying()->SetCorrelation( _correlation );
-        ( *c )->Result().premium = 0;
-        ( *c )->Result().premium_trust = 0;
-        ( *c )->Result().delta = 0;
-        ( *c )->Result().gamma = 0;
-        ( *c )->Result().vega = 0;
-        ( *c )->Result().rho = 0;
-        ( *c )->Result().theta = 0;
-    }
 
     // underlying lists
     _single_set = _book->GetSingleSet();
     _currency_set = _book->GetCurrencySet();
+    _contract_set = _book->GetContractSet();
 
     //! set underlyings today -> redundant
-    SingleSet::iterator s;
-    for ( s = _single_set.begin();
-          s != _single_set.end();
-          s++ )
+    for ( auto& s : _single_set )
     {
-        ( *s )->SetToday( _today );
+        s->SetToday( _today );
 
         //! Heston: the spot/variance correlation rho lives in the global
         //! correlation matrix (variance keyed "<underlying>_var"), not on the
         //! stochastic-vol object. Resolve it onto the vol (SetStochasticRho) so
         //! every engine reads it back via StochasticParams() unchanged.
-        if ( ( *s )->GetVolatility()->IsStochastic() )
+        if ( s->GetVolatility()->IsStochastic() )
         {
             if ( !_correlation )
             {
-                ERR( "book pricing '" + _name + "': stochastic-vol underlying '" + ( *s )->GetName() +
+                ERR( "book pricing '" + _name + "': stochastic-vol underlying '" + s->GetName() +
                      "' needs a correlation matrix for its spot/variance correlation" );
             }
-            ( *s )->GetVolatility()->SetStochasticRho(
-                _correlation->GetValue( ( *s )->GetName(), ( *s )->GetName() + "_var" ) );
+            auto rho = _correlation->GetValue( s->GetName(), s->GetName() + "_var" );
+            s->GetVolatility()->SetStochasticRho( rho );
         }
     }
 }

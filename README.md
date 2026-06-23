@@ -443,7 +443,7 @@ my_debug: !debug_configuration
   generate_nodes_graph: true
 
 my_book: !book
-  options: [my_call]
+  contracts: [my_call]
 my_call: !vanilla
   underlying: my_eq
   premium_currency: eur

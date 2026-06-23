@@ -95,7 +95,7 @@ correl: !correlation_matrix
   matrix: [1, 0.5, 0.5, 1]
 
 book: !book
-  options: [opt]
+  contracts: [opt]
 opt: !vanilla
   underlying: comp_big
   premium_currency: usd

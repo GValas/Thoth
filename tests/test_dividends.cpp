@@ -30,7 +30,7 @@ std::string DivCfg( double spot, double strike, double vol_pct, double rate_pct,
       << "eq: !equity {spot: " << spot
       << ", volatility: vol, currency: eur, continuous_dividends: div}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
       << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
       << ", exercise: european}\n";
@@ -92,7 +92,7 @@ std::string AmDivCfg( const std::string& method, int draws )
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur, discrete_dividends: divs}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2004-12-31, nominal: 1, type: put,"
       << " exercise: american}\n";

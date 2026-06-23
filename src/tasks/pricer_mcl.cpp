@@ -142,7 +142,7 @@ bool PricerMCL::BookIsGpuSupported()
     {
         return false;
     }
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         GpuGbmParams p;
         if ( !c->GPU_GbmParams( p ) )
@@ -196,7 +196,7 @@ void PricerMCL::PriceBook()
         Pricer::InitPricing();
         PriceBookByContract( "GPU" );
         double var = 0;
-        for ( Contract* c : _book->GetOptionList() )
+        for ( Contract* c : _book->GetContractSet() )
         {
             const double t = c->Result().premium_trust * FxToBook( c );
             var += t * t;
@@ -235,7 +235,7 @@ void PricerMCL::PriceBook()
 //! (basket / composite) still fall back to bump-and-revalue.
 bool PricerMCL::CanSingleTreeGreeks() const
 {
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !c->GetUnderlying()->IsMono() )
         {
@@ -374,7 +374,7 @@ void PricerMCL::ComputeGreeks()
         const double book_trust = _book->GetPremiumTrust();
         vector<double> contract_premium;
         vector<double> contract_trust;
-        for ( Contract* c : _book->GetOptionList() )
+        for ( Contract* c : _book->GetContractSet() )
         {
             contract_premium.push_back( c->Result().premium );
             contract_trust.push_back( c->Result().premium_trust );
@@ -399,7 +399,7 @@ void PricerMCL::ComputeGreeks()
         _book->SetPremium( book_premium );
         _book->SetPremiumTrust( book_trust );
         size_t i = 0;
-        for ( Contract* c : _book->GetOptionList() )
+        for ( Contract* c : _book->GetContractSet() )
         {
             c->Result().premium = contract_premium[i];
             c->Result().premium_trust = contract_trust[i];
@@ -658,7 +658,7 @@ void PricerMCL::Tree_Init()
         {
             std::ostringstream oss;
             oss << "diffusion dates = " << _diffusion_dates.size() << ", "
-                << "contracts = " << _book->GetOptionList().size() << ", "
+                << "contracts = " << _book->GetContractSet().size() << ", "
                 << "underlings = " << _single_set.size() << ", "
                 << "currencies = " << _currency_set.size();
             LOG( LogLabel(), oss.str() );
@@ -749,7 +749,7 @@ long PricerMCL::AmericanLsmSteps() const
         return 0;
     }
     long steps = 0;
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !c->IsAmerican() )
         {
@@ -793,7 +793,7 @@ string PricerMCL::AmericanSpotName( Contract* Contract )
 void PricerMCL::SetupAmericanRecording()
 {
     size_t n = (size_t)_mcl->_paths;
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !c->IsAmerican() )
         {
@@ -837,7 +837,7 @@ void PricerMCL::LogRecordings()
     {
         return;
     }
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !c->IsAmerican() )
         {
@@ -886,7 +886,7 @@ void PricerMCL::PriceAmerican()
                                         c->GetPremiumCurrency()->GetName() );
     };
 
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         if ( !c->IsAmerican() )
         {
@@ -947,7 +947,7 @@ void PricerMCL::PriceAmerican()
 
     //! re-aggregate the base book premium from the (now American) contracts
     double book_premium = 0;
-    for ( Contract* c : _book->GetOptionList() )
+    for ( Contract* c : _book->GetContractSet() )
     {
         book_premium += c->Result().premium * fx_of( c );
     }
@@ -1155,15 +1155,11 @@ void PricerMCL::Tree_Read()
     MonteCarloNode* N = _root;
     _book->SetPremium( N->GetIndicatorValue( 0 ) );
     _book->SetPremiumTrust( N->GetIndicatorTrust( 0 ) );
-    vector<Contract*> option_list = _book->GetOptionList();
-    vector<Contract*>::iterator C;
-    for ( C = option_list.begin();
-          C != option_list.end();
-          C++ )
+    for ( Contract* c : _book->GetContractSet() )
     {
-        N = _collector.GetNode( ( *C )->GetName() );
-        ( *C )->Result().premium = N->GetIndicatorValue( 0 );
-        ( *C )->Result().premium_trust = N->GetIndicatorTrust( 0 );
+        N = _collector.GetNode( c->GetName() );
+        c->Result().premium = N->GetIndicatorValue( 0 );
+        c->Result().premium_trust = N->GetIndicatorTrust( 0 );
     }
 
     //! per-bump book premium (single-tree Greeks): read each scenario root's

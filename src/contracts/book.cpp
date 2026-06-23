@@ -14,10 +14,12 @@ Book::Book( const string& ObjectName ) : Object( ObjectName, KIND_BOOK ) {}
 //! destructor
 Book::~Book() = default;
 
-//! read the list of contracts (resolved as Contract references)
+//! read the list of contracts (resolved as Contract references) into the name-ordered
+//! set (membership is the same as the YAML list; only the iteration order is by name)
 void Book::Configure( ObjectReader& reader )
 {
-    _option_list = reader.Ref<vector<Contract>>( "options" );
+    vector<Contract*> contracts = reader.Ref<vector<Contract>>( "contracts" );
+    _contract_set.insert( contracts.begin(), contracts.end() );
 }
 
 //! setter
@@ -48,16 +50,32 @@ void Book::SetGamma( double Gamma )
 //! just re-anchors each contract (which in turn rolls its currency and underlying)
 void Book::SetToday( const date& Today )
 {
-    for ( Contract* c : _option_list )
+    for ( Contract* c : _contract_set )
     {
         c->SetToday( Today );
     }
 }
 
-//! getter (the stored list, by const reference: it is iterated in hot Greek loops)
-const vector<Contract*>& Book::GetOptionList() const
+//! re-anchor on Today and zero every accumulator before a (re-)price: the book's
+//! own aggregated premium / Greeks, then each contract's date + Result (Reset).
+void Book::Reset( const date& Today, Correlation* Correl )
 {
-    return _option_list;
+    _premium = 0;
+    _premium_trust = 0;
+    _delta = 0;
+    _gamma = 0;
+    for ( Contract* c : _contract_set )
+    {
+        c->Reset( Today );
+        c->SetCorrelation( Correl );
+        c->GetUnderlying()->SetCorrelation( Correl );
+    }
+}
+
+//! getter (the stored set, by const reference: it is iterated in hot Greek loops)
+const ContractSet& Book::GetContractSet() const
+{
+    return _contract_set;
 }
 
 //! getter
@@ -88,7 +106,7 @@ double Book::GetGamma() const
 set<date> Book::GetFixingDates()
 {
     set<date> set_dates;
-    for ( Contract* c : _option_list )
+    for ( Contract* c : _contract_set )
     {
         set<date> s = c->GetFixingDates();
         set_dates.insert( s.begin(), s.end() );
@@ -100,7 +118,7 @@ set<date> Book::GetFixingDates()
 SingleSet Book::GetSingleSet() const
 {
     SingleSet s;
-    for ( Contract* c : _option_list )
+    for ( Contract* c : _contract_set )
     {
         SingleSet s_ = c->GetSingleSet();
         s.insert( s_.begin(), s_.end() );
@@ -114,7 +132,7 @@ SingleSet Book::GetSingleSet() const
 CurrencySet Book::GetCurrencySet() const
 {
     CurrencySet s;
-    for ( Contract* c : _option_list )
+    for ( Contract* c : _contract_set )
     {
         CurrencySet s_ = c->GetUnderlying()->GetCurrencySet();
         s.insert( c->GetPremiumCurrency() );
@@ -130,7 +148,7 @@ MonteCarloNode* Book::GetNode( NodeCollector& NC )
         _name,
         [&]( BookNode* B )
         {
-            for ( Contract* c : _option_list )
+            for ( Contract* c : _contract_set )
             {
                 //! FX conversion to the book currency is applied at aggregation
                 //! (AggregateContract, PDE/ANA); the MCL book sums premiums in the

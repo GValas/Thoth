@@ -19,6 +19,7 @@ class Single;
 class Currency;
 class Forex;
 class Underlying;
+class Contract;
 
 //! strict-weak ordering of object pointers by their (unique) name. Using the name
 //! rather than the pointer value is what makes the set order deterministic: heap
@@ -37,3 +38,4 @@ using SingleSet = std::set<Single*, ByName<Single>>;
 using CurrencySet = std::set<Currency*, ByName<Currency>>;
 using ForexSet = std::set<Forex*, ByName<Forex>>;
 using UnderlyingSet = std::set<Underlying*, ByName<Underlying>>;
+using ContractSet = std::set<Contract*, ByName<Contract>>;

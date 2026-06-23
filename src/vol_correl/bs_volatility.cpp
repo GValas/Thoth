@@ -20,7 +20,7 @@ BsVolatility::~BsVolatility() = default;
 //! read own field (flat vol), then the common calendar
 void BsVolatility::Configure( ObjectReader& reader )
 {
-    Volatility::Configure( reader );                              //!< common fields first (optional calendar)
+    Volatility::Configure( reader );                        //!< common fields first (optional calendar)
     _volatility = reader.Get<double>( "volatility" ) / 100; //!< quoted percent -> decimal (20 -> 0.20)
 }
 

@@ -10,8 +10,8 @@ class Book : public Object
     //
   private:
     //! attributes
-    vector<Contract*> _option_list; //!< contracts priced together (non-owning)
-    Currency* _currency = nullptr;  //!< book reporting currency
+    ContractSet _contract_set;     //!< contracts priced together (non-owning)
+    Currency* _currency = nullptr; //!< book reporting currency
 
     //! premium: aggregated PV and its Monte-Carlo standard error ("trust")
     double _premium = 0;
@@ -36,9 +36,12 @@ class Book : public Object
     void SetGamma( double Gamma );
     //! cascade the valuation date to every contract in the book
     void SetToday( const date& Today ) override;
+    //! re-anchor on Today and clear all accumulators (book premium + Greeks and every
+    //! contract's Result) so a re-price starts clean — engines aggregate additively.
+    void Reset( const date& Today, Correlation* Correl );
 
     //! getter
-    const vector<Contract*>& GetOptionList() const;
+    const ContractSet& GetContractSet() const;
     double GetPremium() const;
     double GetPremiumTrust() const;
     double GetDelta() const;

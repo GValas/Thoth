@@ -27,7 +27,7 @@ std::string TwoOptionBookCfg( const std::string& method, int draws )
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
-      << "book: !book {options: [o1, o2]}\n"
+      << "book: !book {contracts: [o1, o2]}\n"
       << "o1: !vanilla {underlying: eq, premium_currency: eur, strike: 90,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n"
       << "o2: !vanilla {underlying: eq, premium_currency: eur, strike: 110,"

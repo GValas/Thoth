@@ -151,7 +151,7 @@ classDiagram
     Contract <|-- VarianceSwap
 
     Object <|-- Book
-    Book --> "*" Contract : options
+    Book --> "*" Contract : contracts
     Contract --> Underlying
     Contract --> Currency : premium
 ```

@@ -781,59 +781,59 @@ shared_mcl_gpu: !mcl_configuration
 
 # --- books (one contract each) ---------------------------------------------
 book_van_eu: !book
-  options: [c_van_eu]
+  contracts: [c_van_eu]
 book_van_am: !book
-  options: [c_van_am]
+  contracts: [c_van_am]
 book_van_eu_div: !book
-  options: [c_van_eu_div]
+  contracts: [c_van_eu_div]
 book_van_am_div: !book
-  options: [c_van_am_div]
+  contracts: [c_van_am_div]
 book_barr_cont: !book
-  options: [c_barr_cont]
+  contracts: [c_barr_cont]
 book_barr_disc: !book
-  options: [c_barr_disc]
+  contracts: [c_barr_disc]
 book_vswap: !book
-  options: [c_vswap]
+  contracts: [c_vswap]
 book_van_eu_q: !book
-  options: [c_van_eu_q]
+  contracts: [c_van_eu_q]
 book_van_am_q: !book
-  options: [c_van_am_q]
+  contracts: [c_van_am_q]
 book_compo: !book
-  options: [c_compo]
+  contracts: [c_compo]
 book_compo_am: !book
-  options: [c_compo_am]
+  contracts: [c_compo_am]
 book_rb_best: !book
-  options: [c_rb_best]
+  contracts: [c_rb_best]
 book_rb_worst: !book
-  options: [c_rb_worst]
+  contracts: [c_rb_worst]
 book_heston: !book
-  options: [c_heston]
+  contracts: [c_heston]
 book_bates: !book
-  options: [c_bates]
+  contracts: [c_bates]
 book_basket: !book
-  options: [c_basket]
+  contracts: [c_basket]
 book_sabr: !book
-  options: [c_sabr]
+  contracts: [c_sabr]
 book_compo_sabr: !book
-  options: [c_compo_sabr]
+  contracts: [c_compo_sabr]
 book_basket_sabr: !book
-  options: [c_basket_sabr]
+  contracts: [c_basket_sabr]
 book_barr_cont_in: !book
-  options: [c_barr_cont_in]
+  contracts: [c_barr_cont_in]
 book_barr_cont_do: !book
-  options: [c_barr_cont_do]
+  contracts: [c_barr_cont_do]
 book_barr_cont_di: !book
-  options: [c_barr_cont_di]
+  contracts: [c_barr_cont_di]
 book_barr_cont_put: !book
-  options: [c_barr_cont_put]
+  contracts: [c_barr_cont_put]
 book_barr_disc_in: !book
-  options: [c_barr_disc_in]
+  contracts: [c_barr_disc_in]
 book_van_eu_put: !book
-  options: [c_van_eu_put]
+  contracts: [c_van_eu_put]
 book_van_am_call: !book
-  options: [c_van_am_call]
+  contracts: [c_van_am_call]
 book_heston_am: !book
-  options: [c_heston_am]
+  contracts: [c_heston_am]
 
 # --- contracts -------------------------------------------------------------
 c_van_eu: !vanilla

@@ -48,6 +48,7 @@ class Pricer : public Task
 
     SingleSet _single_set;
     CurrencySet _currency_set;
+    ContractSet _contract_set;
 
     //! set while the book-level ComputeGreeks (MCL) re-prices the whole book for
     //! bumped scenarios, so the engine silences its progress bar for those inner

@@ -33,7 +33,7 @@ std::string RepoCfg( const std::string& method, const std::string& type,
     o << "eq: !equity {spot: 100, volatility: vol, currency: eur"
       << ( repo_pct > 0 ? ", repo: repo" : "" ) << "}\n"
       << "vol: !bs_volatility {volatility: 20, calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
       << ", exercise: european}\n";

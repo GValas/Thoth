@@ -472,9 +472,9 @@
       "type": "object",
       "title": "!book",
       "additionalProperties": false,
-      "required": ["options"],
+      "required": ["contracts"],
       "properties": {
-        "options": { "$ref": "#/$defs/refList", "description": "Names of the contracts in the book." }
+        "contracts": { "$ref": "#/$defs/refList", "description": "Names of the contracts in the book." }
       }
     },
 

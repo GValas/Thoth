@@ -25,9 +25,10 @@ mcl_config: !mcl_configuration
   vol_year_step: 0.01
   use_sobol: true
   generate_nodes_graph: false
+  allow_gpu: false
 
 book: !book
-  options: [simple_call]
+  contracts: [simple_call]
 
 simple_call: !vanilla
   underlying: eq

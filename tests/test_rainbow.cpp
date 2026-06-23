@@ -28,7 +28,7 @@ std::string RainbowCfg( const std::string& type, double strike,
       << "rb: !rainbow {underlyings: [eq1, eq2], type: " << type << "}\n"
       << "cor: !correlation_matrix {underlyings: [eq1, eq2], matrix: [1, " << rho
       << ", " << rho << ", 1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: rb, premium_currency: eur, strike: " << strike
       << ", maturity: 2000-12-31, type: call, exercise: european}\n";
     return o.str();
@@ -49,7 +49,7 @@ std::string SingleCfg( double spot, double vol, double strike )
       << "eq: !equity {spot: " << spot << ", volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol << ", calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
       << ", maturity: 2000-12-31, type: call, exercise: european}\n";
     return o.str();

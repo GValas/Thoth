@@ -39,6 +39,15 @@ void Contract::SetToday( const date& Today )
     Object::SetToday( Today );
 }
 
+//! re-anchor on Today and wipe the priced result: a fresh Valuation zeroes the
+//! premium and every Greek, so engines that aggregate via Result() += ... do not
+//! double-count across re-prices.
+void Contract::Reset( const date& Today )
+{
+    SetToday( Today );
+    _valuation = Valuation{};
+}
+
 //! getter
 Underlying* Contract::GetUnderlying() const
 {

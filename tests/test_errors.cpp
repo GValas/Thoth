@@ -26,7 +26,7 @@ TEST_CASE( "MCL without a correlation matrix throws" )
       << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     CHECK_THROWS_AS( Price( o.str() ), std::runtime_error );
@@ -52,7 +52,7 @@ TEST_CASE( "a missing referenced object is rejected" )
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
-      << "book: !book {options: [ghost]}\n";
+      << "book: !book {contracts: [ghost]}\n";
     CHECK_THROWS_AS( Price( o.str() ), std::runtime_error );
 }
 
@@ -72,7 +72,7 @@ TEST_CASE( "a non positive-definite correlation matrix is rejected" )
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "eq2: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " maturity: 2000-12-31, type: call, exercise: european}\n";
     CHECK_THROWS_AS( Price( o.str() ), std::runtime_error );

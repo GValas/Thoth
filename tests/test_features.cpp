@@ -28,7 +28,7 @@ std::string OneContract( const std::string& method, const std::string& contract_
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << extra_objects
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << contract_block;
     return o.str();
 }
@@ -89,7 +89,7 @@ TEST_CASE( "Sobol MCL: deterministic and converges to Black-Scholes" )
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     double a = Premium( Price( o.str() ) );
@@ -115,7 +115,7 @@ TEST_CASE( "sequence runs every sub-task" )
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     YAML::Node r = Price( o.str(), "seq" );
@@ -142,7 +142,7 @@ TEST_CASE( "basket: near-perfectly correlated 50/50 basket equals the single ass
       << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq1, eq2], matrix: [1, 0.99, 0.99, 1]}\n"
       << "bk: !basket {underlyings: [eq1, eq2], weights: [0.5, 0.5]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: bk, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     double basket = Premium( Price( o.str() ) );
@@ -186,7 +186,7 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
           << "fxvol: !bs_volatility {volatility: 15}\n"
           << "comp: !composite {equity: eq, composite_currency: usd}\n"
           << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
-          << "book: !book {options: [o]}\n"
+          << "book: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
           << " maturity: 2000-12-31, type: call, exercise: european}\n";
         return o.str();
@@ -238,7 +238,7 @@ TEST_CASE( "American composite put exceeds European and matches the PDE oracle" 
           << "fxvol: !bs_volatility {volatility: 15}\n"
           << "comp: !composite {equity: eq, composite_currency: usd}\n"
           << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
-          << "book: !book {options: [o]}\n"
+          << "book: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
           << " maturity: 2000-12-31, type: put, exercise: " << exercise << "}\n";
         return o.str();
@@ -281,7 +281,7 @@ TEST_CASE( "composite MCL Greeks do not corrupt the correlation Cholesky" )
       << "fxvol: !bs_volatility {volatility: 15}\n"
       << "comp: !composite {equity: eq, composite_currency: usd}\n"
       << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
       << " maturity: 2000-12-31, type: call, exercise: european}\n";
     auto r = Price( o.str() ); //!< must not throw "cor is not SDP"
@@ -305,7 +305,7 @@ TEST_CASE( "SABR ATM vanilla matches Black-Scholes at alpha" )
       << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0],"
       << " rho: [0.0], nu: [0.01], calendar: cal}\n"
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     double p = Premium( Price( o.str() ) );
@@ -333,7 +333,7 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
           << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0], " << sabr
           << ", calendar: cal}\n"
           << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
-          << "book: !book {options: [o]}\n"
+          << "book: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
           << " is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n";
         return o.str();
@@ -386,7 +386,7 @@ TEST_CASE( "basket local-vol MCL: flat SABR components match the BS basket" )
           << vol_obj
           << "cor: !correlation_matrix {underlyings: [eq1, eq2], matrix: [1, 0.3, 0.3, 1]}\n"
           << "bk: !basket {underlyings: [eq1, eq2], weights: [0.5, 0.5]}\n"
-          << "book: !book {options: [o]}\n"
+          << "book: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: bk, premium_currency: eur, strike: 100,"
           << " is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n";
         return o.str();
@@ -427,7 +427,7 @@ TEST_CASE( "composite local-vol MCL reprices the implied surface (matches ANA)" 
           << "fxvol: !bs_volatility {volatility: 15}\n"
           << "comp: !composite {equity: eq, composite_currency: usd}\n"
           << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
-          << "book: !book {options: [o]}\n"
+          << "book: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
           << " maturity: 2000-12-31, type: call, exercise: european}\n";
         return o.str();
@@ -471,7 +471,7 @@ TEST_CASE( "Heston MCL degenerate limit matches Black-Scholes" )
       << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
       << "h: !heston_volatility {spot: 100, init_vol: 30, long_vol: 30, kappa: 5,"
       << " vol_of_vol: 0.0001, calendar: cal}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     auto mr = Price( o.str() );
@@ -495,7 +495,7 @@ TEST_CASE( "Heston MCL negative-rho skew enriches the OTM put" )
       << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
       << "h: !heston_volatility {spot: 100, init_vol: 20, long_vol: 20, kappa: 2,"
       << " vol_of_vol: 0.5, calendar: cal}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 80,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n";
     double heston = Premium( Price( o.str() ) );
@@ -521,7 +521,7 @@ TEST_CASE( "Heston ANA characteristic function agrees with MCL" )
           << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
           << "h: !heston_volatility {spot: 100, init_vol: 20, long_vol: 20, kappa: 2,"
           << " vol_of_vol: 0.5, calendar: cal}\n"
-          << "bk: !book {options: [o]}\n"
+          << "bk: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 80,"
           << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: put, exercise: european}\n";
         return o.str();
@@ -545,7 +545,7 @@ TEST_CASE( "Heston ANA degenerate limit matches Black-Scholes" )
       << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
       << "h: !heston_volatility {spot: 100, init_vol: 30, long_vol: 30, kappa: 5,"
       << " vol_of_vol: 0.0001, calendar: cal}\n"
-      << "bk: !book {options: [o]}\n"
+      << "bk: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
       << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n";
     CHECK( Premium( Price( o.str() ) ) == doctest::Approx( BsCall( 100, 100, 0.08, 0.30, T1 ) ).epsilon( 0.01 ) );
@@ -570,7 +570,7 @@ TEST_CASE( "Heston PDE 2-D ADI matches ANA and supports American" )
           << "eq: !equity {spot: 100, volatility: h, currency: eur}\n"
           << "h: !heston_volatility {spot: 100, init_vol: 25, long_vol: 25, kappa: 2,"
           << " vol_of_vol: 0.5, calendar: cal}\n"
-          << "bk: !book {options: [o]}\n"
+          << "bk: !book {contracts: [o]}\n"
           << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
           << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
           << ", exercise: " << exercise << "}\n";

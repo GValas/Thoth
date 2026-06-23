@@ -191,7 +191,7 @@ inline std::string VanillaCfg( double spot, double strike, double vol_pct, doubl
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: " << spot << ", volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
       << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
       << ", exercise: " << exercise << "}\n";
@@ -225,7 +225,7 @@ inline std::string BarrierCfg( double spot, double strike, double barrier,
       << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
       << "eq: !equity {spot: " << spot << ", volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !barrier {underlying: eq, premium_currency: eur, strike: " << strike
       << ", maturity: 2000-12-31, nominal: 1, type: " << type
       << ", barrier_type: " << barrier_type
@@ -264,7 +264,7 @@ inline std::string QuantoVanillaCfg( double spot, double strike, double vol_pct,
       << "fxvol: !bs_volatility {volatility: " << fx_vol_pct << "}\n"
       << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd],"
       << " matrix: [1, " << corr << ", " << corr << ", 1]}\n"
-      << "book: !book {options: [o]}\n"
+      << "book: !book {contracts: [o]}\n"
       << "o: !vanilla {underlying: eq, premium_currency: usd, strike: " << strike
       << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: " << type
       << ", exercise: european}\n";
