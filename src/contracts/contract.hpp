@@ -11,15 +11,16 @@
 //!   2. the *canonical Monte-Carlo node graph* — GetNode() builds a ContractNode
 //!      from per-flow-date sub-trees (GetFlowNode), shared/deduplicated through the
 //!      NodeCollector so a whole book reuses common spot/vol/rate nodes;
-//!   3. the *optional pricing facets* (PdePriceable / GpuPriceable, see
-//!      pricing_facets.hpp) — flavour flags / params a given engine reads.
+//!   3. the *PDE flavour flags* (PdePriceable, see pricing_facets.hpp) — barrier /
+//!      variance-swap description flags a grid solve reads.
 //! A contract is a pure *description*: it holds no priced result, and it does not
-//! decide which engine can price it — whether a PDE / closed form applies is an
-//! engine decision (PricerPDE / PricerANA inspect the contract + underlying). The
-//! pricing engines (tasks) keep the premium + Greeks themselves (Pricer::Result).
-//! Concrete contracts supply the payoff (Intrinsic / GetFlowNode), the schedule (the
-//! Get*Dates getters) and the facet flags; the common plumbing lives here.
-class Contract : public Object, public PdePriceable, public GpuPriceable
+//! decide which engine can price it — whether a PDE / closed form / GPU kernel
+//! applies is an engine decision (PricerPDE / PricerANA / PricerMCL inspect the
+//! contract + underlying). The pricing engines (tasks) keep the premium + Greeks
+//! themselves (Pricer::Result). Concrete contracts supply the payoff (Intrinsic /
+//! GetFlowNode), the schedule (the Get*Dates getters) and the facet flags; the
+//! common plumbing lives here.
+class Contract : public Object, public PdePriceable
 {
 
   protected:
@@ -72,9 +73,8 @@ class Contract : public Object, public PdePriceable, public GpuPriceable
     //! flow dates: dates on which a cash flow settles (drive GetNode's sub-trees)
     virtual set<date> GetFlowDates() = 0;
 
-    //! PDE / GPU pricing facets are inherited from pricing_facets.hpp:
+    //! PDE flavour flags are inherited from pricing_facets.hpp:
     //!   PdePriceable : barrier / accrued-variance flavour flags (engine steering)
-    //!   GpuPriceable : GPU_GbmParams
     //! Whether a PDE / closed form actually applies is decided by PricerPDE /
     //! PricerANA (they inspect the contract + underlying), not by the contract.
 

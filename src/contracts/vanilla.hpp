@@ -29,9 +29,6 @@ class Vanilla : public Contract
     double Intrinsic( const double spot ) override;
     bool IsAmerican() override;
 
-    //! gpu monte-carlo (mcl_gpu) — only for European, single-asset, deterministic-vol GBM
-    bool GPU_GbmParams( GpuGbmParams& Out ) override;
-
     //! fixing dates (single observation at maturity)
     set<date> GetFixingDates() override;
     set<date> GetFlowDates() override;

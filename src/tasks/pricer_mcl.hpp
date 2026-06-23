@@ -62,7 +62,7 @@ class PricerMCL : public Pricer
     //! whole book is GPU-supported (single-asset European vanillas under GBM). When
     //! false the engine runs entirely on the CPU (the diffusion-tree path below).
     bool _use_gpu = false;
-    bool BookIsGpuSupported(); //!< gpu::Available() && every contract GPU_GbmParams
+    bool BookIsGpuSupported(); //!< gpu::Available() && every contract is GPU GBM-supported
 
     //! tree
     void Tree_Init();
