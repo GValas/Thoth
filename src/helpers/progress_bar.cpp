@@ -27,23 +27,15 @@ GlobalProgress& global_progress()
 }
 
 ProgressBar::ProgressBar( const string& Label, long Total, bool Enabled, bool PublishGlobal )
+    : _label( Label ),
+      _total( Total > 0 ? Total : 1 ),
+      _enabled( Enabled ),
+      _publish_global( PublishGlobal ),
+      _tty( isatty( STDOUT_FILENO ) != 0 ),
+      _start( time( nullptr ) ),
+      _last_percent( -1 ),
+      _last_width( 0 )
 {
-    Start( Label, Total, Enabled, PublishGlobal );
-}
-
-//! (re)configure the bar for a run and reset its render state, so one bar object can
-//! be reused across successive phases (e.g. a Task-owned member).
-void ProgressBar::Start( const string& Label, long Total, bool Enabled, bool PublishGlobal )
-{
-    _label = Label;
-    _total = ( Total > 0 ? Total : 1 );
-    _enabled = Enabled;
-    _publish_global = PublishGlobal;
-    _tty = ( isatty( STDOUT_FILENO ) != 0 );
-    _start = time( nullptr );
-    _last_percent = -1;
-    _last_width = 0;
-
     //! only the visible (enabled) bar publishes globally, and only when allowed;
     //! the silenced inner re-price bars of bump-and-revalue Greeks must not
     //! clobber the snapshot, nor must a slave-local pass (theta reprice).

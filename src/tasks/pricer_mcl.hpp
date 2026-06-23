@@ -28,6 +28,7 @@ class PricerMCL : public Pricer
     //! first part, the Longstaff-Schwartz post-pass (PriceAmerican / fit) fills
     //! the rest, so the bar only reaches 100% once the American premium is ready.
     //! For non-American books it covers just the sweep.
+    std::unique_ptr<ProgressBar> _progress_bar;
     long _progress_step = 0; //!< running position shared by the sweep and the LSM fit
 
     //! optional quasi-random path generator (Sobol + Brownian bridge); only

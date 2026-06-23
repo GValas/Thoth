@@ -226,11 +226,10 @@ void Pricer::PriceBookByContract()
     //! AggregateContract folds in premium/delta/gamma, vega/rho/theta are summed below.
 
     long done = 0;
-    //! (re)start the task-owned bar for this contract loop. Disabled during an inner
-    //! bump-revalue (ComputeParamGreeks reprices the whole book per parameter):
-    //! otherwise each reprice redraws a full "<engine> 100%" line. The base price
-    //! (Execute) runs with _quiet_pricing = false, so it shows.
-    _progress.Start( _progress_label, (long)_book->GetContractSet().size(), !_quiet_pricing );
+    //! disable the bar during an inner bump-revalue (ComputeParamGreeks reprices the
+    //! whole book per parameter): otherwise each reprice redraws a full "<engine> 100%"
+    //! line. The base price (Execute) runs with _quiet_pricing = false, so it shows.
+    ProgressBar bar( _progress_label, (long)_book->GetContractSet().size(), !_quiet_pricing );
     for ( Contract* c : _book->GetContractSet() )
     {
         cancellation::CancellationPoint(); //!< abort promptly if the client disconnected
@@ -250,9 +249,9 @@ void Pricer::PriceBookByContract()
         _book_result.rho += Result( c ).rho * fx;
         _book_result.theta += Result( c ).theta * fx;
 
-        _progress.Update( ++done );
+        bar.Update( ++done );
     }
-    _progress.Done();
+    bar.Done();
 }
 
 //! shared finite-difference bump-and-revalue engine (see the header for the

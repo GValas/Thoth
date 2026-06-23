@@ -711,7 +711,7 @@ void PricerMCL::Tree_Run()
     //! not make a cluster master's aggregate bar run backwards during that tail.
     const bool show_bar = !_quiet_pricing || _theta_pass;
     const string bar_label = _theta_pass ? LogLabel() + " theta" : LogLabel();
-    _progress.Start( bar_label, n + lsm_steps, show_bar, !_theta_pass );
+    _progress_bar = std::make_unique<ProgressBar>( bar_label, n + lsm_steps, show_bar, !_theta_pass );
 
     for ( long i = 0; i < n; i++ )
     {
@@ -731,9 +731,9 @@ void PricerMCL::Tree_Run()
         _collector.RecordPath();
 
         //! live progress (price/trust computed only when the bar redraws)
-        _progress.Update( i + 1, [&]()
-                          { return "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
-                                   ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ); } );
+        _progress_bar->Update( i + 1, [&]()
+                               { return "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
+                                        ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ); } );
     }
     _progress_step = n; //!< the LSM fit continues the bar from here
 
@@ -744,8 +744,9 @@ void PricerMCL::Tree_Run()
     //! it in PriceAmerican once the LSM premium is known.
     if ( lsm_steps == 0 )
     {
-        _progress.Done( "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
-                        ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ) );
+        _progress_bar->Done( "price = " + ToString( _root->GetIndicatorValue( 0 ) ) +
+                             ", trust = " + ToString( _root->GetIndicatorTrust( 0 ) ) );
+        _progress_bar.reset();
     }
 }
 
@@ -965,8 +966,11 @@ void PricerMCL::PriceAmerican()
 
     //! finalise the shared bar now that the American premium is known (the sweep
     //! left it open). Shows the American book premium, not the European readback.
-    //! (no-op when the sweep ran disabled, e.g. a quiet inner reprice.)
-    _progress.Done( "price = " + ToString( book_premium ) );
+    if ( _progress_bar )
+    {
+        _progress_bar->Done( "price = " + ToString( book_premium ) );
+        _progress_bar.reset();
+    }
 }
 
 //! Fit a Longstaff-Schwartz exercise policy on the recorded base paths. Backward
@@ -1025,8 +1029,10 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
     {
         //! advance the shared progress bar: the LSM fit continues the same bar
         //! the path sweep started, so the whole American job fills one bar
-        //! (no-op when the sweep ran disabled)
-        _progress.Update( ++_progress_step );
+        if ( _progress_bar )
+        {
+            _progress_bar->Update( ++_progress_step );
+        }
 
         double df = exp( -Rate * ( Tau[t + 1] - Tau[t] ) );
         for ( size_t p = 0; p < N; p++ )

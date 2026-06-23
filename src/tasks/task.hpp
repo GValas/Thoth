@@ -1,6 +1,5 @@
 #pragma once
 #include "object.hpp"
-#include "progress_bar.hpp"
 #include "yaml_config.hpp"
 
 //! Abstract executable unit (a pricer or a sequence): Execute() does the work and
@@ -12,10 +11,6 @@ class Task : public Object
     //! attributes
     double _task_time = 0; //!< wall-clock seconds the task took (written into the result block)
     string _result;        //!< name of the YAML object the result block is written under
-
-    //! the task's progress bar, owned from construction (idle until a phase Start()s
-    //! it). Reused across phases — the engine's base price loop / path sweep drive it.
-    ProgressBar _progress;
 
     //! non-owning handle to the run's config, so WriteResults can write this
     //! task's output back into the same document the engine was driven from
