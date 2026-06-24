@@ -36,7 +36,10 @@ export function taggedSchema(kinds: readonly string[]): yaml.Schema {
         },
       }),
   );
-  return yaml.DEFAULT_SCHEMA.extend(types);
+  //! Extend JSON_SCHEMA (numbers / bools / null) NOT DEFAULT_SCHEMA: the default would
+  //! resolve an unquoted `2000-01-01` into a JS Date, but the engine treats dates as
+  //! strings (date-pattern), so we keep timestamps as plain strings here.
+  return yaml.JSON_SCHEMA.extend(types);
 }
 
 //! Parse a Thoth YAML book into a JS object tree, wrapping each tagged mapping as

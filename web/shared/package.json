@@ -2,15 +2,8 @@
   "name": "@thoth/shared",
   "version": "0.1.0",
   "description": "Shared Thoth engine integration: HTTP client, engine pool, tag-preserving YAML, grid builder. Consumed by the NestJS BFF and the (future) MCP server.",
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
