@@ -42,7 +42,7 @@ MonteCarloNode* BsVolatility::GetNode( NodeCollector& NC )
     auto init = [&]( ConstantNode* C )
     { C->SetConstantValue( ( _volatility + _vol_shift ) * GetDayWeight() ); };
     //! mutualise with the base tree unless the current Greek scenario bumps vols
-    if ( NC.HasScenario() && !NC.ScenarioBumpsVol() )
+    if ( NC.Scenario().active() && !NC.Scenario().bumps_vol )
     {
         return NC.GetOrCreateShared<ConstantNode>( _name, init );
     }

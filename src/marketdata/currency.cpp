@@ -42,7 +42,7 @@ MonteCarloNode* Currency::GetRateNode( NodeCollector& NC )
     auto init = [&]( YieldCurveNode* Y )
     { Y->SetCurve( _rate ); };
     //! mutualise with the base tree unless the current Greek scenario bumps rates
-    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    if ( NC.Scenario().active() && !NC.Scenario().bumps_rate )
     {
         return NC.GetOrCreateShared<YieldCurveNode>( _name + node_name::RATE, init );
     }

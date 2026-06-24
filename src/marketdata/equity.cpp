@@ -222,7 +222,7 @@ MonteCarloNode* Equity::GetDriftNode( NodeCollector& NC )
     };
     //! the drift depends on the rate (and div/repo, never bumped), so it is
     //! mutualised with the base tree unless the scenario bumps rates (rho)
-    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    if ( NC.Scenario().active() && !NC.Scenario().bumps_rate )
     {
         return NC.GetOrCreateShared<DriftNode>( _name + node_name::DRIFT, init );
     }
@@ -261,7 +261,7 @@ MonteCarloNode* Equity::GetDividendNode( NodeCollector& NC )
     };
     //! depends on the discount curve (rho) only: shared with the base tree unless
     //! the scenario bumps rates
-    if ( NC.HasScenario() && !NC.ScenarioBumpsRate() )
+    if ( NC.Scenario().active() && !NC.Scenario().bumps_rate )
     {
         return NC.GetOrCreateShared<DividendNode>( _name + node_name::DIVIDEND, init );
     }

@@ -2,6 +2,8 @@
 
 #include "nodes.hpp"
 
+#include <utility>
+
 //! node_collector.hpp — the Monte-Carlo node graph owner and evaluator interface.
 
 //! Owns and wires the Monte-Carlo node graph: builds/looks up nodes by name
@@ -21,9 +23,15 @@ class NodeCollector
     map<string, std::unique_ptr<MonteCarloNode>> _node_map; //!< owns every node
     map<string, BrownianNode*> _brownian_node_map;          //!< non-owning view
 
-    string _scenario_suffix;           //!< appended to node names while building a Greek bump
-    bool _scenario_bumps_rate = false; //!< scenario bumps rates (rho)
-    bool _scenario_bumps_vol = false;  //!< scenario bumps vols (vega)
+    //! Greek-scenario build context (set via SetScenario, read via Scenario()).
+    struct ScenarioContext
+    {
+        string suffix;           //!< node-name suffix while building a Greek bump ("" = base tree)
+        bool bumps_rate = false; //!< the scenario bumps rates (rho)
+        bool bumps_vol = false;  //!< the scenario bumps vols (vega)
+        bool active() const { return !suffix.empty(); }
+    };
+    ScenarioContext _scenario;
 
     //! the evaluation schedule produced by SortNodes and consumed by PriceNodes:
     //! two parallel arrays forming a flat list of (node, date-index) work items in
@@ -32,17 +40,7 @@ class NodeCollector
     vector<MonteCarloNode*> _node_list;
     vector<size_t> _date_index_list;
 
-    //! per-path recording : snapshot a node's values at chosen dates, every draw
-    //! ( opt-in; used to feed the American / Longstaff-Schwartz pricer )
-    struct PathRecord
-    {
-        MonteCarloNode* node = nullptr;
-        vector<size_t> date_index; //!< columns: diffusion-date indices
-        vector<double> tau;        //!< year fraction of each column from today
-        LaMatrix paths;            //!< [ nb_draws x date_index.size() ]
-        size_t row = 0;            //!< next draw to fill
-    };
-    vector<PathRecord> _records;
+    //! (the per-path American recorder lives in PathRecorder now, owned by the pricer)
 
     //! ownership sinks shared by the public New*Node helpers: PushNode adopts any
     //! node into _node_map (and hands it the date schedule); PushBrownianNode also
@@ -59,7 +57,7 @@ class NodeCollector
     template <class T>
     T* NewNode( const string& Name )
     {
-        auto n = std::make_unique<T>( Name + _scenario_suffix );
+        auto n = std::make_unique<T>( Name + _scenario.suffix );
         T* p = n.get();
         PushNode( std::move( n ) );
         return p;
@@ -71,7 +69,7 @@ class NodeCollector
     template <class T, class Init>
     MonteCarloNode* GetOrCreate( const string& Name, Init init )
     {
-        if ( MonteCarloNode* existing = GetNode( Name + _scenario_suffix ) )
+        if ( MonteCarloNode* existing = GetNode( Name + _scenario.suffix ) )
         {
             return existing;
         }
@@ -91,10 +89,10 @@ class NodeCollector
         {
             return existing;
         }
-        string saved = _scenario_suffix;
-        _scenario_suffix.clear(); //!< build under the bare name
+        string saved = _scenario.suffix;
+        _scenario.suffix.clear(); //!< build under the bare name
         T* node = NewNode<T>( Name );
-        _scenario_suffix = saved;
+        _scenario.suffix = saved;
         init( node );
         return node;
     }
@@ -105,16 +103,12 @@ class NodeCollector
     //! (which are looked up by their bare name via GetNode). Empty = base tree.
     //! The bump flags let the market-data leaves stay shared (GetOrCreateShared)
     //! unless the scenario actually bumps them (vega -> vol, rho -> rate).
-    void SetScenarioSuffix( const string& Suffix ) { _scenario_suffix = Suffix; }
-    const string& GetScenarioSuffix() const { return _scenario_suffix; }
-    void SetScenarioBumps( bool Rate, bool Vol )
+    void SetScenario( const string& Suffix, bool BumpsRate, bool BumpsVol )
     {
-        _scenario_bumps_rate = Rate;
-        _scenario_bumps_vol = Vol;
+        _scenario = { Suffix, BumpsRate, BumpsVol };
     }
-    bool HasScenario() const { return !_scenario_suffix.empty(); }
-    bool ScenarioBumpsRate() const { return _scenario_bumps_rate; }
-    bool ScenarioBumpsVol() const { return _scenario_bumps_vol; }
+    void ClearScenario() { _scenario = {}; } //!< back to the base tree
+    const ScenarioContext& Scenario() const { return _scenario; }
 
     //! getter
     size_t GetDateIndex( const date& AsOfDate );
@@ -166,18 +160,17 @@ class NodeCollector
     void SortNodes( MonteCarloNode& RootNode ); //!< single-root convenience overload
     //! topologically sort the union DAG reachable from several roots into one
     //! evaluation schedule (shared nodes appear once) — used so the base tree
-    //! and every Greek-bump sub-tree are priced in a single path sweep.
-    void SortNodes( const vector<MonteCarloNode*>& Roots );
+    //! and every Greek-bump sub-tree are priced in a single path sweep. ForcedPoints
+    //! are extra (node, date-index) work items the schedule must include even if no
+    //! root reaches them there — the American recorder's columns (PathRecorder::
+    //! SchedulePoints), so a derived spot's interior path is computed, not just maturity.
+    void SortNodes( const vector<MonteCarloNode*>& Roots,
+                    const vector<std::pair<MonteCarloNode*, size_t>>& ForcedPoints = {} );
     void PriceNodes(); //!< evaluate the sorted schedule for the current draw
 
-    //! path recording (American / path-dependent) — opt-in, no effect when unused
-    void StartRecording( MonteCarloNode* Node,
-                         const vector<size_t>& DateIndices,
-                         size_t NbDraws );
-    void RecordPath(); //!< call once per draw, after PriceNodes
-    bool IsRecording() const { return !_records.empty(); }
-    const la_matrix* RecordedPaths( const string& NodeName ) const;
-    vector<double> RecordedTau( const string& NodeName ) const;
+    //! diffusion-date indices up to (and including) Maturity — the exercise grid an
+    //! American/barrier contract steps over. A pure date-schedule query (the per-path
+    //! recording itself lives in PathRecorder), used by the pricer and the barrier.
     vector<size_t> DiffusionIndicesUpTo( const date& Maturity ) const;
 
     //!

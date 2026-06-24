@@ -285,6 +285,7 @@ void PricerMCL::PriceBook()
     //! pricing across the base and bumped scenarios
     _diffusion_dates.clear();
     _collector.Reset();
+    _recorder.Clear(); //!< drop American path recordings alongside the node graph
     _scenario_roots.clear();
     _scenario_premium.clear();
     _rng.Seed( (std::uint64_t)_mcl->_seed );
@@ -336,11 +337,9 @@ void PricerMCL::BuildGreekScenarios()
                       const std::function<void()>& Mutate, const std::function<void()>& Restore )
     {
         Mutate();
-        _collector.SetScenarioSuffix( Tag );
-        _collector.SetScenarioBumps( BumpsRate, BumpsVol );
+        _collector.SetScenario( Tag, BumpsRate, BumpsVol );
         MonteCarloNode* root = _book->GetNode( _collector );
-        _collector.SetScenarioBumps( false, false );
-        _collector.SetScenarioSuffix( "" );
+        _collector.ClearScenario();
         Restore();
         _scenario_roots.emplace_back( Tag, root );
     };
@@ -704,8 +703,9 @@ void PricerMCL::Tree_Init()
     //! flow only references at maturity.
     SetupAmericanRecording();
 
-    //! sort nodes
-    _collector.SortNodes( roots );
+    //! sort nodes — pass the recorder's columns so a derived spot's interior path
+    //! dates are scheduled, not just where the contract flow reaches it
+    _collector.SortNodes( roots, _recorder.SchedulePoints() );
 
     //! debug node graph : capture one Graphviz .dot per built tree into the result
     //! block as <tree>_mcl_graph, so it returns to the client over HTTP / in the
@@ -813,7 +813,7 @@ void PricerMCL::Tree_Run()
         _collector.PriceNodes();
 
         //! snapshot recorded spot paths (no-op unless American contracts)
-        _collector.RecordPath();
+        _recorder.RecordPath();
 
         //! live progress (price/trust computed only when the bar redraws)
         _progress_bar->Update( i + 1, [&]()
@@ -840,7 +840,7 @@ void PricerMCL::Tree_Run()
 //! the American post-pass is embedded in the same bar as the path sweep.
 long PricerMCL::AmericanLsmSteps() const
 {
-    if ( !_collector.IsRecording() )
+    if ( !_recorder.IsRecording() )
     {
         return 0;
     }
@@ -872,7 +872,7 @@ string PricerMCL::LogLabel() const
     {
         return "GPU";
     }
-    return _collector.IsRecording() ? "AMC" : "MCL";
+    return _recorder.IsRecording() ? "AMC" : "MCL";
 }
 
 //! name of the diffusion node carrying a contract's exercise value. Asking the
@@ -905,7 +905,7 @@ void PricerMCL::SetupAmericanRecording()
         vector<size_t> grid = _collector.DiffusionIndicesUpTo( c->GetMaturityDate() );
 
         //! base spot path : feeds the LSM policy fit and the base premium
-        _collector.StartRecording( spot, grid, n );
+        _recorder.StartRecording( spot, grid, n, _collector.GetDateList() );
 
         //! single-tree Greeks: also record each bump scenario's spot path so the
         //! frozen exercise policy can be applied to the bumped paths (the spot
@@ -915,7 +915,7 @@ void PricerMCL::SetupAmericanRecording()
         {
             if ( MonteCarloNode* sb = _collector.GetNode( spot_name + tagged.first ) )
             {
-                _collector.StartRecording( sb, grid, n );
+                _recorder.StartRecording( sb, grid, n, _collector.GetDateList() );
             }
         }
 
@@ -929,7 +929,7 @@ void PricerMCL::SetupAmericanRecording()
 //! martingale check on each recorded underlying : E[ S_T ] ~ S_0 * exp( r T )
 void PricerMCL::LogRecordings()
 {
-    if ( !_collector.IsRecording() )
+    if ( !_recorder.IsRecording() )
     {
         return;
     }
@@ -940,7 +940,7 @@ void PricerMCL::LogRecordings()
             continue;
         }
         const string spot_name = AmericanSpotName( c );
-        const la_matrix* paths = _collector.RecordedPaths( spot_name );
+        const la_matrix* paths = _recorder.RecordedPaths( spot_name );
         if ( !paths || paths->size2 == 0 )
         {
             continue;
@@ -966,7 +966,7 @@ void PricerMCL::LogRecordings()
 //! _scenario_premium so ComputeGreeks finite-differences the American values.
 void PricerMCL::PriceAmerican()
 {
-    if ( !_collector.IsRecording() )
+    if ( !_recorder.IsRecording() )
     {
         return;
     }
@@ -990,8 +990,8 @@ void PricerMCL::PriceAmerican()
         }
 
         const string spot_name = AmericanSpotName( c );
-        const la_matrix* S0 = _collector.RecordedPaths( spot_name );
-        vector<double> tau = _collector.RecordedTau( spot_name );
+        const la_matrix* S0 = _recorder.RecordedPaths( spot_name );
+        vector<double> tau = _recorder.RecordedTau( spot_name );
         double r = c->GetPremiumCurrency()->GetRate()->GetCurveValue( c->GetMaturityDate() );
 
         //! fit the exercise policy once on the base paths
@@ -1025,8 +1025,8 @@ void PricerMCL::PriceAmerican()
 
             //! bumped paths (spot/vol/rate). The rho scenario also discounts (and
             //! drifts, already in the path) at the bumped rate
-            const la_matrix* Sb = _collector.RecordedPaths( spot_name + tag );
-            vector<double> taub = _collector.RecordedTau( spot_name + tag );
+            const la_matrix* Sb = _recorder.RecordedPaths( spot_name + tag );
+            vector<double> taub = _recorder.RecordedTau( spot_name + tag );
             if ( !Sb )
             {
                 Sb = S0;

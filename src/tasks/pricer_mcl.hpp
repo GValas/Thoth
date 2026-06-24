@@ -1,5 +1,6 @@
 #pragma once
 #include "mcl_configuration.hpp"
+#include "path_recorder.hpp"
 #include "pricer.hpp"
 #include "rng.hpp"
 #include <memory>
@@ -43,6 +44,10 @@ class PricerMCL : public Pricer
     // mcl nodes
     NodeCollector _collector;
     MonteCarloNode* _root;
+
+    //! per-path American/LSM recorder (snapshots spot paths for the Longstaff-Schwartz
+    //! pass); inert unless the book has American contracts. Reset alongside _collector.
+    PathRecorder _recorder;
 
     //! single-tree Greeks: the base tree and every spot/vol/rate bump sub-tree
     //! are built into one collector and priced in a single path sweep (sharing

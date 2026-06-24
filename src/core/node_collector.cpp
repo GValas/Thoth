@@ -25,10 +25,7 @@ void NodeCollector::Reset()
     _brownian_node_map.clear();
     _node_list.clear();
     _date_index_list.clear();
-    _records.clear();
-    _scenario_suffix.clear();
-    _scenario_bumps_rate = false;
-    _scenario_bumps_vol = false;
+    _scenario = {};
 }
 
 //! push back — register a Brownian node. It is doubly indexed: the non-owning
@@ -85,7 +82,7 @@ void NodeCollector::SetDiffusionDates( const set<date>& DiffusionDates )
 //! copy (though Brownian leaves are usually shared via their bare name).
 BrownianNode* NodeCollector::NewBrownianNode( const string& Name )
 {
-    auto n = std::make_unique<BrownianNode>( Name + _scenario_suffix );
+    auto n = std::make_unique<BrownianNode>( Name + _scenario.suffix );
     BrownianNode* p = n.get(); //!< observer pointer to return after the move
     PushBrownianNode( std::move( n ) );
     return p;
@@ -117,89 +114,6 @@ date NodeCollector::PreviousDiffusionDate( const date& AsOfDate )
         ERR( "no previous diffusion date for " + to_simple_string( AsOfDate ) );
     }
     return it->second;
-}
-
-//! ----------------------------------------------------------------------
-//! per-path recording (feeds the American / Longstaff-Schwartz pricer)
-//! ----------------------------------------------------------------------
-
-//! register a node to snapshot at the given dates; allocate the path matrix.
-//! DateIndices are the exercise-grid columns; NbDraws is the number of MC paths
-//! (matrix rows). Idempotent per node so several contracts sharing an underlying
-//! record it once.
-void NodeCollector::StartRecording( MonteCarloNode* Node,
-                                    const vector<size_t>& DateIndices,
-                                    size_t NbDraws )
-{
-    //! already recorded ? (e.g. two American contracts on the same underlying)
-    for ( const auto& r : _records )
-    {
-        if ( r.node == Node )
-        {
-            return;
-        }
-    }
-    PathRecord record;
-    record.node = Node;
-    record.date_index = DateIndices;
-    //! precompute each column's year fraction from today — the LSM regression works
-    //! in τ, so cache it now rather than reconverting dates on every path.
-    for ( size_t idx : DateIndices )
-    {
-        record.tau.push_back( YearFraction( _date_list[0], _date_list[idx] ) );
-    }
-    //! [ nb_draws x nb_exercise_dates ] : one row per path, filled by RecordPath
-    record.paths = la_matrix_alloc( NbDraws, DateIndices.size() );
-    _records.push_back( std::move( record ) );
-}
-
-//! snapshot the current draw into the next row of each recorded matrix.
-//! Called once per path after PriceNodes, while the node values for this draw are live.
-void NodeCollector::RecordPath()
-{
-    for ( auto& r : _records )
-    {
-        //! defensive: never write past the pre-sized matrix if called extra times
-        if ( r.row >= r.paths->size1 )
-        {
-            continue;
-        }
-        //! copy each recorded date's value into this draw's row
-        for ( size_t c = 0; c < r.date_index.size(); c++ )
-        {
-            la_matrix_set( r.paths, r.row, c, r.node->GetValue( r.date_index[c] ) );
-        }
-        r.row++; //!< advance to the next draw's row
-    }
-}
-
-//! recorded [ nb_draws x nb_exercise_dates ] matrix for a node, or nullptr.
-//! Looked up by name (the LSM pass holds names, not node pointers); linear scan is
-//! fine since _records holds only the handful of recorded underlyings.
-const la_matrix* NodeCollector::RecordedPaths( const string& NodeName ) const
-{
-    for ( const auto& r : _records )
-    {
-        if ( r.node->GetName() == NodeName )
-        {
-            return r.paths.get();
-        }
-    }
-    return nullptr;
-}
-
-//! year fractions of the recorded columns for a node (the τ grid for the LSM
-//! regression); empty vector if the node was not recorded.
-vector<double> NodeCollector::RecordedTau( const string& NodeName ) const
-{
-    for ( const auto& r : _records )
-    {
-        if ( r.node->GetName() == NodeName )
-        {
-            return r.tau;
-        }
-    }
-    return {};
 }
 
 //! diffusion-date indices up to (and including) a maturity — the exercise grid.
@@ -300,7 +214,8 @@ void NodeCollector::SortNodes( MonteCarloNode& RootNode )
 //! scheduled independently. Implemented as Kahn's algorithm working from the
 //! leaves up: nodes with no children are ready first, parents follow once all their
 //! children are scheduled. Ordered-by-name structures keep the result reproducible.
-void NodeCollector::SortNodes( const vector<MonteCarloNode*>& Roots )
+void NodeCollector::SortNodes( const vector<MonteCarloNode*>& Roots,
+                               const vector<std::pair<MonteCarloNode*, size_t>>& ForcedPoints )
 {
 
     //! structures ( ordered by node name, not pointer, for reproducibility )
@@ -321,13 +236,11 @@ void NodeCollector::SortNodes( const vector<MonteCarloNode*>& Roots )
     //! dependencies — to be evaluated at every recorded date. A diffusion spot is
     //! already scheduled at all dates via its self-dependency, but a derived spot
     //! (composite / basket) is otherwise only pulled in where the contract flow
-    //! references it (maturity), leaving the interior path columns uncomputed.
-    for ( const auto& rec : _records )
+    //! references it (maturity), leaving the interior path columns uncomputed. The
+    //! points come from the pricer's PathRecorder (the recorder lives outside here).
+    for ( const auto& [forced_node, idx] : ForcedPoints )
     {
-        for ( size_t idx : rec.date_index )
-        {
-            node_stack.push( node( rec.node, idx ) );
-        }
+        node_stack.push( node( forced_node, idx ) );
     }
     //! DFS over the dependency graph, building the parent links and child counts
     //! Kahn's algorithm needs. Each (node, date) is expanded at most once.
