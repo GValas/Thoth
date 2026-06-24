@@ -30,5 +30,10 @@ web/**/node_modules/
 web/**/dist/
 web/bff/data/*.sqlite
 web/**/.angular/
+# TS incremental build artifact (caused a Docker build break when shipped in context)
+web/**/*.tsbuildinfo
 # redis dev data
 redis-data/
+
+# ── Secrets / local env (NEVER commit) ──
+.env

@@ -1,89 +1,47 @@
-<div class="md-header">
-  <app-workspace-picker (selected)="onWorkspace($event)"></app-workspace-picker>
+<div class="toolbar">
+  <h2 class="title">Market data</h2>
+  <span class="spacer"></span>
+  <button mat-button [disabled]="busy()" (click)="generate()">
+    <mat-icon>casino</mat-icon> Generate
+  </button>
+  <button mat-button (click)="check()"><mat-icon>fact_check</mat-icon> Check</button>
+  <button mat-flat-button color="primary" (click)="save()"><mat-icon>save</mat-icon> Save</button>
 </div>
 
-@if (workspace()) {
-  <div class="md-grid">
-    <mat-card class="md-list">
-      <mat-card-header>
-        <mat-card-title>Objects</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="add-kind">
-          <mat-label>Add object of kind…</mat-label>
-          <mat-select (selectionChange)="addObject($event.value)" [value]="null">
-            @for (k of kinds(); track k) {
-              <mat-option [value]="k">{{ k }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+<p class="intro thoth-muted">Rates &amp; volatilities are in <strong>percent</strong>.</p>
 
-        @for (group of grouped(); track group[0]) {
-          <div class="kind-group">
-            <div class="kind-label thoth-muted">{{ group[0] }}</div>
-            <mat-nav-list dense>
-              @for (obj of group[1]; track obj.name) {
-                <a
-                  mat-list-item
-                  [class.active]="obj.name === selectedName()"
-                  (click)="select(obj)"
-                >
-                  <span matListItemTitle>{{ obj.name }}</span>
-                  @if (errors()[obj.name] && errors()[obj.name].length) {
-                    <mat-icon matListItemMeta class="thoth-error">error</mat-icon>
-                  }
-                </a>
-              }
-            </mat-nav-list>
-          </div>
-        }
-        @if (objects().length === 0) {
-          <p class="thoth-muted">No objects yet. Add one above.</p>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="md-editor">
-      <mat-card-header>
-        <mat-card-title>
-          @if (selected(); as obj) {
-            {{ obj.name }}
-            <span class="thoth-muted">— {{ obj.kind }}</span>
-          } @else {
-            Select an object
-          }
-        </mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="reminders thoth-muted">
-          <mat-icon>info</mat-icon>
-          Rates &amp; vols are entered in PERCENT. Curve dates &amp; values must be equal
-          length. References point to other objects by name.
-        </div>
-
-        @if (selected()) {
-          <form [formGroup]="form">
-            <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
-          </form>
-
-          @if (errors()[selected()!.name] && errors()[selected()!.name].length) {
-            <div class="obj-errors">
-              <strong class="thoth-error">Errors</strong>
-              <ul>
-                @for (msg of errors()[selected()!.name]; track msg) {
-                  <li class="thoth-error">{{ msg }}</li>
-                }
-              </ul>
-            </div>
-          }
-        }
-      </mat-card-content>
-      <mat-card-actions align="end">
-        <button mat-stroked-button (click)="validate()">Check</button>
-        <button mat-flat-button color="primary" (click)="save()">Save</button>
-      </mat-card-actions>
-    </mat-card>
+@if (errorList().length) {
+  <div class="errors">
+    <strong>{{ errorList().length }} object(s) have errors:</strong>
+    <ul>
+      @for (e of errorList(); track e.name) {
+        <li><code>{{ e.name }}</code>: {{ e.messages.join('; ') }}</li>
+      }
+    </ul>
   </div>
-} @else {
-  <p class="thoth-muted">Pick or create a workspace to begin.</p>
 }
+
+<section class="area">
+  <h3>Equities <span class="count">{{ model.equities().length }}</span></h3>
+  <app-equities-section [model]="model" [today]="workspace()?.today ?? '2026-01-01'"></app-equities-section>
+</section>
+
+<section class="area">
+  <h3>Rates <span class="count">{{ model.currencies().length }}</span></h3>
+  <app-rates-section [model]="model" [today]="workspace()?.today ?? '2026-01-01'"></app-rates-section>
+</section>
+
+<section class="area">
+  <h3>FX <span class="count">{{ model.forexs().length }}</span></h3>
+  <app-fx-section [model]="model"></app-fx-section>
+</section>
+
+<section class="area">
+  <h3>Correlation</h3>
+  <app-correlation-section [model]="model"></app-correlation-section>
+</section>
+
+<details class="area">
+  <summary><h3>Advanced <span class="count">{{ model.advanced().length }}</span></h3></summary>
+  <app-advanced-objects-section [model]="model" [schema]="schema()"></app-advanced-objects-section>
+</details>

@@ -1,0 +1,9 @@
+# Build context = ./web (used by bff/Dockerfile). Keep host-built artefacts out of the
+# image so the in-container `npm ci` / `nest build` are authoritative. In particular,
+# a stale tsconfig.tsbuildinfo would make tsc's incremental build emit nothing after
+# nest's deleteOutDir, leaving /app/bff/dist empty and breaking the runtime COPY.
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.git
+**/data

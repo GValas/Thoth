@@ -3,8 +3,9 @@
 # prod.sh — start (or manage) the full Thoth dashboard stack via docker compose.
 #
 # Brings up the production stack defined in docker-compose.yml:
-#   redis · pricer1 · pricer2 (engine replicas) · bff (NestJS) · web (nginx + SPA)
-# then waits until the API is healthy and prints how to reach it.
+#   redis · 2 GPU clusters (c1master/c2master + 5 CPU slaves each) · bff (NestJS) ·
+#   web (nginx + SPA) — then waits until the API is healthy and prints how to reach it.
+# Note: the clusters need the NVIDIA Container Toolkit + 2 GPUs (see docker-compose.yml).
 #
 # Usage:
 #   scripts/prod.sh [up]        build images + start detached, wait for health   (default)
@@ -54,7 +55,7 @@ if grep -q 'change-me' "$ROOT/.env" && [[ "${FORCE:-0}" != "1" ]]; then
 fi
 
 # --- bring up --------------------------------------------------------------
-echo "==> starting Thoth stack (redis · pricer1 · pricer2 · bff · web)"
+echo "==> starting Thoth stack (redis · 2 GPU clusters [+5 slaves each] · bff · web)"
 if [[ "${NO_BUILD:-0}" == "1" ]]; then compose up -d; else compose up -d --build; fi
 
 # --- wait for health -------------------------------------------------------

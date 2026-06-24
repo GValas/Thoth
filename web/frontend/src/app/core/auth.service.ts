@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, map, tap } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthUser } from './models';
@@ -8,6 +9,7 @@ import { AuthUser } from './models';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
 
   private readonly _token = signal<string | null>(null);
   private readonly _user = signal<AuthUser | null>(null);
@@ -68,7 +70,11 @@ export class AuthService {
   }
 
   logout(): void {
-    this.api.logout().subscribe({ next: () => this.clear(), error: () => this.clear() });
+    const done = () => {
+      this.clear();
+      void this.router.navigate(['/login']); // navigate so the auth guard fires at once
+    };
+    this.api.logout().subscribe({ next: done, error: done });
   }
 
   clear(): void {

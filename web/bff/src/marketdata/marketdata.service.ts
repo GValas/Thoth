@@ -6,14 +6,16 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { buildBookYaml } from '@thoth/shared';
-import { ObjectEntity } from '../persistence/entities';
+import { ObjectEntity, Workspace } from '../persistence/entities';
 import { SchemaService } from '../schema/schema.service';
 import { validateObjects, type WsObject } from '../common/semantic-validation';
+import { generateMarketData, type SeedOptions } from './seed-generator';
 
 @Injectable()
 export class MarketDataService {
   constructor(
     @InjectRepository(ObjectEntity) private readonly objects: Repository<ObjectEntity>,
+    @InjectRepository(Workspace) private readonly workspaces: Repository<Workspace>,
     private readonly schema: SchemaService,
   ) {}
 
@@ -42,6 +44,15 @@ export class MarketDataService {
   //! Validate without persisting (the UI "check" button).
   validate(objects: WsObject[]): Record<string, string[]> {
     return validateObjects(this.schema, objects);
+  }
+
+  //! Generate a coherent random market-data set (equities + currencies + fx + correlation)
+  //! using the workspace's valuation date, then REPLACE the workspace's objects with it
+  //! (a fresh sample book). Goes through the same validate+persist path as replaceObjects.
+  async seed(workspaceId: string, opts: SeedOptions = {}): Promise<WsObject[]> {
+    const ws = await this.workspaces.findOne({ where: { id: workspaceId } });
+    const objects = generateMarketData({ ...opts, today: opts.today ?? ws?.today });
+    return this.replaceObjects(workspaceId, objects);
   }
 
   //! Build a tagged YAML book of all the workspace's objects plus the extra objects the

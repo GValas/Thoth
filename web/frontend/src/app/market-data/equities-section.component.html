@@ -1,0 +1,104 @@
+<div class="eq-head">
+  <button mat-stroked-button (click)="addEquity()"><mat-icon>add</mat-icon> Stock</button>
+  @if (selected()) {
+    <button mat-stroked-button color="warn" (click)="removeEquity()">
+      <mat-icon>delete</mat-icon> {{ selected()!.name }}
+    </button>
+  }
+  <span class="hint">Spot &amp; currency editable inline · select a row to edit vol / repo / dividends</span>
+</div>
+
+<ag-grid-angular
+  class="ag-theme-quartz grid"
+  [rowData]="rows()"
+  [columnDefs]="cols()"
+  [domLayout]="'autoHeight'"
+  [rowSelection]="'single'"
+  [getRowId]="rowId"
+  (gridReady)="onReady($event)"
+  (cellValueChanged)="onCell($event)"
+  (rowSelected)="onRowSelected($event)"
+></ag-grid-angular>
+
+@if (selected(); as eq) {
+  <div class="detail">
+    <h4>{{ eq.name }} — volatility, repo &amp; dividends</h4>
+
+    <div class="editor-block">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Volatility model</mat-label>
+        <mat-select [ngModel]="volObj()?.kind" (ngModelChange)="setVolKind($event)">
+          @for (k of volKinds; track k) {
+            <mat-option [value]="k">{{ k.replace('_volatility', '') }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @switch (volObj()?.kind) {
+        @case ('bs_volatility') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="num">
+            <mat-label>Volatility (%)</mat-label>
+            <input matInput type="number" [ngModel]="volNum('volatility')"
+                   (ngModelChange)="setVolNum('volatility', $event)" />
+          </mat-form-field>
+        }
+        @case ('heston_volatility') {
+          <div class="num-row">
+            @for (f of ['spot','init_vol','long_vol','kappa','vol_of_vol','jump_intensity','jump_mean','jump_vol']; track f) {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="num">
+                <mat-label>{{ f }}</mat-label>
+                <input matInput type="number" [ngModel]="volNum(f)"
+                       (ngModelChange)="setVolNum(f, $event)" />
+              </mat-form-field>
+            }
+          </div>
+        }
+        @case ('sabr_volatility') {
+          <div class="sabr">
+            <ag-grid-angular
+              class="ag-theme-quartz grid"
+              [rowData]="sabrRows()"
+              [columnDefs]="sabrCols"
+              [domLayout]="'autoHeight'"
+              (gridReady)="onSabrReady($event)"
+              (cellValueChanged)="commitSabr()"
+            ></ag-grid-angular>
+            <div class="curve-actions">
+              <button mat-stroked-button (click)="addPillar()"><mat-icon>add</mat-icon> Pillar</button>
+              <button mat-stroked-button color="warn" (click)="removePillar()">
+                <mat-icon>remove</mat-icon> Pillar
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="editor-block">
+      <h5>Repo curve (%)</h5>
+      @if (repoName()) {
+        <app-curve-grid [model]="model" [name]="repoName()!" valueLabel="Repo (%)"></app-curve-grid>
+      }
+    </div>
+
+    <div class="editor-block">
+      <h5>Dividends</h5>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Dividend model</mat-label>
+        <mat-select [ngModel]="divKind()" (ngModelChange)="setDivKind($event)">
+          @for (k of divKinds; track k) {
+            <mat-option [value]="k">{{ k === 'discrete_dividends' ? 'discrete cash' : 'continuous yield' }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (divName()) {
+        <app-curve-grid
+          [model]="model"
+          [name]="divName()!"
+          [valueField]="divValueField()"
+          [valueLabel]="divValueField() === 'amounts' ? 'Cash' : 'Yield (%)'"
+        ></app-curve-grid>
+      }
+    </div>
+  </div>
+}

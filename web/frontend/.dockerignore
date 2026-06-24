@@ -1,0 +1,7 @@
+# Build context = ./web/frontend (used by frontend Dockerfile). Exclude host-built
+# artefacts so the in-container `npm ci` / `npm run build` are authoritative and the
+# uploaded context stays small.
+node_modules
+dist
+.angular
+**/*.tsbuildinfo

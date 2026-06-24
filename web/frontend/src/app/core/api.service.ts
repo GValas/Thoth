@@ -9,6 +9,7 @@ import {
   GridSubmit,
   Health,
   SchemaResponse,
+  SeedRequest,
   TokenResponse,
   UpdateWorkspace,
   UserRole,
@@ -72,6 +73,10 @@ export class ApiService {
       `${this.base}/workspaces/${workspaceId}/objects/validate`,
       { objects },
     );
+  }
+  //! generate a random sample market-data set; replaces the workspace's objects.
+  seedObjects(workspaceId: string, req: SeedRequest = {}): Observable<WsObject[]> {
+    return this.http.post<WsObject[]>(`${this.base}/workspaces/${workspaceId}/objects/seed`, req);
   }
 
   // --- grid ---

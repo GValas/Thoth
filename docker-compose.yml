@@ -1,18 +1,45 @@
-# Thoth dashboard — production stack.
+# Thoth dashboard — production stack (2 GPU clusters).
 #
 #   docker compose up --build
 #   open http://localhost:8088   (nginx serves the SPA + proxies /api -> bff)
 #
-# Scaling note: engine replicas are NAMED services (pricer1, pricer2), not
-# `deploy.replicas`, so each has its own DNS name and the BFF's EnginePool can lease
-# ONE replica per job (which is what makes GET /grid/:id/progress per-job-accurate).
-# Add more by copying the anchor and extending THOTH_ENGINE_URLS.
+# Engine topology: TWO clusters, each = 1 GPU master (`thoth -cluster`) + 5 CPU slaves
+# (`thoth -server`). A master prices a share of an MCL book on its own GPU and fans the
+# rest of the Monte-Carlo paths out to its 5 slaves over HTTP, aggregating the result.
+# The masters expose the SAME /price + /health API as a plain server, so the BFF treats
+# them as two engine endpoints (THOTH_ENGINE_URLS) and its EnginePool leases ONE cluster
+# per job (keeps GET /grid/:id/progress per-job-accurate). Masters are NAMED services so
+# each has its own DNS name and a pinned GPU.
+#
+# Requires: NVIDIA Container Toolkit + at least 1 GPU. Each master pins one GPU by id:
+#   THOTH_GPU_C1 (cluster 1, default 0), THOTH_GPU_C2 (cluster 2, default 0).
+# Defaults put BOTH masters on GPU 0 so the stack runs on a single-GPU host (the two
+# masters then share the card). With two GPUs, set THOTH_GPU_C2=1 to split them.
+# THOTH_CUDA_ARCH = the GPUs' compute capability (default 89 = Ada / RTX 40-series).
+# Slaves are CPU-only.
 
-x-pricer: &pricer
+# ---- CPU slave: one ordinary HTTP pricing server (built once, shared image) -----------
+x-slave: &slave
+  image: thoth-cpu
   build:
     context: ./pricer
     dockerfile: Dockerfile
-  # CPU image by default; for GPU set build args (see pricer/Dockerfile) + a gpu profile.
+  restart: unless-stopped
+  expose:
+    - "8080"
+  networks: [thoth]
+
+# ---- GPU master: the CUDA image, run in cluster mode (command set per-master) ---------
+x-master: &master
+  image: thoth-gpu
+  build:
+    context: ./pricer
+    dockerfile: Dockerfile
+    args:
+      ENABLE_CUDA: "ON"
+      BUILD_BASE: "nvidia/cuda:12.6.3-devel-ubuntu24.04"
+      RUNTIME_BASE: "nvidia/cuda:12.6.3-runtime-ubuntu24.04"
+      CUDA_ARCH: "${THOTH_CUDA_ARCH:-89}"
   restart: unless-stopped
   expose:
     - "8080"
@@ -26,20 +53,70 @@ services:
       - redis-data:/data
     networks: [thoth]
 
-  pricer1:
-    <<: *pricer
-  pricer2:
-    <<: *pricer
+  # ===== cluster 1 : master on GPU 0 + 5 CPU slaves ====================================
+  c1s1:  { <<: *slave }
+  c1s2:  { <<: *slave }
+  c1s3:  { <<: *slave }
+  c1s4:  { <<: *slave }
+  c1s5:  { <<: *slave }
+
+  c1master:
+    <<: *master
+    command:
+      - "-cluster"
+      - "8080"
+      - "http://c1s1:8080"
+      - "http://c1s2:8080"
+      - "http://c1s3:8080"
+      - "http://c1s4:8080"
+      - "http://c1s5:8080"
+    depends_on:
+      [c1s1, c1s2, c1s3, c1s4, c1s5]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${THOTH_GPU_C1:-0}"]
+              capabilities: [gpu]
+
+  # ===== cluster 2 : master on GPU 1 + 5 CPU slaves ====================================
+  c2s1:  { <<: *slave }
+  c2s2:  { <<: *slave }
+  c2s3:  { <<: *slave }
+  c2s4:  { <<: *slave }
+  c2s5:  { <<: *slave }
+
+  c2master:
+    <<: *master
+    command:
+      - "-cluster"
+      - "8080"
+      - "http://c2s1:8080"
+      - "http://c2s2:8080"
+      - "http://c2s3:8080"
+      - "http://c2s4:8080"
+      - "http://c2s5:8080"
+    depends_on:
+      [c2s1, c2s2, c2s3, c2s4, c2s5]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${THOTH_GPU_C2:-0}"]
+              capabilities: [gpu]
 
   bff:
     build:
       context: ./web
       dockerfile: bff/Dockerfile
     restart: unless-stopped
-    depends_on: [redis, pricer1, pricer2]
+    depends_on: [redis, c1master, c2master]
     environment:
       PORT: "3000"
-      THOTH_ENGINE_URLS: "http://pricer1:8080,http://pricer2:8080"
+      # one URL per cluster master; the EnginePool leases one cluster per job
+      THOTH_ENGINE_URLS: "http://c1master:8080,http://c2master:8080"
       QUEUE_DRIVER: "bullmq"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"

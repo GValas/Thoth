@@ -68,6 +68,13 @@ export interface ValidateResponse {
   errors: Record<string, string[]>;
 }
 
+//! "Generate sample data" options (counts default to 5 equities / 3 currencies server-side).
+export interface SeedRequest {
+  equities?: number;
+  currencies?: number;
+  seed?: number;
+}
+
 export interface GridSubmit {
   workspaceId: string;
   engine: Engine;
@@ -77,6 +84,7 @@ export interface GridSubmit {
   maturities: string[]; //!< YYYY-MM-DD
   indicators: string[];
   exercise?: Exercise;
+  currency?: string; //!< contract/premium currency (defaults to the workspace currency)
   configName?: string;
   correlationName?: string;
 }
@@ -84,10 +92,19 @@ export interface GridSubmit {
 export interface GridMatrix {
   underlying: string;
   type: OptionType;
+  currency: string;
   strikes: number[];
   maturities: string[];
   premium: number[][];
   greeks: Record<string, number[][]>;
+}
+
+//! Provenance of a computed grid: which server ran it and how long it took.
+export interface GridMeta {
+  server?: string; //!< engine URL (cluster master) that priced the job
+  execMs?: number; //!< BFF round-trip wall clock
+  engineMs?: number; //!< engine's own compute time (task_time)
+  engineVersion?: string;
 }
 
 export type GridStatus = 'queued' | 'running' | 'done' | 'error';
@@ -95,7 +112,7 @@ export type GridStatus = 'queued' | 'running' | 'done' | 'error';
 export interface GridResult {
   jobId?: string;
   status: GridStatus;
-  result?: { matrices: GridMatrix[] };
+  result?: { matrices: GridMatrix[]; meta?: GridMeta };
   error?: string;
 }
 

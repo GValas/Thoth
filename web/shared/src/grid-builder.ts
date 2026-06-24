@@ -137,7 +137,15 @@ export function parseGridResult(
           }
         }
       }
-      matrices.push({ underlying: u, type, strikes: req.strikes, maturities: req.maturities, premium, greeks });
+      matrices.push({
+        underlying: u,
+        type,
+        currency: req.currency,
+        strikes: req.strikes,
+        maturities: req.maturities,
+        premium,
+        greeks,
+      });
     }
   }
   return matrices;

@@ -115,15 +115,31 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
       };
       const bookYaml = dumpBook(buildGridDoc(req, ctx), this.schema.kinds());
 
-      const resultYaml = await this.engine.priceForJob(jobId, bookYaml, 'grid');
+      const { yaml: resultYaml, server } = await this.engine.priceForJob(jobId, bookYaml, 'grid');
       const resultDoc = loadBook(resultYaml, this.schema.kinds()) as Record<string, unknown>;
       const block = (resultDoc['grid_result'] ?? {}) as Record<string, unknown>;
       const matrices = parseGridResult(block, req);
 
+      // provenance: which server ran it, round-trip wall clock, the engine's own compute
+      // time (task_time, seconds) and build version — surfaced to the UI as a note.
+      const sys = (resultDoc['system_information'] ?? {}) as Record<string, unknown>;
+      const engineSec =
+        typeof block['task_time'] === 'number'
+          ? (block['task_time'] as number)
+          : typeof sys['task_time'] === 'number'
+            ? (sys['task_time'] as number)
+            : undefined;
+      const meta = {
+        server,
+        execMs: Date.now() - t0,
+        engineMs: engineSec !== undefined ? Math.round(engineSec * 1000) : undefined,
+        engineVersion: typeof sys['version'] === 'string' ? (sys['version'] as string) : undefined,
+      };
+
       await this.runs.update(jobId, {
         status: 'done',
-        result: { matrices },
-        execMs: Date.now() - t0,
+        result: { matrices, meta },
+        execMs: meta.execMs,
       });
     } catch (e) {
       const msg = e instanceof EngineError ? e.message : e instanceof Error ? e.message : String(e);

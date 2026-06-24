@@ -55,6 +55,7 @@ export interface GridRequest {
 export interface GridMatrix {
   underlying: string;
   type: OptionType;
+  currency: string; //!< contract premium currency (same for every cell of a grid)
   strikes: number[];
   maturities: string[];
   premium: number[][];

@@ -29,12 +29,18 @@ export class EngineService {
   }
 
   //! Price under a leased replica, tracked against jobId for the duration so its
-  //! progress is queryable. Throws EngineError on an engine-reported failure.
-  async priceForJob(jobId: string, bookYaml: string, taskName = 'root'): Promise<string> {
+  //! progress is queryable. Returns the result YAML plus which engine (server URL) ran
+  //! it. Throws EngineError on an engine-reported failure.
+  async priceForJob(
+    jobId: string,
+    bookYaml: string,
+    taskName = 'root',
+  ): Promise<{ yaml: string; server: string }> {
     const lease = await this.pool.acquire();
     this.activeByJob.set(jobId, lease.client);
     try {
-      return await lease.client.postPrice(bookYaml, taskName);
+      const yaml = await lease.client.postPrice(bookYaml, taskName);
+      return { yaml, server: lease.client.baseUrl };
     } finally {
       this.activeByJob.delete(jobId);
       lease.release();
