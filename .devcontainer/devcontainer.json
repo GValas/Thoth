@@ -1,5 +1,9 @@
 {
-  "name": "Thoth C++ (g++ / make)",
+  // Single dev container carrying BOTH stacks: the C++ engine toolchain (g++, cmake,
+  // CUDA) AND Node (the feature below) for the web/ workspaces (BFF + Angular). The
+  // repo is mounted, so pricer/ and web/ are edited together. For full container
+  // isolation (separate pricer/bff/web + Redis) see .devcontainer/docker-compose.dev.yml.
+  "name": "Thoth monorepo (C++ engine + web)",
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -24,7 +28,10 @@
         "ms-vscode.cmake-tools",
         "ms-vscode.makefile-tools",
         "redhat.vscode-yaml",
-        "tintinweb.graphviz-interactive-preview"
+        "tintinweb.graphviz-interactive-preview",
+        "angular.ng-template",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
       ],
       "settings": {
         // Le terminal "Claude Code" (.vscode/tasks.json) s'ouvre dans le Panel.
@@ -33,6 +40,6 @@
       }
     }
   },
-  "postCreateCommand": "g++ --version && cmake --version && git --version && claude --version; (nvcc --version && nvidia-smi -L) || echo 'CUDA toolkit/GPU not detected (mcl_gpu will fall back to CPU)'",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
   "remoteUser": "vscode"
 }

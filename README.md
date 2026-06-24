@@ -40,10 +40,15 @@ JWT + rotating refresh cookie with an admin RBAC tab.
 **Run (prod, Docker):**
 
 ```bash
-cp .env.example .env        # then edit the secrets
-docker compose up --build   # pricer1/2 · redis · bff · web
-# open http://localhost:8088   (login with ADMIN_EMAIL / ADMIN_PASSWORD)
+cp .env.example .env          # then edit the secrets (JWT_*, ADMIN_PASSWORD)
+scripts/prod.sh               # build + start the stack, wait for health, print the URL
+# open http://localhost:8088  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
+# scripts/prod.sh logs|ps|down to manage it
 ```
+
+`scripts/prod.sh` wraps `docker compose` (`docker-compose.yml`: redis · pricer1/2 ·
+bff · web); it refuses to start while `.env` still holds `change-me` placeholder
+secrets (override with `FORCE=1`). You can also drive compose directly.
 
 **Develop:** the default devcontainer carries the C++ toolchain *and* Node, so you can
 run all three locally — `thoth -server 8080`, then in `web/bff` `npm i && npm run start:dev`
