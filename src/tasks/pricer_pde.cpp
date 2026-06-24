@@ -62,10 +62,13 @@ void PricerPDE::PreCheck()
 {
     for ( Contract* c : _book->GetContractSet() )
     {
-        if ( !c->GetUnderlying()->IsGriddable() ||
-             ( c->GetKind() != "vanilla" &&
-               c->GetKind() != "variance" &&
-               c->GetKind() != "barrier" ) )
+        //! the PDE grid handles a vanilla, a barrier or a variance swap on a
+        //! griddable underlying; dispatch on the type (RTTI) rather than the kind
+        //! string, mirroring PriceContract / PricerANA::PreCheck.
+        const bool supported = dynamic_cast<Vanilla*>( c ) || dynamic_cast<Barrier*>( c ) ||
+                               dynamic_cast<VarianceSwap*>( c );
+
+        if ( !c->GetUnderlying()->IsGriddable() || !supported )
         {
             std::string msg = std::format( "{} ({}) can't be PDE-priced", c->GetName(), c->GetKind() );
             ERR( msg );

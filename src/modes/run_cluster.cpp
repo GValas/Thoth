@@ -89,14 +89,14 @@ static string ClusterPrice( const string& Body,
 
     //! a sequence (e.g. the full pricer matrix) : apply the cluster logic to each
     //! sub-pricer in turn, so its MCL cells are path-split across the slaves too.
-    if ( req.GetTag( task ) == "sequence" )
+    if ( req.GetTag( task ) == KIND_SEQUENCE )
     {
         return ClusterPriceSequence( Body, task, Slaves );
     }
 
     //! only a plain (CPU) MCL single-pricer is path-split across the slaves. The
     //! engine is the tag itself now (!mcl_pricer), so the split test is a tag check.
-    bool splittable = req.GetTag( task ) == "mcl_pricer";
+    bool splittable = req.GetTag( task ) == KIND_MCL_PRICER;
     string mcl;
     bool allow_gpu = false;
     if ( splittable )
