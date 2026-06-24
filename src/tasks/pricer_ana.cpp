@@ -1,3 +1,4 @@
+#include <format>
 #include "thoth.hpp"
 #include "pricer_ana.hpp"
 #include "barrier.hpp"
@@ -38,28 +39,37 @@ constexpr int VARSWAP_STRIP_POINTS = 800;
 //! the contract. European vanilla / continuous barrier / variance swap, each on a
 //! griddable (equity-like) underlying; everything else (American, discrete barrier,
 //! exotic underlying) falls to PDE / MCL.
-bool AnaHasSolution( Contract* c )
-{
-    if ( Vanilla* v = dynamic_cast<Vanilla*>( c ) )
-    {
-        return !v->IsAmerican() && v->GetUnderlying()->IsGriddable();
-    }
-    if ( Barrier* b = dynamic_cast<Barrier*>( c ) )
-    {
-        return !b->IsDiscrete() && b->GetUnderlying()->IsGriddable(); //!< continuous only
-    }
-    if ( VarianceSwap* s = dynamic_cast<VarianceSwap*>( c ) )
-    {
-        return s->GetUnderlying()->IsGriddable();
-    }
-    return false;
-}
+
 } // namespace
 
 //! check a closed form is available for every contract (engine decision, see above)
 void PricerANA::PreCheck()
 {
-    CheckAllowed( AnaHasSolution, "ANA (closed-form)" );
+
+    for ( Contract* c : _book->GetContractSet() )
+    {
+        const std::string msg = std::format( "{} ({}) can't be ANA-priced", c->GetName(), c->GetKind() );
+
+        if ( !c->GetUnderlying()->IsGriddable() )
+        {
+            ERR( msg );
+        }
+
+        //! a closed form exists for a European vanilla, a continuous barrier, or a
+        //! (model-free) variance swap; anything else has no analytic evaluator.
+        auto* van = dynamic_cast<Vanilla*>( c );
+        auto* bar = dynamic_cast<Barrier*>( c );
+        auto* vsw = dynamic_cast<VarianceSwap*>( c );
+
+        const bool supported = ( van && !van->IsAmerican() ) ||
+                               ( bar && !bar->IsDiscrete() ) ||
+                               ( vsw != nullptr );
+
+        if ( !supported )
+        {
+            ERR( msg );
+        }
+    }
 }
 
 //! price the whole book by closed-form. One progress bar over the contracts;

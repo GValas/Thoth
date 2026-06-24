@@ -1,3 +1,4 @@
+#include <format>
 #include "thoth.hpp"
 #include "pricer_pde.hpp"
 #include "barrier.hpp"
@@ -5,6 +6,7 @@
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
 #include "variance_swap.hpp"
+#include "vanilla.hpp"
 
 //! Heston / Bates 2-D (S, v) ADI grid parameters (see SolveHestonGrid). The grid
 //! resolution follows the book's vanilla_precision (low | medium | high): a 2-D ADI
@@ -58,18 +60,22 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 //! is resolved as a required reference in Configure, so it is always non-null here)
 void PricerPDE::PreCheck()
 {
-    //! the grid solve applies to any contract whose underlying admits a spot grid;
-    //! an engine decision made here from the (pure-description) underlying, not asked
-    //! of the contract.
-    CheckAllowed( []( Contract* c )
-                  { return c->GetUnderlying()->IsGriddable(); }, "PDE" );
+    for ( Contract* c : _book->GetContractSet() )
+    {
+        if ( !c->GetUnderlying()->IsGriddable() ||
+             ( c->GetKind() != "vanilla" &&
+               c->GetKind() != "variance" &&
+               c->GetKind() != "barrier" ) )
+        {
+            std::string msg = std::format( "{} ({}) can't be PDE-priced", c->GetName(), c->GetKind() );
+            ERR( msg );
+        }
+    }
 }
 
 //! solve the grid for every contract (re-runnable for the Greeks bumps)
 void PricerPDE::PriceBook()
 {
-    //! one progress bar over the contracts; each step prices the contract and,
-    //! when requested, its bump-and-revalue Greeks (see Pricer::PriceBookByContract).
     PriceBookByContract();
 }
 
@@ -77,6 +83,7 @@ void PricerPDE::PriceBook()
 //! dispatch on the contract type to the matching grid solve.
 void PricerPDE::PriceContract( Contract* Ctr )
 {
+
     if ( auto* vs = dynamic_cast<VarianceSwap*>( Ctr ) )
     {
         SolveVarianceSwap( vs ); //!< expected-accumulated-variance grid (sets premium)
@@ -85,9 +92,13 @@ void PricerPDE::PriceContract( Contract* Ctr )
     {
         PriceBarrier( bar );
     }
+    else if ( auto* van = dynamic_cast<Vanilla*>( Ctr ) )
+    {
+        PriceVanilla( van );
+    }
     else
     {
-        PriceVanilla( Ctr );
+        ERR( "Unsupported contract : " + Ctr->GetName() );
     }
 }
 
