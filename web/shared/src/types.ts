@@ -1,0 +1,62 @@
+//! Shared types for the Thoth engine integration layer.
+
+//! A YAML object carrying a Thoth local tag (e.g. `!equity`). On the wire the tag is
+//! `!<kind>`; in JS we represent it as a plain object with a `__tag` discriminator so
+//! the same value round-trips through tag-preserving load/dump. Reference: the engine
+//! reads the kind only from the tag (pricer/src/yaml_config.cpp GetTag).
+export const TAG_KEY = '__tag' as const;
+
+export interface TaggedObject {
+  [TAG_KEY]: string; //!< the kind, without the leading '!'
+  [field: string]: unknown;
+}
+
+//! The single Greek/premium fields a pricer writes per contract / per book. Per-cell
+//! Greeks exist only on ANA/PDE/GPU-MCL (see pricer.cpp WriteResults gating); premium
+//! and premium_trust are always present.
+export interface CellResult {
+  premium: number;
+  premium_trust?: number;
+  delta?: number;
+  gamma?: number;
+  vega?: number;
+  rho?: number;
+  theta?: number;
+}
+
+//! Process-global progress snapshot from GET /progress: "<current> <total> <active>".
+//! Global, not per-request — correlation comes from leasing one engine replica per job.
+export interface ProgressSnapshot {
+  current: number;
+  total: number;
+  active: boolean;
+}
+
+//! Engine selection for a pricing book. Per-cell Greeks require ana | pde (or GPU mcl).
+export type Engine = 'ana' | 'pde' | 'mcl';
+export type OptionType = 'call' | 'put';
+export type Exercise = 'european' | 'american';
+
+//! A strike x maturity grid request (one product = vanilla in v1), one engine, one or
+//! more underlyings and call/put types. indicators drive which Greeks are requested.
+export interface GridRequest {
+  engine: Engine;
+  today: string; //!< YYYY-MM-DD
+  currency: string; //!< reporting currency name (must exist among the objects)
+  underlyings: string[]; //!< object names of the underlyings to price across
+  types: OptionType[];
+  strikes: number[];
+  maturities: string[]; //!< YYYY-MM-DD
+  indicators: string[]; //!< e.g. ["premium","delta","gamma","vega","rho","theta"]
+  exercise?: Exercise; //!< default "european"
+}
+
+//! One (underlying, type) pivot: a rows(strikes) x cols(maturities) matrix per metric.
+export interface GridMatrix {
+  underlying: string;
+  type: OptionType;
+  strikes: number[];
+  maturities: string[];
+  premium: number[][];
+  greeks: Partial<Record<keyof CellResult, number[][]>>;
+}
