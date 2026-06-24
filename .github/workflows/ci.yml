@@ -19,6 +19,10 @@ jobs:
   build-test:
     name: Build & test (Ubuntu, g++, Release)
     runs-on: ubuntu-24.04
+    # the C++ engine lives under pricer/ since the monorepo split
+    defaults:
+      run:
+        working-directory: pricer
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +47,9 @@ jobs:
   sanitizers:
     name: Sanitizers (ASan + UBSan)
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: pricer
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +77,9 @@ jobs:
   format:
     name: clang-format gate
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: pricer
     steps:
       - uses: actions/checkout@v4
 

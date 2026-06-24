@@ -18,7 +18,7 @@ au même niveau qu'un nouveau `web/`.
 Découvertes d'exploration qui structurent l'archi :
 
 - Le moteur **expose déjà** `thoth -server <port>` (cpp-httplib) : `POST /price` (YAML in →
-  YAML out, header optionnel `X-Exec-Name`, réponse **chunked toujours HTTP 200**, erreur =
+  YAML out, header optionnel `X-Task-Name`, réponse **chunked toujours HTTP 200**, erreur =
   corps commençant par `error: `), `GET /health`, `GET /progress`. Voir `run_server.cpp`.
 - **Aucune modif de logique C++** : on garde `thoth -server` comme microservice de pricing
   (seuls des chemins/scripts changent du fait du déplacement).
@@ -29,7 +29,30 @@ Découvertes d'exploration qui structurent l'archi :
   (`schema/thoth.schema.json`) → pilote la génération/validation des formulaires.
 
 **Décisions** : monorepo **`pricer/` + `web/`** · stack **NestJS + Angular** (full-TypeScript)
-· persistance **SQLite** (ORM NestJS) · v1 = **les deux onglets** + auth/admin.
+· persistance **SQLite** (ORM NestJS) · v1 = **les deux onglets** + auth/admin · moteur de
+grille **choisi par l'utilisateur** (ana/pde/mcl, pas de défaut) · **scalabilité horizontale
+dès le départ** (N réplicas `pricer` + file BullMQ/Redis, un job ↔ un réplica).
+
+> **Corrections vérifiées contre le code moteur (à honorer en implémentation)** :
+> 1. Le header de sélection de tâche est **`X-Task-Name`** (pas `X-Exec-Name` ; cf.
+>    `run_server.cpp:73`), optionnel, défaut = `root:` du book.
+> 2. **Greeks par cellule** : `<cell>_delta…theta` ne sont écrits que si
+>    `GreeksPerContract()` (ANA/PDE/GPU-MCL). **CPU-MCL** ne donne que des Greeks
+>    **niveau book** ; `<cell>_premium`/`_premium_trust` sont toujours écrits.
+> 3. `/progress` est **process-global, sans id de corrélation** ; pool moteur limité à 4
+>    connexions + mutex global. La corrélation par job vient du **lease d'un réplica**.
+> 4. Le **schéma ne valide pas** l'appariement `dates`/`values`, l'existence des
+>    références, ni les bornes pourcent → **validation sémantique** côté BFF requise.
+> 5. Tests round-trip YAML = comparaison **structurelle**, pas octet (le moteur réordonne
+>    les clés et ajoute `system_information` + blocs `*_result`).
+> 6. Round-trip de tags **essentiellement en émission** (persistance JSON+kind) ; le
+>    parsing js-yaml bidirectionnel ne sert qu'à l'import de books d'exemple. Les tags ne
+>    sont **que sur des mappings top-level**.
+> 7. `is_absolute_strike` / `nominal` sont **ignorés** par le moteur (strike absolu, pas
+>    de notionnel sur la vanille) — ne pas le promettre dans l'UI.
+> 8. Schéma **maintenu à la main** (pas de générateur) → ajouter un **test garde-fou** :
+>    chaque `pricer/samples/*.yaml` valide contre le schéma, et l'ensemble des kinds du
+>    schéma == l'ensemble `KIND_*` du registre (`pricer/src/core/object.hpp`).
 
 ## Restructuration monorepo (à faire en premier, `git mv` pour garder l'historique)
 
@@ -132,8 +155,8 @@ stage *runtime* (`thoth -server`).
 
 ## Backend NestJS
 
-**EngineModule** — client moteur : `postPrice(yaml, execName="root")` → POST
-`${THOTH_ENGINE_URL}/price`, `Content-Type: application/x-yaml`, header `X-Exec-Name`.
+**EngineModule** — client moteur : `postPrice(yaml, taskName="root")` → POST
+`${THOTH_ENGINE_URL}/price`, `Content-Type: application/x-yaml`, header `X-Task-Name`.
 **Erreur détectée par corps commençant par `error: `** (chunked toujours HTTP 200) → 422.
 `health()`, `progress()`. `THOTH_ENGINE_URL` config (défaut `:8080`).
 

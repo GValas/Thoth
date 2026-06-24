@@ -1,19 +1,34 @@
-# Build artifacts
+# ── Engine (pricer/) build artifacts ──
+/pricer/build/
+/pricer/build-debug/
+/pricer/build-gpu/
+/pricer/build-san/
+/pricer/build-cov/
+/pricer/thoth
+*.o
+*.gcov
+# stale root build dirs from before the monorepo move
 /build/
 /build-debug/
 /build-gpu/
+/build-san/
+/build-cov/
 /thoth
 
 # Generated output
-*.o
 log.txt
 *.out.yaml
+
+# Engine TODO (local, untracked)
+/pricer/TODO.md
 
 # Claude local settings
 .claude/
 
-# todo list file
-TODO.md
-# coverage build (gcov)
-build-cov/
-*.gcov
+# ── Web (web/) ──
+web/**/node_modules/
+web/**/dist/
+web/bff/data/*.sqlite
+web/**/.angular/
+# redis dev data
+redis-data/

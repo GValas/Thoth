@@ -6,9 +6,10 @@
       // -g -O0 via CMAKE_BUILD_TYPE=Debug -> breakpoints land on the right lines.
       // THOTH_ENABLE_CUDA=ON so gpu::Available() uses the real device (not the
       // CPU stub) -> allow_gpu books actually price on the GPU under the debugger.
+      // engine sources live under pricer/ since the monorepo split
       "label": "cmake: build debug",
       "type": "shell",
-      "command": "cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DTHOTH_ENABLE_CUDA=ON && cmake --build build-debug -j --target thoth",
+      "command": "cmake -S pricer -B pricer/build-debug -DCMAKE_BUILD_TYPE=Debug -DTHOTH_ENABLE_CUDA=ON && cmake --build pricer/build-debug -j --target thoth",
       "group": "build",
       "problemMatcher": ["$gcc"]
     }

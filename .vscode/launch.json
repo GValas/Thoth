@@ -5,7 +5,7 @@
       // Asked once at launch; type the pricing config you want to debug.
       "id": "inputYaml",
       "type": "promptString",
-      "description": "Pricing input YAML (path relative to the project root)",
+      "description": "Pricing input YAML (path relative to pricer/)",
       "default": "samples/simple_call.yaml"
     }
   ],
@@ -17,9 +17,9 @@
       "name": "Debug thoth -batch",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build-debug/thoth",
+      "program": "${workspaceFolder}/pricer/build-debug/thoth",
       "args": ["-batch", "${input:inputYaml}", "/tmp/thoth-debug.out.yaml"],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/pricer",
       "stopAtEntry": false,
       "MIMode": "gdb",
       "miDebuggerPath": "/usr/bin/gdb",
@@ -38,9 +38,9 @@
       "name": "Debug thoth -server 8080",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build-debug/thoth",
+      "program": "${workspaceFolder}/pricer/build-debug/thoth",
       "args": ["-server", "8080"],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/pricer",
       "stopAtEntry": false,
       "MIMode": "gdb",
       "miDebuggerPath": "/usr/bin/gdb",
