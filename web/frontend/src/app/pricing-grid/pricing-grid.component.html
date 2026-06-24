@@ -1,0 +1,114 @@
+<div class="pg-header">
+  <app-workspace-picker (selected)="onWorkspace($event)"></app-workspace-picker>
+</div>
+
+@if (workspace()) {
+  <mat-card class="pg-form">
+    <mat-card-content>
+      <div class="row">
+        <div class="field">
+          <label class="lbl">Engine</label>
+          <mat-button-toggle-group [value]="engine" (change)="setEngine($event.value)">
+            <mat-button-toggle value="ana">ana</mat-button-toggle>
+            <mat-button-toggle value="pde">pde</mat-button-toggle>
+            <mat-button-toggle value="mcl">mcl</mat-button-toggle>
+          </mat-button-toggle-group>
+          @if (!engine) {
+            <span class="hint thoth-muted">Pick an engine to continue.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="lbl">Option type</label>
+          <div class="checks">
+            <mat-checkbox
+              [checked]="types.includes('call')"
+              (change)="toggleType('call', $event.checked)"
+              >Call</mat-checkbox
+            >
+            <mat-checkbox
+              [checked]="types.includes('put')"
+              (change)="toggleType('put', $event.checked)"
+              >Put</mat-checkbox
+            >
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="lbl">Exercise</label>
+          <mat-button-toggle-group [(value)]="exercise">
+            <mat-button-toggle value="european">European</mat-button-toggle>
+            <mat-button-toggle value="american">American</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+      </div>
+
+      <div class="row">
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Underlyings</mat-label>
+          <mat-select [(ngModel)]="selectedUnderlyings" multiple>
+            @for (o of underlyingObjects(); track o.name) {
+              <mat-option [value]="o.name">{{ o.name }} ({{ o.kind }})</mat-option>
+            }
+          </mat-select>
+          @if (underlyingObjects().length === 0) {
+            <mat-hint>No underlying objects in this workspace.</mat-hint>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Strikes (comma / space separated)</mat-label>
+          <input matInput [(ngModel)]="strikesText" placeholder="90, 100, 110" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Maturities (YYYY-MM-DD)</mat-label>
+          <input matInput [(ngModel)]="maturitiesText" placeholder="2026-12-31 2027-06-30" />
+        </mat-form-field>
+      </div>
+
+      <div class="row greeks-row">
+        <mat-checkbox [(ngModel)]="includeGreeks" [disabled]="mclSelected()">
+          Per-cell Greeks
+        </mat-checkbox>
+        @if (mclSelected()) {
+          <span class="hint thoth-muted">
+            <mat-icon>info</mat-icon>
+            CPU Monte-Carlo gives book-level Greeks only
+          </span>
+        }
+      </div>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-flat-button color="primary" [disabled]="!canSubmit" (click)="submit()">
+        Price grid
+      </button>
+    </mat-card-actions>
+  </mat-card>
+
+  @if (running()) {
+    <div class="pg-progress">
+      <mat-progress-bar
+        [mode]="progress() ? 'determinate' : 'indeterminate'"
+        [value]="progressPct"
+      ></mat-progress-bar>
+      <span class="thoth-muted">
+        {{ status() }}
+        @if (progress(); as p) {
+          — {{ p.current }} / {{ p.total }}
+        }
+      </span>
+    </div>
+  }
+
+  @if (error()) {
+    <p class="thoth-error">{{ error() }}</p>
+  }
+
+  @for (mx of matrices(); track mx.underlying + mx.type) {
+    <app-matrix-grid [matrix]="mx"></app-matrix-grid>
+  }
+} @else {
+  <p class="thoth-muted">Pick or create a workspace to begin.</p>
+}

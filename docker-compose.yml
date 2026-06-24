@@ -1,0 +1,76 @@
+# Thoth dashboard — production stack.
+#
+#   docker compose up --build
+#   open http://localhost:8088   (nginx serves the SPA + proxies /api -> bff)
+#
+# Scaling note: engine replicas are NAMED services (pricer1, pricer2), not
+# `deploy.replicas`, so each has its own DNS name and the BFF's EnginePool can lease
+# ONE replica per job (which is what makes GET /grid/:id/progress per-job-accurate).
+# Add more by copying the anchor and extending THOTH_ENGINE_URLS.
+
+x-pricer: &pricer
+  build:
+    context: ./pricer
+    dockerfile: Dockerfile
+  # CPU image by default; for GPU set build args (see pricer/Dockerfile) + a gpu profile.
+  restart: unless-stopped
+  expose:
+    - "8080"
+  networks: [thoth]
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks: [thoth]
+
+  pricer1:
+    <<: *pricer
+  pricer2:
+    <<: *pricer
+
+  bff:
+    build:
+      context: ./web
+      dockerfile: bff/Dockerfile
+    restart: unless-stopped
+    depends_on: [redis, pricer1, pricer2]
+    environment:
+      PORT: "3000"
+      THOTH_ENGINE_URLS: "http://pricer1:8080,http://pricer2:8080"
+      QUEUE_DRIVER: "bullmq"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      DB_PATH: "/app/bff/data/thoth.sqlite"
+      DB_SYNC: "true"
+      # the engine's JSON Schema, mounted read-only below (single-sourced from pricer/)
+      SCHEMA_PATH: "/app/schema/thoth.schema.json"
+      # secrets / admin seed — override via a root .env (see .env.example)
+      JWT_SECRET: "${JWT_SECRET:-change-me-access}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-change-me-refresh}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@thoth.dev}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-change-me-please}"
+    volumes:
+      - bff-data:/app/bff/data
+      - ./pricer/schema:/app/schema:ro
+    networks: [thoth]
+
+  web:
+    build:
+      context: ./web/frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on: [bff]
+    ports:
+      - "8088:80"
+    networks: [thoth]
+
+networks:
+  thoth:
+
+volumes:
+  redis-data:
+  bff-data:

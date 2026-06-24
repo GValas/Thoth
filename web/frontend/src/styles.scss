@@ -1,0 +1,84 @@
+@use '@angular/material' as mat;
+@use 'styles/tokens' as tokens;
+
+// AG Grid base + quartz theme
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-quartz.css';
+
+@include mat.core();
+
+// Angular Material light theme keyed to the primary blue.
+$thoth-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: light,
+      primary: mat.$blue-palette,
+      tertiary: mat.$azure-palette,
+    ),
+    density: (
+      scale: -1,
+    ),
+  )
+);
+
+:root {
+  @include mat.all-component-themes($thoth-theme);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: tokens.$thoth-bg;
+  color: tokens.$thoth-text;
+  font-family: tokens.$thoth-font;
+  font-size: 14px;
+}
+
+// tabular numerals on every numeric table/cell — finance-grade alignment.
+table,
+th,
+td,
+.ag-cell,
+.ag-header-cell,
+.thoth-num {
+  font-variant-numeric: tabular-nums;
+}
+
+// AG Grid quartz, retuned to the Thoth palette.
+.ag-theme-quartz {
+  --ag-font-family: #{tokens.$thoth-font};
+  --ag-foreground-color: #{tokens.$thoth-text};
+  --ag-background-color: #{tokens.$thoth-bg};
+  --ag-header-background-color: #{tokens.$thoth-surface};
+  --ag-border-color: #{tokens.$thoth-border};
+  --ag-row-border-color: #{tokens.$thoth-border};
+  --ag-accent-color: #{tokens.$thoth-primary};
+  --ag-cell-horizontal-padding: 10px;
+  --ag-grid-size: 5px;
+  --ag-font-size: 13px;
+}
+
+.thoth-muted {
+  color: tokens.$thoth-text-muted;
+}
+
+.thoth-spacer {
+  flex: 1 1 auto;
+}
+
+.thoth-error {
+  color: tokens.$thoth-negative;
+}
+
+a {
+  color: tokens.$thoth-primary;
+}
+
+// Reusable page padding.
+.thoth-page {
+  padding: 16px 20px;
+}

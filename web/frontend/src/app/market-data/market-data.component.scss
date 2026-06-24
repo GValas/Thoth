@@ -1,0 +1,62 @@
+.md-header {
+  margin-bottom: 16px;
+}
+
+.md-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.md-list {
+  background: var(--thoth-surface);
+}
+
+.add-kind {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.kind-group {
+  margin-bottom: 8px;
+}
+
+.kind-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px 0;
+}
+
+a[mat-list-item].active {
+  background: rgba(37, 99, 235, 0.08);
+  font-weight: 600;
+}
+
+.reminders {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  background: var(--thoth-surface);
+  border: 1px solid var(--thoth-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 16px;
+}
+
+.reminders mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.obj-errors {
+  margin-top: 12px;
+}
+
+.obj-errors ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

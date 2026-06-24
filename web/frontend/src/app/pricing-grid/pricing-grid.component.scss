@@ -1,0 +1,62 @@
+.pg-header {
+  margin-bottom: 16px;
+}
+
+.pg-form {
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--thoth-text-muted);
+}
+
+.checks {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 40px;
+}
+
+.grow {
+  flex: 1 1 320px;
+}
+
+.greeks-row {
+  align-items: center;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.hint mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.pg-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}

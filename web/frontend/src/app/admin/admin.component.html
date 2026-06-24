@@ -1,0 +1,74 @@
+<mat-card class="new-user">
+  <mat-card-header>
+    <mat-card-title>Add user</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="new-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" [(ngModel)]="newEmail" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" [(ngModel)]="newPassword" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Role</mat-label>
+        <mat-select [(ngModel)]="newRole">
+          <mat-option value="user">user</mat-option>
+          <mat-option value="admin">admin</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-flat-button color="primary" (click)="create()">Create</button>
+    </div>
+  </mat-card-content>
+</mat-card>
+
+<mat-card class="user-table">
+  <mat-card-header>
+    <mat-card-title>Users</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <table mat-table [dataSource]="users()">
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef>Email</th>
+        <td mat-cell *matCellDef="let u">{{ u.email }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="role">
+        <th mat-header-cell *matHeaderCellDef>Role</th>
+        <td mat-cell *matCellDef="let u">
+          <mat-select [value]="u.role" (selectionChange)="setRole(u, $event.value)">
+            <mat-option value="user">user</mat-option>
+            <mat-option value="admin">admin</mat-option>
+          </mat-select>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="enabled">
+        <th mat-header-cell *matHeaderCellDef>Enabled</th>
+        <td mat-cell *matCellDef="let u">
+          <mat-slide-toggle [checked]="u.enabled" (change)="toggleEnabled(u)"></mat-slide-toggle>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let u">
+          <button mat-icon-button (click)="resetPassword(u)" title="Reset password">
+            <mat-icon>key</mat-icon>
+          </button>
+          <button mat-icon-button class="thoth-error" (click)="remove(u)" title="Delete">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="cols"></tr>
+      <tr mat-row *matRowDef="let row; columns: cols"></tr>
+    </table>
+    @if (users().length === 0) {
+      <p class="thoth-muted">No users.</p>
+    }
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,38 @@
+// Thoth design tokens — central SCSS variables.
+// Finance-grade, dense, professional. Light theme only.
+
+// Surfaces & structure
+$thoth-bg: #ffffff;
+$thoth-surface: #f7f9fc;
+$thoth-border: #e5e9f0;
+
+// Accents
+$thoth-primary: #2563eb;
+$thoth-negative: #dc2626;
+
+// Text
+$thoth-text: #1f2937;
+$thoth-text-muted: #6b7280;
+
+// Heatmap divergent stops (premium: low -> high)
+$thoth-heat-low: #2563eb; // blue
+$thoth-heat-mid: #ffffff; // white
+$thoth-heat-high: #dc2626; // red
+
+// Typography
+$thoth-font: 'Inter', 'Roboto', 'Helvetica Neue', sans-serif;
+
+// CSS custom properties (consumable from component styles & TS).
+:root {
+  --thoth-bg: #{$thoth-bg};
+  --thoth-surface: #{$thoth-surface};
+  --thoth-border: #{$thoth-border};
+  --thoth-primary: #{$thoth-primary};
+  --thoth-negative: #{$thoth-negative};
+  --thoth-text: #{$thoth-text};
+  --thoth-text-muted: #{$thoth-text-muted};
+  --thoth-heat-low: #{$thoth-heat-low};
+  --thoth-heat-mid: #{$thoth-heat-mid};
+  --thoth-heat-high: #{$thoth-heat-high};
+  --thoth-font: #{$thoth-font};
+}

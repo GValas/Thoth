@@ -1,0 +1,62 @@
+# Optional 3-container DEV stack (sources bind-mounted, live watch). Opt-in: the
+# default single-container devcontainer (devcontainer.json) already carries the C++
+# toolchain AND Node, so you can also run all three processes there directly.
+#
+# To use this instead, either run it standalone:
+#     docker compose -f .devcontainer/docker-compose.dev.yml up
+# or point devcontainer.json at it:
+#     "dockerComposeFile": "docker-compose.dev.yml",
+#     "service": "bff", "runServices": ["pricer","bff","web","redis"],
+#     "workspaceFolder": "/workspaces/Thoth"
+#
+# All services bind-mount the repo at /workspaces/Thoth and are reachable by name.
+
+services:
+  redis:
+    image: redis:7-alpine
+    networks: [thoth]
+
+  pricer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    command: bash -lc "cmake -B pricer/build pricer && cmake --build pricer/build -j && pricer/build/thoth -server 8080"
+    working_dir: /workspaces/Thoth
+    volumes:
+      - ..:/workspaces/Thoth:cached
+    expose: ["8080"]
+    networks: [thoth]
+
+  bff:
+    image: node:24-bookworm
+    working_dir: /workspaces/Thoth/web/bff
+    command: bash -lc "npm install && (cd ../shared && npm install && npm run build) && npm run start:dev"
+    environment:
+      PORT: "3000"
+      THOTH_ENGINE_URLS: "http://pricer:8080"
+      QUEUE_DRIVER: "bullmq"
+      REDIS_HOST: "redis"
+      SCHEMA_PATH: "/workspaces/Thoth/pricer/schema/thoth.schema.json"
+      DB_PATH: "/workspaces/Thoth/web/bff/data/thoth.sqlite"
+      ADMIN_EMAIL: "admin@thoth.dev"
+      ADMIN_PASSWORD: "adminpass123"
+      JWT_SECRET: "dev-access"
+      JWT_REFRESH_SECRET: "dev-refresh"
+    depends_on: [redis, pricer]
+    volumes:
+      - ..:/workspaces/Thoth:cached
+    expose: ["3000"]
+    networks: [thoth]
+
+  web:
+    image: node:24-bookworm
+    working_dir: /workspaces/Thoth/web/frontend
+    command: bash -lc "npm install && npm run start -- --host 0.0.0.0 --port 4200"
+    depends_on: [bff]
+    ports: ["4200:4200"]
+    volumes:
+      - ..:/workspaces/Thoth:cached
+    networks: [thoth]
+
+networks:
+  thoth:

@@ -1,0 +1,22 @@
+.new-user {
+  margin-bottom: 16px;
+}
+
+.new-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.new-row mat-form-field {
+  min-width: 200px;
+}
+
+table {
+  width: 100%;
+}
+
+.user-table .mat-mdc-select {
+  max-width: 120px;
+}

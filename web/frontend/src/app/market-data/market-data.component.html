@@ -1,0 +1,89 @@
+<div class="md-header">
+  <app-workspace-picker (selected)="onWorkspace($event)"></app-workspace-picker>
+</div>
+
+@if (workspace()) {
+  <div class="md-grid">
+    <mat-card class="md-list">
+      <mat-card-header>
+        <mat-card-title>Objects</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="add-kind">
+          <mat-label>Add object of kind…</mat-label>
+          <mat-select (selectionChange)="addObject($event.value)" [value]="null">
+            @for (k of kinds(); track k) {
+              <mat-option [value]="k">{{ k }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        @for (group of grouped(); track group[0]) {
+          <div class="kind-group">
+            <div class="kind-label thoth-muted">{{ group[0] }}</div>
+            <mat-nav-list dense>
+              @for (obj of group[1]; track obj.name) {
+                <a
+                  mat-list-item
+                  [class.active]="obj.name === selectedName()"
+                  (click)="select(obj)"
+                >
+                  <span matListItemTitle>{{ obj.name }}</span>
+                  @if (errors()[obj.name] && errors()[obj.name].length) {
+                    <mat-icon matListItemMeta class="thoth-error">error</mat-icon>
+                  }
+                </a>
+              }
+            </mat-nav-list>
+          </div>
+        }
+        @if (objects().length === 0) {
+          <p class="thoth-muted">No objects yet. Add one above.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="md-editor">
+      <mat-card-header>
+        <mat-card-title>
+          @if (selected(); as obj) {
+            {{ obj.name }}
+            <span class="thoth-muted">— {{ obj.kind }}</span>
+          } @else {
+            Select an object
+          }
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="reminders thoth-muted">
+          <mat-icon>info</mat-icon>
+          Rates &amp; vols are entered in PERCENT. Curve dates &amp; values must be equal
+          length. References point to other objects by name.
+        </div>
+
+        @if (selected()) {
+          <form [formGroup]="form">
+            <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
+          </form>
+
+          @if (errors()[selected()!.name] && errors()[selected()!.name].length) {
+            <div class="obj-errors">
+              <strong class="thoth-error">Errors</strong>
+              <ul>
+                @for (msg of errors()[selected()!.name]; track msg) {
+                  <li class="thoth-error">{{ msg }}</li>
+                }
+              </ul>
+            </div>
+          }
+        }
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-stroked-button (click)="validate()">Check</button>
+        <button mat-flat-button color="primary" (click)="save()">Save</button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+} @else {
+  <p class="thoth-muted">Pick or create a workspace to begin.</p>
+}
