@@ -54,6 +54,16 @@ class PricerMCL : public Pricer
                                          //!< bar even while quiet, but keep it out of GlobalProgress
     vector<std::pair<string, MonteCarloNode*>> _scenario_roots;
     map<string, double> _scenario_premium;
+
+    //! debug node graphs — MCL-only state (ANA/PDE keep none, see Pricer hooks).
+    //! Graphviz .dot of each MC tree ("premium" for the base, "delta"/"gamma"/... for
+    //! the Greek scenario trees), keyed by tree; emitted as <tree>_mcl_graph by
+    //! WriteEngineResults when debug generate_nodes_graph is on. Empty otherwise.
+    map<string, string> _tree_graphs;
+    //! tree name the current bump-and-revalue Greek reprice is building (set via the
+    //! base TagRepriceGraph hook), so a composite/basket Greek reprice's graph is keyed
+    //! by its Greek instead of overwriting "premium". Empty outside such a reprice.
+    string _graph_tree_tag;
     bool CanSingleTreeGreeks() const; //!< true iff every underlying is Mono (American is handled by a frozen LSM policy)
     void BuildGreekScenarios();       //!< build the delta/gamma/vega/rho bump sub-trees
 
@@ -125,6 +135,11 @@ class PricerMCL : public Pricer
     //! random numbers); the CPU path keeps MCL's book-level single-tree Greeks.
     bool GreeksPerContract() const override;      //!< true iff _use_gpu
     void PriceContract( Contract* Ctr ) override; //!< one contract on the device (GPU mode)
+
+    //! MCL-only result fields: emit each captured node graph as <tree>_mcl_graph
+    void WriteEngineResults() override;
+    //! record which Greek reprice's graph the base bump engine is about to build
+    void TagRepriceGraph( const string& Tag ) override { _graph_tree_tag = Tag; }
 
   public:
     //! read the common pricer fields (Pricer::Configure) then resolve the required

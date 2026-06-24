@@ -11,6 +11,40 @@
 
 #include "linalg.hpp"
 
+#include <utility>
+
+//! ----------------------------------------------------------------------
+//! Generic scope guard: runs a cleanup callable on scope exit — including when
+//! the scope is left by an exception. Use it to restore mutated shared state
+//! across a call that may throw (e.g. a bump-and-revalue reprice that ERRs), so
+//! the restore is not skipped by the throw. Call dismiss() to cancel the cleanup.
+//! ----------------------------------------------------------------------
+template <class F>
+class ScopeGuard
+{
+    F _cleanup;
+    bool _active = true;
+
+  public:
+    explicit ScopeGuard( F cleanup ) : _cleanup( std::move( cleanup ) ) {}
+
+    ~ScopeGuard()
+    {
+        if ( _active )
+            _cleanup();
+    }
+
+    void dismiss() { _active = false; } //!< cancel the cleanup (commit the change)
+
+    ScopeGuard( ScopeGuard&& o ) noexcept : _cleanup( std::move( o._cleanup ) ), _active( o._active )
+    {
+        o._active = false;
+    }
+    ScopeGuard( const ScopeGuard& ) = delete;
+    ScopeGuard& operator=( const ScopeGuard& ) = delete;
+    ScopeGuard& operator=( ScopeGuard&& ) = delete;
+};
+
 template <class T, void ( *Free )( T* )>
 class LaOwner
 {

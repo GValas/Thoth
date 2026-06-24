@@ -3,6 +3,7 @@
 #include "cancellation.hpp"
 #include "market_data.hpp" //!< RISK_FACTOR_VOL / RISK_FACTOR_RATE
 #include "object_reader.hpp"
+#include "raii.hpp" //!< ScopeGuard — restore bumped market state even if Reprice throws
 #include "progress_bar.hpp"
 
 //! constructor (members are initialised in-class). The concrete kind is supplied by
@@ -279,15 +280,18 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         {
             const double spot = s->GetSpot();
 
+            //! restore this underlying's spot on scope exit, even if a Reprice throws
+            ScopeGuard restore_spot( [&]
+                                     { s->SetSpot( spot ); } );
+
             if ( DoDelta ) //!< one-sided forward difference, reuses P0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
                 s->SetSpot( spot + h );
-                _graph_tree_tag = "delta"; //!< capture this reprice's node graph
+                TagRepriceGraph( "delta" ); //!< capture this reprice's node graph (MCL only)
                 const double pu = Reprice();
-                _graph_tree_tag.clear();
+                TagRepriceGraph( "" );
                 Tick();
-                s->SetSpot( spot ); //!< restore
                 g.delta += ( pu - P0 ) / h;
             }
 
@@ -295,14 +299,13 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
                 s->SetSpot( spot + h );
-                _graph_tree_tag = "gamma"; //!< one graph for gamma (the up bump)
+                TagRepriceGraph( "gamma" ); //!< one graph for gamma (the up bump; MCL only)
                 const double pu = Reprice();
-                _graph_tree_tag.clear();
+                TagRepriceGraph( "" );
                 Tick();
                 s->SetSpot( spot - h );
                 const double pd = Reprice();
                 Tick();
-                s->SetSpot( spot ); //!< restore
                 g.gamma += ( pu - 2 * P0 + pd ) / ( h * h );
             }
         }
@@ -315,14 +318,15 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         {
             s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, GREEK_VOL_BUMP );
         }
-        _graph_tree_tag = "vega";
+        //! restore every shifted vol on scope exit, even if Reprice throws
+        ScopeGuard restore_vol( [&]
+                                {
+            for ( Single* s : Singles )
+                s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, 0 ); } );
+        TagRepriceGraph( "vega" );
         const double pu = Reprice();
-        _graph_tree_tag.clear();
+        TagRepriceGraph( "" );
         Tick();
-        for ( Single* s : Singles )
-        {
-            s->GetVolatility()->ApplyShift( RISK_FACTOR_VOL, 0 ); //!< restore
-        }
         g.vega = ( pu - P0 ) / GREEK_VOL_BUMP * 0.01;
     }
 
@@ -333,14 +337,15 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         {
             c->GetRate()->ApplyShift( RISK_FACTOR_RATE, GREEK_RATE_BUMP );
         }
-        _graph_tree_tag = "rho";
+        //! restore every shifted rate on scope exit, even if Reprice throws
+        ScopeGuard restore_rate( [&]
+                                 {
+            for ( Currency* c : Currencies )
+                c->GetRate()->ApplyShift( RISK_FACTOR_RATE, 0 ); } );
+        TagRepriceGraph( "rho" );
         const double pu = Reprice();
-        _graph_tree_tag.clear();
+        TagRepriceGraph( "" );
         Tick();
-        for ( Currency* c : Currencies )
-        {
-            c->GetRate()->ApplyShift( RISK_FACTOR_RATE, 0 ); //!< restore
-        }
         g.rho = ( pu - P0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
@@ -349,11 +354,13 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
     {
         const date base = _today;
         RollToday( base + days( 1 ) );
-        _graph_tree_tag = "theta";
+        //! restore the valuation date on scope exit, even if Reprice throws
+        ScopeGuard restore_today( [&]
+                                  { RollToday( base ); } );
+        TagRepriceGraph( "theta" );
         const double p1 = Reprice();
-        _graph_tree_tag.clear();
+        TagRepriceGraph( "" );
         Tick();
-        RollToday( base ); //!< restore the valuation date
         g.theta = p1 - P0;
     }
 
@@ -512,14 +519,9 @@ void Pricer::WriteResults()
     WriteResult( "premium", _book_result.premium );
     WriteResult( "premium_trust", _book_result.premium_trust );
 
-    //! debug node graph : one Graphviz .dot per MC tree (base + Greek scenarios),
-    //! emitted as <tree>_mcl_graph (e.g. premium_mcl_graph, delta_mcl_graph). The
-    //! Dump() emitter renders multi-line scalars as literal blocks, so the .dot text
-    //! stays readable (no \n / \" escapes).
-    for ( const auto& [tree, dot] : _tree_graphs )
-    {
-        WriteResult( tree + "_mcl_graph", dot );
-    }
+    //! engine-specific fields (the MCL node-graph .dot blocks, <tree>_mcl_graph);
+    //! a no-op for ANA/PDE, which keep no such state
+    WriteEngineResults();
 
     //! requested Greeks (book level), computed by bump-and-revalue
     if ( _request_delta )

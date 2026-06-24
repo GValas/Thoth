@@ -68,6 +68,14 @@ double Composite::GetImplicitVol( const double Strike,
     return v;
 }
 
+//! continuous carry (dividend yield + repo) of the wrapped asset, delegated so the
+//! composite drifts at (r_settle - q) consistently across the ANA forward, the PDE
+//! carry (pricer_pde reads GetUnderlying()->DividendRepoYield) and the MCL drift node.
+double Composite::DividendRepoYield( const date& MaturityDate ) const
+{
+    return _underlying->DividendRepoYield( MaturityDate );
+}
+
 //!
 //! pricing quanto = correcting drift.
 //! When the payoff settles in a QuantoCurrency different from this composite's own
@@ -81,8 +89,16 @@ double Composite::GetForward( const date& MaturityDate,
     double df = _currency->GetRate()->GetDiscountFactor( MaturityDate );
     double dt = YearFraction( _today, MaturityDate );
 
+    //! continuous carry of the wrapped asset (dividend yield + repo). The composite
+    //! price S_eq*FX is a traded settlement-ccy asset paying this yield, so under the
+    //! settlement measure it drifts at (r_settle - q): the 1/df grows at r_settle and
+    //! exp(-q*dt) subtracts the carry. The MCL leg already applies it (it diffuses the
+    //! wrapped equity via Equity::GetDriftNode); without this factor ANA/PDE would drop
+    //! the carry and disagree with MCL by exp(-q*dt). Zero for a carry-free underlying.
+    double div = DividendRepoYield( MaturityDate );
+
     //! quanto adjustment — only when the settlement (quanto) ccy differs; otherwise
-    //! qto stays 1 and the forward is the plain GetSpot()/df.
+    //! qto stays 1 and the forward is the carry-adjusted GetSpot()/df.
     double qto = 1;
     if ( QuantoCurrency != _currency )
     {
@@ -97,7 +113,7 @@ double Composite::GetForward( const date& MaturityDate,
         qto = exp( ( rho * v_fx * v_eq + v_fx * v_fx ) * dt );
     }
 
-    return GetSpot() * qto / df;
+    return GetSpot() * exp( -dt * div ) * qto / df;
 }
 
 //! single-name set: the wrapped underlying's factors plus the FX leg(s) needed to

@@ -878,6 +878,10 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     };
 
     vector<double> Y0 = U, Y1 = U;
+    //! Thomas-solver scratch, reused across every sweep of every time step (resized
+    //! per sweep to NS-1 or Nv; capacity stabilises after the first step, so no
+    //! per-iteration allocation inside the Nt loop)
+    vector<double> a, d, c, x;
     for ( int n = 1; n <= Nt; n++ )
     {
         const double tau = n * dt;
@@ -897,7 +901,10 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         for ( int j = 0; j < Nv; j++ )
         {
             int m = NS - 1; //!< unknowns i = 1..NS-1
-            vector<double> a( m ), d( m ), c( m ), x( m );
+            a.resize( m );
+            d.resize( m );
+            c.resize( m );
+            x.resize( m );
             double vj = V( j );
             for ( int i = 1; i < NS; i++ )
             {
@@ -932,7 +939,10 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         for ( int i = 1; i < NS; i++ )
         {
             int m = Nv; //!< unknowns j = 0..Nv-1
-            vector<double> a( m ), d( m ), c( m ), x( m );
+            a.resize( m );
+            d.resize( m );
+            c.resize( m );
+            x.resize( m );
             for ( int j = 0; j < Nv; j++ )
             {
                 double vj = V( j );

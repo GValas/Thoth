@@ -1,6 +1,19 @@
 #include "thoth.hpp"
 #include "sequence.hpp"
 #include "object_reader.hpp"
+#include "yaml_config.hpp" //!< YamlConfig::Set + OBJECT_SEPARATOR (shared summary writer)
+
+//! the one place the sequence summary schema lives; both the in-process Sequence and
+//! the cluster master write through this so the two stay byte-compatible.
+void WriteSequenceSummary( YamlConfig& Cfg,
+                           const string& ResultBlock,
+                           double TaskTime,
+                           const vector<string>& TaskNames )
+{
+    Cfg.Set( ResultBlock + OBJECT_SEPARATOR + "kind", string( KIND_SEQUENCE ) + "_result" );
+    Cfg.Set( ResultBlock + OBJECT_SEPARATOR + "task_time", TaskTime );
+    Cfg.Set( ResultBlock + OBJECT_SEPARATOR + "tasks", TaskNames );
+}
 
 //! constructor: a sequence is a Task of kind KIND_SEQUENCE (the sub-tasks it owns
 //! are resolved later in Configure, not here)
@@ -50,8 +63,6 @@ void Sequence::WriteResults()
 {
     if ( !_result.empty() )
     {
-        WriteResult( "kind", _kind + "_result" );
-        WriteResult( "task_time", _task_time );
-        WriteResult( "tasks", _task_names );
+        WriteSequenceSummary( *_cfg, _result, _task_time, _task_names );
     }
 }

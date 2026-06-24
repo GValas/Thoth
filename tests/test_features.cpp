@@ -211,6 +211,74 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
     CHECK( std::abs( p_ana - p_mcl ) <= 6.0 * Trust( mcl ) + 5e-2 );
 }
 
+// --- composite on a dividend/repo-paying asset : the USD value S*FX is a traded
+// USD asset paying the wrapped equity's continuous carry q (= dividend yield +
+// repo), so under the USD measure it drifts at (r_usd - q) and the composite
+// forward is s_comp*exp((r_usd-q)T). The MCL leg diffuses the wrapped equity with
+// its full r-q-repo drift; ANA/PDE must apply the same carry (Composite::GetForward),
+// else they drop exp(-qT) and disagree. This case fails without that carry factor.
+TEST_CASE( "composite with dividend + repo carry agrees across ANA/MCL/PDE" )
+{
+    const double S = 100, fx = 1.5, vol_s = 0.30, vol_fx = 0.15, rho = 0.5;
+    const double r_usd = 0.05, K = 150;
+    const double q = 0.03 + 0.02; //!< continuous dividend yield 3% + repo 2%
+
+    // closed-form composite BS with carry: forward = s_comp*exp((r_usd-q)T), which
+    // equals BS on a carry-discounted spot s_comp*exp(-qT) grown at r_usd.
+    const double s_comp = S * fx;
+    const double v_comp = std::sqrt( vol_s * vol_s + vol_fx * vol_fx +
+                                     2 * rho * vol_s * vol_fx );
+    const double ref = BsCall( s_comp * std::exp( -q * T1 ), K, r_usd, v_comp, T1 );
+
+    auto cfg = []( const std::string& method )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd," << ( method == "ana" ? "" : method == "pde" ? " pde_configuration: pd,"
+                                                                                                                                           : " mcl_configuration: m," )
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << "m: !mcl_configuration {max_day_step: 7, min_day_step: -1, paths: 200000,"
+          << " vol_year_step: 0.01, use_sobol: true}\n"
+          << "pd: !pde_configuration {vanilla_precision: high}\n"
+          << "eur: !currency {rate: r_eur}\n"
+          << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "usd: !currency {rate: r_usd}\n"
+          << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "div: !continuous_dividends_curve {dates: [2000-01-01, 2010-01-01], values: [3, 3]}\n"
+          << "rep: !repo_curve {dates: [2000-01-01, 2010-01-01], values: [2, 2]}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur,"
+          << " continuous_dividends: div, repo: rep}\n"
+          << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur, spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 15}\n"
+          << "comp: !composite {equity: eq, composite_currency: usd}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd], matrix: [1, 0.5, 0.5, 1]}\n"
+          << "book: !book {contracts: [o]}\n"
+          << "o: !vanilla {underlying: comp, premium_currency: usd, strike: 150,"
+          << " maturity: 2000-12-31, type: call, exercise: european}\n";
+        return o.str();
+    };
+
+    auto ana = Price( cfg( "ana" ) );
+    auto mcl = Price( cfg( "mcl" ) );
+    auto pde = Price( cfg( "pde" ) );
+    const double p_ana = Premium( ana ), p_mcl = Premium( mcl ), p_pde = Premium( pde );
+    CAPTURE( ref );
+    CAPTURE( p_ana );
+    CAPTURE( p_mcl );
+    CAPTURE( p_pde );
+
+    // each engine matches the carry-adjusted closed form
+    CHECK( std::abs( p_ana - ref ) <= 1e-2 );
+    CHECK( std::abs( p_pde - ref ) <= 0.1 );
+    CHECK( std::abs( p_mcl - ref ) <= 6.0 * Trust( mcl ) + 5e-2 );
+
+    // and the engines agree with each other
+    CHECK( std::abs( p_ana - p_pde ) <= 0.1 );
+    CHECK( std::abs( p_ana - p_mcl ) <= 6.0 * Trust( mcl ) + 5e-2 );
+}
+
 // --- American composite : early exercise on the USD value S*FX. The composite
 // spot is a derived (non-diffusion) node, so its full path is only available once
 // recording forces it to be scheduled at every exercise date; the LSM then prices

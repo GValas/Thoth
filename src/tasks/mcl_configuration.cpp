@@ -24,11 +24,12 @@ void MclConfiguration::Configure( ObjectReader& reader )
     _seed = reader.Get<int>( "seed", 0 );
     _sobol_skip = reader.Get<long>( "sobol_skip", 0 );
     _allow_gpu = reader.Get<bool>( "allow_gpu", false );
-    //! guard against degenerate grids: paths <= 0 -> NaN premium, and
+    //! guard against degenerate grids: paths <= 1 -> the (n-1) sample-variance
+    //! denominator in the MC trust / standard error is 0 -> NaN; and
     //! max_day_step <= 0 -> a zero-day diffusion step that never advances
-    if ( _paths <= 0 )
+    if ( _paths <= 1 )
     {
-        ERR( "mcl_configuration '" + GetName() + "': paths must be > 0" );
+        ERR( "mcl_configuration '" + GetName() + "': paths must be > 1" );
     }
     if ( _max_day_step <= 0 )
     {

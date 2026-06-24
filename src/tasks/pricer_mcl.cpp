@@ -15,28 +15,48 @@
 
 namespace
 {
+//! Internal scenario tags for the single-tree Greek bumps. The delta/gamma tags are
+//! prefixes completed by the bumped single's name ("@D+:<single>"); vega and rho are
+//! whole tags. Centralised here so the producer (BuildGreekScenarios), the consumers
+//! (ComputeGreeks and the American reprice) and GraphTreeKey share one spelling — a
+//! stray literal would otherwise silently yield a wrong/zero Greek or an .at() throw.
+namespace scenario_tag
+{
+inline constexpr char DELTA_PREFIX[] = "@D+:";
+inline constexpr char GAMMA_UP_PREFIX[] = "@G+:";
+inline constexpr char GAMMA_DOWN_PREFIX[] = "@G-:";
+inline constexpr char VEGA[] = "@V+";
+inline constexpr char RHO[] = "@R+";
+
+//! per-single delta / gamma tag = prefix + the bumped single's name
+inline string delta( const string& single ) { return DELTA_PREFIX + single; }
+inline string gamma_up( const string& single ) { return GAMMA_UP_PREFIX + single; }
+inline string gamma_down( const string& single ) { return GAMMA_DOWN_PREFIX + single; }
+} // namespace scenario_tag
+
 //! readable result-field key for a node-graph tree, from the internal scenario tag
 //! ("@D+:<s>" delta bump, "@G+:/@G-:<s>" gamma up/down, "@V+" vega, "@R+" rho). The
 //! base tree is keyed "premium" by the caller. Output -> "<key>_mcl_graph".
 string GraphTreeKey( const string& Tag )
 {
-    if ( Tag.rfind( "@D+:", 0 ) == 0 )
+    using namespace scenario_tag;
+    if ( Tag.starts_with( DELTA_PREFIX ) )
     {
-        return "delta_" + Tag.substr( 4 );
+        return "delta_" + Tag.substr( sizeof( DELTA_PREFIX ) - 1 );
     }
-    if ( Tag.rfind( "@G+:", 0 ) == 0 )
+    if ( Tag.starts_with( GAMMA_UP_PREFIX ) )
     {
-        return "gamma_up_" + Tag.substr( 4 );
+        return "gamma_up_" + Tag.substr( sizeof( GAMMA_UP_PREFIX ) - 1 );
     }
-    if ( Tag.rfind( "@G-:", 0 ) == 0 )
+    if ( Tag.starts_with( GAMMA_DOWN_PREFIX ) )
     {
-        return "gamma_down_" + Tag.substr( 4 );
+        return "gamma_down_" + Tag.substr( sizeof( GAMMA_DOWN_PREFIX ) - 1 );
     }
-    if ( Tag == "@V+" )
+    if ( Tag == VEGA )
     {
         return "vega";
     }
-    if ( Tag == "@R+" )
+    if ( Tag == RHO )
     {
         return "rho";
     }
@@ -333,17 +353,17 @@ void PricerMCL::BuildGreekScenarios()
         if ( _request_delta )
         {
             const double h = GREEK_SPOT_BUMP * spot;
-            build( "@D+:" + s->GetName(), false, false, [&]
+            build( scenario_tag::delta( s->GetName() ), false, false, [&]
                    { s->SetSpot( spot + h ); }, [&]
                    { s->SetSpot( spot ); } );
         }
         if ( _request_gamma )
         {
             const double h = GREEK_GAMMA_BUMP * spot;
-            build( "@G+:" + s->GetName(), false, false, [&]
+            build( scenario_tag::gamma_up( s->GetName() ), false, false, [&]
                    { s->SetSpot( spot + h ); }, [&]
                    { s->SetSpot( spot ); } );
-            build( "@G-:" + s->GetName(), false, false, [&]
+            build( scenario_tag::gamma_down( s->GetName() ), false, false, [&]
                    { s->SetSpot( spot - h ); }, [&]
                    { s->SetSpot( spot ); } );
         }
@@ -352,7 +372,7 @@ void PricerMCL::BuildGreekScenarios()
     //! vega : one-sided parallel vol bump on every underlying
     if ( _request_vega )
     {
-        build( "@V+", false, true, [&]
+        build( scenario_tag::VEGA, false, true, [&]
                { ApplyVolShift( GREEK_VOL_BUMP ); }, [&]
                { ApplyVolShift( 0 ); } );
     }
@@ -360,7 +380,7 @@ void PricerMCL::BuildGreekScenarios()
     //! rho : one-sided parallel rate bump on every currency's curve
     if ( _request_rho )
     {
-        build( "@R+", true, false, [&]
+        build( scenario_tag::RHO, true, false, [&]
                { ApplyRateShift( GREEK_RATE_BUMP ); }, [&]
                { ApplyRateShift( 0 ); } );
     }
@@ -397,13 +417,13 @@ void PricerMCL::ComputeGreeks()
             if ( _request_delta ) //!< one-sided forward difference, reuses p0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
-                delta += ( _scenario_premium.at( "@D+:" + s->GetName() ) - p0 ) / h;
+                delta += ( _scenario_premium.at( scenario_tag::delta( s->GetName() ) ) - p0 ) / h;
             }
             if ( _request_gamma ) //!< central second difference (needs both sides)
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
-                gamma += ( _scenario_premium.at( "@G+:" + s->GetName() ) - 2 * p0 +
-                           _scenario_premium.at( "@G-:" + s->GetName() ) ) /
+                gamma += ( _scenario_premium.at( scenario_tag::gamma_up( s->GetName() ) ) - 2 * p0 +
+                           _scenario_premium.at( scenario_tag::gamma_down( s->GetName() ) ) ) /
                          ( h * h );
             }
         }
@@ -412,11 +432,11 @@ void PricerMCL::ComputeGreeks()
     //! vega / rho : one-sided, per 1 vol point / per 1% rate move
     if ( _request_vega )
     {
-        vega = ( _scenario_premium.at( "@V+" ) - p0 ) / GREEK_VOL_BUMP * 0.01;
+        vega = ( _scenario_premium.at( scenario_tag::VEGA ) - p0 ) / GREEK_VOL_BUMP * 0.01;
     }
     if ( _request_rho )
     {
-        rho = ( _scenario_premium.at( "@R+" ) - p0 ) / GREEK_RATE_BUMP * 0.01;
+        rho = ( _scenario_premium.at( scenario_tag::RHO ) - p0 ) / GREEK_RATE_BUMP * 0.01;
     }
 
     //! theta : roll today one calendar day forward and reprice (base-only tree;
@@ -738,6 +758,17 @@ void PricerMCL::Tree_Init()
     }
 }
 
+//! MCL-only result fields (called from Pricer::WriteResults after the premium): one
+//! Graphviz .dot per captured MC tree, emitted as <tree>_mcl_graph. _tree_graphs is
+//! empty unless debug generate_nodes_graph is on, so this is a no-op otherwise.
+void PricerMCL::WriteEngineResults()
+{
+    for ( const auto& [tree, dot] : _tree_graphs )
+    {
+        WriteResult( tree + "_mcl_graph", dot );
+    }
+}
+
 //! the Monte-Carlo path sweep: draw `paths` correlated paths, evaluate the whole
 //! scheduled DAG on each (PriceNodes accumulates the running mean / variance into
 //! every indicator node) and record the American spot paths. Drives the shared
@@ -1001,7 +1032,7 @@ void PricerMCL::PriceAmerican()
                 Sb = S0;
                 taub = tau;
             }
-            double rb = ( tag == "@R+" ) ? r + GREEK_RATE_BUMP : r;
+            double rb = ( tag == scenario_tag::RHO ) ? r + GREEK_RATE_BUMP : r;
 
             double tb = 0;
             double amer_c = ApplyAmericanPolicy( c, Sb, taub, rb, policy, tb );

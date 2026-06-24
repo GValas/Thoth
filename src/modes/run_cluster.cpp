@@ -1,5 +1,6 @@
 #include "run_modes.hpp"
 #include "object_manager.hpp"
+#include "sequence.hpp" //!< WriteSequenceSummary — shared sequence-summary schema
 
 #include <atomic>
 #include <chrono>
@@ -304,13 +305,12 @@ static string ClusterPriceSequence( const string& Body,
     LOG( "SEQ", "ran " + std::to_string( tasks.size() ) + " task(s), task_time = " +
                     ToString( total_time ) + " sec" );
 
-    //! sequence summary block, mirroring Sequence::WriteResults
+    //! sequence summary block — written through the same helper as the in-process
+    //! Sequence::WriteResults so the cluster output cannot drift from it
     const string seq_result = out.GetString( TaskName + ".result", "" );
     if ( !seq_result.empty() )
     {
-        out.Set( seq_result + ".kind", "sequence_result" );
-        out.Set( seq_result + ".task_time", total_time );
-        out.Set( seq_result + ".tasks", tasks );
+        WriteSequenceSummary( out, seq_result, total_time, tasks );
     }
     out.Set( "system_information.cluster",
              "sequence of " + std::to_string( tasks.size() ) +

@@ -193,7 +193,9 @@ void CheckDateList( const vector<date>& DateList )
 {
     for ( size_t i = 1; i < DateList.size(); i++ )
     {
-        if ( DateList[i] < DateList[i - 1] ) //!< only flags a strict decrease (ties allowed)
+        if ( DateList[i] <= DateList[i - 1] ) //!< reject ties too: equal pillars give a
+                                              //!< zero YearFraction -> division by zero in
+                                              //!< Curve::GetCurveValue -> NaN-poisoned curve
         {
             ERR( " date_list must be strictly croissant " );
         }

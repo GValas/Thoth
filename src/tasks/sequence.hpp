@@ -1,6 +1,17 @@
 #pragma once
 #include "task.hpp"
 
+class YamlConfig;
+
+//! Write the sequence summary block (kind / task_time / tasks) under ResultBlock in
+//! Cfg. Shared by Sequence::WriteResults (in-process) and the cluster master's
+//! ClusterPriceSequence (which synthesises the same block from the slave responses),
+//! so the two cannot drift out of byte-compatibility.
+void WriteSequenceSummary( YamlConfig& Cfg,
+                           const string& ResultBlock,
+                           double TaskTime,
+                           const vector<string>& TaskNames );
+
 //! A task that runs a list of sub-tasks (typically pricers) one after another,
 //! each writing its own result block. This lets a single configuration drive a
 //! whole batch — for instance the full pricer/product matrix — in one run.

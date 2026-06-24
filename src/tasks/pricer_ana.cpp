@@ -135,7 +135,7 @@ void PricerANA::PriceVanilla( Vanilla* Opt )
                                                h.jump_intensity, h.jump_mean, h.jump_vol )
                           : Heston_Put_Price( f, k, t, df, h.v0, h.kappa, h.theta, h.xi, h.rho,
                                               h.jump_intensity, h.jump_mean, h.jump_vol );
-        out.delta = out.gamma = out.vega_bs = out.volga_bs = 0;
+        out.delta = out.gamma = 0;
         return;
     }
 
@@ -151,10 +151,9 @@ void PricerANA::PriceVanilla( Vanilla* Opt )
         out.delta = BS_Put_Delta( f, k, t, v, df );
     }
 
-    //! greeks that are sign-independent of call/put (gamma, vega, volga)
+    //! spot gamma (sign-independent of call/put); vega / rho / theta come from the
+    //! per-contract bump-and-revalue in the generic Greek engine
     out.gamma = BS_Gamma( f, k, t, v, df );
-    out.vega_bs = BS_Vega( f, k, t, v, df );
-    out.volga_bs = BS_Volga( f, k, t, v, df );
 }
 
 //! Reiner-Rubinstein closed-form barrier price for a single spot value: decode the
@@ -249,12 +248,11 @@ void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
     }
 
     //! integrate the 1/K^2-weighted OTM strip into the fair variance, then assemble
-    //! PV = notional * DF * (fair_var - strike_var); vega is reported w.r.t. vol
+    //! PV = notional * DF * (fair_var - strike_var)
     double k_fair = VarSwap_FairVariance( fwd, t, df, strikes, vols );
     double k_var = Swap->GetVolatilityStrike() * Swap->GetVolatilityStrike(); //!< strike vol -> strike variance
 
     out.premium = VarSwap_Price( Swap->GetNotional(), df, k_fair, k_var );
-    out.vega_bs = VarSwap_Vega( Swap->GetNotional(), df, k_fair );
     out.delta = 0; //!< first-order spot-neutral by construction (model-free strip)
     out.gamma = 0;
 }

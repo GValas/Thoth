@@ -44,12 +44,16 @@ class Pricer : public Task
     //! per-class constant fixed by each subclass through the constructor.
     string _progress_label;
 
-    //! Graphviz .dot of each MC tree built by the MCL engine, keyed by the tree it
-    //! prices ("premium" for the base tree, "delta"/"gamma"/"vega"/"rho" for the
-    //! Greek-bump scenario trees). Filled when debug generate_nodes_graph is on;
-    //! written into the result block as <key>_mcl_graph by WriteResults. Empty
-    //! otherwise.
-    map<string, string> _tree_graphs;
+    //! engine-specific result fields, written from the common WriteResults after the
+    //! premium. Default no-op; the MCL engine overrides it to emit its node-graph
+    //! .dot fields (<tree>_mcl_graph). Keeps the MCL-only graph state out of this base.
+    virtual void WriteEngineResults() {}
+
+    //! tag the node graph captured by the next bump-and-revalue reprice. The base
+    //! greek engine (BumpAndRevalueGreeks) calls this around each bump with the tree
+    //! name ("delta"/"gamma"/"vega"/"rho"/"theta"), or "" to clear; only the MCL
+    //! engine acts on it (to key that reprice's graph), so ANA/PDE use this no-op.
+    virtual void TagRepriceGraph( const string& /*Tag*/ ) {}
 
     SingleSet _single_set;
     CurrencySet _currency_set;
@@ -61,14 +65,6 @@ class Pricer : public Task
     //! The per-contract engines (PDE, ANA) instead show one bar over the contract
     //! loop that already covers each contract's Greeks, so they never set this.
     bool _quiet_pricing = false;
-
-    //! while a bump-and-revalue Greek reprices the book (a quiet inner price), this
-    //! names the tree being built ("delta"/"gamma"/"vega"/"rho"/"theta") so the MCL
-    //! engine captures that reprice's node graph under <tag>_mcl_graph too — not just
-    //! the base "premium" tree. Empty outside a Greek reprice (the base build keys
-    //! "premium"). Composite / basket books (bump-and-revalue) get one graph per
-    //! Greek this way; Mono books capture their single-tree scenario graphs directly.
-    string _graph_tree_tag;
 
     //! requested indicators
     bool _request_premium = false;

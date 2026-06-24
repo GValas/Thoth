@@ -65,6 +65,12 @@ class Composite : public Underlying
     //! composite implied vol: sqrt(v_eq^2 + v_fx^2 + 2*rho*v_eq*v_fx).
     double GetImplicitVol( const double Strike,
                            const date& MaturityDate ) override;
+    //! continuous carry (dividend yield + repo) of the wrapped asset: the composite
+    //! price S_eq*FX is a traded settlement-ccy asset paying this yield, so all three
+    //! engines drift it at (r_settle - q). Delegated to the wrapped underlying (the
+    //! base default is 0, which silently dropped the carry from the ANA forward and
+    //! the PDE carry term while the MCL drift node still applied it).
+    [[nodiscard]] double DividendRepoYield( const date& MaturityDate ) const override;
 
     //! constructor, destructor — tagged KIND_COMPOSITE.
     Composite( const string& ObjectName );
