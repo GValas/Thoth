@@ -51,20 +51,25 @@ results render as a per-(underlying,type) **table — one row per (date, strike)
 Greeks as columns** — with a note of which **cluster/server** priced it and how long it took
 (engine `task_time` + round-trip). The form, results and any in-flight job **persist across
 tab navigation** (engine is user-selected — CPU Monte-Carlo gives book-level Greeks only).
+For **PDE/MCL** the grid builder synthesises a default engine-config object
+(`!pde_configuration` / `!mcl_configuration`) and auto-attaches the workspace's correlation
+matrix when the request carries none, so those engines price straight from the GUI.
 Auth is JWT + rotating refresh cookie with an admin RBAC tab.
 
 **Run (prod, Docker):**
 
 ```bash
 cp .env.example .env          # then edit the secrets (JWT_*, ADMIN_PASSWORD)
-scripts/prod.sh               # build + start the stack, wait for health, print the URL
-# open http://localhost:8088  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
-# scripts/prod.sh logs|ps|down to manage it
+scripts/prod.sh               # build + start, wait for health, then STAY ATTACHED
+# open http://localhost:7777  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
+# Ctrl-C here tears the whole stack down in cascade; scripts/prod.sh logs|ps|down to manage it
 ```
 
 `scripts/prod.sh` wraps `docker compose` (`docker-compose.yml`: redis · 2 GPU clusters ·
 bff · web); it refuses to start while `.env` still holds `change-me` placeholder
-secrets (override with `FORCE=1`). You can also drive compose directly. The
+secrets (override with `FORCE=1`). After the health check it **holds the foreground**,
+streaming every service's logs; `Ctrl-C` — or any container exiting/crashing — runs a
+cascade `docker compose down` (pass `DETACH=1` for the old detached behaviour). You can also drive compose directly. The
 `web/.dockerignore` and `web/frontend/.dockerignore` files keep host-built artefacts
 (`node_modules`, `dist`, `*.tsbuildinfo`) out of the build contexts, so the in-container
 installs/builds are authoritative — without this a stale `tsbuildinfo` makes the BFF's

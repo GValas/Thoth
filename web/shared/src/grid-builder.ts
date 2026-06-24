@@ -17,6 +17,23 @@ const PRICER_TAG: Record<Engine, string> = {
 
 const GREEK_FIELDS = ['delta', 'gamma', 'vega', 'rho', 'theta'] as const;
 
+//! Reserved name for the engine config synthesised when the caller provides none, so a
+//! pde/mcl grid priced straight from the GUI (which sends no configName) still references
+//! a valid !pde_configuration / !mcl_configuration object instead of emitting a null ref
+//! (which the engine rejects with "pde_configuration must be a string").
+const DEFAULT_CONFIG_NAME = '_grid_engine_config';
+
+//! Default parameter objects, mirroring the canonical single-vanilla samples
+//! (samples/simple_call.out.yaml for MCL; the engine's own "high" preset for PDE).
+const DEFAULT_PDE_CONFIG: Record<string, unknown> = { vanilla_precision: 'high' };
+const DEFAULT_MCL_CONFIG: Record<string, unknown> = {
+  max_day_step: 1,
+  min_day_step: -1,
+  paths: 50000,
+  vol_year_step: 0.01,
+  use_sobol: true,
+};
+
 //! Engines that emit per-contract Greek fields (GreeksPerContract()==true).
 export function engineHasPerCellGreeks(engine: Engine): boolean {
   return engine === 'ana' || engine === 'pde';
@@ -88,14 +105,31 @@ export function buildGridDoc(req: GridRequest, ctx: GridContext): Record<string,
     indicators: req.indicators,
     result: ctx.resultName,
   };
-  if (ctx.correlationName) pricer.correlation = ctx.correlationName;
-  if (req.engine === 'pde') pricer.pde_configuration = ctx.configName;
-  if (req.engine === 'mcl') pricer.mcl_configuration = ctx.configName;
+  // Correlation: explicit ref wins; otherwise auto-attach the workspace's correlation
+  // matrix when there is one (MCL diffusion mandates it; harmless/quanto-useful elsewhere).
+  const correlationName =
+    ctx.correlationName ?? ctx.supportObjects.find((o) => o.kind === 'correlation_matrix')?.name;
+  if (correlationName) pricer.correlation = correlationName;
+
+  // Engine config: explicit ref wins; otherwise synthesise a default object so a grid
+  // priced from the GUI (no configName) still has a valid pde/mcl_configuration reference.
+  if (req.engine === 'pde' || req.engine === 'mcl') {
+    const field = req.engine === 'pde' ? 'pde_configuration' : 'mcl_configuration';
+    const configName = ctx.configName ?? DEFAULT_CONFIG_NAME;
+    pricer[field] = configName;
+    if (!ctx.configName) {
+      doc[configName] = {
+        [TAG_KEY]: field,
+        ...(req.engine === 'pde' ? DEFAULT_PDE_CONFIG : DEFAULT_MCL_CONFIG),
+      };
+    }
+  }
   doc[ctx.pricerName] = pricer;
 
   doc.grid_book = { [TAG_KEY]: 'book', contracts: cells };
 
-  // merge the workspace's supporting market objects
+  // merge the workspace's supporting market objects (a workspace object with the same
+  // name as a synthesised default deliberately wins — the user's config overrides ours).
   for (const o of ctx.supportObjects) {
     doc[o.name] = { [TAG_KEY]: o.kind, ...o.payload };
   }

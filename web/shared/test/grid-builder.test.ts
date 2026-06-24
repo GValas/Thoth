@@ -48,6 +48,40 @@ describe('grid builder', () => {
     expect(mcl.mcl_configuration).toBe('m');
   });
 
+  it('synthesises a default engine config when none is provided (GUI path)', () => {
+    // PDE: a !pde_configuration object is created and referenced.
+    const pdeDoc = buildGridDoc({ ...req, engine: 'pde' }, ctx);
+    const pdeName = (pdeDoc.grid as any).pde_configuration as string;
+    expect(typeof pdeName).toBe('string');
+    expect((pdeDoc[pdeName] as any)[TAG_KEY]).toBe('pde_configuration');
+    expect((pdeDoc[pdeName] as any).vanilla_precision).toBe('high');
+
+    // MCL: a !mcl_configuration object with the required fields is created and referenced.
+    const mclDoc = buildGridDoc({ ...req, engine: 'mcl' }, ctx);
+    const mclName = (mclDoc.grid as any).mcl_configuration as string;
+    const cfg = mclDoc[mclName] as any;
+    expect(cfg[TAG_KEY]).toBe('mcl_configuration');
+    expect(cfg.paths).toBeGreaterThan(1);
+    expect(cfg.max_day_step).toBeGreaterThan(0);
+
+    // ANA never gets a config object.
+    const anaDoc = buildGridDoc({ ...req, engine: 'ana' }, ctx);
+    expect((anaDoc.grid as any).pde_configuration).toBeUndefined();
+    expect((anaDoc.grid as any).mcl_configuration).toBeUndefined();
+  });
+
+  it('auto-attaches the workspace correlation matrix (MCL mandates one)', () => {
+    const withCorrel: GridContext = {
+      ...ctx,
+      supportObjects: [{ name: 'correl', kind: 'correlation_matrix', payload: {} }],
+    };
+    const mcl = buildGridDoc({ ...req, engine: 'mcl' }, withCorrel).grid as any;
+    expect(mcl.correlation).toBe('correl');
+    // an explicit correlationName still wins
+    const explicit = buildGridDoc({ ...req, engine: 'mcl' }, { ...withCorrel, correlationName: 'c2' }).grid as any;
+    expect(explicit.correlation).toBe('c2');
+  });
+
   it('pivots per-cell results into matrices', () => {
     // fake a result block: premium = i*10 + j, delta = 0.5 for every call cell
     const block: Record<string, number> = {};

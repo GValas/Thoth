@@ -20,6 +20,11 @@
   "hostRequirements": {
     "gpu": "optional"
   },
+  // The prod stack (scripts/prod.sh) publishes the web UI on 7777.
+  "forwardPorts": [7777],
+  "portsAttributes": {
+    "7777": { "label": "Thoth web UI", "onAutoForward": "notify" }
+  },
   "customizations": {
     "vscode": {
       "extensions": [

@@ -1,7 +1,7 @@
 # Thoth dashboard — production stack (2 GPU clusters).
 #
 #   docker compose up --build
-#   open http://localhost:8088   (nginx serves the SPA + proxies /api -> bff)
+#   open http://localhost:7777   (nginx serves the SPA + proxies /api -> bff)
 #
 # Engine topology: TWO clusters, each = 1 GPU master (`thoth -cluster`) + 5 CPU slaves
 # (`thoth -server`). A master prices a share of an MCL book on its own GPU and fans the
@@ -142,7 +142,7 @@ services:
     restart: unless-stopped
     depends_on: [bff]
     ports:
-      - "8088:80"
+      - "7777:80"
     networks: [thoth]
 
 networks:
