@@ -509,7 +509,7 @@ void Pricer::WriteResults()
     {
         greeks += ", vega_" + param + " = " + ToString( value );
     }
-    LOG( "BPR",
+    LOG( "PRC",
          "book price = " + ToString( _book_result.premium ) + ", " +
              "book trust = " + ToString( _book_result.premium_trust ) + greeks + ", " +
              "book time = " + ToString( _task_time ) + "sec" );
