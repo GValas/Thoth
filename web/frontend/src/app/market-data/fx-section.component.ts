@@ -44,6 +44,7 @@ interface FxRow {
       }
       .grid {
         width: 100%;
+        max-width: 720px;
       }
       .empty {
         color: var(--thoth-text-muted, #888);

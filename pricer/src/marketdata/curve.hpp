@@ -38,6 +38,9 @@ class Curve : public MarketData
 
     //! set the parallel shift (rho bump, in decimal rate); 0 restores the curve
     void SetCurveShift( double Shift ) { _curve_shift = Shift; }
+    //! the parallel shift currently applied — so a Monte-Carlo node can freeze the
+    //! rho bump at build time (the bump is restored before the path sweep runs)
+    [[nodiscard]] double GetCurveShift() const { return _curve_shift; }
 
     //! MarketData bump-and-revalue: a curve responds only to the "rate" factor (rho)
     void ApplyShift( const string& Factor, double Shift ) override

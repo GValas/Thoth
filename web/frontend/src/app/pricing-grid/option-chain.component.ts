@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, signal } from '@angular/core';
+import { Component, Input, computed, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -21,23 +21,30 @@ interface ChainBlock {
 
 //! Option-chain view of one underlying: a block per maturity, with CALLS on the left and PUTS
 //! on the right of a central Strike column, strikes running top-to-bottom (ascending). Each
-//! wing shows premium + whatever per-cell Greeks the engine produced (CPU MCL has none), and
+//! wing shows premium + whatever per-cell Greeks the engine produced (every engine does), and
 //! the premium sits next to the strike on both sides so the two wings mirror around it. Either
-//! wing is omitted when the user priced only calls or only puts.
+//! wing is omitted when the user priced only calls or only puts. The Greek columns fold away
+//! behind a per-chain toggle (premium + strike stay) so the chain can collapse to a compact view.
 @Component({
   selector: 'app-option-chain',
   standalone: true,
   imports: [MatButtonModule, MatIconModule, AgGridAngular],
   template: `
     <div class="oc-head">
-      <span class="oc-name">{{ chain.underlying }}</span>
-      <span class="oc-ccy thoth-muted">{{ chain.currency }}</span>
+      <span class="oc-name">{{ underlying() }}</span>
+      <span class="oc-ccy thoth-muted">{{ currency() }}</span>
       <span class="thoth-spacer"></span>
+      @if (hasGreeks()) {
+        <button mat-stroked-button (click)="foldGreeks.set(!foldGreeks())">
+          <mat-icon>{{ foldGreeks() ? 'unfold_more' : 'unfold_less' }}</mat-icon>
+          {{ foldGreeks() ? 'Show Greeks' : 'Hide Greeks' }}
+        </button>
+      }
       <button mat-stroked-button (click)="exportCsv()"><mat-icon>download</mat-icon> CSV</button>
     </div>
     @for (block of blocks(); track block.maturity) {
       <div class="oc-block">
-        <div class="oc-mat"><mat-icon>event</mat-icon> {{ block.maturity }}</div>
+        <div class="oc-mat">{{ block.maturity }}</div>
         <ag-grid-angular
           class="ag-theme-quartz oc-grid"
           [rowData]="block.rows"
@@ -73,27 +80,30 @@ interface ChainBlock {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        font-weight: 500;
+        font-weight: 700;
+        color: #fff;
+        background: #1f2937;
+        padding: 4px 10px;
+        border-radius: 4px;
         margin-bottom: 4px;
-      }
-      .oc-mat mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
       }
       .oc-grid {
         width: 100%;
       }
       /* ag-grid renders outside this component's view encapsulation, so reach its header/
          cell classes via ::ng-deep to tint the call/put wings and emphasise the strike. */
-      /* centre every column + group header title (numeric cells stay right-aligned).
-         the right-aligned column type ships a higher-specificity theme rule that pins
-         its header to flex-end, so match that specificity to win the override. */
-      :host ::ng-deep .ag-header-cell .ag-header-cell-label,
-      :host ::ng-deep .ag-right-aligned-header .ag-header-cell-label,
+      /* centre every column + group header title — Calls/Puts/Strike/prem/delta/... (numeric
+         cells stay right-aligned). The quartz theme pins the rightAligned headers to flex-end
+         and loads after these component styles, so !important is needed to win; text-align
+         centres the inner text element as a belt-and-suspenders fallback. */
+      :host ::ng-deep .ag-header-cell-label,
       :host ::ng-deep .ag-header-group-cell-label {
-        justify-content: center;
+        justify-content: center !important;
+      }
+      :host ::ng-deep .ag-header-cell-text,
+      :host ::ng-deep .ag-header-group-text {
+        text-align: center;
+        width: 100%;
       }
       :host ::ng-deep .oc-calls .ag-header-group-cell-label {
         color: #1b8a4b;
@@ -117,16 +127,32 @@ interface ChainBlock {
     `,
   ],
 })
-export class OptionChainComponent implements OnChanges {
-  @Input({ required: true }) chain!: OptionChain;
+export class OptionChainComponent {
+  //! @Input bridged into a signal so the columns/blocks/labels recompute reactively.
+  private readonly chainSig = signal<OptionChain | null>(null);
+  @Input({ required: true }) set chain(v: OptionChain) {
+    this.chainSig.set(v);
+  }
 
-  readonly blocks = signal<ChainBlock[]>([]);
-  readonly cols = signal<(ColDef | ColGroupDef)[]>([]);
+  //! Greeks visibility: when folded, only premium + strike columns are shown.
+  readonly foldGreeks = signal(false);
 
-  ngOnChanges(): void {
-    const c = this.chain;
-    const side = c.call ?? c.put; //!< present Greeks are the same on both wings (same engine)
-    const present = side ? GREEKS.filter((g) => side.greeks?.[g]) : [];
+  readonly underlying = computed(() => this.chainSig()?.underlying ?? '');
+  readonly currency = computed(() => this.chainSig()?.currency ?? '');
+
+  //! per-cell Greeks actually produced (identical on both wings — same engine).
+  private readonly present = computed(() => {
+    const c = this.chainSig();
+    if (!c) return [];
+    const side = c.call ?? c.put;
+    return side ? GREEKS.filter((g) => side.greeks?.[g]) : [];
+  });
+  readonly hasGreeks = computed(() => this.present().length > 0);
+
+  readonly cols = computed<(ColDef | ColGroupDef)[]>(() => {
+    const c = this.chainSig();
+    if (!c) return [];
+    const present = this.foldGreeks() ? [] : this.present();
     const metrics = ['premium', ...present];
 
     // a wing = premium + Greeks under a CALLS/PUTS group. The call wing is reversed so its
@@ -159,11 +185,16 @@ export class OptionChainComponent implements OnChanges {
       valueFormatter: fmtStrike,
     });
     if (c.put) cols.push(wing('p', 'Puts', false));
-    this.cols.set(cols);
+    return cols;
+  });
 
+  readonly blocks = computed<ChainBlock[]>(() => {
+    const c = this.chainSig();
+    if (!c) return [];
+    const present = this.present(); // rows always carry the Greeks; cols() decides visibility
     // strikes ascending (top -> bottom); keep the original column index i to read the matrices.
     const order = c.strikes.map((strike, i) => ({ strike, i })).sort((a, b) => a.strike - b.strike);
-    const blocks: ChainBlock[] = c.maturities.map((maturity, j) => {
+    return c.maturities.map((maturity, j) => {
       const rows = order.map(({ strike, i }) => {
         const row: ChainRow = { strike };
         if (c.call) {
@@ -178,15 +209,14 @@ export class OptionChainComponent implements OnChanges {
       });
       return { maturity, rows };
     });
-    this.blocks.set(blocks);
-  }
+  });
 
-  //! Export the whole chain (every maturity) as a flat CSV, built from the data directly so it
-  //! needs no per-block ag-grid handle. One row per (maturity, strike); call then put columns.
+  //! Export the whole chain (every maturity, all Greeks regardless of the fold state) as a flat
+  //! CSV, built from the data directly so it needs no per-block ag-grid handle.
   exportCsv(): void {
-    const c = this.chain;
-    const side = c.call ?? c.put;
-    const present = side ? GREEKS.filter((g) => side.greeks?.[g]) : [];
+    const c = this.chainSig();
+    if (!c) return;
+    const present = this.present();
     const sides: Array<['call' | 'put', GridSide]> = [];
     if (c.call) sides.push(['call', c.call]);
     if (c.put) sides.push(['put', c.put]);

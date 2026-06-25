@@ -40,11 +40,11 @@
   }
 }
 
-//! Flat, boxless sections separated by a light rule — compact, no card chrome.
+//! Flat, boxless sections separated by a rule — compact, no card chrome.
 .area {
   margin: 0 0 18px;
   padding-top: 10px;
-  border-top: 1px solid var(--thoth-border, #e3e3e3);
+  border-top: 1px solid rgba(0, 0, 0, 0.28);
 
   h3 {
     margin: 0 0 10px;
@@ -64,20 +64,4 @@
     text-transform: none;
     letter-spacing: 0;
   }
-}
-
-//! Advanced is a native, boxless disclosure.
-details.area > summary {
-  cursor: pointer;
-  list-style: none;
-
-  h3 {
-    display: inline-flex;
-  }
-}
-details.area > summary::-webkit-details-marker {
-  display: none;
-}
-details.area[open] > summary {
-  margin-bottom: 10px;
 }

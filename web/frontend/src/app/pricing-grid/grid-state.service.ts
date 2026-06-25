@@ -85,7 +85,6 @@ export class GridStateService {
     return [...byUnderlying.values()];
   });
 
-  readonly mclSelected = computed(() => this.engine === 'mcl');
   readonly underlyingObjects = computed(() =>
     this.objects().filter((o) => ['equity', 'basket', 'forex', 'rainbow', 'composite'].includes(o.kind)),
   );
@@ -122,6 +121,7 @@ export class GridStateService {
   //! Greeks on. Engine and underlyings are left for the user to pick. refreshObjects()
   //! still validates the currency against the workspace's actual currencies.
   private applyDefaults(ws: Workspace): void {
+    this.engine = 'ana';
     this.strikesText = '80 90 100 110 120';
     this.maturities = [1, 2, 3, 4, 5].map((m) => addMonths(ws.today, m));
     this.exercise = 'european';
@@ -223,9 +223,8 @@ export class GridStateService {
 
   setEngine(e: Engine): void {
     this.engine = e;
-    //! don't mutate includeGreeks here: for CPU mcl the checkbox is disabled (mclSelected)
-    //! and submit() already drops Greeks, so forcing it false only destroyed the user's
-    //! preference and left it unchecked after switching back to ana / pde / mcl_gpu.
+    //! every engine (incl. CPU mcl, via single-tree per-contract attribution) now produces
+    //! per-cell Greeks, so the choice no longer touches the Greeks preference.
     this.persist();
   }
 
@@ -267,7 +266,7 @@ export class GridStateService {
     if (!ws || !this.engine) return;
 
     const indicators = ['premium'];
-    if (this.engine !== 'mcl' && this.includeGreeks) indicators.push(...GREEK_INDICATORS);
+    if (this.includeGreeks) indicators.push(...GREEK_INDICATORS); // every engine now does per-cell Greeks
 
     const dto: GridSubmit = {
       workspaceId: ws.id,

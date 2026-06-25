@@ -3,18 +3,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../core/api.service';
-import { SchemaResponse, Workspace } from '../core/models';
+import { Workspace } from '../core/models';
 import { MarketModel } from './market-model';
 import { EquitiesSectionComponent } from './equities-section.component';
 import { RatesSectionComponent } from './rates-section.component';
 import { FxSectionComponent } from './fx-section.component';
 import { CorrelationSectionComponent } from './correlation-section.component';
-import { AdvancedObjectsSectionComponent } from './advanced-objects-section.component';
 
 //! Market-data DASHBOARD: pick a workspace, then edit its market data in four domain areas
-//! (equities · rates · fx · correlation) plus an advanced editor for other object kinds.
-//! "Generate sample data" spawns a valid random set server-side; Check validates; Save PUTs
-//! the whole object set. All four areas share one MarketModel (the canonical object list).
+//! (equities · rates · fx · correlation). "Generate sample data" spawns a valid random set
+//! server-side; Check validates; Save PUTs the whole object set. All four areas share one
+//! MarketModel (the canonical object list).
 @Component({
   selector: 'app-market-data',
   standalone: true,
@@ -26,7 +25,6 @@ import { AdvancedObjectsSectionComponent } from './advanced-objects-section.comp
     RatesSectionComponent,
     FxSectionComponent,
     CorrelationSectionComponent,
-    AdvancedObjectsSectionComponent,
   ],
   templateUrl: './market-data.component.html',
   styleUrl: './market-data.component.scss',
@@ -37,13 +35,8 @@ export class MarketDataComponent implements OnInit {
 
   readonly model = new MarketModel();
   readonly workspace = signal<Workspace | null>(null);
-  readonly schema = signal<SchemaResponse | null>(null);
   readonly errors = signal<Record<string, string[]>>({});
   readonly busy = signal(false);
-
-  constructor() {
-    this.api.schema().subscribe((s) => this.schema.set(s));
-  }
 
   //! No workspace picker: silently use the first workspace (creating a default one if the
   //! account has none) and load its objects.

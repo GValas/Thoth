@@ -21,6 +21,12 @@ class YieldCurveNode : public MonteCarloNode
   private:
     Curve* _curve = nullptr; //!< the zero curve sampled per diffusion date (non-owning)
     bool _filled = false;    //!< true once the whole value vector has been populated
+    //! the curve's rho shift, snapshotted at build time. The single-tree rho bump shifts
+    //! the curve, builds this (suffixed) node, then RESTORES the shift before the path
+    //! sweep — but ComputeValue runs during the sweep, when the live shift is back to 0.
+    //! Freezing it here lets the bumped node still discount / drift at the bumped rate
+    //! (base and non-rate nodes snapshot 0, so they are unaffected). Fixes MCL rho.
+    double _shift = 0.0;
 
   public:
     //! fill the entire zero-rate vector on first call, then no-op (path-independent).

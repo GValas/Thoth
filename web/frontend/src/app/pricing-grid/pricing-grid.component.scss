@@ -46,11 +46,12 @@
   align-self: center;
 }
 
-// separator between successive underlying (equity) result blocks
-.chain-sep {
-  border: 0;
-  border-top: 1px solid var(--thoth-border, rgba(0, 0, 0, 0.12));
-  margin: 24px 0;
+// one results tab per underlying
+.results-tabs {
+  margin-top: 8px;
+}
+.tab-body {
+  padding-top: 16px;
 }
 
 .checks {

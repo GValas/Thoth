@@ -227,12 +227,13 @@ bool PricerMCL::BookIsGpuSupported()
     return true;
 }
 
-//! GPU mode prices each contract independently on the device, so its Greeks are
-//! per-contract bump-and-revalue; the CPU path keeps MCL's book-level single-tree
-//! Greeks (a correlated diffusion can't isolate one contract).
+//! per-contract Greeks are available either from the GPU per-contract loop, or once
+//! the CPU single-tree sweep has attributed its bump scenarios per contract
+//! (ComputeGreeks sets _per_contract_greeks_ready). Before that — and on the book-level
+//! fallback path — only the book Greeks exist, so this stays false there.
 bool PricerMCL::GreeksPerContract() const
 {
-    return _use_gpu;
+    return _use_gpu || _per_contract_greeks_ready;
 }
 
 //! price one contract on the GPU (GBM European vanilla). Used only in _use_gpu
@@ -288,6 +289,7 @@ void PricerMCL::PriceBook()
     _recorder.Clear(); //!< drop American path recordings alongside the node graph
     _scenario_roots.clear();
     _scenario_premium.clear();
+    _contract_scenario_premium.clear();
     _rng.Seed( (std::uint64_t)_mcl->_seed );
 
     //! single-tree Greeks: build the bump sub-trees alongside the base tree (and
@@ -390,9 +392,10 @@ void PricerMCL::BuildGreekScenarios()
 //! (American / non-Mono) fall back to the bump-and-revalue base implementation.
 void PricerMCL::ComputeGreeks()
 {
+    _per_contract_greeks_ready = false;
     if ( !_build_greek_scenarios )
     {
-        Pricer::ComputeGreeks(); //!< American / non-Mono : bump-and-revalue
+        Pricer::ComputeGreeks(); //!< American / non-Mono : bump-and-revalue (book-level)
         return;
     }
 
@@ -407,35 +410,90 @@ void PricerMCL::ComputeGreeks()
     double rho = 0;
     double theta = 0;
 
-    //! delta / gamma : summed over the per-underlying spot bumps
+    //! per-contract Greeks accumulated in lock-step with the book ones, each in the
+    //! contract's own currency (so the book Greek is exactly the fx-weighted sum of
+    //! these). Written into Result() only at the very end, since the theta reprice's
+    //! InitPricing zeroes every contract result.
+    struct Pcg
+    {
+        double delta = 0, gamma = 0, vega = 0, rho = 0, theta = 0;
+    };
+    std::map<string, Pcg> pcg;
+
+    //! base per-contract premia captured before the theta roll overwrites them.
+    std::map<string, double> base_contract;
+    for ( Contract* c : _book->GetContractSet() )
+    {
+        base_contract[c->GetName()] = Result( c ).premium;
+    }
+    //! a contract's premium under bump `tag` (a bump it does not touch leaves it on the
+    //! shared sub-tree, so the value is absent/equal to base -> a zero contribution).
+    auto cprem = [&]( const string& name, const string& tag ) -> double
+    {
+        auto ci = _contract_scenario_premium.find( name );
+        if ( ci != _contract_scenario_premium.end() )
+        {
+            auto ti = ci->second.find( tag );
+            if ( ti != ci->second.end() )
+            {
+                return ti->second;
+            }
+        }
+        return base_contract[name];
+    };
+
+    //! delta / gamma : summed over the per-underlying spot bumps (book + per contract)
     if ( _request_delta || _request_gamma )
     {
         for ( Single* s : _single_set )
         {
             const double spot = s->GetSpot();
+            const string sn = s->GetName();
             if ( _request_delta ) //!< one-sided forward difference, reuses p0
             {
                 const double h = GREEK_SPOT_BUMP * spot;
-                delta += ( _scenario_premium.at( scenario_tag::delta( s->GetName() ) ) - p0 ) / h;
+                delta += ( _scenario_premium.at( scenario_tag::delta( sn ) ) - p0 ) / h;
+                for ( Contract* c : _book->GetContractSet() )
+                {
+                    const string& n = c->GetName();
+                    pcg[n].delta += ( cprem( n, scenario_tag::delta( sn ) ) - base_contract[n] ) / h;
+                }
             }
             if ( _request_gamma ) //!< central second difference (needs both sides)
             {
                 const double h = GREEK_GAMMA_BUMP * spot;
-                gamma += ( _scenario_premium.at( scenario_tag::gamma_up( s->GetName() ) ) - 2 * p0 +
-                           _scenario_premium.at( scenario_tag::gamma_down( s->GetName() ) ) ) /
+                gamma += ( _scenario_premium.at( scenario_tag::gamma_up( sn ) ) - 2 * p0 +
+                           _scenario_premium.at( scenario_tag::gamma_down( sn ) ) ) /
                          ( h * h );
+                for ( Contract* c : _book->GetContractSet() )
+                {
+                    const string& n = c->GetName();
+                    pcg[n].gamma += ( cprem( n, scenario_tag::gamma_up( sn ) ) - 2 * base_contract[n] +
+                                      cprem( n, scenario_tag::gamma_down( sn ) ) ) /
+                                    ( h * h );
+                }
             }
         }
     }
 
-    //! vega / rho : one-sided, per 1 vol point / per 1% rate move
+    //! vega / rho : one-sided, per 1 vol point / per 1% rate move (book + per contract)
     if ( _request_vega )
     {
         vega = ( _scenario_premium.at( scenario_tag::VEGA ) - p0 ) / GREEK_VOL_BUMP * 0.01;
+        for ( Contract* c : _book->GetContractSet() )
+        {
+            const string& n = c->GetName();
+            pcg[n].vega = ( cprem( n, scenario_tag::VEGA ) - base_contract[n] ) / GREEK_VOL_BUMP * 0.01;
+        }
     }
     if ( _request_rho )
     {
         rho = ( _scenario_premium.at( scenario_tag::RHO ) - p0 ) / GREEK_RATE_BUMP * 0.01;
+        for ( Contract* c : _book->GetContractSet() )
+        {
+            const string& n = c->GetName();
+            pcg[n].rho = ( cprem( n, scenario_tag::RHO ) - base_contract[n] ) / GREEK_RATE_BUMP * 0.01;
+        }
     }
 
     //! theta : roll today one calendar day forward and reprice (base-only tree;
@@ -466,6 +524,15 @@ void PricerMCL::ComputeGreeks()
         PriceBook();               //!< the single extra graph
         _graph_tree_tag.clear();
         const double p1 = _book_result.premium;
+
+        //! per-contract theta = rolled premium - base premium (both contract currency),
+        //! read off the just-repriced contract results before they are restored below
+        for ( Contract* c : _book->GetContractSet() )
+        {
+            const string& n = c->GetName();
+            pcg[n].theta = Result( c ).premium - base_contract[n];
+        }
+
         _today = base_today;
         _suppress_scenarios = false;
         _theta_pass = false;
@@ -487,13 +554,27 @@ void PricerMCL::ComputeGreeks()
         theta = p1 - p0;
     }
 
-    //! write the Greeks now — after theta's reprice (which zeroed the aggregate) and
-    //! its premium/trust restore — so none of them get wiped.
+    //! write the book Greeks now — after theta's reprice (which zeroed the aggregate)
+    //! and its premium/trust restore — so none of them get wiped.
     _book_result.delta = delta;
     _book_result.gamma = gamma;
     _book_result.vega = vega;
     _book_result.rho = rho;
     _book_result.theta = theta;
+
+    //! publish the per-contract Greeks (the theta reprice has finished, so the contract
+    //! results are stable) and flag them ready so GreeksPerContract() lets WriteResults
+    //! emit the <contract>_<greek> fields for the MCL engine too.
+    for ( Contract* c : _book->GetContractSet() )
+    {
+        const Pcg& g = pcg[c->GetName()];
+        Result( c ).delta = g.delta;
+        Result( c ).gamma = g.gamma;
+        Result( c ).vega = g.vega;
+        Result( c ).rho = g.rho;
+        Result( c ).theta = g.theta;
+    }
+    _per_contract_greeks_ready = true;
 }
 
 //! turn the per-underlying independent white noises into correlated Brownian
@@ -1038,6 +1119,11 @@ void PricerMCL::PriceAmerican()
             double amer_c = ApplyAmericanPolicy( c, Sb, taub, rb, policy, tb );
 
             it->second += ( amer_c - euro_c ) * fx;
+
+            //! swap the contract's European bump value for its American one in the
+            //! per-contract scenario premia too, so per-contract Greeks (ComputeGreeks)
+            //! finite-difference the American values just like the book aggregate above.
+            _contract_scenario_premium[c->GetName()][tag] = amer_c;
         }
     }
 
@@ -1262,6 +1348,19 @@ void PricerMCL::Tree_Read()
     //! MC mean, keyed by its tag, for ComputeGreeks to finite-difference
     for ( auto& tagged : _scenario_roots )
     {
-        _scenario_premium[tagged.first] = tagged.second->GetIndicatorValue( 0 );
+        const string& tag = tagged.first;
+        _scenario_premium[tag] = tagged.second->GetIndicatorValue( 0 );
+
+        //! and the SAME bump's premium for each individual contract (its scenario node
+        //! is "<contract><tag>", in the contract's own currency), so ComputeGreeks can
+        //! attribute the Greek per contract. A contract the bump does not touch shares
+        //! the unbumped sub-tree, so its value equals the base — a zero contribution.
+        for ( Contract* c : _book->GetContractSet() )
+        {
+            if ( MonteCarloNode* cn = _collector.GetNode( c->GetName() + tag ) )
+            {
+                _contract_scenario_premium[c->GetName()][tag] = cn->GetIndicatorValue( 0 );
+            }
+        }
     }
 }

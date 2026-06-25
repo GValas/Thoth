@@ -100,10 +100,13 @@ describe('grid builder', () => {
     expect(Number.isNaN(call.greeks.vega![0][0])).toBe(true);
   });
 
-  it('omits per-cell Greeks for MCL', () => {
-    expect(engineHasPerCellGreeks('mcl')).toBe(false);
+  it('every engine (incl. CPU mcl) now exposes per-cell Greeks', () => {
+    for (const engine of ['ana', 'pde', 'mcl', 'mcl_gpu'] as const) {
+      expect(engineHasPerCellGreeks(engine)).toBe(true);
+    }
+    // requested Greeks become NaN-filled matrices (populated once the engine returns them)
     const mats = parseGridResult({}, { ...req, engine: 'mcl' });
-    expect(mats[0].greeks.delta).toBeUndefined();
+    expect(mats[0].greeks.delta).toBeDefined();
   });
 
   it('mcl_gpu is an mcl_pricer with allow_gpu set, and has per-cell Greeks', () => {

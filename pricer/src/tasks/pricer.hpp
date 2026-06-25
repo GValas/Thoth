@@ -114,10 +114,16 @@ class Pricer : public Task
     //! Used by the per-contract loop and its bump-and-revalue Greeks.
     virtual void PriceContract( Contract* Ctr );
 
-    //! true for engines whose Greeks are computed per contract inside the
-    //! contract loop (PDE, ANA). MCL stays book-level (correlated diffusion can
-    //! not isolate a single contract), so it keeps ComputeGreeks.
+    //! true once per-contract Greek fields are available to write (PDE / ANA always;
+    //! GPU-MCL; and CPU-MCL after its single-tree sweep attributes the bump scenarios
+    //! per contract). Gates the per-contract Greek block in WriteResults.
     virtual bool GreeksPerContract() const { return false; }
+
+    //! true for engines whose PriceBook already folds the Greeks into its contract
+    //! loop (PDE / ANA / GPU-MCL), so Execute skips the separate ComputeGreeks pass.
+    //! Distinct from GreeksPerContract: CPU-MCL writes per-contract Greeks but still
+    //! needs ComputeGreeks to run (its Greeks come from the single-tree bump sweep).
+    virtual bool GreeksInPriceBook() const { return GreeksPerContract(); }
 
     //! true for an engine whose PriceContract already yields spot delta/gamma from
     //! its grid (PDE). For a multi-asset underlying, whose basket "spot" is fixed

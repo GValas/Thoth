@@ -24,18 +24,26 @@ void YieldCurveNode::ComputeValue( size_t /*DateIndex*/ )
     {
         return;
     }
-    //! one zero rate per diffusion date; null curve degrades to a 0 rate.
+    //! one zero rate per diffusion date; null curve degrades to a 0 rate. GetCurveValue
+    //! adds the curve's LIVE rho shift, but the bump-and-revalue sweep has already restored
+    //! that to 0; swap it for the shift snapshotted at build time (_shift): subtract the
+    //! live shift, add the frozen one. Base / non-rate nodes snapshot 0 -> unchanged.
     for ( size_t i = 0; i < _date_list.size(); i++ )
     {
-        _value_list[i] = _curve ? _curve->GetCurveValue( _date_list[i] ) : 0.0;
+        _value_list[i] = _curve
+                             ? ( _curve->GetCurveValue( _date_list[i] ) - _curve->GetCurveShift() + _shift )
+                             : 0.0;
     }
     _filled = true;
 }
 
-//! attach the zero curve to sample (non-owning).
+//! attach the zero curve to sample (non-owning) and freeze its current rho shift, so a
+//! rate-bumped scenario node keeps discounting / drifting at the bumped rate even though
+//! the bump is restored before the path sweep evaluates this node (see ComputeValue).
 void YieldCurveNode::SetCurve( Curve* C )
 {
     _curve = C;
+    _shift = C ? C->GetCurveShift() : 0.0;
 }
 
 //! Leaf node: its values come from the curve, not from other graph nodes, so it

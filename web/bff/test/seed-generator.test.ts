@@ -47,10 +47,16 @@ describe('market-data seed generator', () => {
     expect(generateMarketData({ seed: 42 })).toEqual(generateMarketData({ seed: 42 }));
   });
 
-  it('honors the workspace valuation date in curve pillars', () => {
+  it('builds 10-pillar yearly curves from the workspace valuation date', () => {
     const objs = generateMarketData({ today: '2030-06-15' });
-    const curve = objs.find((o) => o.kind === 'yield_curve')!;
-    expect((curve.payload.dates as string[])[0]).toBe('2030-06-15');
-    expect((curve.payload.dates as string[])[1]).toBe('2040-06-15');
+    for (const kind of ['yield_curve', 'repo_curve', 'continuous_dividends_curve']) {
+      const curve = objs.find((o) => o.kind === kind)!;
+      const dates = curve.payload.dates as string[];
+      const values = curve.payload.values as number[];
+      expect(dates).toHaveLength(10);
+      expect(values).toHaveLength(10);
+      expect(dates[0]).toBe('2030-06-15'); // first pillar = today
+      expect(dates[9]).toBe('2039-06-15'); // last pillar = today + 9y
+    }
   });
 });

@@ -74,10 +74,6 @@
           }
         </mat-chip-set>
       </div>
-
-      @if (s.mclSelected()) {
-        <span class="hint thoth-muted"><mat-icon>info</mat-icon> CPU mcl gives book-level Greeks only</span>
-      }
     </mat-card-content>
   </mat-card>
 
@@ -104,17 +100,22 @@
     <p class="meta thoth-muted">
       <mat-icon>schedule</mat-icon>
       Priced on <code>{{ meta.server }}</code>
-      @if (meta.engineMs != null) { · engine {{ meta.engineMs }} ms }
-      @if (meta.execMs != null) { · round-trip {{ meta.execMs }} ms }
+      @if (meta.engineMs != null) { · engine {{ fmtDuration(meta.engineMs) }} }
+      @if (meta.execMs != null) { · round-trip {{ fmtDuration(meta.execMs) }} }
       @if (meta.engineVersion) { · {{ meta.engineVersion }} }
     </p>
   }
 
-  @for (chain of s.chains(); track chain.underlying; let first = $first) {
-    @if (!first) {
-      <hr class="chain-sep" />
-    }
-    <app-option-chain [chain]="chain"></app-option-chain>
+  @if (s.chains().length) {
+    <mat-tab-group class="results-tabs" mat-stretch-tabs="false" animationDuration="0ms">
+      @for (chain of s.chains(); track chain.underlying) {
+        <mat-tab [label]="chain.underlying">
+          <div class="tab-body">
+            <app-option-chain [chain]="chain"></app-option-chain>
+          </div>
+        </mat-tab>
+      }
+    </mat-tab-group>
   }
 } @else {
   <p class="thoth-muted">Loading…</p>

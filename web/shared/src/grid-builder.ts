@@ -2,9 +2,10 @@
 //! single /price request (the efficient design — one diffusion sweep for MCL), then
 //! pivot the per-cell results into matrices.
 //!
-//! Per-cell premium/premium_trust are written by every engine; per-cell Greeks only by
-//! ANA/PDE (and GPU-MCL) — see pricer.cpp WriteResults gating. The caller picks the
-//! engine (no default); for MCL the Greeks matrices come back empty.
+//! Per-cell premium/premium_trust and per-cell Greeks are written by every engine now —
+//! ANA/PDE/GPU-MCL price each contract independently, and CPU MCL attributes its single-tree
+//! bump scenarios per contract (see PricerMCL::ComputeGreeks). MCL's per-cell Greeks carry
+//! Monte-Carlo noise but are produced. The caller picks the engine (no default).
 
 import { TAG_KEY, type CellResult, type Engine, type GridMatrix, type GridRequest } from './types.js';
 import { dumpBook } from './yaml.js';
@@ -41,11 +42,12 @@ const DEFAULT_MCL_CONFIG: Record<string, unknown> = {
   use_sobol: true,
 };
 
-//! Engines that emit per-contract Greek fields (GreeksPerContract()==true): ANA, PDE and
-//! GPU-MCL (PricerMCL::GreeksPerContract() returns true once the device path is active).
-//! CPU MCL gives book-level Greeks only, so its per-cell Greek matrices come back empty.
-export function engineHasPerCellGreeks(engine: Engine): boolean {
-  return engine === 'ana' || engine === 'pde' || engine === 'mcl_gpu';
+//! Engines that emit per-contract Greek fields. Every engine now does: ANA (closed form),
+//! PDE (per-contract grid), GPU-MCL (per-contract device pricing) and CPU MCL (single-tree
+//! bump scenarios attributed per contract — see PricerMCL::ComputeGreeks). MCL's per-cell
+//! Greeks carry the usual Monte-Carlo noise, but they are produced.
+export function engineHasPerCellGreeks(_engine: Engine): boolean {
+  return true;
 }
 
 function pad(n: number, width: number): string {

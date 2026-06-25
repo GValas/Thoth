@@ -78,8 +78,11 @@ engine then computes them the cheapest way for its structure:
   per bump. theta is a separate one-day reprice (a second, base-only sweep, shown
   under its own `MCL theta` / `AMC theta` progress bar). Sharing the path nodes is exact
   common-random-numbers, so the Greeks match the old reset-per-scenario values
-  bit-for-bit. Books with American contracts or non-trivial (basket/composite)
-  underlyings fall back to book-level bump-and-revalue.
+  bit-for-bit. Each bump scenario also carries a node **per contract**, so MCL now
+  reports **per-contract Greeks** too (attributed by differencing each contract's
+  scenario node — the book Greek is exactly their fx-weighted sum); they carry the
+  usual Monte-Carlo noise the book total averages out. Books with American contracts
+  or non-trivial (basket/composite) underlyings fall back to book-level bump-and-revalue.
 
 Units: delta `dP/dS`, gamma `d²P/dS²`, vega per vol point, rho per 1% parallel
 rate move, theta per calendar day. On a 1y ATM call the three engines agree and

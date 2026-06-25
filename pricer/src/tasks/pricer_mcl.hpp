@@ -60,6 +60,17 @@ class PricerMCL : public Pricer
     vector<std::pair<string, MonteCarloNode*>> _scenario_roots;
     map<string, double> _scenario_premium;
 
+    //! per-contract version of _scenario_premium: contract name -> bump tag -> that
+    //! contract's MC premium under the bump (in the contract's own currency, as the
+    //! per-contract premium is). Read in Tree_Read alongside the book scenario premia
+    //! (and overwritten with the American value in PriceAmerican), then finite-
+    //! differenced in ComputeGreeks to attribute each Greek to each contract.
+    map<string, map<string, double>> _contract_scenario_premium;
+    //! set once ComputeGreeks has filled per-contract Greeks from the single-tree
+    //! sweep, so GreeksPerContract() lets WriteResults emit them. Left false on the
+    //! fallback (non-Mono / book-level) path, which has no per-contract Greeks.
+    bool _per_contract_greeks_ready = false;
+
     //! debug node graphs — MCL-only state (ANA/PDE keep none, see Pricer hooks).
     //! Graphviz .dot of each MC tree ("premium" for the base, "delta"/"gamma"/... for
     //! the Greek scenario trees), keyed by tree; emitted as <tree>_mcl_graph by
@@ -136,9 +147,12 @@ class PricerMCL : public Pricer
     //! single-tree Greeks (delta/gamma/vega/rho in one path sweep); theta stays
     //! bump-and-revalue. Falls back to Pricer::ComputeGreeks when !CanSingleTreeGreeks.
     void ComputeGreeks() override;
-    //! GPU mode prices contract by contract (per-contract bump Greeks, common
-    //! random numbers); the CPU path keeps MCL's book-level single-tree Greeks.
-    bool GreeksPerContract() const override;      //!< true iff _use_gpu
+    //! per-contract Greeks are available from the GPU contract loop, or once the CPU
+    //! single-tree sweep has attributed its bumps per contract (_per_contract_greeks_ready).
+    bool GreeksPerContract() const override; //!< _use_gpu || _per_contract_greeks_ready
+    //! only the GPU contract loop computes Greeks inside PriceBook; the CPU path still
+    //! needs ComputeGreeks (its single-tree bump sweep), so it is NOT "in PriceBook".
+    bool GreeksInPriceBook() const override { return _use_gpu; }
     void PriceContract( Contract* Ctr ) override; //!< one contract on the device (GPU mode)
 
     //! MCL-only result fields: emit each captured node graph as <tree>_mcl_graph

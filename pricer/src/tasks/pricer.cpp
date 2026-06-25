@@ -116,7 +116,7 @@ void Pricer::Execute()
     //! optional Greeks by book-level bump-and-revalue (MCL); restores the base book
     const bool greeks = _request_delta || _request_gamma || _request_vega ||
                         _request_rho || _request_theta;
-    if ( greeks && !GreeksPerContract() )
+    if ( greeks && !GreeksInPriceBook() )
     {
         ComputeGreeks();
     }

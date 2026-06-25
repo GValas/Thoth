@@ -12,6 +12,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatTabsModule } from '@angular/material/tabs';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { GridStateService } from './grid-state.service';
 import { OptionChainComponent } from './option-chain.component';
@@ -36,6 +37,7 @@ import { OptionChainComponent } from './option-chain.component';
     MatProgressBarModule,
     MatTooltipModule,
     MatDatepickerModule,
+    MatTabsModule,
     OptionChainComponent,
   ],
   providers: [provideNativeDateAdapter()],
@@ -54,5 +56,17 @@ export class PricingGridComponent implements OnInit {
   addMaturity(d: Date | null): void {
     this.s.addMaturity(d);
     this.pickerDate = null;
+  }
+
+  //! render a millisecond duration in the most readable unit: µs / ms / s / min+s.
+  fmtDuration(ms: number | undefined): string {
+    if (ms == null || !Number.isFinite(ms)) return '';
+    if (ms < 1) return `${Math.round(ms * 1000)} µs`;
+    if (ms < 1000) return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+    const s = ms / 1000;
+    if (s < 60) return `${s < 10 ? s.toFixed(2) : s.toFixed(1)} s`;
+    const min = Math.floor(s / 60);
+    const rem = Math.round(s % 60);
+    return rem ? `${min} min ${rem} s` : `${min} min`;
   }
 }

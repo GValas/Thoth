@@ -11,7 +11,7 @@ export interface SeedOptions {
   //! number of equities (default 5) and currencies (default 3) to spawn
   equities?: number;
   currencies?: number;
-  //! valuation date (YYYY-MM-DD) — curve pillars are today and today+10y
+  //! valuation date (YYYY-MM-DD) — curves span 10 yearly pillars from today
   today?: string;
   //! PRNG seed for reproducible output
   seed?: number;
@@ -36,6 +36,26 @@ function addYears(date: string, years: number): string {
   return `${yy}-${m}-${d}`;
 }
 
+//! a 10-pillar yearly curve from `today` out to +9y, the values drifting mildly around
+//! `base` (a gentle term structure across the pillars + small per-pillar noise, clamped
+//! non-negative) so the generated curves read as real term structures, not flat lines.
+function curve10(
+  today: string,
+  base: number,
+  rnd: () => number,
+  p = 2,
+): { dates: string[]; values: number[] } {
+  const dates: string[] = [];
+  const values: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    dates.push(addYears(today, i));
+    //! slope from 0.85*base (front) to 1.15*base (back), plus +/-5% noise
+    const v = base * (0.85 + (0.3 * i) / 9) + (rnd() - 0.5) * base * 0.1;
+    values.push(Math.round(Math.max(0, v) * 10 ** p) / 10 ** p);
+  }
+  return { dates, values };
+}
+
 const CCY_POOL = ['eur', 'usd', 'jpy', 'gbp', 'chf', 'cad'];
 
 //! realistic large-cap tickers to draw equity names from (sampled, no repeats).
@@ -52,7 +72,6 @@ export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
   const nEq = Math.max(1, Math.min(opts.equities ?? 5, 26));
   const nCcy = Math.max(1, Math.min(opts.currencies ?? 3, CCY_POOL.length));
   const today = opts.today ?? '2026-01-01';
-  const far = addYears(today, 10);
   const rnd = mulberry32(opts.seed ?? 1);
   const round = (x: number, p = 2) => Math.round(x * 10 ** p) / 10 ** p;
   const between = (lo: number, hi: number, p = 2) => round(lo + rnd() * (hi - lo), p);
@@ -60,10 +79,9 @@ export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
   const objs: WsObject[] = [];
   const ccys = CCY_POOL.slice(0, nCcy);
 
-  // --- currencies: a !currency pointing at its own flat !yield_curve (rates in percent) ---
+  // --- currencies: a !currency pointing at its own 10-pillar !yield_curve (rates in percent) ---
   for (const c of ccys) {
-    const rate = between(0.5, 5);
-    objs.push({ name: `${c}_rate`, kind: 'yield_curve', payload: { dates: [today, far], values: [rate, rate] } });
+    objs.push({ name: `${c}_rate`, kind: 'yield_curve', payload: curve10(today, between(0.5, 5), rnd) });
     objs.push({ name: c, kind: 'currency', payload: { rate: `${c}_rate` } });
   }
 
@@ -79,14 +97,12 @@ export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
     const name = pool[i] ?? `STK${i + 1}`;
     equityNames.push(name);
     const ccy = ccys[Math.floor(rnd() * ccys.length)];
-    const repoRate = between(0, 1);
-    const divYield = between(0, 3);
     objs.push({ name: `${name}_vol`, kind: 'bs_volatility', payload: { volatility: between(15, 45) } });
-    objs.push({ name: `${name}_repo`, kind: 'repo_curve', payload: { dates: [today, far], values: [repoRate, repoRate] } });
+    objs.push({ name: `${name}_repo`, kind: 'repo_curve', payload: curve10(today, between(0, 1), rnd) });
     objs.push({
       name: `${name}_div`,
       kind: 'continuous_dividends_curve',
-      payload: { dates: [today, far], values: [divYield, divYield] },
+      payload: curve10(today, between(0, 3), rnd),
     });
     objs.push({
       name,
