@@ -46,14 +46,21 @@ curves · **FX** pairs · **Correlation** matrix), AG-Grid inline editing, full 
 term-structures (flat/SABR/Heston), an **Advanced** schema-driven editor for other object
 kinds, and a **Generate sample data** button (`POST /api/workspaces/:id/objects/seed`,
 default 5 equities with realistic tickers / 3 currencies) — and **Pricing Grid**: pick the
-engine, contract **currency**, underlyings, strikes, and maturities (via a **date picker**);
-results render as a per-(underlying,type) **table — one row per (date, strike), premium +
-Greeks as columns** — with a note of which **cluster/server** priced it and how long it took
-(engine `task_time` + round-trip). The form, results and any in-flight job **persist across
-tab navigation** (engine is user-selected — CPU Monte-Carlo gives book-level Greeks only).
+engine (**ana / pde / mcl / mcl/gpu**), contract **currency**, underlyings, strikes, and
+maturities (via a **date picker**); a first visit prepopulates a ready-to-price default grid
+(strikes 80–120, the next five monthly maturities, EUR, European, Greeks on). Results render
+as an **option chain** — one block per maturity, **calls on the left and puts on the right of
+a central strike column, strikes top-to-bottom**, each wing showing premium + the per-cell
+Greeks — with a note of which **cluster/server** priced it and how long it took (engine
+`task_time` + round-trip). The form, results and any in-flight job **persist across tab
+navigation _and across a reconnection_** — the form is saved per workspace in `localStorage`
+and the last run is re-fetched by id on reload (the `GridRun` lives server-side), reattaching
+to the live job if it is still pricing. Per-cell Greeks come from **ana / pde / mcl/gpu**;
+CPU **mcl** gives book-level Greeks only.
 For **PDE/MCL** the grid builder synthesises a default engine-config object
-(`!pde_configuration` / `!mcl_configuration`) and auto-attaches the workspace's correlation
-matrix when the request carries none, so those engines price straight from the GUI.
+(`!pde_configuration` at the **medium** precision preset / `!mcl_configuration`, with
+`mcl/gpu` flipping `allow_gpu` on) and auto-attaches the workspace's correlation matrix when
+the request carries none, so those engines price straight from the GUI.
 Auth is JWT + rotating refresh cookie with an admin RBAC tab.
 
 **Run (prod, Docker):**

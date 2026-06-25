@@ -32,8 +32,10 @@ export interface ProgressSnapshot {
   active: boolean;
 }
 
-//! Engine selection for a pricing book. Per-cell Greeks require ana | pde (or GPU mcl).
-export type Engine = 'ana' | 'pde' | 'mcl';
+//! Engine selection for a pricing book. Per-cell Greeks require ana | pde | mcl_gpu
+//! (CPU mcl gives book-level Greeks only). `mcl_gpu` is the same !mcl_pricer as `mcl`
+//! but with allow_gpu set, so it runs the device Monte-Carlo and emits per-contract Greeks.
+export type Engine = 'ana' | 'pde' | 'mcl' | 'mcl_gpu';
 export type OptionType = 'call' | 'put';
 export type Exercise = 'european' | 'american';
 

@@ -1,6 +1,6 @@
 //! Wire types mirroring the Thoth BFF API (see web/bff and web/shared/src/types.ts).
 
-export type Engine = 'ana' | 'pde' | 'mcl';
+export type Engine = 'ana' | 'pde' | 'mcl' | 'mcl_gpu';
 export type OptionType = 'call' | 'put';
 export type Exercise = 'european' | 'american';
 export type UserRole = 'admin' | 'user';
@@ -97,6 +97,18 @@ export interface GridMatrix {
   maturities: string[];
   premium: number[][];
   greeks: Record<string, number[][]>;
+}
+
+//! One underlying's call/put matrices paired up for the option-chain display: a block per
+//! maturity, calls on the left and puts on the right, strikes running top-to-bottom. Either
+//! side may be absent when the user priced only calls or only puts.
+export interface OptionChain {
+  underlying: string;
+  currency: string;
+  strikes: number[];
+  maturities: string[];
+  call?: GridMatrix;
+  put?: GridMatrix;
 }
 
 //! Provenance of a computed grid: which server ran it and how long it took.

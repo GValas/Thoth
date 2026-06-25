@@ -24,8 +24,8 @@ Correlation::Correlation( const string& ObjectName ) : MarketData( ObjectName, K
 Correlation::~Correlation() = default;
 
 //! read the matrix (full "matrix" or symmetric/lower-triangular "symmetric_matrix"
-//! form — the latter not yet supported) and the optional "underlyings" / "forexs"
-//! name lists that index its rows and columns.
+//! form) and the optional "underlyings" / "forexs" name lists that index its rows
+//! and columns.
 void Correlation::Configure( ObjectReader& reader )
 {
     if ( reader.Has<vector<double>>( "matrix" ) )
@@ -77,11 +77,35 @@ void Correlation::SetMatrix( LaVector Matrix )
     }
 }
 
-//! setter
-void Correlation::SetSymmetricMatrix( la_vector* /*SymmetricMatrix*/ )
+//! setter: the YAML supplies only the lower triangle, row-major and including the
+//! diagonal — (0,0),(1,0),(1,1),(2,0),(2,1),(2,2)… — so its length is a triangular
+//! number n(n+1)/2 for an (n x n) matrix. Mirror it into a full row-major vector and
+//! reuse SetMatrix so the same reshape + symmetric-positive-definite validation applies.
+void Correlation::SetSymmetricMatrix( la_vector* SymmetricMatrix )
 {
-    //! not implemented; fail loudly rather than silently ignoring the matrix
-    ERR( "correlation '" + _name + "' : symmetric_matrix is not supported (use matrix)" );
+    LaVector tri( SymmetricMatrix ); //!< adopt -> freed on return
+    const size_t len = tri->size;
+    //! invert len = n(n+1)/2  ->  n = (-1 + sqrt(1 + 8*len)) / 2
+    const double nd = ( -1.0 + sqrt( 1.0 + 8.0 * (double)len ) ) / 2.0;
+    const size_t n = (size_t)( nd + 0.5 ); //!< round to nearest
+    if ( n * ( n + 1 ) / 2 != len )
+    {
+        ERR( "correlation '" + _name +
+             "' : symmetric_matrix length is not a triangular number n(n+1)/2" );
+    }
+    //! expand the lower triangle into a full n x n row-major vector (mirror j<->i)
+    LaVector full( la_vector_alloc( n * n ) );
+    size_t k = 0;
+    for ( size_t i = 0; i < n; ++i )
+    {
+        for ( size_t j = 0; j <= i; ++j )
+        {
+            const double v = la_vector_get( tri, k++ );
+            la_vector_set( full, i * n + j, v );
+            la_vector_set( full, j * n + i, v );
+        }
+    }
+    SetMatrix( std::move( full ) ); //!< reshape + positive-definite check + cache reset
 }
 
 //! setter for the FX legs of the matrix. They must form a *pivot basis*: every

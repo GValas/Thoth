@@ -101,19 +101,23 @@ export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
     });
   }
 
-  // --- fx: each non-base currency quoted against the base (currencies[0]); name = pair ---
+  // --- fx: a pivot basis — every pair shares the same *underlying* (pivot) currency,
+  // currencies[0], quoted against each other currency; name = "pivot/x". The engine's
+  // correlation triangle requires this common-underlying basis (Correlation::SetForexList
+  // takes the pivot from the first pair and rejects any pair anchored elsewhere), so the
+  // shared currency must be the underlying, not the base — cf. the canonical eur/usd sample.
   const fxNames: string[] = [];
-  const base = ccys[0];
-  for (const u of ccys.slice(1)) {
-    const pair = `${u}/${base}`;
+  const pivot = ccys[0];
+  for (const x of ccys.slice(1)) {
+    const pair = `${pivot}/${x}`;
     fxNames.push(pair);
     objs.push({ name: `${pair}_vol`, kind: 'bs_volatility', payload: { volatility: between(5, 15) } });
     objs.push({
       name: pair,
       kind: 'forex',
       payload: {
-        base_currency: base,
-        underlying_currency: u,
+        base_currency: x,
+        underlying_currency: pivot,
         spot: between(0.5, 2, 4),
         volatility: `${pair}_vol`,
       },

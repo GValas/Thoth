@@ -12,6 +12,7 @@
             <mat-button-toggle value="ana">ana</mat-button-toggle>
             <mat-button-toggle value="pde">pde</mat-button-toggle>
             <mat-button-toggle value="mcl">mcl</mat-button-toggle>
+            <mat-button-toggle value="mcl_gpu">mcl/gpu</mat-button-toggle>
           </mat-button-toggle-group>
           @if (!s.engine) {
             <span class="hint thoth-muted">Pick an engine to continue.</span>
@@ -32,7 +33,7 @@
 
         <div class="field">
           <label class="lbl">Exercise</label>
-          <mat-button-toggle-group [(value)]="s.exercise">
+          <mat-button-toggle-group [(value)]="s.exercise" (change)="s.persist()">
             <mat-button-toggle value="european">European</mat-button-toggle>
             <mat-button-toggle value="american">American</mat-button-toggle>
           </mat-button-toggle-group>
@@ -40,7 +41,7 @@
 
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ccy">
           <mat-label>Currency</mat-label>
-          <mat-select [(ngModel)]="s.currency">
+          <mat-select [(ngModel)]="s.currency" (ngModelChange)="s.persist()">
             @for (c of s.currencyNames(); track c) {
               <mat-option [value]="c">{{ c }}</mat-option>
             }
@@ -49,9 +50,9 @@
       </div>
 
       <div class="row underlyings-row">
-        <mat-form-field appearance="outline" class="grow">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
           <mat-label>Underlyings</mat-label>
-          <mat-select [(ngModel)]="s.selectedUnderlyings" multiple>
+          <mat-select [(ngModel)]="s.selectedUnderlyings" (ngModelChange)="s.persist()" multiple>
             @for (o of s.underlyingObjects(); track o.name) {
               <mat-option [value]="o.name">{{ o.name }} ({{ o.kind }})</mat-option>
             }
@@ -63,17 +64,14 @@
         <button mat-icon-button type="button" (click)="s.refreshObjects()" matTooltip="Reload underlyings from saved market data">
           <mat-icon>refresh</mat-icon>
         </button>
-      </div>
-
-      <div class="row">
-        <mat-form-field appearance="outline" class="grow">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
           <mat-label>Strikes (comma / space separated)</mat-label>
-          <input matInput [(ngModel)]="s.strikesText" placeholder="90, 100, 110" />
+          <input matInput [(ngModel)]="s.strikesText" (ngModelChange)="s.persist()" placeholder="90, 100, 110" />
         </mat-form-field>
       </div>
 
       <div class="row maturities-row">
-        <mat-form-field appearance="outline" class="datepick">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="datepick">
           <mat-label>Add maturity</mat-label>
           <input
             matInput
@@ -95,18 +93,11 @@
             <span class="hint thoth-muted">Pick one or more maturity dates.</span>
           }
         </mat-chip-set>
-      </div>
-
-      <div class="row greeks-row">
-        <mat-checkbox [(ngModel)]="s.includeGreeks" [disabled]="s.mclSelected()">
+        <span class="thoth-spacer"></span>
+        <mat-checkbox class="greeks-check" [(ngModel)]="s.includeGreeks" (ngModelChange)="s.persist()" [disabled]="s.mclSelected()"
+          [matTooltip]="s.mclSelected() ? 'CPU Monte-Carlo gives book-level Greeks only' : ''">
           Per-cell Greeks
         </mat-checkbox>
-        @if (s.mclSelected()) {
-          <span class="hint thoth-muted">
-            <mat-icon>info</mat-icon>
-            CPU Monte-Carlo gives book-level Greeks only
-          </span>
-        }
       </div>
     </mat-card-content>
     <mat-card-actions align="end">
@@ -145,8 +136,11 @@
     </p>
   }
 
-  @for (mx of s.matrices(); track mx.underlying + mx.type) {
-    <app-results-table [matrix]="mx"></app-results-table>
+  @for (chain of s.chains(); track chain.underlying; let first = $first) {
+    @if (!first) {
+      <hr class="chain-sep" />
+    }
+    <app-option-chain [chain]="chain"></app-option-chain>
   }
 } @else {
   <p class="thoth-muted">Loading…</p>

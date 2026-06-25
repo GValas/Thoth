@@ -71,6 +71,166 @@ static bool PollSlaveProgress( const string& Url, long& Current, long& Total, bo
     return true;
 }
 
+//! split a single ANA/PDE pricer's BOOK across the slaves by contract: each slave prices
+//! a disjoint subset of the contracts and the results are reassembled. This is exact for
+//! these engines because every contract is priced independently (no cross-contract
+//! coupling; the shared market data + correlation are replicated to each slave), so the
+//! per-contract fields are identical to a single-box run and the book-level aggregates are
+//! just their sum. Per-contract fields (<contract>_*) are disjoint across slaves and so
+//! unioned; book-level fields (premium, premium_trust, the book Greeks and any model-param
+//! vega_<x>) are summed (premium_trust in quadrature); task_time becomes the slowest slave
+//! (the work runs in parallel). Caller guarantees >= 2 contracts and >= 2 slaves.
+static string ClusterPriceByContract( const string& Body,
+                                      const string& task,
+                                      const string& TaskName,
+                                      const vector<string>& Slaves )
+{
+    YamlConfig req( YamlConfig::from_string_t{}, Body );
+    const string book = req.GetString( task + ".book" );
+    const vector<string> contracts = req.GetStringList( book + ".contracts" );
+    const string result = req.GetString( task + ".result" );
+
+    const int N = std::min( (int)Slaves.size(), (int)contracts.size() );
+
+    //! round-robin partition: cells are emitted in (strike, maturity) order with maturity
+    //! innermost, so dealing them out cyclically spreads the costlier long maturities evenly
+    //! across slaves rather than piling them onto the last chunk.
+    vector<vector<string>> chunks( N );
+    for ( size_t i = 0; i < contracts.size(); i++ )
+    {
+        chunks[i % N].push_back( contracts[i] );
+    }
+
+    //! one body per slave: the same document with the book's contract list reduced to the
+    //! chunk (mutate `req` in place and snapshot via Dump, as the MCL path-split does).
+    vector<string> bodies( N );
+    for ( int k = 0; k < N; k++ )
+    {
+        req.Set( book + ".contracts", chunks[k] );
+        bodies[k] = req.Dump();
+    }
+
+    LOG( "CLU", "splitting " + std::to_string( contracts.size() ) + " contracts across " +
+                    std::to_string( N ) + " slave(s)" );
+
+    //! dispatch concurrently : one thread per slave, errors captured per index (same pattern
+    //! and progress aggregation as the MCL path-split).
+    vector<string> responses( N );
+    vector<std::exception_ptr> errs( N );
+    vector<std::thread> threads;
+    for ( int k = 0; k < N; k++ )
+    {
+        threads.emplace_back( [&, k]()
+                              {
+            try { responses[k] = PostToSlave( Slaves[k], bodies[k], TaskName ); }
+            catch ( ... ) { errs[k] = std::current_exception(); } } );
+    }
+
+    std::atomic<bool> dispatching{ true };
+    std::thread poller( [&]()
+                        {
+        ProgressBar bar( "CLU", 100 );
+        while ( dispatching.load() )
+        {
+            long sum_cur = 0, sum_tot = 0;
+            for ( int k = 0; k < N; k++ )
+            {
+                long c = 0, t = 0; bool a = false;
+                if ( PollSlaveProgress( Slaves[k], c, t, a ) ) { sum_cur += c; sum_tot += t; }
+            }
+            if ( sum_tot > 0 )
+            {
+                bar.Update( std::min<long>( 99, 100 * sum_cur / sum_tot ) );
+            }
+            std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+        }
+        bar.Done(); } );
+
+    for ( auto& t : threads )
+    {
+        t.join();
+    }
+    dispatching.store( false );
+    poller.join();
+
+    for ( int k = 0; k < N; k++ )
+    {
+        if ( errs[k] )
+        {
+            std::rethrow_exception( errs[k] );
+        }
+    }
+
+    //! a key is per-contract iff it is "<contract>_<metric>" for one of the book's
+    //! contracts; the trailing underscore keeps "cell_..._1" from matching "cell_..._10".
+    auto is_per_contract = [&]( const string& key )
+    {
+        for ( const string& c : contracts )
+        {
+            if ( key.size() > c.size() + 1 && key.rfind( c + "_", 0 ) == 0 )
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    //! base = first slave's full document; overwrite book-level fields with the cross-slave
+    //! sums and fold in the other slaves' (disjoint) per-contract fields.
+    YamlConfig out( YamlConfig::from_string_t{}, responses[0] );
+    map<string, double> book_sum; //!< summed book-level means (premium + Greeks)
+    double trust2 = 0.0;          //!< book premium_trust combined in quadrature
+    double max_time = 0.0;        //!< parallel wall time = slowest slave
+
+    for ( int k = 0; k < N; k++ )
+    {
+        YamlConfig r( YamlConfig::from_string_t{}, responses[k] );
+        for ( const string& key : r.GetChildKeys( result ) )
+        {
+            const string path = result + "." + key;
+            if ( key == "task_time" )
+            {
+                if ( r.IsDouble( path ) )
+                {
+                    max_time = std::max( max_time, r.GetDouble( path, 0.0 ) );
+                }
+                continue;
+            }
+            if ( !r.IsDouble( path ) )
+            {
+                continue; //!< strings (kind, *_graph) : keep the base slave's copy
+            }
+            const double v = r.GetDouble( path, 0.0 );
+            if ( is_per_contract( key ) )
+            {
+                if ( k != 0 )
+                {
+                    out.Set( path, v ); //!< slave 0's per-contract fields are already in `out`
+                }
+            }
+            else if ( key == "premium_trust" )
+            {
+                trust2 += v * v;
+            }
+            else
+            {
+                book_sum[key] += v; //!< book-level aggregate -> sum
+            }
+        }
+    }
+
+    for ( const auto& [key, v] : book_sum )
+    {
+        out.Set( result + "." + key, v );
+    }
+    out.Set( result + ".premium_trust", sqrt( trust2 ) );
+    out.Set( result + ".task_time", max_time );
+    out.Set( "system_information.cluster",
+             "book of " + std::to_string( contracts.size() ) + " contract(s) split over " +
+                 std::to_string( N ) + " slave(s)" );
+    return out.Dump();
+}
+
 //! forward declaration : a !sequence is dispatched per sub-task (mutual recursion
 //! with ClusterPrice, which a sub-task re-enters as an individual pricer).
 static string ClusterPriceSequence( const string& Body,
@@ -118,10 +278,26 @@ static string ClusterPrice( const string& Body,
     }
     if ( !splittable )
     {
+        //! ANA / PDE : the per-contract solves are independent, so split the book across
+        //! the slaves by contract (each prices a disjoint subset) instead of running the
+        //! whole book single-threaded on the master. Worth it only with something to
+        //! parallelise (>= 2 contracts AND >= 2 slaves); GPU-MCL stays on the master since
+        //! it uses the master's device, not the CPU slaves.
+        const string tag = req.GetTag( task );
+        if ( ( tag == KIND_ANA_PRICER || tag == KIND_PDE_PRICER ) && Slaves.size() >= 2 )
+        {
+            const string book = req.GetString( task + ".book", "" );
+            if ( !book.empty() && req.IsStringList( book + ".contracts" ) &&
+                 req.GetStringList( book + ".contracts" ).size() >= 2 )
+            {
+                return ClusterPriceByContract( Body, task, TaskName, Slaves );
+            }
+        }
+
         //! computed on the master rather than offloading a whole, unsplit job onto
-        //! one slave (non-MCL engine, an MCL pricer with no path config, or a GPU
-        //! cell which runs on the master's device). Under the master's price_mutex,
-        //! so it stays serialised with the rest of the cluster pricing.
+        //! one slave (a GPU cell on the master's device, or an ANA/PDE book too small
+        //! to split). Under the master's price_mutex, so it stays serialised with the
+        //! rest of the cluster pricing.
         LOG( allow_gpu ? "GPU" : "CLU",
              allow_gpu ? "GPU pricer : computing on the master device (not path-split)"
                        : "request is not a splittable MCL pricer : computing on the master" );
@@ -334,6 +510,20 @@ int RunClusterMaster( int Port,
 
     server.Get( "/health", []( const httplib::Request&, httplib::Response& res )
                 { res.set_content( "ok\n", "text/plain" ); } );
+
+    //! progress of the in-flight cluster pricing : "<current> <total> <active 0|1>",
+    //! same contract as the plain server so a BFF (or any poller) leasing the master
+    //! reads it uniformly. Reads only atomics (no price_mutex), so it answers while a
+    //! price runs. It is populated whether the master path-splits (the aggregate "CLU"
+    //! bar publishes the global percent) or computes on its own device (ANA / PDE /
+    //! mcl_gpu — the inner pricer's bar publishes directly). Without it the master 404s
+    //! every poll, which the BFF surfaces as a failed grid even though the price ran.
+    server.Get( "/progress", []( const httplib::Request&, httplib::Response& res )
+                {
+        const GlobalProgress& g = global_progress();
+        std::ostringstream oss;
+        oss << g.current.load() << " " << g.total.load() << " " << ( g.active.load() ? 1 : 0 );
+        res.set_content( oss.str(), "text/plain" ); } );
 
     server.Post( "/price", [Slaves]( const httplib::Request& req, httplib::Response& res )
                  {

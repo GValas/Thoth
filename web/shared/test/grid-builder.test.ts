@@ -54,7 +54,7 @@ describe('grid builder', () => {
     const pdeName = (pdeDoc.grid as any).pde_configuration as string;
     expect(typeof pdeName).toBe('string');
     expect((pdeDoc[pdeName] as any)[TAG_KEY]).toBe('pde_configuration');
-    expect((pdeDoc[pdeName] as any).vanilla_precision).toBe('high');
+    expect((pdeDoc[pdeName] as any).vanilla_precision).toBe('medium');
 
     // MCL: a !mcl_configuration object with the required fields is created and referenced.
     const mclDoc = buildGridDoc({ ...req, engine: 'mcl' }, ctx);
@@ -104,5 +104,15 @@ describe('grid builder', () => {
     expect(engineHasPerCellGreeks('mcl')).toBe(false);
     const mats = parseGridResult({}, { ...req, engine: 'mcl' });
     expect(mats[0].greeks.delta).toBeUndefined();
+  });
+
+  it('mcl_gpu is an mcl_pricer with allow_gpu set, and has per-cell Greeks', () => {
+    expect(engineHasPerCellGreeks('mcl_gpu')).toBe(true);
+    const doc = buildGridDoc({ ...req, engine: 'mcl_gpu' }, ctx);
+    expect((doc.grid as any)[TAG_KEY]).toBe('mcl_pricer'); // same tag as cpu mcl
+    const cfgName = (doc.grid as any).mcl_configuration as string;
+    const cfg = doc[cfgName] as any;
+    expect(cfg[TAG_KEY]).toBe('mcl_configuration');
+    expect(cfg.allow_gpu).toBe(true);
   });
 });

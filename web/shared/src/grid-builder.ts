@@ -9,10 +9,13 @@
 import { TAG_KEY, type CellResult, type Engine, type GridMatrix, type GridRequest } from './types.js';
 import { dumpBook } from './yaml.js';
 
+//! mcl_gpu is the same !mcl_pricer as mcl; the GPU is selected via allow_gpu in its
+//! mcl_configuration (see the config block in buildGridDoc), not by a distinct tag.
 const PRICER_TAG: Record<Engine, string> = {
   ana: 'ana_pricer',
   pde: 'pde_pricer',
   mcl: 'mcl_pricer',
+  mcl_gpu: 'mcl_pricer',
 };
 
 const GREEK_FIELDS = ['delta', 'gamma', 'vega', 'rho', 'theta'] as const;
@@ -24,8 +27,12 @@ const GREEK_FIELDS = ['delta', 'gamma', 'vega', 'rho', 'theta'] as const;
 const DEFAULT_CONFIG_NAME = '_grid_engine_config';
 
 //! Default parameter objects, mirroring the canonical single-vanilla samples
-//! (samples/simple_call.out.yaml for MCL; the engine's own "high" preset for PDE).
-const DEFAULT_PDE_CONFIG: Record<string, unknown> = { vanilla_precision: 'high' };
+//! (samples/simple_call.out.yaml for MCL). The PDE grid uses the "medium" preset
+//! (1001 x 601) rather than "high" (1501 x 1301): an interactive strike x maturity
+//! grid solves one finite-difference grid PER cell, and "high" is ~3.2x the node-steps
+//! for sub-pip extra precision that a premium screen does not need. Callers wanting the
+//! finer grid pass an explicit pde_configuration (configName) with vanilla_precision:high.
+const DEFAULT_PDE_CONFIG: Record<string, unknown> = { vanilla_precision: 'medium' };
 const DEFAULT_MCL_CONFIG: Record<string, unknown> = {
   max_day_step: 1,
   min_day_step: -1,
@@ -34,9 +41,11 @@ const DEFAULT_MCL_CONFIG: Record<string, unknown> = {
   use_sobol: true,
 };
 
-//! Engines that emit per-contract Greek fields (GreeksPerContract()==true).
+//! Engines that emit per-contract Greek fields (GreeksPerContract()==true): ANA, PDE and
+//! GPU-MCL (PricerMCL::GreeksPerContract() returns true once the device path is active).
+//! CPU MCL gives book-level Greeks only, so its per-cell Greek matrices come back empty.
 export function engineHasPerCellGreeks(engine: Engine): boolean {
-  return engine === 'ana' || engine === 'pde';
+  return engine === 'ana' || engine === 'pde' || engine === 'mcl_gpu';
 }
 
 function pad(n: number, width: number): string {
@@ -113,15 +122,20 @@ export function buildGridDoc(req: GridRequest, ctx: GridContext): Record<string,
 
   // Engine config: explicit ref wins; otherwise synthesise a default object so a grid
   // priced from the GUI (no configName) still has a valid pde/mcl_configuration reference.
-  if (req.engine === 'pde' || req.engine === 'mcl') {
+  if (req.engine !== 'ana') {
     const field = req.engine === 'pde' ? 'pde_configuration' : 'mcl_configuration';
     const configName = ctx.configName ?? DEFAULT_CONFIG_NAME;
     pricer[field] = configName;
     if (!ctx.configName) {
-      doc[configName] = {
-        [TAG_KEY]: field,
-        ...(req.engine === 'pde' ? DEFAULT_PDE_CONFIG : DEFAULT_MCL_CONFIG),
-      };
+      //! mcl_gpu reuses the MCL defaults but flips allow_gpu on, so the synthesised
+      //! config runs the device Monte-Carlo (and thus emits per-contract Greeks).
+      const defaults =
+        req.engine === 'pde'
+          ? DEFAULT_PDE_CONFIG
+          : req.engine === 'mcl_gpu'
+            ? { ...DEFAULT_MCL_CONFIG, allow_gpu: true }
+            : DEFAULT_MCL_CONFIG;
+      doc[configName] = { [TAG_KEY]: field, ...defaults };
     }
   }
   doc[ctx.pricerName] = pricer;

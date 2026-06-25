@@ -129,7 +129,9 @@ underlying's surface exposes is silently skipped.
   `discrete_dividends`, `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
   read by **linear interpolation on the (continuously-compounded) rate** between
   pillars (ACT/365 weight), held flat beyond the first/last pillar. A
-  `correlation_matrix` must be symmetric positive-definite (validated at load).
+  A `correlation_matrix` takes either a full row-major `matrix` or a lower-triangular
+  `symmetric_matrix` (diagonal included, length `n(n+1)/2`); either way it must be
+  symmetric positive-definite (validated at load).
   `discrete_dividends` is an (ex-`dates`, cash `amounts`) schedule on an equity,
   priced by the **escrowed-dividend model**: the forward (and the MCL diffusion
   spot) net the present value of the dividends due before maturity off the spot,
@@ -368,7 +370,7 @@ aggregate the results:
 # then POST a book to the master (single-MCL-pricer books get path-split):
 ./build/thoth -client http://localhost:8090 samples/simple_call.yaml
 # a !sequence (e.g. the matrix) is dispatched cell by cell — each MCL cell is
-# path-split across the slaves in turn, ANA/PDE cells compute on the master:
+# path-split, ANA/PDE cells are book-split by contract across the slaves:
 ./scripts/run_local_client_matrix.sh samples/matrix.yaml --port 8090
 ```
 
@@ -383,18 +385,30 @@ per-slave variances for the `*_trust` standard errors. Pooling is
 schema-agnostic (it enumerates the result keys rather than matching a fixed
 list), so a new result field aggregates without touching the master. The
 pooling is exact: 2×100k slaves reproduce a single 200k-path run to machine
-precision. A **`!sequence`** root is dispatched task by task: each MCL cell is
-path-split across the slaves in turn (ANA/PDE and other non-splittable cells are
-computed by the master), and every cell's result block is gathered into one
-response — so the full matrix gets the cluster applied cell by cell. Any other
-non-splittable root (a non-MCL engine, an MCL pricer with no path config) is
-computed by the **master itself** rather than offloaded whole onto a slave.
+precision. An **ANA/PDE book** is instead **split by contract**: with ≥2 contracts
+and ≥2 slaves, each slave prices a disjoint subset of the contracts (their
+per-contract solves are independent — no cross-contract coupling, and the market
+data + correlation are replicated to every slave), so the result is identical to a
+single-box run. The per-contract result fields are unioned across slaves and the
+book-level aggregates summed (premium, the book Greeks, the model-param
+`vega_<param>`; `premium_trust` in quadrature), with `task_time` reported as the
+slowest slave. This turns a strike×maturity PDE grid — one finite-difference solve
+per cell — into a fan-out across the whole slave pool. A **`!sequence`** root is
+dispatched task by task: each MCL cell is path-split and each ANA/PDE cell
+book-split across the slaves in turn, and every cell's result block is gathered
+into one response — so the full matrix gets the cluster applied cell by cell. The
+remaining non-splittable roots (a GPU-MCL cell, which uses the master's device, or
+a book too small to split) are computed by the **master itself** rather than
+offloaded whole onto a slave.
 
 While the slaves run, the master draws an **approximate global progress bar** by
-polling each slave's `GET /progress` (the in-flight pricing's path count) and
-summing them — paths done / paths total across the cluster, as a percent. A slave
+polling each slave's `GET /progress` (the in-flight pricing's path/contract count)
+and summing them — work done / work total across the cluster, as a percent. A slave
 that fails to answer a poll simply drops out of that tick's total, so the bar
-degrades gracefully rather than stalling.
+degrades gracefully rather than stalling. The master **re-exposes that aggregate**
+on its own `GET /progress` (same `"<current> <total> <active>"` contract as a plain
+`-server`), so a client leasing the master — e.g. the web BFF — reads progress
+uniformly whether the work was path-split, contract-split or run on the master.
 
 ### Docker
 

@@ -53,9 +53,17 @@ export class EngineService {
   }
 
   //! Best-effort progress for a running job (null if the job isn't currently pricing).
+  //! Swallows any /progress failure (e.g. an engine without the endpoint, or a transient
+  //! error) -> null, so polling degrades to "no live progress" instead of 500-ing the
+  //! grid: the price itself runs independently of this poll.
   async jobProgress(jobId: string): Promise<ProgressSnapshot | null> {
     const client = this.activeByJob.get(jobId);
-    return client ? client.progress() : null;
+    if (!client) return null;
+    try {
+      return await client.progress();
+    } catch {
+      return null;
+    }
   }
 
   async healthyReplicas(): Promise<number> {

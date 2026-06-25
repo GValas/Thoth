@@ -14,7 +14,7 @@ import { GridService, type GridSubmitDto } from './grid.service';
 
 class GridDto implements GridSubmitDto {
   @IsString() workspaceId!: string;
-  @IsIn(['ana', 'pde', 'mcl']) engine!: 'ana' | 'pde' | 'mcl';
+  @IsIn(['ana', 'pde', 'mcl', 'mcl_gpu']) engine!: 'ana' | 'pde' | 'mcl' | 'mcl_gpu';
   @IsArray() @ArrayNotEmpty() @IsString({ each: true }) underlyings!: string[];
   @IsArray() @ArrayNotEmpty() @IsIn(['call', 'put'], { each: true }) types!: ('call' | 'put')[];
   @IsArray() @ArrayNotEmpty() @IsNumber({}, { each: true }) strikes!: number[];

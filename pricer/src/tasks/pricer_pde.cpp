@@ -365,10 +365,20 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     LaVector U_1 = la_vector_calloc( _j + 1 );
     // la_matrix * V        = la_matrix_calloc(J+1, N+1);
 
+    //! the grid is uniform in x and the Black-Scholes operator coefficients depend only
+    //! on x (not t), so the node spot levels Phi(j*h) are constant across the backward
+    //! sweep: precompute them once and reuse for the payoff, the American exercise test
+    //! and the discrete-barrier mask instead of re-evaluating sinh per step.
+    vector<double> phi_node( _j + 1 );
+    for ( int j = 0; j <= _j; j++ )
+    {
+        phi_node[j] = Phi( j * _h );
+    }
+
     // init U_1 (boundaries)     u(x) = V(X)  X = phi(x) x =
     for ( int i = 0; i < _j + 1; i++ )
     {
-        la_vector_set( U_1, i, Ctr->Intrinsic( Phi( i * _h ) ) );
+        la_vector_set( U_1, i, Ctr->Intrinsic( phi_node[i] ) );
     }
 
     //! discrete barrier observed at maturity (terminal step N)
@@ -397,6 +407,18 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // PrintList(diag_m);
     // PrintList(diag_d);
 
+    //! the explicit RHS matrix T_1 is time-independent too, so assemble its three interior
+    //! diagonals once here rather than recomputing T_1(j, .) — and the sinh/cosh transformed
+    //! grid coefficients behind it — for every node on every backward step. This turns the
+    //! backward loop into pure arithmetic and is the bulk of the per-contract speedup.
+    vector<double> t1_d( _j + 1, 0.0 ), t1_m( _j + 1, 0.0 ), t1_u( _j + 1, 0.0 );
+    for ( int j = 1; j < _j; j++ )
+    {
+        t1_d[j] = T_1( j, j - 1 ); //!< sub   (couples to U_1[j-1])
+        t1_m[j] = T_1( j, j );     //!< main  (couples to U_1[j])
+        t1_u[j] = T_1( j, j + 1 ); //!< super (couples to U_1[j+1])
+    }
+
     // backwarding
     for ( int i = _n - 1; i >= 0; i-- )
     {
@@ -406,7 +428,10 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         la_vector_set( D_1, _j, _u_up ); // up boundary (fonction de t?)
         for ( int j = 1; j < _j; j++ )
         {
-            la_vector_set( D_1, j, T_1( j, j - 1 ) * la_vector_get( U_1, j - 1 ) + T_1( j, j ) * la_vector_get( U_1, j ) + T_1( j, j + 1 ) * la_vector_get( U_1, j + 1 ) );
+            la_vector_set( D_1, j,
+                           t1_d[j] * la_vector_get( U_1, j - 1 ) +
+                               t1_m[j] * la_vector_get( U_1, j ) +
+                               t1_u[j] * la_vector_get( U_1, j + 1 ) );
         }
 
         // PrintList(D_1);
@@ -421,7 +446,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         {
             for ( int k = 0; k < _j + 1; k++ )
             {
-                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( ObservedSpot( Phi( k * _h ), i ) ) );
+                U_0->data[k] = max( U_0->data[k], Ctr->Intrinsic( ObservedSpot( phi_node[k], i ) ) );
             }
         }
 

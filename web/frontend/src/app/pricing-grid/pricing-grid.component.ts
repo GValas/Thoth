@@ -14,7 +14,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { GridStateService } from './grid-state.service';
-import { ResultsTableComponent } from './results-table.component';
+import { OptionChainComponent } from './option-chain.component';
 
 //! Pricing-grid builder. All state lives in GridStateService (root-scoped) so the form,
 //! results and any in-flight job survive tab navigation; this component is just the view.
@@ -36,7 +36,7 @@ import { ResultsTableComponent } from './results-table.component';
     MatProgressBarModule,
     MatTooltipModule,
     MatDatepickerModule,
-    ResultsTableComponent,
+    OptionChainComponent,
   ],
   providers: [provideNativeDateAdapter()],
   templateUrl: './pricing-grid.component.html',
