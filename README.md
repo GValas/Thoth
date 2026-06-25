@@ -70,8 +70,6 @@ cp .env.example .env          # then edit the secrets (JWT_*, ADMIN_PASSWORD)
 scripts/prod.sh               # build + start, wait for health, then STAY ATTACHED
 # open http://localhost:7777  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
 # Ctrl-C here tears the whole stack down in cascade; scripts/prod.sh logs|ps|down to manage it
-
-scripts/prod-react.sh         # same stack, but serves the React POC frontend (web/frontend-react)
 ```
 
 `scripts/prod.sh` wraps `docker compose` (`docker-compose.yml`: redis · 2 GPU clusters ·
@@ -103,8 +101,7 @@ Thoth/
 ├── web/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid builder
 │   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid)
-│   ├── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
-│   └── frontend-react/  # React + Vite POC of the Pricing Grid (same BFF, no backend change)
+│   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/
 └── todo-gui.md          # web dashboard design notes
