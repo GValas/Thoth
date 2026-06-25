@@ -8,7 +8,7 @@ repository:
 | Path | What it is |
 |------|------------|
 | [`pricer/`](pricer/README.md) | **The C++23 pricing engine** — Monte-Carlo, PDE and analytic pricers; multi-asset / multi-currency books; YAML-configured; usable as a batch tool or an HTTP service (`thoth -server`). This is the mature, fully-tested core. See **[`pricer/README.md`](pricer/README.md)**. |
-| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), and compute strike × maturity price grids (heatmap + Greeks). The engine is used unmodified as a pricing microservice. |
+| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), and compute strike × maturity price grids (an option-chain view + Greeks). The engine is used unmodified as a pricing microservice. |
 
 ## Engine quickstart
 
