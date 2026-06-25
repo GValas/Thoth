@@ -1,8 +1,8 @@
 import { Component, Input, computed, signal } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 import { AgGridAngular } from 'ag-grid-angular';
-import type { ColDef, ColGroupDef, ValueFormatterParams } from 'ag-grid-community';
-import { OptionChain } from '../core/models';
+import type { CellClassParams, ColDef, ColGroupDef, ValueFormatterParams } from 'ag-grid-community';
+import { GridMatrix, OptionChain } from '../core/models';
 
 const GREEKS = ['delta', 'gamma', 'vega', 'rho', 'theta'];
 
@@ -37,6 +37,7 @@ interface ChainBlock {
               class="ag-theme-quartz oc-grid"
               [rowData]="block.rows"
               [columnDefs]="cols()"
+              [context]="{ maturity: block.maturity }"
               [domLayout]="'autoHeight'"
             ></ag-grid-angular>
           </div>
@@ -93,6 +94,13 @@ interface ChainBlock {
       :host ::ng-deep .oc-prem {
         font-weight: 600;
       }
+      /* live move tint on the value cells (premium + Greeks) */
+      :host ::ng-deep .oc-up {
+        color: #1b8a4b;
+      }
+      :host ::ng-deep .oc-down {
+        color: #c2374a;
+      }
     `,
   ],
 })
@@ -100,7 +108,55 @@ export class OptionChainComponent {
   //! @Input bridged into a signal so the columns/blocks/labels recompute reactively.
   private readonly chainSig = signal<OptionChain | null>(null);
   @Input({ required: true }) set chain(v: OptionChain) {
+    this.computeDirections(v); //!< before chainSig.set: compare to the previous values
     this.chainSig.set(v);
+  }
+
+  //! per-cell move direction (+1 up / -1 down) of the LAST update, keyed
+  //! "<maturity>|<strike>|<field>"; drives the green/red cell tint while live re-pricing
+  //! makes the premia/Greeks move (same idea as the live spot column on Market Data).
+  private readonly dir = signal<Map<string, number>>(new Map());
+  private readonly prevValue = new Map<string, number>();
+
+  private dirKey(maturity: string, strike: number, field: string): string {
+    return `${maturity}|${strike}|${field}`;
+  }
+
+  //! diff the incoming chain against the last one (per maturity/strike/field): cells that
+  //! changed get +1/-1, unchanged ones drop out (no tint). A static grid never changes, so
+  //! it stays untinted; live re-pricing repaints every tick.
+  private computeDirections(next: OptionChain): void {
+    const side = next.call ?? next.put;
+    const metrics = ['premium', ...(side ? GREEKS.filter((g) => side.greeks?.[g]) : [])];
+    const wings: Array<['c' | 'p', GridMatrix]> = [];
+    if (next.call) wings.push(['c', next.call]);
+    if (next.put) wings.push(['p', next.put]);
+
+    const dirs = new Map<string, number>();
+    next.maturities.forEach((maturity, j) => {
+      next.strikes.forEach((strike, i) => {
+        for (const [prefix, m] of wings) {
+          for (const metric of metrics) {
+            const v = metric === 'premium' ? m.premium[i]?.[j] : m.greeks[metric]?.[i]?.[j];
+            if (v == null || !Number.isFinite(v)) continue;
+            const key = this.dirKey(maturity, strike, `${prefix}_${metric}`);
+            const prev = this.prevValue.get(key);
+            if (prev !== undefined && v !== prev) dirs.set(key, Math.sign(v - prev));
+            this.prevValue.set(key, v);
+          }
+        }
+      });
+    });
+    this.dir.set(dirs);
+  }
+
+  //! direction for a rendered cell, from the grid context (maturity) + row (strike) + column.
+  private cellDir(p: CellClassParams<ChainRow>): number {
+    const maturity = (p.context as { maturity?: string } | undefined)?.maturity;
+    const field = p.colDef.field;
+    const strike = p.data?.strike;
+    if (!maturity || !field || strike == null) return 0;
+    return this.dir().get(this.dirKey(maturity, strike, field)) ?? 0;
   }
 
   //! Greeks visibility: when folded, only premium + strike columns are shown.
@@ -131,6 +187,11 @@ export class OptionChainComponent {
           width: metric === 'premium' ? 112 : 88,
           type: 'rightAligned',
           cellClass: metric === 'premium' ? 'oc-prem' : undefined,
+          //! green/red tint on the last move (live re-pricing); static grids never change.
+          cellClassRules: {
+            'oc-up': (p: CellClassParams<ChainRow>) => this.cellDir(p) > 0,
+            'oc-down': (p: CellClassParams<ChainRow>) => this.cellDir(p) < 0,
+          },
           valueFormatter: fmt,
         })),
       };
