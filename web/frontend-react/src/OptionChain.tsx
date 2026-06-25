@@ -20,9 +20,9 @@ function cell(m: GridMatrix | undefined, metric: string, i: number, j: number): 
 //! Option-chain view of one underlying: a block per maturity, CALLS left / PUTS right of a
 //! central Strike column, strikes ascending top-to-bottom. Greek columns fold behind a toggle.
 export function OptionChainView({ chain }: { chain: OptionChain }) {
-  const [fold, setFold] = useState(false);
+  const [activeMat, setActiveMat] = useState(0);
   const present = useMemo(() => presentGreeks(chain), [chain]);
-  const metrics = fold ? ['premium'] : ['premium', ...present];
+  const metrics = ['premium', ...present];
   const callMetrics = [...metrics].reverse(); // premium ends next to the strike
   const order = useMemo(
     () => chain.strikes.map((strike, i) => ({ strike, i })).sort((a, b) => a.strike - b.strike),
@@ -33,21 +33,18 @@ export function OptionChainView({ chain }: { chain: OptionChain }) {
 
   return (
     <div className="chain">
-      <div className="chain-head">
-        <span className="chain-name">{chain.underlying}</span>
-        <span className="muted">{chain.currency}</span>
-        <span className="spacer" />
-        {present.length > 0 && (
-          <button className="link" onClick={() => setFold(!fold)}>
-            {fold ? 'Show Greeks' : 'Hide Greeks'}
+      <div className="tabs sub">
+        {chain.maturities.map((mat, j) => (
+          <button key={mat} className={j === activeMat ? 'tab on' : 'tab'} onClick={() => setActiveMat(j)}>
+            {mat}
           </button>
-        )}
+        ))}
       </div>
 
-      {chain.maturities.map((mat, j) => (
-        <div className="block" key={mat}>
-          <div className="mat">{mat}</div>
-          <table className="oc">
+      {chain.maturities.map((mat, j) =>
+        j !== activeMat ? null : (
+          <div className="block" key={mat}>
+            <table className="oc">
             <thead>
               <tr className="groups">
                 {chain.call && <th className="calls" colSpan={callMetrics.length}>Calls</th>}

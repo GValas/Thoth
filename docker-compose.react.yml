@@ -1,0 +1,14 @@
+# Override layer that swaps the `web` SPA for the React POC frontend. Use it on top of the
+# base compose file, e.g.:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.react.yml up --build
+#   # or simply:  scripts/prod-react.sh
+#
+# Only the build context changes — the service keeps its base ports / depends_on / network,
+# so it still serves on :7777 and reverse-proxies /api to the same BFF. The BFF and engines
+# are untouched, so the React frontend talks to the exact same backend as the Angular one.
+services:
+  web:
+    build:
+      context: ./web/frontend-react
+      dockerfile: Dockerfile

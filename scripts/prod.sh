@@ -35,7 +35,14 @@ CMD="${1:-up}"
 command -v docker >/dev/null 2>&1 || { echo "error: docker not found" >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "error: 'docker compose' (v2) not found" >&2; exit 1; }
 
-compose() { docker compose -f "$ROOT/docker-compose.yml" "$@"; }
+# Optional extra compose file layered on top of the base (e.g. docker-compose.react.yml to
+# swap in the React frontend) — set COMPOSE_EXTRA to its repo-relative path. prod-react.sh
+# uses this; leaving it unset keeps the plain Angular stack.
+compose() {
+  local extra=()
+  [[ -n "${COMPOSE_EXTRA:-}" ]] && extra=(-f "$ROOT/$COMPOSE_EXTRA")
+  docker compose -f "$ROOT/docker-compose.yml" "${extra[@]}" "$@"
+}
 
 case "$CMD" in
   down)    compose down; exit 0 ;;

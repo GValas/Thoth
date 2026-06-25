@@ -69,14 +69,17 @@ export class MarketModel {
     this.syncForex();
   }
 
-  //! FX pairs are derived, not hand-added: keep exactly one !forex per non-base currency,
-  //! quoted against the first (base) currency. Creates missing pairs (+ their flat vol),
-  //! drops stale ones (currency removed / base changed); existing spot & vol are preserved.
+  //! FX pairs are derived, not hand-added: keep exactly one !forex per non-pivot currency.
+  //! They must form a *pivot basis* — every pair shares the same underlying (pivot) currency,
+  //! the first currency — because the engine's correlation triangle requires it (see
+  //! Correlation::SetForexList) and the seed generator uses the same convention. So the pair
+  //! is named "<pivot>/<x>" with underlying_currency = pivot, base_currency = x. Creates
+  //! missing pairs (+ their flat vol), drops stale ones; existing spot & vol are preserved.
   syncForex(): void {
     const ccys = this.currencyNames();
-    const base = ccys[0];
-    const desired = new Map<string, string>(); // pair name -> underlying currency
-    if (base) for (const u of ccys.slice(1)) desired.set(`${u}/${base}`, u);
+    const pivot = ccys[0];
+    const desired = new Map<string, string>(); // pair name -> base (quote) currency
+    if (pivot) for (const x of ccys.slice(1)) desired.set(`${pivot}/${x}`, x);
 
     for (const fx of this.forexs()) {
       if (!desired.has(fx.name)) {
@@ -84,7 +87,7 @@ export class MarketModel {
         this.remove(fx.name, ...(typeof vol === 'string' ? [vol] : []));
       }
     }
-    for (const [name, u] of desired) {
+    for (const [name, x] of desired) {
       if (this.has(name)) continue;
       const volName = `${name}_vol`;
       if (!this.has(volName)) {
@@ -93,7 +96,7 @@ export class MarketModel {
       this.upsert({
         name,
         kind: 'forex',
-        payload: { base_currency: base, underlying_currency: u, spot: 1, volatility: volName },
+        payload: { base_currency: x, underlying_currency: pivot, spot: 1, volatility: volName },
       });
     }
   }

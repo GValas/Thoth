@@ -1,6 +1,5 @@
 import { Component, Input, computed, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { MatTabsModule } from '@angular/material/tabs';
 import { AgGridAngular } from 'ag-grid-angular';
 import type { ColDef, ColGroupDef, ValueFormatterParams } from 'ag-grid-community';
 import { OptionChain } from '../core/models';
@@ -28,31 +27,22 @@ interface ChainBlock {
 @Component({
   selector: 'app-option-chain',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule, AgGridAngular],
+  imports: [MatTabsModule, AgGridAngular],
   template: `
-    <div class="oc-head">
-      <span class="oc-name">{{ underlying() }}</span>
-      <span class="oc-ccy thoth-muted">{{ currency() }}</span>
-      <span class="thoth-spacer"></span>
-      @if (hasGreeks()) {
-        <button mat-stroked-button (click)="foldGreeks.set(!foldGreeks())">
-          <mat-icon>{{ foldGreeks() ? 'unfold_more' : 'unfold_less' }}</mat-icon>
-          {{ foldGreeks() ? 'Show Greeks' : 'Hide Greeks' }}
-        </button>
+    <mat-tab-group class="oc-tabs" mat-stretch-tabs="false" animationDuration="0ms">
+      @for (block of blocks(); track block.maturity) {
+        <mat-tab [label]="block.maturity">
+          <div class="oc-block">
+            <ag-grid-angular
+              class="ag-theme-quartz oc-grid"
+              [rowData]="block.rows"
+              [columnDefs]="cols()"
+              [domLayout]="'autoHeight'"
+            ></ag-grid-angular>
+          </div>
+        </mat-tab>
       }
-      <button mat-stroked-button (click)="exportCsv()"><mat-icon>download</mat-icon> CSV</button>
-    </div>
-    @for (block of blocks(); track block.maturity) {
-      <div class="oc-block">
-        <div class="oc-mat">{{ block.maturity }}</div>
-        <ag-grid-angular
-          class="ag-theme-quartz oc-grid"
-          [rowData]="block.rows"
-          [columnDefs]="cols()"
-          [domLayout]="'autoHeight'"
-        ></ag-grid-angular>
-      </div>
-    }
+    </mat-tab-group>
   `,
   styles: [
     `
@@ -60,32 +50,11 @@ interface ChainBlock {
         display: block;
         margin-bottom: 28px;
       }
-      .oc-head {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-      .oc-name {
-        font-weight: 600;
-        font-size: 1.05rem;
-      }
-      .thoth-spacer {
-        flex: 1;
+      .oc-tabs {
+        margin-top: 4px;
       }
       .oc-block {
-        margin-bottom: 16px;
-      }
-      .oc-mat {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        color: #fff;
-        background: #1f2937;
-        padding: 4px 10px;
-        border-radius: 4px;
-        margin-bottom: 4px;
+        padding-top: 12px;
       }
       .oc-grid {
         width: 100%;
@@ -135,11 +104,6 @@ export class OptionChainComponent {
   }
 
   //! Greeks visibility: when folded, only premium + strike columns are shown.
-  readonly foldGreeks = signal(false);
-
-  readonly underlying = computed(() => this.chainSig()?.underlying ?? '');
-  readonly currency = computed(() => this.chainSig()?.currency ?? '');
-
   //! per-cell Greeks actually produced (identical on both wings — same engine).
   private readonly present = computed(() => {
     const c = this.chainSig();
@@ -147,12 +111,11 @@ export class OptionChainComponent {
     const side = c.call ?? c.put;
     return side ? GREEKS.filter((g) => side.greeks?.[g]) : [];
   });
-  readonly hasGreeks = computed(() => this.present().length > 0);
 
   readonly cols = computed<(ColDef | ColGroupDef)[]>(() => {
     const c = this.chainSig();
     if (!c) return [];
-    const present = this.foldGreeks() ? [] : this.present();
+    const present = this.present();
     const metrics = ['premium', ...present];
 
     // a wing = premium + Greeks under a CALLS/PUTS group. The call wing is reversed so its
@@ -211,52 +174,6 @@ export class OptionChainComponent {
     });
   });
 
-  //! Export the whole chain (every maturity, all Greeks regardless of the fold state) as a flat
-  //! CSV, built from the data directly so it needs no per-block ag-grid handle.
-  exportCsv(): void {
-    const c = this.chainSig();
-    if (!c) return;
-    const present = this.present();
-    const sides: Array<['call' | 'put', GridSide]> = [];
-    if (c.call) sides.push(['call', c.call]);
-    if (c.put) sides.push(['put', c.put]);
-
-    const head = ['maturity', 'strike'];
-    for (const [name] of sides) {
-      head.push(`${name}_premium`);
-      for (const g of present) head.push(`${name}_${g}`);
-    }
-    const order = c.strikes.map((strike, i) => ({ strike, i })).sort((a, b) => a.strike - b.strike);
-    const lines = [head.join(',')];
-    c.maturities.forEach((maturity, j) => {
-      for (const { strike, i } of order) {
-        const cells = [maturity, String(strike)];
-        for (const [, m] of sides) {
-          cells.push(csvNum(m.premium[i]?.[j]));
-          for (const g of present) cells.push(csvNum(m.greeks[g]?.[i]?.[j]));
-        }
-        lines.push(cells.join(','));
-      }
-    });
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${c.underlying}_chain.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-}
-
-//! the bits of a GridMatrix the CSV export reads.
-interface GridSide {
-  premium: number[][];
-  greeks: Record<string, number[][]>;
-}
-
-function csvNum(v: number | undefined): string {
-  return v == null || !Number.isFinite(v) ? '' : String(v);
 }
 
 function fmt(p: ValueFormatterParams): string {

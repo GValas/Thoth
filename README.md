@@ -70,6 +70,8 @@ cp .env.example .env          # then edit the secrets (JWT_*, ADMIN_PASSWORD)
 scripts/prod.sh               # build + start, wait for health, then STAY ATTACHED
 # open http://localhost:7777  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
 # Ctrl-C here tears the whole stack down in cascade; scripts/prod.sh logs|ps|down to manage it
+
+scripts/prod-react.sh         # same stack, but serves the React POC frontend (web/frontend-react)
 ```
 
 `scripts/prod.sh` wraps `docker compose` (`docker-compose.yml`: redis · 2 GPU clusters ·

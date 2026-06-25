@@ -203,6 +203,15 @@ button.link {
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
+/* nested maturity sub-tabs: smaller, sits inside an underlying tab */
+.tabs.sub {
+  margin: 10px 0 0;
+  flex-wrap: wrap;
+}
+.tabs.sub .tab {
+  padding: 5px 10px;
+  font-size: 12px;
+}
 
 /* option chain */
 .chain {
