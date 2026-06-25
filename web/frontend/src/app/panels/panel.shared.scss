@@ -1,0 +1,101 @@
+// Shared look for the three single-instrument pricing panels — same compact, finance-grade
+// charte as the Vanilla Grid (one outlined card holding dense control rows).
+
+.panel-card {
+  margin-bottom: 16px;
+}
+
+.panel-card ::ng-deep .mat-mdc-card-content {
+  padding: 12px 14px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.row:last-child {
+  margin-bottom: 0;
+}
+
+.actions-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+}
+
+.dense-toggle ::ng-deep .mat-button-toggle-button {
+  --mat-standard-button-toggle-height: 36px;
+}
+.dense-toggle ::ng-deep .mat-button-toggle-label-content {
+  line-height: 34px;
+  padding: 0 12px;
+}
+
+.thoth-spacer {
+  flex: 1;
+}
+
+.checks {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.ccy {
+  width: 92px;
+}
+.num {
+  width: 130px;
+}
+.wide {
+  width: 180px;
+}
+.datepick {
+  width: 168px;
+}
+.throttle {
+  width: 116px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--thoth-text-muted);
+  margin-right: 2px;
+}
+
+.dot-live {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--thoth-primary, #4f46e5);
+  margin-right: 6px;
+  animation: livepulse 1.2s ease-in-out infinite;
+}
+@keyframes livepulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: 0 0 12px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+  code {
+    font-weight: 600;
+  }
+}

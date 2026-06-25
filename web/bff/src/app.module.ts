@@ -9,6 +9,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { MarketDataModule } from './marketdata/marketdata.module';
 import { MarketFeedModule } from './market-feed/market-feed.module';
 import { GridModule } from './grid/grid.module';
+import { InstrumentModule } from './instrument/instrument.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -23,6 +24,7 @@ import { HealthController } from './health.controller';
     MarketDataModule,
     MarketFeedModule,
     GridModule,
+    InstrumentModule,
   ],
   controllers: [HealthController],
 })

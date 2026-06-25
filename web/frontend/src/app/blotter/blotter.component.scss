@@ -1,0 +1,95 @@
+.bl-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  .title {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+  .count {
+    font-size: 13px;
+  }
+}
+
+.bl-toolbar {
+  margin-bottom: 16px;
+}
+.bl-toolbar ::ng-deep .mat-mdc-card-content {
+  padding: 10px 14px;
+}
+
+.toolbar-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.throttle {
+  width: 116px;
+}
+
+.thoth-spacer {
+  flex: 1;
+}
+
+.bl-table {
+  width: 100%;
+  background: var(--thoth-bg);
+  border: 1px solid var(--thoth-border);
+  border-radius: 8px;
+  overflow: hidden;
+
+  th.num,
+  td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  td.prem {
+    font-weight: 600;
+  }
+  // live move tint, same green/red language as the option chain
+  td.up {
+    color: #1b8a4b;
+  }
+  td.down {
+    color: #c2374a;
+  }
+}
+
+.status-ic {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.status-ic.ok {
+  color: var(--thoth-text-muted);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  margin-right: 8px;
+}
+.dot-live {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--thoth-primary, #4f46e5);
+  margin-right: 6px;
+  animation: livepulse 1.2s ease-in-out infinite;
+}
+@keyframes livepulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.empty {
+  margin-top: 24px;
+  font-size: 14px;
+}

@@ -23,6 +23,14 @@ export const routes: Routes = [
           import('./pricing-grid/pricing-grid.component').then((m) => m.PricingGridComponent),
       },
       {
+        path: 'panels',
+        loadComponent: () => import('./panels/panels.component').then((m) => m.PanelsComponent),
+      },
+      {
+        path: 'blotter',
+        loadComponent: () => import('./blotter/blotter.component').then((m) => m.BlotterComponent),
+      },
+      {
         path: 'admin',
         canActivate: [roleGuard],
         loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),

@@ -10,6 +10,8 @@ import {
   GridResult,
   GridSubmit,
   Health,
+  InstrumentPriceRequest,
+  InstrumentPriceResponse,
   SchemaResponse,
   SeedRequest,
   TokenResponse,
@@ -94,6 +96,13 @@ export class ApiService {
   }
   getGridProgress(id: string): Observable<GridProgress> {
     return this.http.get<GridProgress>(`${this.base}/grid/${id}/progress`);
+  }
+
+  // --- single-instrument pricing (panels + blotter) ---
+  //! synchronous price of one hand-entered instrument (premium + Greeks). `live: true`
+  //! overlays the latest live spots, so panels/blotter can quote off the live feed.
+  priceInstrument(dto: InstrumentPriceRequest): Observable<InstrumentPriceResponse> {
+    return this.http.post<InstrumentPriceResponse>(`${this.base}/instrument/price`, dto);
   }
 
   // --- admin ---

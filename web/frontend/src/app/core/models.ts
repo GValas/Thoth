@@ -133,6 +133,36 @@ export interface GridProgress {
   progress: { current: number; total: number; active: boolean } | null;
 }
 
+// --- single-instrument pricing (panels + blotter) ---
+
+//! Instrument kinds the pricing panels can quote (engine `!<kind>` tags).
+export type InstrumentKind = 'vanilla' | 'barrier' | 'variance_swap';
+
+//! Price one hand-entered instrument. `instrument` carries the kind's own fields
+//! (underlying, strike, maturity, barrier_type, …) verbatim; `live` overlays live spots.
+export interface InstrumentPriceRequest {
+  workspaceId: string;
+  engine: Engine;
+  kind: InstrumentKind;
+  instrument: Record<string, unknown>;
+  indicators: string[];
+  currency?: string;
+  today?: string;
+  live?: boolean;
+}
+
+//! One instrument's flat result: premium plus whichever requested Greeks the engine wrote.
+export interface InstrumentResult {
+  premium: number;
+  greeks: Partial<Record<'delta' | 'gamma' | 'vega' | 'rho' | 'theta', number>>;
+}
+
+export interface InstrumentPriceResponse {
+  result: InstrumentResult;
+  currency: string;
+  meta: { server?: string; execMs: number; engineMs?: number; engineVersion?: string };
+}
+
 export interface UserRow {
   id: string;
   email: string;

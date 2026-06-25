@@ -4,3 +4,4 @@ export * from './yaml.js';
 export * from './engine-client.js';
 export * from './engine-pool.js';
 export * from './grid-builder.js';
+export * from './instrument-builder.js';

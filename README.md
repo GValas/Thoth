@@ -8,7 +8,7 @@ repository:
 | Path | What it is |
 |------|------------|
 | [`pricer/`](pricer/README.md) | **The C++23 pricing engine** — Monte-Carlo, PDE and analytic pricers; multi-asset / multi-currency books; YAML-configured; usable as a batch tool or an HTTP service (`thoth -server`). This is the mature, fully-tested core. See **[`pricer/README.md`](pricer/README.md)**. |
-| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), and compute strike × maturity price grids (an option-chain view + Greeks). The engine is used unmodified as a pricing microservice. |
+| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), compute strike × maturity vanilla price grids (an option-chain view + Greeks), price single products in dedicated **vanilla / barrier / variance** panels, and monitor them live in a global **blotter**. The engine is used unmodified as a pricing microservice. |
 
 ## Engine quickstart
 
@@ -46,7 +46,8 @@ curves · **FX** pairs · **Correlation** matrix), AG-Grid inline editing, full 
 term-structures (flat/SABR/Heston), an **Advanced** schema-driven editor for other object
 kinds, a **Generate sample data** button (`POST /api/workspaces/:id/objects/seed`,
 default 5 equities with realistic tickers / 3 currencies), and a **live-spots** ticker
-streamed in real time from the `spot-feed` service (SSE) — and **Pricing Grid**: pick the
+streamed in real time from the `spot-feed` service (SSE) — and **Vanilla Grid** (formerly
+"Pricing Grid"): pick the
 engine (**ana / pde / mcl / mcl/gpu**), contract **currency**, underlyings, strikes, and
 maturities (via a **date picker**); a first visit prepopulates a ready-to-price default grid
 (strikes 80–120, the next five monthly maturities, EUR, European, Greeks on). Results render
@@ -62,6 +63,19 @@ For **PDE/MCL** the grid builder synthesises a default engine-config object
 (`!pde_configuration` at the **medium** precision preset / `!mcl_configuration`, with
 `mcl/gpu` flipping `allow_gpu` on) and auto-attaches the workspace's correlation matrix when
 the request carries none, so those engines price straight from the GUI.
+
+Beyond the grid, the **Panels** tab prices a *single* hand-entered product with all its
+variations across three sub-panels — **Vanilla** (call/put, European/American, strike,
+maturity, nominal, absolute/relative strike), **Barrier** (the four `up&out / up&in /
+down&out / down&in` types, continuous or discrete monitoring, barrier level, strike,
+maturity) and **Variance** (variance swap: volatility strike + notional) — each showing
+premium + Greeks, each able to **re-price live** off the spot feed on a throttle, and each
+with a **Send to blotter** button. The **Blotter** tab is a global monitoring book: every
+product sent from a panel becomes a row whose premium is re-priced for the whole book in
+**live mode** (throttled, off the live spots), tinted green/red on each move; rows survive
+tab navigation and a reload (persisted in `localStorage`). Both are backed by a synchronous
+`POST /api/instrument/price` endpoint (`live: true` overlays the live spots) that builds a
+one-contract book — the single-product counterpart of the grid pipeline.
 Auth is JWT + rotating refresh cookie with an admin RBAC tab.
 
 **Run (prod, Docker):**
@@ -100,10 +114,10 @@ Thoth/
 ├── .env.example         # compose secrets (JWT, admin seed)
 ├── pricer/              # C++ engine (CMake, src/ tests/ samples/ schema/ docs/ scripts/)
 ├── web/
-│   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid builder
-│   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, live spots)
+│   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid + instrument builders
+│   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, instrument, live spots)
 │   ├── spot-feed/       # fake real-time equity spot feed (GBM walk -> Redis pub/sub)
-│   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
+│   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly): Vanilla Grid · Panels · Blotter
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/
 └── todo-gui.md          # web dashboard design notes

@@ -52,6 +52,21 @@ export class EngineService {
     return this.pool.withEngine((c) => c.postPrice(bookYaml, taskName));
   }
 
+  //! Synchronous one-off pricing that also reports which replica ran it (server URL) —
+  //! for the single-instrument panels/blotter, which want the provenance like the grid.
+  async priceNowWithServer(
+    bookYaml: string,
+    taskName = 'root',
+  ): Promise<{ yaml: string; server: string }> {
+    const lease = await this.pool.acquire();
+    try {
+      const yaml = await lease.client.postPrice(bookYaml, taskName);
+      return { yaml, server: lease.client.baseUrl };
+    } finally {
+      lease.release();
+    }
+  }
+
   //! Best-effort progress for a running job (null if the job isn't currently pricing).
   //! Swallows any /progress failure (e.g. an engine without the endpoint, or a transient
   //! error) -> null, so polling degrades to "no live progress" instead of 500-ing the

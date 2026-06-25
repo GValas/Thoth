@@ -26,7 +26,9 @@ import { Health } from '../core/models';
       <span class="brand">Thoth</span>
       <nav>
         <a mat-button routerLink="/market-data" routerLinkActive="active">Market Data</a>
-        <a mat-button routerLink="/pricing-grid" routerLinkActive="active">Pricing Grid</a>
+        <a mat-button routerLink="/pricing-grid" routerLinkActive="active">Vanilla Grid</a>
+        <a mat-button routerLink="/panels" routerLinkActive="active">Panels</a>
+        <a mat-button routerLink="/blotter" routerLinkActive="active">Blotter</a>
         @if (auth.isAdmin()) {
           <a mat-button routerLink="/admin" routerLinkActive="active">Admin</a>
         }
