@@ -38,6 +38,13 @@ export class GridController {
     return this.grid.submit(dto, user.userId);
   }
 
+  //! live re-price: synchronous, live spots overlaid, returns { matrices, meta } directly
+  //! (no job). The frontend Live mode calls this on a throttle.
+  @Post('live')
+  priceLive(@Body() dto: GridDto) {
+    return this.grid.priceLive(dto);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.grid.get(id);

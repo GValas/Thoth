@@ -7,6 +7,25 @@
   }
 }
 
+// live-mode throttle input + pulsing indicator
+.throttle {
+  width: 116px;
+}
+.dot-live {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--thoth-primary, #4f46e5);
+  margin-right: 6px;
+  animation: livepulse 1.2s ease-in-out infinite;
+}
+@keyframes livepulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .pg-form {
   margin-bottom: 16px;
 }

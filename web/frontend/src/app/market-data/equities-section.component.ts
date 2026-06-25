@@ -1,4 +1,4 @@
-import { Component, Input, computed, signal } from '@angular/core';
+import { Component, Input, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,6 +15,7 @@ import type {
 } from 'ag-grid-community';
 import { CurveGridComponent } from './curve-grid.component';
 import { defaultVol, MarketModel, VOL_KINDS, DIV_KINDS } from './market-model';
+import { LiveSpotsService } from './live-spots.service';
 import type { WsObject } from '../core/models';
 
 interface EquityRow {
@@ -53,22 +54,41 @@ export class EquitiesSectionComponent {
   readonly volKinds = VOL_KINDS;
   readonly divKinds = DIV_KINDS;
 
+  private readonly live = inject(LiveSpotsService);
   private api?: GridApi;
   readonly selectedName = signal<string | null>(null);
 
-  readonly rows = computed<EquityRow[]>(() =>
-    this.model.equities().map((e) => {
+  //! the Spot column shows the LIVE feed when the feed is on and the symbol is quoted,
+  //! otherwise the stored (editable) spot. Reading live.enabled()/live.spots() here makes
+  //! the grid re-render on every tick and when the Live toggle flips.
+  readonly rows = computed<EquityRow[]>(() => {
+    const liveOn = this.live.enabled();
+    const quotes = this.live.spots();
+    return this.model.equities().map((e) => {
       const vol = this.model.byName(e.payload['volatility'] as string);
+      const q = liveOn ? quotes.get(e.name) : undefined;
       return {
         name: e.name,
-        spot: e.payload['spot'] as number,
+        spot: q ? q.price : (e.payload['spot'] as number),
         currency: e.payload['currency'] as string,
         vol: vol ? vol.kind.replace('_volatility', '') : '—',
         repo: this.curveSummary(e.payload['repo'] as string),
         div: this.divSummary(e),
       };
-    }),
-  );
+    });
+  });
+
+  //! true while a live quote is driving this symbol's spot (so it is read-only then).
+  private isLive(name: string): boolean {
+    return this.live.enabled() && this.live.spots().has(name);
+  }
+
+  //! last move direction of a live-quoted symbol (+1 up / -1 down / 0 none), for cell tint.
+  private liveDir(name: string): number {
+    if (!this.live.enabled()) return 0;
+    const q = this.live.spots().get(name);
+    return q ? Math.sign(q.price - q.prev) : 0;
+  }
 
   readonly cols = computed<ColDef[]>(() => {
     const currencies = this.model.currencyNames();
@@ -77,11 +97,17 @@ export class EquitiesSectionComponent {
       {
         headerName: 'Spot',
         field: 'spot',
-        editable: true,
+        //! live feed wins: while a symbol is quoted the cell is read-only and tinted by the
+        //! last move; turn Live off (or for an unquoted symbol) and it is editable again.
+        editable: (p) => !this.isLive(p.data.name),
         cellEditor: 'agNumberCellEditor',
         valueParser: (p) => Number(p.newValue),
         type: 'rightAligned',
         width: 110,
+        cellClassRules: {
+          'spot-up': (p) => this.liveDir(p.data.name) > 0,
+          'spot-down': (p) => this.liveDir(p.data.name) < 0,
+        },
       },
       {
         headerName: 'Ccy',

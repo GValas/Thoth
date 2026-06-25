@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { MarketDataModule } from './marketdata/marketdata.module';
+import { MarketFeedModule } from './market-feed/market-feed.module';
 import { GridModule } from './grid/grid.module';
 import { HealthController } from './health.controller';
 
@@ -20,6 +21,7 @@ import { HealthController } from './health.controller';
     UsersModule,
     WorkspacesModule,
     MarketDataModule,
+    MarketFeedModule,
     GridModule,
   ],
   controllers: [HealthController],

@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import {
   AuthUser,
   CreateWorkspace,
+  GridMatrix,
+  GridMeta,
   GridProgress,
   GridResult,
   GridSubmit,
@@ -82,6 +84,10 @@ export class ApiService {
   // --- grid ---
   submitGrid(dto: GridSubmit): Observable<{ jobId: string }> {
     return this.http.post<{ jobId: string }>(`${this.base}/grid`, dto);
+  }
+  //! synchronous live re-price (live spots overlaid) — returns matrices directly, no job.
+  priceGridLive(dto: GridSubmit): Observable<{ matrices: GridMatrix[]; meta: GridMeta }> {
+    return this.http.post<{ matrices: GridMatrix[]; meta: GridMeta }>(`${this.base}/grid/live`, dto);
   }
   getGrid(id: string): Observable<GridResult> {
     return this.http.get<GridResult>(`${this.base}/grid/${id}`);

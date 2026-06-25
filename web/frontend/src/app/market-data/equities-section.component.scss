@@ -20,6 +20,16 @@
   max-width: 760px;
 }
 
+// live spot cell tint (AG-Grid cellClassRules) — last tick up / down
+::ng-deep .spot-up {
+  color: #1b8a4b;
+  font-weight: 600;
+}
+::ng-deep .spot-down {
+  color: #c2374a;
+  font-weight: 600;
+}
+
 .detail {
   margin-top: 16px;
   padding-top: 12px;

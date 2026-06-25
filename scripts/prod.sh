@@ -59,7 +59,7 @@ if grep -q 'change-me' "$ROOT/.env" && [[ "${FORCE:-0}" != "1" ]]; then
 fi
 
 # --- bring up (detached first, so we can health-check before attaching) ----
-echo "==> starting Thoth stack (redis · 2 GPU clusters [+5 slaves each] · bff · web)"
+echo "==> starting Thoth stack (redis · spot-feed · 2 GPU clusters [+5 slaves each] · bff · web)"
 if [[ "${NO_BUILD:-0}" == "1" ]]; then compose up -d; else compose up -d --build; fi
 
 # From here on, any failure / interrupt must tear the whole stack down in cascade.

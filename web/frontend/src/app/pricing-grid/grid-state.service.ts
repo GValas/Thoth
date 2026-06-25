@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Subscription, interval, switchMap } from 'rxjs';
+import { Subscription, firstValueFrom, interval, switchMap } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import {
   Engine,
@@ -249,26 +249,36 @@ export class GridStateService {
     this.persist();
   }
 
+  // --- live mode: synchronous re-pricing on a throttle, with live spots overlaid ---
+  readonly liveMode = signal(false);
+  liveThrottleSec = 5; //!< configurable re-price interval (seconds); mutable for [(ngModel)]
+  private liveTimer?: ReturnType<typeof setTimeout>;
+
   get canSubmit(): boolean {
-    return (
-      !!this.workspace() &&
-      !!this.engine &&
-      this.selectedUnderlyings.length > 0 &&
-      this.types.length > 0 &&
-      this.parseNumbers(this.strikesText).length > 0 &&
-      this.maturities.length > 0 &&
-      !this.running()
-    );
+    return this.buildDto() !== null && !this.running();
   }
 
-  submit(): void {
+  //! form valid enough to price, ignoring the in-flight guard (live re-prices repeatedly).
+  get canLive(): boolean {
+    return this.buildDto() !== null;
+  }
+
+  //! assemble the BFF request from the current form, or null if it is incomplete.
+  private buildDto(): GridSubmit | null {
     const ws = this.workspace();
-    if (!ws || !this.engine) return;
-
+    if (
+      !ws ||
+      !this.engine ||
+      !this.selectedUnderlyings.length ||
+      !this.types.length ||
+      !this.parseNumbers(this.strikesText).length ||
+      !this.maturities.length
+    ) {
+      return null;
+    }
     const indicators = ['premium'];
-    if (this.includeGreeks) indicators.push(...GREEK_INDICATORS); // every engine now does per-cell Greeks
-
-    const dto: GridSubmit = {
+    if (this.includeGreeks) indicators.push(...GREEK_INDICATORS); // every engine does per-cell Greeks
+    return {
       workspaceId: ws.id,
       engine: this.engine,
       underlyings: this.selectedUnderlyings,
@@ -279,7 +289,12 @@ export class GridStateService {
       exercise: this.exercise,
       currency: this.currency || ws.currency,
     };
+  }
 
+  submit(): void {
+    const dto = this.buildDto();
+    if (!dto) return;
+    this.stopLive(); // a one-off submit takes over from live mode
     this.error.set(null);
     this.matrices.set([]);
     this.meta.set(null);
@@ -294,6 +309,51 @@ export class GridStateService {
       },
       error: (e) => this.fail(e),
     });
+  }
+
+  //! Live mode: re-price synchronously every `liveThrottleSec` seconds with the latest live
+  //! spots overlaid server-side. The throttle is the GAP between re-prices (timed after each
+  //! completes), so a slow engine never overlaps itself; the form stays editable and the next
+  //! tick picks up any change.
+  toggleLive(): void {
+    if (this.liveMode()) this.stopLive();
+    else this.startLive();
+  }
+
+  startLive(): void {
+    if (!this.buildDto()) return;
+    this.liveMode.set(true);
+    this.error.set(null);
+    void this.liveTick();
+  }
+
+  stopLive(): void {
+    this.liveMode.set(false);
+    if (this.liveTimer) {
+      clearTimeout(this.liveTimer);
+      this.liveTimer = undefined;
+    }
+  }
+
+  private async liveTick(): Promise<void> {
+    if (!this.liveMode()) return;
+    const dto = this.buildDto();
+    if (dto) {
+      this.status.set('live');
+      try {
+        const res = await firstValueFrom(this.api.priceGridLive(dto));
+        this.matrices.set(res.matrices ?? []);
+        this.meta.set(res.meta ?? null);
+        this.error.set(null);
+      } catch (e) {
+        const err = e as { error?: { message?: string } };
+        this.error.set(err.error?.message ?? 'Live pricing failed');
+      }
+    }
+    if (this.liveMode()) {
+      const ms = Math.max(1, this.liveThrottleSec) * 1000;
+      this.liveTimer = setTimeout(() => void this.liveTick(), ms);
+    }
   }
 
   private startPolling(jobId: string): void {

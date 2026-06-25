@@ -14,6 +14,7 @@ import {
   parseGridResult,
   EngineError,
   type GridContext,
+  type GridMatrix,
   type GridRequest,
 } from '@thoth/shared';
 import { GridRun } from '../persistence/entities';
@@ -21,6 +22,7 @@ import { EngineService } from '../engine/engine.service';
 import { SchemaService } from '../schema/schema.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { MarketDataService } from '../marketdata/marketdata.service';
+import { MarketFeedService } from '../market-feed/market-feed.service';
 import { MemoryGridQueue, createBullMqQueue, type GridQueue } from './queue';
 
 //! the BFF-side request: pricing axes + which workspace + optional engine config refs.
@@ -44,6 +46,7 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     private readonly schema: SchemaService,
     private readonly workspaces: WorkspacesService,
     private readonly marketData: MarketDataService,
+    private readonly feed: MarketFeedService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -71,6 +74,65 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     );
     await this.queue.submit(run.id);
     return { jobId: run.id };
+  }
+
+  //! Live re-pricing: price the grid SYNCHRONOUSLY (no queue, no GridRun) with the latest
+  //! live spots overlaid onto the equities, returning the matrices directly. The frontend's
+  //! Live mode calls this on a throttle. Equities the feed does not quote keep their stored
+  //! spot, so a partial feed still prices.
+  async priceLive(dto: GridSubmitDto): Promise<{
+    matrices: GridMatrix[];
+    meta: { execMs: number; engineMs?: number; engineVersion?: string };
+  }> {
+    const t0 = Date.now();
+    const ws = await this.workspaces.get(dto.workspaceId);
+    const req: GridRequest = {
+      engine: dto.engine,
+      today: dto.today ?? ws.today,
+      currency: dto.currency ?? ws.currency,
+      underlyings: dto.underlyings,
+      types: dto.types,
+      strikes: dto.strikes,
+      maturities: dto.maturities,
+      indicators: dto.indicators,
+      exercise: dto.exercise,
+    };
+
+    const support = await this.marketData.listObjects(dto.workspaceId);
+    const live = await this.feed.latest();
+    const px = new Map(live.map((t) => [t.symbol, t.price]));
+    const supportObjects = support.map((o) =>
+      o.kind === 'equity' && px.has(o.name)
+        ? { ...o, payload: { ...o.payload, spot: px.get(o.name) as number } }
+        : o,
+    );
+
+    const ctx: GridContext = {
+      pricerName: 'grid',
+      resultName: 'grid_result',
+      configName: dto.configName,
+      correlationName: dto.correlationName,
+      supportObjects,
+    };
+    const bookYaml = dumpBook(buildGridDoc(req, ctx), this.schema.kinds());
+    const resultYaml = await this.engine.priceNow(bookYaml, 'grid');
+    const resultDoc = loadBook(resultYaml, this.schema.kinds()) as Record<string, unknown>;
+    const block = (resultDoc['grid_result'] ?? {}) as Record<string, unknown>;
+    const matrices = parseGridResult(block, req);
+
+    const sys = (resultDoc['system_information'] ?? {}) as Record<string, unknown>;
+    const engineSec =
+      typeof block['task_time'] === 'number'
+        ? (block['task_time'] as number)
+        : typeof sys['task_time'] === 'number'
+          ? (sys['task_time'] as number)
+          : undefined;
+    const meta = {
+      execMs: Date.now() - t0,
+      engineMs: engineSec !== undefined ? Math.round(engineSec * 1000) : undefined,
+      engineVersion: typeof sys['version'] === 'string' ? (sys['version'] as string) : undefined,
+    };
+    return { matrices, meta };
   }
 
   async get(jobId: string): Promise<GridRun> {

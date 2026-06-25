@@ -36,6 +36,19 @@
         <mat-checkbox class="greeks-check" [(ngModel)]="s.includeGreeks" (ngModelChange)="s.persist()">Greeks</mat-checkbox>
 
         <span class="thoth-spacer"></span>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="throttle">
+          <mat-label>Live every (s)</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="s.liveThrottleSec" />
+        </mat-form-field>
+        <button
+          mat-stroked-button
+          [color]="s.liveMode() ? 'primary' : undefined"
+          [disabled]="!s.canLive"
+          (click)="s.toggleLive()"
+          [matTooltip]="s.liveMode() ? 'Live re-pricing on — click to stop' : 'Re-price continuously off the live spots'"
+        >
+          <mat-icon>{{ s.liveMode() ? 'sensors' : 'sensors_off' }}</mat-icon> Live
+        </button>
         <button mat-flat-button color="primary" [disabled]="!s.canSubmit" (click)="s.submit()">Price grid</button>
       </div>
 
@@ -96,11 +109,15 @@
     <p class="thoth-error">{{ s.error() }}</p>
   }
 
+  @if (s.liveMode()) {
+    <p class="meta thoth-muted"><span class="dot-live"></span> Live — re-pricing every {{ s.liveThrottleSec }}s off the live spots</p>
+  }
+
   @if (s.meta(); as meta) {
     <p class="meta thoth-muted">
       <mat-icon>schedule</mat-icon>
-      Priced on <code>{{ meta.server }}</code>
-      @if (meta.engineMs != null) { · engine {{ fmtDuration(meta.engineMs) }} }
+      @if (meta.server) { Priced on <code>{{ meta.server }}</code> · }
+      @if (meta.engineMs != null) { engine {{ fmtDuration(meta.engineMs) }} }
       @if (meta.execMs != null) { · round-trip {{ fmtDuration(meta.execMs) }} }
       @if (meta.engineVersion) { · {{ meta.engineVersion }} }
     </p>

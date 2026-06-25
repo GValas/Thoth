@@ -53,6 +53,23 @@ services:
       - redis-data:/data
     networks: [thoth]
 
+  # ===== fake real-time equity spot feed: GBM walk -> Redis pub/sub (spots.tick) ========
+  # the BFF subscribes once and fans the ticks out to browsers over SSE. Swap this for a
+  # real market feed and nothing downstream changes.
+  spot-feed:
+    build:
+      context: ./web/spot-feed
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on: [redis]
+    environment:
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      TICK_MS: "1000"     # publish cadence (ms)
+      SPOT_DRIFT: "0.05"  # annualised drift
+      SPOT_VOL: "0.25"    # annualised vol
+    networks: [thoth]
+
   # ===== cluster 1 : master on GPU 0 + 5 CPU slaves ====================================
   c1s1:  { <<: *slave }
   c1s2:  { <<: *slave }

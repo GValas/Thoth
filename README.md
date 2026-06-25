@@ -44,8 +44,9 @@ GPUs' compute capability — see `docker-compose.yml`.) Two tabs: **Market Data*
 four editable areas (**Equities** spot/vol/repo/dividends · **Rates** per-currency yield
 curves · **FX** pairs · **Correlation** matrix), AG-Grid inline editing, full vol
 term-structures (flat/SABR/Heston), an **Advanced** schema-driven editor for other object
-kinds, and a **Generate sample data** button (`POST /api/workspaces/:id/objects/seed`,
-default 5 equities with realistic tickers / 3 currencies) — and **Pricing Grid**: pick the
+kinds, a **Generate sample data** button (`POST /api/workspaces/:id/objects/seed`,
+default 5 equities with realistic tickers / 3 currencies), and a **live-spots** ticker
+streamed in real time from the `spot-feed` service (SSE) — and **Pricing Grid**: pick the
 engine (**ana / pde / mcl / mcl/gpu**), contract **currency**, underlyings, strikes, and
 maturities (via a **date picker**); a first visit prepopulates a ready-to-price default grid
 (strikes 80–120, the next five monthly maturities, EUR, European, Greeks on). Results render
@@ -100,7 +101,8 @@ Thoth/
 ├── pricer/              # C++ engine (CMake, src/ tests/ samples/ schema/ docs/ scripts/)
 ├── web/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid builder
-│   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid)
+│   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, live spots)
+│   ├── spot-feed/       # fake real-time equity spot feed (GBM walk -> Redis pub/sub)
 │   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/

@@ -1,6 +1,14 @@
 <div class="toolbar">
   <h2 class="title">Market data</h2>
   <span class="spacer"></span>
+  <button
+    mat-stroked-button
+    [color]="live.enabled() ? 'primary' : undefined"
+    (click)="live.enabled.set(!live.enabled())"
+    [matTooltip]="live.enabled() ? 'Live spots streaming — click to pause' : 'Live spots paused — click to resume'"
+  >
+    <mat-icon>{{ live.enabled() ? 'sensors' : 'sensors_off' }}</mat-icon> Live
+  </button>
   <button mat-button [disabled]="busy()" (click)="generate()">
     <mat-icon>casino</mat-icon> Generate
   </button>

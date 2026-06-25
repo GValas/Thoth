@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../core/api.service';
 import { Workspace } from '../core/models';
 import { MarketModel } from './market-model';
@@ -9,6 +10,7 @@ import { EquitiesSectionComponent } from './equities-section.component';
 import { RatesSectionComponent } from './rates-section.component';
 import { FxSectionComponent } from './fx-section.component';
 import { CorrelationSectionComponent } from './correlation-section.component';
+import { LiveSpotsService } from './live-spots.service';
 
 //! Market-data DASHBOARD: pick a workspace, then edit its market data in four domain areas
 //! (equities · rates · fx · correlation). "Generate sample data" spawns a valid random set
@@ -21,6 +23,7 @@ import { CorrelationSectionComponent } from './correlation-section.component';
     MatButtonModule,
     MatIconModule,
     MatSnackBarModule,
+    MatTooltipModule,
     EquitiesSectionComponent,
     RatesSectionComponent,
     FxSectionComponent,
@@ -32,11 +35,24 @@ import { CorrelationSectionComponent } from './correlation-section.component';
 export class MarketDataComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
+  readonly live = inject(LiveSpotsService);
 
   readonly model = new MarketModel();
   readonly workspace = signal<Workspace | null>(null);
   readonly errors = signal<Record<string, string[]>>({});
   readonly busy = signal(false);
+
+  //! equity symbols to stream live spots for (stable reference between equity-set changes).
+  readonly equityNames = computed(() => this.model.equities().map((e) => e.name));
+
+  constructor() {
+    //! drive the live feed from the Live toggle: on -> stream the workspace's equities,
+    //! off -> stop. Re-runs when the toggle flips or the equity set changes.
+    effect(() => {
+      if (this.live.enabled()) void this.live.start(this.equityNames());
+      else this.live.stop();
+    });
+  }
 
   //! No workspace picker: silently use the first workspace (creating a default one if the
   //! account has none) and load its objects.

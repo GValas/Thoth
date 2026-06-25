@@ -1,0 +1,19 @@
+{
+  "name": "@thoth/spot-feed",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fake real-time equity spot feed: GBM random walk per symbol, published to Redis (pub/sub + latest snapshot) for the BFF to fan out.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
