@@ -3,54 +3,45 @@
 </div>
 
 @if (s.workspace()) {
-  <mat-card class="pg-form">
+  <mat-card class="pg-form" appearance="outlined">
     <mat-card-content>
-      <div class="row">
-        <div class="field">
-          <label class="lbl">Engine</label>
-          <mat-button-toggle-group [value]="s.engine" (change)="s.setEngine($event.value)">
-            <mat-button-toggle value="ana">ana</mat-button-toggle>
-            <mat-button-toggle value="pde">pde</mat-button-toggle>
-            <mat-button-toggle value="mcl">mcl</mat-button-toggle>
-            <mat-button-toggle value="mcl_gpu">mcl/gpu</mat-button-toggle>
-          </mat-button-toggle-group>
-          @if (!s.engine) {
-            <span class="hint thoth-muted">Pick an engine to continue.</span>
-          }
+      <!-- compact control bar: engine · type · exercise · currency · greeks · submit -->
+      <div class="row controls-row">
+        <mat-button-toggle-group class="dense-toggle" [value]="s.engine" (change)="s.setEngine($event.value)" aria-label="Engine">
+          <mat-button-toggle value="ana">ana</mat-button-toggle>
+          <mat-button-toggle value="pde">pde</mat-button-toggle>
+          <mat-button-toggle value="mcl">mcl</mat-button-toggle>
+          <mat-button-toggle value="mcl_gpu">mcl/gpu</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        <div class="checks">
+          <mat-checkbox [checked]="s.types.includes('call')" (change)="s.toggleType('call', $event.checked)">Call</mat-checkbox>
+          <mat-checkbox [checked]="s.types.includes('put')" (change)="s.toggleType('put', $event.checked)">Put</mat-checkbox>
         </div>
 
-        <div class="field">
-          <label class="lbl">Option type</label>
-          <div class="checks">
-            <mat-checkbox [checked]="s.types.includes('call')" (change)="s.toggleType('call', $event.checked)"
-              >Call</mat-checkbox
-            >
-            <mat-checkbox [checked]="s.types.includes('put')" (change)="s.toggleType('put', $event.checked)"
-              >Put</mat-checkbox
-            >
-          </div>
-        </div>
-
-        <div class="field">
-          <label class="lbl">Exercise</label>
-          <mat-button-toggle-group [(value)]="s.exercise" (change)="s.persist()">
-            <mat-button-toggle value="european">European</mat-button-toggle>
-            <mat-button-toggle value="american">American</mat-button-toggle>
-          </mat-button-toggle-group>
-        </div>
+        <mat-button-toggle-group class="dense-toggle" [(value)]="s.exercise" (change)="s.persist()" aria-label="Exercise">
+          <mat-button-toggle value="european">European</mat-button-toggle>
+          <mat-button-toggle value="american">American</mat-button-toggle>
+        </mat-button-toggle-group>
 
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ccy">
-          <mat-label>Currency</mat-label>
+          <mat-label>Ccy</mat-label>
           <mat-select [(ngModel)]="s.currency" (ngModelChange)="s.persist()">
             @for (c of s.currencyNames(); track c) {
               <mat-option [value]="c">{{ c }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
+
+        <mat-checkbox class="greeks-check" [(ngModel)]="s.includeGreeks" (ngModelChange)="s.persist()">Greeks</mat-checkbox>
+
+        <span class="thoth-spacer"></span>
+        <button mat-flat-button color="primary" [disabled]="!s.canSubmit" (click)="s.submit()">Price grid</button>
       </div>
 
-      <div class="row underlyings-row">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
+      <!-- inputs: underlyings · strikes · add-maturity + chips -->
+      <div class="row inputs-row">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow underlyings-field">
           <mat-label>Underlyings</mat-label>
           <mat-select [(ngModel)]="s.selectedUnderlyings" (ngModelChange)="s.persist()" multiple>
             @for (o of s.underlyingObjects(); track o.name) {
@@ -64,21 +55,13 @@
         <button mat-icon-button type="button" (click)="s.refreshObjects()" matTooltip="Reload underlyings from saved market data">
           <mat-icon>refresh</mat-icon>
         </button>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
-          <mat-label>Strikes (comma / space separated)</mat-label>
-          <input matInput [(ngModel)]="s.strikesText" (ngModelChange)="s.persist()" placeholder="90, 100, 110" />
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="strikes-field">
+          <mat-label>Strikes</mat-label>
+          <input matInput [(ngModel)]="s.strikesText" (ngModelChange)="s.persist()" placeholder="80 90 100 110 120" />
         </mat-form-field>
-      </div>
-
-      <div class="row maturities-row">
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="datepick">
           <mat-label>Add maturity</mat-label>
-          <input
-            matInput
-            [matDatepicker]="dp"
-            [(ngModel)]="pickerDate"
-            (dateChange)="addMaturity($event.value)"
-          />
+          <input matInput [matDatepicker]="dp" [(ngModel)]="pickerDate" (dateChange)="addMaturity($event.value)" />
           <mat-datepicker-toggle matIconSuffix [for]="dp"></mat-datepicker-toggle>
           <mat-datepicker #dp></mat-datepicker>
         </mat-form-field>
@@ -89,22 +72,13 @@
               <button matChipRemove aria-label="remove maturity"><mat-icon>cancel</mat-icon></button>
             </mat-chip>
           }
-          @if (s.maturities.length === 0) {
-            <span class="hint thoth-muted">Pick one or more maturity dates.</span>
-          }
         </mat-chip-set>
-        <span class="thoth-spacer"></span>
-        <mat-checkbox class="greeks-check" [(ngModel)]="s.includeGreeks" (ngModelChange)="s.persist()" [disabled]="s.mclSelected()"
-          [matTooltip]="s.mclSelected() ? 'CPU Monte-Carlo gives book-level Greeks only' : ''">
-          Per-cell Greeks
-        </mat-checkbox>
       </div>
+
+      @if (s.mclSelected()) {
+        <span class="hint thoth-muted"><mat-icon>info</mat-icon> CPU mcl gives book-level Greeks only</span>
+      }
     </mat-card-content>
-    <mat-card-actions align="end">
-      <button mat-flat-button color="primary" [disabled]="!s.canSubmit" (click)="s.submit()">
-        Price grid
-      </button>
-    </mat-card-actions>
   </mat-card>
 
   @if (s.running()) {

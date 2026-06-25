@@ -1,15 +1,21 @@
 .pg-header {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+
+  .title {
+    margin: 0;
+    font-size: 1.15rem;
+  }
 }
 
 .pg-form {
   margin-bottom: 16px;
 }
 
+// two dense rows, controls vertically centred so toggles/fields/chips align
 .row {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 12px;
+  align-items: center;
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
@@ -20,7 +26,16 @@
 
 // trim the Material card's default padding so the form reads as one compact band
 .pg-form ::ng-deep .mat-mdc-card-content {
-  padding: 12px 16px;
+  padding: 10px 14px;
+}
+
+// shorter toggle buttons in the control bar
+.dense-toggle ::ng-deep .mat-button-toggle-button {
+  --mat-standard-button-toggle-height: 36px;
+}
+.dense-toggle ::ng-deep .mat-button-toggle-label-content {
+  line-height: 34px;
+  padding: 0 12px;
 }
 
 .thoth-spacer {
@@ -38,31 +53,14 @@
   margin: 24px 0;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.lbl {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--thoth-text-muted);
-}
-
 .checks {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  height: 40px;
 }
 
 .grow {
-  flex: 1 1 320px;
-}
-
-.greeks-row {
-  align-items: center;
+  flex: 1 1 220px;
 }
 
 .hint {
@@ -86,19 +84,15 @@
 }
 
 .ccy {
-  width: 120px;
+  width: 84px;
 }
 
-.underlyings-row {
-  align-items: center;
-}
-
-.maturities-row {
-  align-items: center;
+.strikes-field {
+  flex: 1 1 200px;
 }
 
 .datepick {
-  width: 220px;
+  width: 168px;
 }
 
 .mats {
