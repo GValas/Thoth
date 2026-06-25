@@ -101,7 +101,8 @@ Thoth/
 ├── web/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid builder
 │   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid)
-│   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
+│   ├── frontend/        # Angular SPA (Material + AG Grid + ngx-formly) + nginx
+│   └── frontend-react/  # React + Vite POC of the Pricing Grid (same BFF, no backend change)
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/
 └── todo-gui.md          # web dashboard design notes
