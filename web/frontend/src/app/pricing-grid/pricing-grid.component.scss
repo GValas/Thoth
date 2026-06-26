@@ -45,16 +45,7 @@
 
 // trim the Material card's default padding so the form reads as one compact band
 .pg-form ::ng-deep .mat-mdc-card-content {
-  padding: 10px 14px;
-}
-
-// shorter toggle buttons in the control bar
-.dense-toggle ::ng-deep .mat-button-toggle-button {
-  --mat-standard-button-toggle-height: 36px;
-}
-.dense-toggle ::ng-deep .mat-button-toggle-label-content {
-  line-height: 34px;
-  padding: 0 12px;
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .thoth-spacer {
@@ -104,7 +95,7 @@
 }
 
 .ccy {
-  width: 84px;
+  width: 80px;
 }
 
 .strikes-field {
@@ -112,7 +103,7 @@
 }
 
 .datepick {
-  width: 168px;
+  width: 150px;
 }
 
 .mats {

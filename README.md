@@ -95,6 +95,17 @@ tab navigation and a reload (persisted in `localStorage`). Both are backed by a 
 one-contract book — the single-product counterpart of the grid pipeline.
 Auth is JWT + rotating refresh cookie with an admin RBAC tab.
 
+**Look & feel:** the whole SPA shares a dense, finance-grade charte driven by a single
+design-token layer (`web/frontend/src/styles/_tokens.scss` — palette, a px **type scale**,
+a 4px **spacing scale**, and **control-size** dials — consumed as CSS custom properties),
+with Angular Material run at density `-4` and a tightened AG-Grid quartz theme for compact,
+trading-desk rows. Two interchangeable themes are built from the same tokens: a **refined
+light** charte (default) and a **Bloomberg-style dark terminal** charte (true-black canvas,
+amber accent + amber column headers, monospace numerics, brighter green/red direction
+colours). A toolbar toggle (`ThemeService`, persisted in `localStorage`) flips between them
+at runtime by toggling a `theme-dark` class; the heatmap and grids re-skin automatically by
+reading the active theme's CSS variables.
+
 **Run (prod, Docker):**
 
 ```bash

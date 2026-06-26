@@ -1,38 +1,121 @@
 // Thoth design tokens — central SCSS variables.
-// Finance-grade, dense, professional. Light theme only.
+// Finance-grade, dense, professional. Refined light theme.
+//
+// This is the single source of truth for the visual language. Components consume
+// the CSS custom properties (`var(--thoth-*)`); styles.scss consumes the SCSS
+// `$thoth-*` vars to key Angular Material + AG Grid. Keep both in sync.
 
-// Surfaces & structure
-$thoth-bg: #ffffff;
-$thoth-surface: #f7f9fc;
-$thoth-border: #e5e9f0;
+// ── Surfaces & structure ───────────────────────────────────────────────────
+$thoth-bg: #ffffff; // page background
+$thoth-surface: #f4f6fa; // raised band / control bar
+$thoth-surface-2: #eaeef4; // table headers, zebra, hover
+$thoth-border: #dce1ea; // hairline rules between cells/sections
+$thoth-border-strong: #c2cad6; // emphasised dividers / focused field outline
 
-// Accents
-$thoth-primary: #2563eb;
-$thoth-negative: #dc2626;
+// ── Accents (institutional, slightly deepened for print-like contrast) ──────
+$thoth-primary: #1d4ed8; // actions, active nav, links
+$thoth-primary-weak: #e7eefc; // primary tint (selected toggle bg, focus halo)
+$thoth-positive: #15803d; // up move / gains
+$thoth-negative: #dc2626; // down move / losses / errors
 
-// Text
-$thoth-text: #1f2937;
-$thoth-text-muted: #6b7280;
+// ── Text ────────────────────────────────────────────────────────────────────
+$thoth-text: #111827; // primary copy & numerics
+$thoth-text-muted: #5b6473; // labels, secondary copy
+$thoth-text-faint: #9aa3b2; // hints, placeholders, disabled
 
-// Heatmap divergent stops (premium: low -> high)
-$thoth-heat-low: #2563eb; // blue
+// ── Heatmap divergent stops (premium: low -> high) ──────────────────────────
+$thoth-heat-low: #1d4ed8; // blue
 $thoth-heat-mid: #ffffff; // white
 $thoth-heat-high: #dc2626; // red
 
-// Typography
+// ── Typography ──────────────────────────────────────────────────────────────
 $thoth-font: 'Inter', 'Roboto', 'Helvetica Neue', sans-serif;
+$thoth-font-mono: 'JetBrains Mono', 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
 
 // CSS custom properties (consumable from component styles & TS).
 :root {
+  // Surfaces
   --thoth-bg: #{$thoth-bg};
   --thoth-surface: #{$thoth-surface};
+  --thoth-surface-2: #{$thoth-surface-2};
   --thoth-border: #{$thoth-border};
+  --thoth-border-strong: #{$thoth-border-strong};
+
+  // Accents
   --thoth-primary: #{$thoth-primary};
+  --thoth-primary-weak: #{$thoth-primary-weak};
+  --thoth-positive: #{$thoth-positive};
   --thoth-negative: #{$thoth-negative};
+  // back-compat alias (a few components reference --thoth-error)
+  --thoth-error: #{$thoth-negative};
+
+  // Text
   --thoth-text: #{$thoth-text};
   --thoth-text-muted: #{$thoth-text-muted};
+  --thoth-text-faint: #{$thoth-text-faint};
+
+  // Heatmap
   --thoth-heat-low: #{$thoth-heat-low};
   --thoth-heat-mid: #{$thoth-heat-mid};
   --thoth-heat-high: #{$thoth-heat-high};
+
+  // Fonts
   --thoth-font: #{$thoth-font};
+  --thoth-font-mono: #{$thoth-font-mono};
+
+  // ── Type scale (px) — tight, finance-grade ────────────────────────────────
+  --fs-xs: 11px; // micro labels, chips
+  --fs-sm: 12px; // field labels, hints, dense table cells
+  --fs-base: 13px; // body / inputs / default cell
+  --fs-md: 14px; // emphasised values
+  --fs-lg: 16px; // section headings
+  --fs-xl: 18px; // page title
+
+  // ── Spacing scale (4px rhythm) ────────────────────────────────────────────
+  --sp-0: 2px;
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 24px;
+
+  // ── Control sizing — the dial that makes the UI compact ───────────────────
+  --ctl-h: 28px; // compact control height (toggles, buttons, chips)
+  --ctl-h-sm: 24px; // extra-compact (icon buttons, inline controls)
+  --field-h: 38px; // Material outlined form-field height @ density -4
+
+  // ── Geometry ──────────────────────────────────────────────────────────────
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
+}
+
+// ── Bloomberg-style dark terminal charte ─────────────────────────────────────
+// Same dense geometry/type/spacing as light; only the palette flips. Near-black
+// surfaces, amber accent, terminal green/red for direction, mono-friendly numerics.
+body.theme-dark {
+  // Surfaces — pure-black canvas like the terminal, faint warm-grey separators.
+  --thoth-bg: #000000; // canvas (true black)
+  --thoth-surface: #0b0b0d; // raised band / control bar / cards
+  --thoth-surface-2: #161618; // table headers, zebra, hover
+  --thoth-border: #262629; // hairline rules
+  --thoth-border-strong: #3a3a40; // emphasised dividers
+
+  // Accents — Bloomberg signature amber as the primary; brighter directional R/G.
+  --thoth-primary: #ff9e1b; // amber
+  --thoth-primary-weak: #2a1d07; // amber tint for selected/active fills
+  --thoth-positive: #45e07a; // up move (terminal green)
+  --thoth-negative: #ff4d4d; // down move / errors
+  --thoth-error: #ff4d4d;
+
+  // Text — warm off-white body; amber is reserved for accents/headers.
+  --thoth-text: #e8e6df; // warm off-white primary
+  --thoth-text-muted: #9a958a; // labels / secondary (warm grey)
+  --thoth-text-faint: #5c5a52; // hints / disabled
+
+  // Heatmap — black mid so low-magnitude cells melt into the grid; saturated edges.
+  --thoth-heat-low: #2f80ff; // blue
+  --thoth-heat-mid: #0b0b0d; // = surface (near-black)
+  --thoth-heat-high: #ff4d4d; // red
 }

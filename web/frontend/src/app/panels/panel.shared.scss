@@ -2,19 +2,19 @@
 // charte as the Vanilla Grid (one outlined card holding dense control rows).
 
 .panel-card {
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
 }
 
 .panel-card ::ng-deep .mat-mdc-card-content {
-  padding: 12px 14px;
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-3);
 }
 .row:last-child {
   margin-bottom: 0;
@@ -22,18 +22,10 @@
 
 .actions-row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: center;
   flex-wrap: wrap;
-  margin: 4px 0 10px;
-}
-
-.dense-toggle ::ng-deep .mat-button-toggle-button {
-  --mat-standard-button-toggle-height: 36px;
-}
-.dense-toggle ::ng-deep .mat-button-toggle-label-content {
-  line-height: 34px;
-  padding: 0 12px;
+  margin: var(--sp-1) 0 var(--sp-3);
 }
 
 .thoth-spacer {
@@ -47,19 +39,19 @@
 }
 
 .ccy {
-  width: 92px;
+  width: 80px;
 }
 .num {
-  width: 130px;
+  width: 112px;
 }
 .wide {
-  width: 180px;
-}
-.datepick {
   width: 168px;
 }
+.datepick {
+  width: 150px;
+}
 .throttle {
-  width: 116px;
+  width: 104px;
 }
 
 .field-label {

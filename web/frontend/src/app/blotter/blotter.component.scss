@@ -70,10 +70,10 @@
   }
   // live move tint, same green/red language as the option chain
   td.up {
-    color: #1b8a4b;
+    color: var(--thoth-positive);
   }
   td.down {
-    color: #c2374a;
+    color: var(--thoth-negative);
   }
 }
 

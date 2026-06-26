@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ThemeService } from '../core/theme.service';
 import { Health } from '../core/models';
 
 //! Top-level chrome: brand, nav links (Admin hidden for non-admins), health badge, sign-out.
@@ -45,6 +46,13 @@ import { Health } from '../core/models';
         </span>
       }
       <span class="user thoth-muted">{{ auth.user()?.email }}</span>
+      <button
+        mat-icon-button
+        (click)="theme.toggle()"
+        [matTooltip]="theme.mode() === 'dark' ? 'Switch to light' : 'Switch to dark (terminal)'"
+      >
+        <mat-icon>{{ theme.mode() === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
       <button mat-icon-button (click)="auth.logout()" matTooltip="Sign out">
         <mat-icon>logout</mat-icon>
       </button>
@@ -56,16 +64,27 @@ import { Health } from '../core/models';
   styles: [
     `
       .bar {
+        height: 44px;
+        min-height: 44px;
+        padding: 0 14px;
         background: var(--thoth-bg);
         color: var(--thoth-text);
-        border-bottom: 1px solid var(--thoth-border);
-        gap: 8px;
+        border-bottom: 1px solid var(--thoth-border-strong);
+        gap: 4px;
       }
       .brand {
-        font-weight: 600;
-        font-size: 18px;
-        margin-right: 16px;
+        font-weight: 700;
+        font-size: var(--fs-lg);
+        letter-spacing: 0.02em;
+        margin-right: 14px;
         color: var(--thoth-primary);
+      }
+      nav {
+        display: flex;
+        gap: 2px;
+      }
+      nav a {
+        font-size: var(--fs-base);
       }
       nav a.active {
         font-weight: 600;
@@ -75,7 +94,7 @@ import { Health } from '../core/models';
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        font-size: 13px;
+        font-size: var(--fs-sm);
         color: var(--thoth-negative);
         margin-right: 8px;
       }
@@ -83,17 +102,18 @@ import { Health } from '../core/models';
         color: var(--thoth-text-muted);
       }
       .health mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
       }
       .user {
-        font-size: 13px;
-        margin: 0 8px;
+        font-size: var(--fs-sm);
+        margin: 0 6px;
+        color: var(--thoth-text-muted);
       }
       main {
         background: var(--thoth-bg);
-        min-height: calc(100vh - 64px);
+        min-height: calc(100vh - 44px);
       }
     `,
   ],
@@ -101,6 +121,7 @@ import { Health } from '../core/models';
 export class ShellComponent implements OnInit {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   readonly health = signal<Health | null>(null);
 
   ngOnInit(): void {

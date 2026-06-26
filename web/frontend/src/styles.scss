@@ -8,6 +8,8 @@
 @include mat.core();
 
 // Angular Material light theme keyed to the primary blue.
+// Density -4: tight trading-desk controls (form fields ~38px, buttons ~32px)
+// without hitting the -5 clipping edge cases.
 $thoth-theme: mat.define-theme(
   (
     color: (
@@ -16,13 +18,36 @@ $thoth-theme: mat.define-theme(
       tertiary: mat.$azure-palette,
     ),
     density: (
-      scale: -1,
+      scale: -4,
     ),
   )
 );
 
 :root {
   @include mat.all-component-themes($thoth-theme);
+}
+
+// Bloomberg-style dark charte: same density, dark Material colours keyed to amber.
+// Scoped to body.theme-dark so the ThemeService can flip it at runtime.
+$thoth-dark-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: dark,
+      primary: mat.$orange-palette,
+      tertiary: mat.$yellow-palette,
+    ),
+    density: (
+      scale: -4,
+    ),
+  )
+);
+
+body.theme-dark {
+  @include mat.all-component-colors($thoth-dark-theme);
+}
+// Amber, uppercased column headers — the terminal's signature grid look.
+body.theme-dark .ag-theme-quartz {
+  --ag-header-foreground-color: var(--thoth-primary);
 }
 
 html,
@@ -32,53 +57,185 @@ body {
 
 body {
   margin: 0;
-  background: tokens.$thoth-bg;
-  color: tokens.$thoth-text;
+  background: var(--thoth-bg);
+  color: var(--thoth-text);
   font-family: tokens.$thoth-font;
-  font-size: 14px;
+  font-size: var(--fs-base);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+// Terminal feel in dark mode: numerics in a monospace face for column alignment.
+body.theme-dark .ag-cell,
+body.theme-dark .thoth-num,
+body.theme-dark input[type='number'] {
+  font-family: var(--thoth-font-mono);
 }
 
 // tabular numerals on every numeric table/cell — finance-grade alignment.
 table,
 th,
 td,
+input[type='number'],
 .ag-cell,
 .ag-header-cell,
 .thoth-num {
   font-variant-numeric: tabular-nums;
 }
 
-// AG Grid quartz, retuned to the Thoth palette.
-.ag-theme-quartz {
-  --ag-font-family: #{tokens.$thoth-font};
-  --ag-foreground-color: #{tokens.$thoth-text};
-  --ag-background-color: #{tokens.$thoth-bg};
-  --ag-header-background-color: #{tokens.$thoth-surface};
-  --ag-border-color: #{tokens.$thoth-border};
-  --ag-row-border-color: #{tokens.$thoth-border};
-  --ag-accent-color: #{tokens.$thoth-primary};
-  --ag-cell-horizontal-padding: 10px;
-  --ag-grid-size: 5px;
-  --ag-font-size: 13px;
+// ── Global dense control layer ───────────────────────────────────────────────
+// Trims Material's residual chrome so controls read as a single compact band.
+// All page-level forms inherit this; per-component SCSS only handles layout.
+
+// Outlined form fields: shorter, smaller label/input type, no reserved hint row.
+.mat-mdc-form-field {
+  font-size: var(--fs-base);
+}
+.mat-mdc-form-field-infix {
+  min-height: var(--field-h);
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.mat-mdc-text-field-wrapper {
+  background: var(--thoth-bg);
+}
+// Tighten the floating-label / input font.
+.mat-mdc-form-field .mat-mdc-floating-label,
+.mat-mdc-form-field .mat-mdc-input-element,
+.mat-mdc-select-value-text {
+  font-size: var(--fs-base);
 }
 
+// Buttons: smaller footprint, no oversized min-width.
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button {
+  --mdc-text-button-container-height: var(--ctl-h);
+  --mdc-filled-button-container-height: var(--ctl-h);
+  --mdc-outlined-button-container-height: var(--ctl-h);
+  --mdc-protected-button-container-height: var(--ctl-h);
+  min-width: 0;
+  font-size: var(--fs-base);
+  letter-spacing: 0;
+  padding: 0 12px;
+}
+
+// Icon buttons: shrink the 40px default touch target to a desk-tool size.
+.mat-mdc-icon-button.mat-mdc-icon-button {
+  --mdc-icon-button-state-layer-size: var(--ctl-h);
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+}
+.mat-mdc-icon-button .mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+
+// Button-toggle groups (engine/type/exercise selectors): the densest pattern.
+// Centralised here so pages no longer need their own ::ng-deep overrides.
+.mat-button-toggle-group {
+  --mat-standard-button-toggle-height: var(--ctl-h);
+  border-radius: var(--radius);
+}
+.mat-button-toggle-button {
+  --mat-standard-button-toggle-height: var(--ctl-h);
+}
+.mat-button-toggle-label-content {
+  line-height: calc(var(--ctl-h) - 2px) !important;
+  padding: 0 10px !important;
+  font-size: var(--fs-sm);
+}
+.mat-button-toggle-checked {
+  background: var(--thoth-primary-weak);
+  color: var(--thoth-primary);
+  font-weight: 600;
+}
+
+// Checkboxes & their labels: smaller box, smaller label.
+.mat-mdc-checkbox {
+  --mdc-checkbox-state-layer-size: 28px;
+  font-size: var(--fs-sm);
+}
+.mat-mdc-checkbox .mdc-form-field {
+  font-size: var(--fs-sm);
+}
+
+// Select / autocomplete options: compact rows in the dropdown panel.
+.mat-mdc-option {
+  --mat-option-label-text-size: var(--fs-base);
+  min-height: 32px;
+}
+
+// Tabs: shorter header band.
+.mat-mdc-tab .mdc-tab__text-label {
+  font-size: var(--fs-base);
+}
+.mat-mdc-tab-header {
+  --mdc-secondary-navigation-tab-container-height: 36px;
+}
+
+// ── AG Grid quartz, retuned to the Thoth palette and tightened. ──────────────
+// Colours reference the runtime CSS vars so the grid re-skins with the theme;
+// geometry/density values are fixed.
+.ag-theme-quartz {
+  --ag-font-family: var(--thoth-font);
+  --ag-foreground-color: var(--thoth-text);
+  --ag-background-color: var(--thoth-bg);
+  --ag-header-background-color: var(--thoth-surface-2);
+  --ag-odd-row-background-color: var(--thoth-surface);
+  --ag-border-color: var(--thoth-border);
+  --ag-row-border-color: var(--thoth-border);
+  --ag-header-column-separator-color: var(--thoth-border);
+  --ag-accent-color: var(--thoth-primary);
+  --ag-selected-row-background-color: var(--thoth-primary-weak);
+  --ag-row-hover-color: var(--thoth-surface-2);
+  --ag-header-foreground-color: var(--thoth-text-muted);
+  --ag-cell-horizontal-padding: 8px;
+  --ag-grid-size: 3px;
+  --ag-row-height: 26px;
+  --ag-header-height: 28px;
+  --ag-font-size: 12px;
+  --ag-borders: solid 1px;
+}
+// Uppercase, letter-spaced header text — institutional table look.
+.ag-theme-quartz .ag-header-cell-text {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
 .thoth-muted {
   color: tokens.$thoth-text-muted;
 }
-
+.thoth-faint {
+  color: tokens.$thoth-text-faint;
+}
 .thoth-spacer {
   flex: 1 1 auto;
 }
-
 .thoth-error {
   color: tokens.$thoth-negative;
+}
+.thoth-num {
+  font-variant-numeric: tabular-nums;
 }
 
 a {
   color: tokens.$thoth-primary;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
 }
 
-// Reusable page padding.
+// Reusable page padding — tighter gutters for a denser canvas.
 .thoth-page {
-  padding: 16px 20px;
+  padding: 10px 14px;
 }

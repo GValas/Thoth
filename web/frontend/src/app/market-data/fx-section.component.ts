@@ -65,10 +65,10 @@ interface FxRow {
         color: var(--thoth-text-muted, #888);
       }
       :host ::ng-deep .fx-up {
-        color: #1b8a4b;
+        color: var(--thoth-positive);
       }
       :host ::ng-deep .fx-down {
-        color: #c2374a;
+        color: var(--thoth-negative);
       }
       :host ::ng-deep .fx-induced {
         font-style: italic;

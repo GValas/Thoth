@@ -22,11 +22,11 @@
 
 // live spot cell tint (AG-Grid cellClassRules) — last tick up / down
 ::ng-deep .spot-up {
-  color: #1b8a4b;
+  color: var(--thoth-positive);
   font-weight: 600;
 }
 ::ng-deep .spot-down {
-  color: #c2374a;
+  color: var(--thoth-negative);
   font-weight: 600;
 }
 

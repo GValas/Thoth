@@ -78,19 +78,19 @@ interface ChainBlock {
         width: 100%;
       }
       :host ::ng-deep .oc-calls .ag-header-group-cell-label {
-        color: #1b8a4b;
+        color: var(--thoth-positive);
         font-weight: 700;
       }
       :host ::ng-deep .oc-puts .ag-header-group-cell-label {
-        color: #c2374a;
+        color: var(--thoth-negative);
         font-weight: 700;
       }
       :host ::ng-deep .oc-strike-head {
-        background: rgba(0, 0, 0, 0.05);
+        background: var(--thoth-surface-2);
         font-weight: 700;
       }
       :host ::ng-deep .oc-strike {
-        background: rgba(0, 0, 0, 0.04);
+        background: var(--thoth-surface);
         font-weight: 700;
       }
       :host ::ng-deep .oc-prem {
@@ -98,10 +98,10 @@ interface ChainBlock {
       }
       /* live move tint on the value cells (premium + Greeks) */
       :host ::ng-deep .oc-up {
-        color: #1b8a4b;
+        color: var(--thoth-positive);
       }
       :host ::ng-deep .oc-down {
-        color: #c2374a;
+        color: var(--thoth-negative);
       }
     `,
   ],
