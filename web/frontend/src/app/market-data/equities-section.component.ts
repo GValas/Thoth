@@ -1,7 +1,5 @@
 import { Component, Input, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -13,7 +11,6 @@ import type {
   GridReadyEvent,
   RowSelectedEvent,
 } from 'ag-grid-community';
-import { CurveGridComponent } from './curve-grid.component';
 import { defaultVol, MarketModel, VOL_KINDS, DIV_KINDS } from './market-model';
 import { LiveSpotsService } from './live-spots.service';
 import type { WsObject } from '../core/models';
@@ -27,6 +24,14 @@ interface EquityRow {
   div: string;
 }
 
+//! one row of the combined repo/dividend term structure: a shared pillar date carrying both
+//! the repo rate and the dividend value at that pillar (so the two curves stay aligned).
+interface TermRow {
+  date: string;
+  repo: number;
+  div: number;
+}
+
 //! Equities area: an editable grid (spot + currency) over each !equity, plus a detail
 //! panel for the selected stock that edits its referenced volatility (flat/SABR/Heston),
 //! repo curve and dividend schedule. Volatility/repo/dividends are sibling objects the
@@ -36,13 +41,10 @@ interface EquityRow {
   standalone: true,
   imports: [
     FormsModule,
-    MatButtonModule,
-    MatIconModule,
     MatFormFieldModule,
     MatSelectModule,
     MatInputModule,
     AgGridAngular,
-    CurveGridComponent,
   ],
   templateUrl: './equities-section.component.html',
   styleUrl: './equities-section.component.scss',
@@ -130,6 +132,7 @@ export class EquitiesSectionComponent {
     return eq ? (this.model.byName(eq.payload['volatility'] as string) ?? null) : null;
   });
   readonly repoName = computed(() => this.selected()?.payload['repo'] as string | undefined);
+  readonly repoObj = computed(() => this.model.byName(this.repoName() ?? '') ?? null);
   readonly divName = computed(
     () =>
       (this.selected()?.payload['continuous_dividends'] as string | undefined) ??
@@ -150,23 +153,6 @@ export class EquitiesSectionComponent {
 
   onRowSelected(e: RowSelectedEvent<EquityRow>): void {
     if (e.node.isSelected() && e.data) this.selectedName.set(e.data.name);
-  }
-
-  addEquity(): void {
-    this.selectedName.set(this.model.addEquity(this.today));
-  }
-
-  removeEquity(): void {
-    const eq = this.selected();
-    if (!eq) return;
-    const owned = [
-      eq.payload['volatility'],
-      eq.payload['repo'],
-      eq.payload['continuous_dividends'],
-      eq.payload['discrete_dividends'],
-    ].filter((n): n is string => typeof n === 'string');
-    this.model.remove(eq.name, ...owned);
-    this.selectedName.set(null);
   }
 
   // --- volatility editing ---
@@ -245,29 +231,94 @@ export class EquitiesSectionComponent {
       'sabr_volatility',
     );
   }
-  addPillar(): void {
-    const vol = this.volObj();
-    if (!vol) return;
-    const push = (f: string, d: number) => [...((vol.payload[f] as number[]) ?? []), d];
-    this.model.patch(vol.name, {
-      maturities: push('maturities', 1),
-      alpha: push('alpha', 0.2),
-      beta: push('beta', 1),
-      rho: push('rho', 0),
-      nu: push('nu', 0.4),
-    });
+
+  // --- Heston pillar grid: same tabular display as SABR, but a single row of scalar params.
+  // Editing a cell patches only that field, so the Bates jump_* fields stay absent from the
+  // payload (pure Heston) until the user actually sets them.
+  readonly hestonFields = [
+    'spot',
+    'init_vol',
+    'long_vol',
+    'kappa',
+    'vol_of_vol',
+    'jump_intensity',
+    'jump_mean',
+    'jump_vol',
+  ];
+  readonly hestonCols: ColDef[] = this.hestonFields.map((f) => ({
+    headerName: f,
+    field: f,
+    editable: true,
+    cellEditor: 'agNumberCellEditor',
+    valueParser: (p) => Number(p.newValue),
+    flex: 1,
+    minWidth: 80,
+    type: 'rightAligned',
+  }));
+  readonly hestonRows = computed<Record<string, number>[]>(() => {
+    const p = this.volObj()?.payload ?? {};
+    const row: Record<string, number> = {};
+    for (const f of this.hestonFields) row[f] = (p[f] as number) ?? 0;
+    return [row];
+  });
+  commitHeston(e: CellValueChangedEvent<Record<string, number>>): void {
+    const field = e.colDef.field;
+    if (field) this.setVolNum(field, e.data[field]);
   }
-  removePillar(): void {
-    const vol = this.volObj();
-    if (!vol) return;
-    const pop = (f: string) => ((vol.payload[f] as number[]) ?? []).slice(0, -1);
-    this.model.patch(vol.name, {
-      maturities: pop('maturities'),
-      alpha: pop('alpha'),
-      beta: pop('beta'),
-      rho: pop('rho'),
-      nu: pop('nu'),
-    });
+
+  // --- combined repo + dividend term structure (one shared pillar table) ---
+  // Repo and dividends share the same pillar dates and are edited in a single grid; every
+  // commit rewrites BOTH curves with the same `dates`, so they always have an equal pillar
+  // count. The dividend column reads/writes 'values' (continuous yield) or 'amounts' (cash).
+  private termApi?: GridApi;
+  readonly termDates = computed<string[]>(() => {
+    const rd = (this.repoObj()?.payload['dates'] as string[]) ?? [];
+    const dd = (this.divObj()?.payload['dates'] as string[]) ?? [];
+    return rd.length >= dd.length ? rd : dd;
+  });
+  readonly termRows = computed<TermRow[]>(() => {
+    const dates = this.termDates();
+    const rv = (this.repoObj()?.payload['values'] as number[]) ?? [];
+    const dv = (this.divObj()?.payload[this.divValueField()] as number[]) ?? [];
+    const lastR = rv[rv.length - 1] ?? 0;
+    const lastD = dv[dv.length - 1] ?? 0;
+    return dates.map((date, i) => ({ date, repo: rv[i] ?? lastR, div: dv[i] ?? lastD }));
+  });
+  readonly termCols = computed<ColDef[]>(() => [
+    { headerName: 'Pillar', field: 'date', editable: true, flex: 1, minWidth: 130 },
+    {
+      headerName: 'Repo (%)',
+      field: 'repo',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      valueParser: (p) => Number(p.newValue),
+      flex: 1,
+      minWidth: 100,
+      type: 'rightAligned',
+    },
+    {
+      headerName: this.divValueField() === 'amounts' ? 'Dividend (cash)' : 'Dividend (yield %)',
+      field: 'div',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      valueParser: (p) => Number(p.newValue),
+      flex: 1,
+      minWidth: 120,
+      type: 'rightAligned',
+    },
+  ]);
+  onTermReady(e: GridReadyEvent): void {
+    this.termApi = e.api;
+  }
+  commitTerm(): void {
+    const rows: TermRow[] = [];
+    this.termApi?.forEachNode((n) => rows.push(n.data as TermRow));
+    const live = rows.length ? rows : this.termRows();
+    const dates = live.map((r) => r.date);
+    const repo = this.repoName();
+    if (repo) this.model.patch(repo, { dates, values: live.map((r) => Number(r.repo)) });
+    const div = this.divObj();
+    if (div) this.model.patch(div.name, { dates, [this.divValueField()]: live.map((r) => Number(r.div)) });
   }
 
   private curveSummary(name?: string): string {

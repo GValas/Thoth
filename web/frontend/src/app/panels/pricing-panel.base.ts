@@ -81,7 +81,7 @@ export abstract class PricingPanelBase {
   //! a human label for a blotter row, e.g. "ACME call 100 2026-12-31".
   abstract rowLabel(): string;
 
-  //! variance swaps emit no per-contract Greeks; such panels override this to false so the
+  //! whether this instrument exposes per-contract Greeks; panels can override to false so the
   //! Greeks toggle is hidden and only premium is requested.
   readonly supportsGreeks: boolean = true;
 

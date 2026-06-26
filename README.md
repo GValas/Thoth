@@ -41,17 +41,32 @@ its duration, which makes that cluster's progress the job's progress. (The clust
 the NVIDIA Container Toolkit + ≥1 GPU; by default both masters share GPU 0 — set
 `THOTH_GPU_C2=1` to put the second cluster on a second card, and `THOTH_CUDA_ARCH` to the
 GPUs' compute capability — see `docker-compose.yml`.) Two tabs: **Market Data** — a domain dashboard with
-four editable areas (**Equities** spot/vol/repo/dividends · **Rates** per-currency yield
-curves · **FX** pairs · **Correlation** matrix), AG-Grid inline editing, full vol
-term-structures (flat/SABR/Heston), an **Advanced** schema-driven editor for other object
-kinds, a **Generate sample data** button (`POST /api/workspaces/:id/objects/seed`,
-default 5 equities with realistic tickers / 3 currencies), and a **live-spots** ticker
-streamed in real time from the `spot-feed` service (SSE) — and **Vanilla Grid** (formerly
-"Pricing Grid"): pick the
+four editable areas (**Equities** spot/vol/repo/dividends · **Rates** · **FX** · **Correlation**
+matrix), AG-Grid inline editing, full vol term-structures (flat/SABR/Heston, both shown as
+editable pillar/parameter **tables**). The book is a **fixed canonical set** — at most **5 stocks
++ 3 currencies (USD/EUR/JPY) + induced FX + correlation** — that you **edit in place** (no adding
+or deleting items, fixed pillar sets); an empty workspace is **auto-seeded on first load**, and
+**Generate sample data** (`POST /api/workspaces/:id/objects/seed`) reshuffles it. Each stock's
+**repo curve and dividends share a single pillar table** (one row per pillar, a Repo and a
+Dividend column) so the two curves always stay aligned. **Rates** is a single **shared-pillar
+grid** (rows = pillars, one column per currency) so every currency curve always shares the same
+pillar set. **FX** shows the pivot pairs (USD/EUR, USD/JPY) plus the **induced, triangulated
+cross** (EUR/JPY = USD/JPY ÷ USD/EUR), arbitrage-free by construction; the pivot basis is keyed
+off the pairs' shared underlying so it stays stable across reloads. The **Correlation** matrix is
+always a valid (symmetric, unit-diagonal, **positive-definite**) matrix: the generator and every
+hand edit project it onto the nearest valid correlation matrix (eigenvalue-clip repair), and the
+member lists self-heal so they never reference a renamed object. Beyond the live equity **spots**,
+the FX spots and the whole **correlation matrix tick in real time** off the `spot-feed` service
+(SSE): FX pivot legs follow a GBM walk (the cross re-induces from them) and the correlation matrix
+evolves under an Ornstein–Uhlenbeck mean-reversion with a per-tick positive-semidefinite repair so
+it stays a valid correlation matrix; while Live is on those cells are read-only and tinted on each
+move.
+The other tab is **Vanilla Grid** (formerly "Pricing Grid"): pick the
 engine (**ana / pde / mcl / mcl/gpu**), contract **currency**, underlyings, strikes, and
 maturities (via a **date picker**); a first visit prepopulates a ready-to-price default grid
 (strikes 80–120, the next five monthly maturities, EUR, European, Greeks on). Results render
-as an **option chain** — one block per maturity, **calls on the left and puts on the right of
+as an **option chain** — one block per maturity (the maturity sub-tabs are labelled
+`dd-MMM-yy`, e.g. `25-Jun-26`), **calls on the left and puts on the right of
 a central strike column, strikes top-to-bottom**, each wing showing premium + the per-cell
 Greeks — with a note of which **cluster/server** priced it and how long it took (engine
 `task_time` + round-trip). The form, results and any in-flight job **persist across tab
@@ -70,9 +85,11 @@ maturity, nominal, absolute/relative strike), **Barrier** (the four `up&out / up
 down&out / down&in` types, continuous or discrete monitoring, barrier level, strike,
 maturity) and **Variance** (variance swap: volatility strike + notional) — each showing
 premium + Greeks, each able to **re-price live** off the spot feed on a throttle, and each
-with a **Send to blotter** button. The **Blotter** tab is a global monitoring book: every
-product sent from a panel becomes a row whose premium is re-priced for the whole book in
-**live mode** (throttled, off the live spots), tinted green/red on each move; rows survive
+with a **Send to blotter** button (variance swaps now quote premium **and Greeks** — vega,
+rho, theta from the engine's generic bump pass — like the other panels). The **Blotter** tab is
+a global monitoring book: every product sent from a panel becomes a row showing its underlying's
+**live spot** (next to the underlying) and a premium re-priced for the whole book in **live
+mode** (throttled, off the live spots), tinted green/red on each move; rows survive
 tab navigation and a reload (persisted in `localStorage`). Both are backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots) that builds a
 one-contract book — the single-product counterpart of the grid pipeline.
@@ -116,7 +133,7 @@ Thoth/
 ├── web/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid + instrument builders
 │   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, instrument, live spots)
-│   ├── spot-feed/       # fake real-time equity spot feed (GBM walk -> Redis pub/sub)
+│   ├── spot-feed/       # fake real-time feed: GBM equity+fx spots & an OU correlation matrix -> Redis pub/sub
 │   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly): Vanilla Grid · Panels · Blotter
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/

@@ -1,10 +1,4 @@
 <div class="eq-head">
-  <button mat-stroked-button (click)="addEquity()"><mat-icon>add</mat-icon> Stock</button>
-  @if (selected()) {
-    <button mat-stroked-button color="warn" (click)="removeEquity()">
-      <mat-icon>delete</mat-icon> {{ selected()!.name }}
-    </button>
-  }
   <span class="hint">Spot &amp; currency editable inline · select a row to edit vol / repo / dividends</span>
 </div>
 
@@ -43,14 +37,14 @@
           </mat-form-field>
         }
         @case ('heston_volatility') {
-          <div class="num-row">
-            @for (f of ['spot','init_vol','long_vol','kappa','vol_of_vol','jump_intensity','jump_mean','jump_vol']; track f) {
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="num">
-                <mat-label>{{ f }}</mat-label>
-                <input matInput type="number" [ngModel]="volNum(f)"
-                       (ngModelChange)="setVolNum(f, $event)" />
-              </mat-form-field>
-            }
+          <div class="sabr">
+            <ag-grid-angular
+              class="ag-theme-quartz grid"
+              [rowData]="hestonRows()"
+              [columnDefs]="hestonCols"
+              [domLayout]="'autoHeight'"
+              (cellValueChanged)="commitHeston($event)"
+            ></ag-grid-angular>
           </div>
         }
         @case ('sabr_volatility') {
@@ -63,26 +57,13 @@
               (gridReady)="onSabrReady($event)"
               (cellValueChanged)="commitSabr()"
             ></ag-grid-angular>
-            <div class="curve-actions">
-              <button mat-stroked-button (click)="addPillar()"><mat-icon>add</mat-icon> Pillar</button>
-              <button mat-stroked-button color="warn" (click)="removePillar()">
-                <mat-icon>remove</mat-icon> Pillar
-              </button>
-            </div>
           </div>
         }
       }
     </div>
 
     <div class="editor-block">
-      <h5>Repo curve (%)</h5>
-      @if (repoName()) {
-        <app-curve-grid [model]="model" [name]="repoName()!" valueLabel="Repo (%)"></app-curve-grid>
-      }
-    </div>
-
-    <div class="editor-block">
-      <h5>Dividends</h5>
+      <h5>Repo &amp; dividends — shared pillars</h5>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>Dividend model</mat-label>
         <mat-select [ngModel]="divKind()" (ngModelChange)="setDivKind($event)">
@@ -91,13 +72,16 @@
           }
         </mat-select>
       </mat-form-field>
-      @if (divName()) {
-        <app-curve-grid
-          [model]="model"
-          [name]="divName()!"
-          [valueField]="divValueField()"
-          [valueLabel]="divValueField() === 'amounts' ? 'Cash' : 'Yield (%)'"
-        ></app-curve-grid>
+      @if (repoName() || divName()) {
+        <ag-grid-angular
+          class="ag-theme-quartz grid"
+          [rowData]="termRows()"
+          [columnDefs]="termCols()"
+          [domLayout]="'autoHeight'"
+          (gridReady)="onTermReady($event)"
+          (cellValueChanged)="commitTerm()"
+        ></ag-grid-angular>
+        <span class="hint">Repo &amp; dividends share these pillars · edits keep both curves aligned</span>
       }
     </div>
   </div>

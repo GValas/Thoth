@@ -14,10 +14,20 @@ import { Observable, Subject, filter } from 'rxjs';
 
 const TICK_CHANNEL = 'spots.tick';
 const LATEST_HASH = 'spots:latest';
+const CORREL_CHANNEL = 'correl.tick';
+const CORREL_LATEST = 'correl:latest';
 
 export interface SpotTick {
   symbol: string;
   price: number;
+  ts: number;
+}
+
+//! a full live correlation matrix over the streamed universe (equities + fx legs); clients
+//! slice out the sub-matrix for their own members.
+export interface CorrelSnapshot {
+  members: string[];
+  matrix: number[][];
   ts: number;
 }
 
@@ -27,6 +37,7 @@ export class MarketFeedService implements OnModuleInit, OnModuleDestroy {
   private sub?: Redis;
   private client?: Redis;
   private readonly ticks$ = new Subject<SpotTick>();
+  private readonly correl$ = new Subject<CorrelSnapshot>();
 
   constructor(private readonly config: ConfigService) {}
 
@@ -41,21 +52,23 @@ export class MarketFeedService implements OnModuleInit, OnModuleDestroy {
     this.client.on('error', (e: Error) => this.log.warn(`redis (client): ${e.message}`));
     this.sub.on('error', (e: Error) => this.log.warn(`redis (sub): ${e.message}`));
 
-    this.sub.subscribe(TICK_CHANNEL).then(
-      () => this.log.log(`subscribed to ${TICK_CHANNEL} on ${host}:${port}`),
+    this.sub.subscribe(TICK_CHANNEL, CORREL_CHANNEL).then(
+      () => this.log.log(`subscribed to ${TICK_CHANNEL}, ${CORREL_CHANNEL} on ${host}:${port}`),
       (e: Error) => this.log.warn(`subscribe failed: ${e.message}`),
     );
-    this.sub.on('message', (_channel: string, message: string) => {
+    this.sub.on('message', (channel: string, message: string) => {
       try {
-        this.ticks$.next(JSON.parse(message) as SpotTick);
+        if (channel === CORREL_CHANNEL) this.correl$.next(JSON.parse(message) as CorrelSnapshot);
+        else this.ticks$.next(JSON.parse(message) as SpotTick);
       } catch {
-        /* ignore a malformed tick */
+        /* ignore a malformed message */
       }
     });
   }
 
   onModuleDestroy(): void {
     this.ticks$.complete();
+    this.correl$.complete();
     void this.sub?.quit();
     void this.client?.quit();
   }
@@ -87,5 +100,21 @@ export class MarketFeedService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return out;
+  }
+
+  //! live stream of the universe correlation matrix.
+  correlStream(): Observable<CorrelSnapshot> {
+    return this.correl$.asObservable();
+  }
+
+  //! point-in-time snapshot of the latest correlation matrix (null until the first tick).
+  async latestCorrel(): Promise<CorrelSnapshot | null> {
+    if (!this.client) return null;
+    try {
+      const raw = await this.client.get(CORREL_LATEST);
+      return raw ? (JSON.parse(raw) as CorrelSnapshot) : null;
+    } catch {
+      return null;
+    }
   }
 }

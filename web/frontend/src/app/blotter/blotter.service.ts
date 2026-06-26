@@ -39,8 +39,8 @@ export class BlotterService {
   readonly count = computed(() => this.rows().length);
 
   //! which Greek columns to show: the union of Greeks present across the rows, in canonical
-  //! order, so a blotter mixing vanillas (full Greeks) and variance swaps (premium only)
-  //! shows just the columns that carry a value somewhere.
+  //! order, so a blotter mixing instruments shows just the columns that carry a value
+  //! somewhere (e.g. premium-only rows that were sent without the Greeks toggle).
   readonly greekColumns = computed<string[]>(() => {
     const present = new Set<string>();
     for (const r of this.rows()) for (const g of GREEK_KEYS) if (r.greeks[g] != null) present.add(g);

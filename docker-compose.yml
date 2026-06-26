@@ -65,9 +65,13 @@ services:
     environment:
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      TICK_MS: "1000"     # publish cadence (ms)
-      SPOT_DRIFT: "0.05"  # annualised drift
-      SPOT_VOL: "0.25"    # annualised vol
+      TICK_MS: "1000"        # spot publish cadence (ms)
+      SPOT_DRIFT: "0.05"     # annualised equity drift
+      SPOT_VOL: "0.25"       # annualised equity vol
+      FX_VOL: "0.08"         # annualised fx vol (pivot pairs)
+      CORREL_TICK_MS: "2000" # correlation publish cadence (ms)
+      CORREL_MEANREV: "12"   # OU mean-reversion speed (per year)
+      CORREL_VOL: "0.6"      # OU instantaneous correlation vol
     networks: [thoth]
 
   # ===== cluster 1 : master on GPU 0 + 5 CPU slaves ====================================

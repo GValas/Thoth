@@ -8,9 +8,12 @@
 //! seam: swap this simulator for a real market feed and nothing downstream changes.
 
 import { Redis } from 'ioredis';
+import { CorrelSim } from './correl.js';
 
 const TICK_CHANNEL = 'spots.tick';
 const LATEST_HASH = 'spots:latest';
+const CORREL_CHANNEL = 'correl.tick';
+const CORREL_LATEST = 'correl:latest';
 
 //! the same realistic large-cap tickers the market-data seed generator samples from, so a
 //! generated workspace's equities all have a live quote. Override with SYMBOLS=A,B,C.
@@ -19,6 +22,10 @@ const DEFAULT_SYMBOLS = [
   'WMT', 'XOM', 'NESN', 'ROG', 'NOVN', 'ASML', 'SAP', 'MC', 'OR', 'SIE',
   'TM', 'SONY', '7203', 'BABA', 'TSM', 'SHEL', 'HSBA', 'AZN', 'ULVR', 'BP',
 ];
+
+//! fx pivot pairs (usd is the pivot / underlying), with realistic start spots in base ccy.
+//! The cross (eur/jpy) is induced from these two legs in the UI, so it isn't streamed.
+const FX_START: Record<string, number> = { 'usd/eur': 0.92, 'usd/jpy': 150 };
 
 const env = (k: string, d: string) => process.env[k] ?? d;
 const num = (k: string, d: number) => {
@@ -30,10 +37,15 @@ const REDIS_HOST = env('REDIS_HOST', 'localhost');
 const REDIS_PORT = num('REDIS_PORT', 6379);
 const TICK_MS = num('TICK_MS', 1000); //!< publish cadence
 const DRIFT = num('SPOT_DRIFT', 0.05); //!< annualised drift μ
-const VOL = num('SPOT_VOL', 0.25); //!< annualised volatility σ
+const VOL = num('SPOT_VOL', 0.25); //!< annualised equity volatility σ
+const FX_VOL = num('FX_VOL', 0.08); //!< annualised fx volatility (much lower than equities)
+const CORREL_TICK_MS = num('CORREL_TICK_MS', 2000); //!< correlation publish cadence
+const CORREL_MEANREV = num('CORREL_MEANREV', 12); //!< OU mean-reversion speed κ (per year)
+const CORREL_VOL = num('CORREL_VOL', 0.6); //!< OU instantaneous correlation vol
 const SYMBOLS = (process.env.SYMBOLS ? process.env.SYMBOLS.split(',').map((s) => s.trim()) : DEFAULT_SYMBOLS).filter(
   Boolean,
 );
+const FX_SYMBOLS = Object.keys(FX_START);
 
 //! deterministic base price per symbol (a stable hash -> [40, 400]), so restarts resume at a
 //! comparable level rather than jumping; the walk diverges from there.
@@ -60,22 +72,47 @@ async function main(): Promise<void> {
   const redis = new Redis({ host: REDIS_HOST, port: REDIS_PORT, lazyConnect: false });
   redis.on('error', (e: Error) => console.error('[spot-feed] redis error:', e.message));
 
-  const prices = new Map<string, number>(SYMBOLS.map((s) => [s, basePrice(s)]));
+  //! equities walk from a stable base price; fx pairs from their realistic start spots.
+  const prices = new Map<string, number>([
+    ...SYMBOLS.map((s) => [s, basePrice(s)] as [string, number]),
+    ...FX_SYMBOLS.map((s) => [s, FX_START[s]] as [string, number]),
+  ]);
   const dt = (TICK_MS / 1000) / SECONDS_PER_YEAR; //!< tick length in years
 
+  //! the correlation universe spans every streamed symbol (equities + fx legs); a workspace
+  //! slices out the sub-matrix it needs.
+  const correl = new CorrelSim([...SYMBOLS, ...FX_SYMBOLS], {
+    kappa: CORREL_MEANREV,
+    sigma: CORREL_VOL,
+    dtYears: (CORREL_TICK_MS / 1000) / SECONDS_PER_YEAR,
+    gauss,
+  });
+
   console.log(
-    `[spot-feed] ${SYMBOLS.length} symbols every ${TICK_MS}ms ` +
-      `(μ=${DRIFT}, σ=${VOL}) -> ${REDIS_HOST}:${REDIS_PORT} #${TICK_CHANNEL}`,
+    `[spot-feed] ${SYMBOLS.length} equities + ${FX_SYMBOLS.length} fx every ${TICK_MS}ms ` +
+      `(μ=${DRIFT}, σ=${VOL}, fxσ=${FX_VOL}) -> ${REDIS_HOST}:${REDIS_PORT} ` +
+      `#${TICK_CHANNEL}; correlation every ${CORREL_TICK_MS}ms #${CORREL_CHANNEL}`,
   );
+
+  //! one GBM step S *= exp((μ - σ²/2)·dt + σ·√dt·Z), rounded for a tidy payload.
+  const walk = (s0: number, vol: number, decimals: number): number => {
+    const s1 = s0 * Math.exp((DRIFT - 0.5 * vol * vol) * dt + vol * Math.sqrt(dt) * gauss());
+    const p = 10 ** decimals;
+    return Math.round(s1 * p) / p;
+  };
 
   const tick = async () => {
     const ts = Date.now();
     const pipeline = redis.pipeline();
     for (const symbol of SYMBOLS) {
-      const s0 = prices.get(symbol)!;
-      //! GBM step: S *= exp((μ - σ²/2)·dt + σ·√dt·Z)
-      const s1 = s0 * Math.exp((DRIFT - 0.5 * VOL * VOL) * dt + VOL * Math.sqrt(dt) * gauss());
-      const price = Math.round(s1 * 100) / 100;
+      const price = walk(prices.get(symbol)!, VOL, 2);
+      prices.set(symbol, price);
+      const payload = JSON.stringify({ symbol, price, ts });
+      pipeline.publish(TICK_CHANNEL, payload);
+      pipeline.hset(LATEST_HASH, symbol, payload);
+    }
+    for (const symbol of FX_SYMBOLS) {
+      const price = walk(prices.get(symbol)!, FX_VOL, 4);
       prices.set(symbol, price);
       const payload = JSON.stringify({ symbol, price, ts });
       pipeline.publish(TICK_CHANNEL, payload);
@@ -88,10 +125,21 @@ async function main(): Promise<void> {
     }
   };
 
+  const correlTick = async () => {
+    const payload = JSON.stringify({ members: correl.members, matrix: correl.step(), ts: Date.now() });
+    try {
+      await redis.pipeline().publish(CORREL_CHANNEL, payload).set(CORREL_LATEST, payload).exec();
+    } catch (e) {
+      console.error('[spot-feed] correl publish failed:', (e as Error).message);
+    }
+  };
+
   const timer = setInterval(tick, TICK_MS);
+  const correlTimer = setInterval(correlTick, CORREL_TICK_MS);
 
   const shutdown = () => {
     clearInterval(timer);
+    clearInterval(correlTimer);
     redis.quit().finally(() => process.exit(0));
   };
   process.on('SIGINT', shutdown);

@@ -8,7 +8,7 @@
 import type { WsObject } from '../common/semantic-validation';
 
 export interface SeedOptions {
-  //! number of equities (default 5) and currencies (default 3) to spawn
+  //! number of equities (default 5, capped at 5) and currencies (default 3) to spawn
   equities?: number;
   currencies?: number;
   //! valuation date (YYYY-MM-DD) — curves span 10 yearly pillars from today
@@ -56,7 +56,75 @@ function curve10(
   return { dates, values };
 }
 
-const CCY_POOL = ['eur', 'usd', 'jpy', 'gbp', 'chf', 'cad'];
+//! Jacobi eigenvalue decomposition of a small symmetric n×n matrix (A = V·diag(d)·Vᵀ),
+//! eigenvectors as columns of V. Used to project a random matrix onto the valid set.
+function jacobiEigen(aIn: number[][]): { d: number[]; V: number[][] } {
+  const n = aIn.length;
+  const a = aIn.map((r) => [...r]);
+  const V: number[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
+  );
+  for (let sweep = 0; sweep < 100; sweep++) {
+    let off = 0;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += a[p][q] * a[p][q];
+    if (off < 1e-14) break;
+    for (let p = 0; p < n; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(a[p][q]) < 1e-18) continue;
+        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const c = 1 / Math.sqrt(t * t + 1);
+        const s = t * c;
+        for (let k = 0; k < n; k++) {
+          const akp = a[k][p];
+          const akq = a[k][q];
+          a[k][p] = c * akp - s * akq;
+          a[k][q] = s * akp + c * akq;
+        }
+        for (let k = 0; k < n; k++) {
+          const apk = a[p][k];
+          const aqk = a[q][k];
+          a[p][k] = c * apk - s * aqk;
+          a[q][k] = s * apk + c * aqk;
+        }
+        for (let k = 0; k < n; k++) {
+          const vkp = V[k][p];
+          const vkq = V[k][q];
+          V[k][p] = c * vkp - s * vkq;
+          V[k][q] = s * vkp + c * vkq;
+        }
+      }
+    }
+  }
+  return { d: a.map((_, i) => a[i][i]), V };
+}
+
+//! Project a symmetric matrix onto the nearest valid correlation matrix: clip eigenvalues to
+//! a small positive floor (makes it strictly positive-definite — what the engine requires),
+//! reconstruct, then rescale to a unit diagonal. A random unit-diagonal matrix is very often
+//! not positive-definite, so the generator must repair it before emitting `correl`.
+function repairCorrelation(m: number[][]): number[][] {
+  const n = m.length;
+  const { d, V } = jacobiEigen(m);
+  const dc = d.map((x) => Math.max(x, 1e-6));
+  const out = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j < n; j++) {
+      let s = 0;
+      for (let k = 0; k < n; k++) s += V[i][k] * dc[k] * V[j][k];
+      out[i][j] = out[j][i] = s;
+    }
+  }
+  const inv = out.map((_, i) => 1 / Math.sqrt(out[i][i] || 1));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) out[i][j] *= inv[i] * inv[j];
+    out[i][i] = 1;
+  }
+  return out;
+}
+
+//! USD first so it is the pivot of the fx triangle (every pair shares it as underlying).
+const CCY_POOL = ['usd', 'eur', 'jpy', 'gbp', 'chf', 'cad'];
 
 //! realistic large-cap tickers to draw equity names from (sampled, no repeats).
 const STOCK_POOL = [
@@ -69,7 +137,7 @@ const STOCK_POOL = [
 //! 1:1 owned flat-BS vol, repo curve and continuous-dividend curve), fx pairs (+ their vol),
 //! and a single correlation matrix over [equities..., fx...].
 export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
-  const nEq = Math.max(1, Math.min(opts.equities ?? 5, 26));
+  const nEq = Math.max(1, Math.min(opts.equities ?? 5, 5));
   const nCcy = Math.max(1, Math.min(opts.currencies ?? 3, CCY_POOL.length));
   const today = opts.today ?? '2026-01-01';
   const rnd = mulberry32(opts.seed ?? 1);
@@ -141,12 +209,24 @@ export function generateMarketData(opts: SeedOptions = {}): WsObject[] {
   }
 
   // --- correlation: one symmetric matrix over [equities..., fx...]; diagonal 1 ---
+  // Draw random off-diagonals, then project onto the nearest valid correlation matrix so the
+  // result is strictly positive-definite (a raw random unit-diagonal matrix usually is not,
+  // and the engine rejects it with "matrix is not symmetric positive-definite").
   const members = [...equityNames, ...fxNames];
   const n = members.length;
+  const full = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      const v = between(-0.2, 0.5);
+      full[i][j] = full[j][i] = v;
+    }
+    full[i][i] = 1;
+  }
+  const repaired = repairCorrelation(full);
   const symmetric: number[] = []; // lower triangle, row-major: (0,0),(1,0),(1,1),(2,0)...
   for (let i = 0; i < n; i++) {
     for (let j = 0; j <= i; j++) {
-      symmetric.push(i === j ? 1 : between(-0.2, 0.5));
+      symmetric.push(i === j ? 1 : Math.round(repaired[i][j] * 1e4) / 1e4);
     }
   }
   objs.push({

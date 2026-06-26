@@ -33,6 +33,74 @@ export function round(x: number, p = 4): number {
   return Math.round(x * 10 ** p) / 10 ** p;
 }
 
+//! Jacobi eigenvalue decomposition of a small symmetric n×n matrix (A = V·diag(d)·Vᵀ),
+//! eigenvectors as columns of V.
+function jacobiEigen(aIn: number[][]): { d: number[]; V: number[][] } {
+  const n = aIn.length;
+  const a = aIn.map((r) => [...r]);
+  const V: number[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
+  );
+  for (let sweep = 0; sweep < 100; sweep++) {
+    let off = 0;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += a[p][q] * a[p][q];
+    if (off < 1e-14) break;
+    for (let p = 0; p < n; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(a[p][q]) < 1e-18) continue;
+        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const c = 1 / Math.sqrt(t * t + 1);
+        const s = t * c;
+        for (let k = 0; k < n; k++) {
+          const akp = a[k][p];
+          const akq = a[k][q];
+          a[k][p] = c * akp - s * akq;
+          a[k][q] = s * akp + c * akq;
+        }
+        for (let k = 0; k < n; k++) {
+          const apk = a[p][k];
+          const aqk = a[q][k];
+          a[p][k] = c * apk - s * aqk;
+          a[q][k] = s * apk + c * aqk;
+        }
+        for (let k = 0; k < n; k++) {
+          const vkp = V[k][p];
+          const vkq = V[k][q];
+          V[k][p] = c * vkp - s * vkq;
+          V[k][q] = s * vkp + c * vkq;
+        }
+      }
+    }
+  }
+  return { d: a.map((_, i) => a[i][i]), V };
+}
+
+//! Project a symmetric matrix onto the nearest valid correlation matrix: clip eigenvalues to
+//! a small positive floor (strictly positive-definite, as the engine requires), reconstruct,
+//! then rescale to a unit diagonal. A valid matrix is a near-fixed point, so applying this on
+//! every edit only nudges the values when an edit has actually broken positive-definiteness.
+export function repairCorrelation(m: number[][]): number[][] {
+  const n = m.length;
+  if (n === 0) return m;
+  const { d, V } = jacobiEigen(m);
+  const dc = d.map((x) => Math.max(x, 1e-6));
+  const out = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j < n; j++) {
+      let s = 0;
+      for (let k = 0; k < n; k++) s += V[i][k] * dc[k] * V[j][k];
+      out[i][j] = out[j][i] = s;
+    }
+  }
+  const inv = out.map((_, i) => 1 / Math.sqrt(out[i][i] || 1));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) out[i][j] *= inv[i] * inv[j];
+    out[i][i] = 1;
+  }
+  return out;
+}
+
 //! sensible starting payload when a vol object is created or its kind is switched.
 export function defaultVol(kind: string, spot = 100): Record<string, unknown> {
   switch (kind) {
@@ -67,6 +135,7 @@ export class MarketModel {
   set(objs: WsObject[]): void {
     this._objects.set(objs.map((o) => ({ ...o, payload: structuredClone(o.payload) })));
     this.syncForex();
+    this.syncCorrel();
   }
 
   //! FX pairs are derived, not hand-added: keep exactly one !forex per non-pivot currency.
@@ -77,9 +146,15 @@ export class MarketModel {
   //! missing pairs (+ their flat vol), drops stale ones; existing spot & vol are preserved.
   syncForex(): void {
     const ccys = this.currencyNames();
-    const pivot = ccys[0];
+    //! Pivot = the underlying shared by the existing fx basis when there is one, NOT just the
+    //! first currency: the backend returns objects sorted by name, so `currencyNames()[0]` is
+    //! the alphabetically-first currency, which need not be the pivot the data was built with.
+    //! Keying off the existing pairs' underlying keeps the basis stable across reloads (otherwise
+    //! every reload renames the pairs and orphans the correlation matrix's `forexs`). Falls back
+    //! to the first currency only to bootstrap a workspace that has no fx pair yet.
+    const pivot = (this.forexs()[0]?.payload['underlying_currency'] as string) ?? ccys[0];
     const desired = new Map<string, string>(); // pair name -> base (quote) currency
-    if (pivot) for (const x of ccys.slice(1)) desired.set(`${pivot}/${x}`, x);
+    if (pivot) for (const x of ccys) if (x !== pivot) desired.set(`${pivot}/${x}`, x);
 
     for (const fx of this.forexs()) {
       if (!desired.has(fx.name)) {
@@ -99,6 +174,21 @@ export class MarketModel {
         payload: { base_currency: x, underlying_currency: pivot, spot: 1, volatility: volName },
       });
     }
+  }
+  //! Re-key the stored correlation matrix onto the current members so it can never reference a
+  //! renamed/removed object (which the engine and the validator reject). Only rewrites when the
+  //! member set actually drifted — existing correlations are carried over, new pairs default to
+  //! 0 — so a consistent book is left untouched (no churn). Must run after syncForex().
+  private syncCorrel(): void {
+    const correl = this.correlation();
+    if (!correl) return;
+    const want = correlMembers(this);
+    const have = [
+      ...((correl.payload['underlyings'] as string[]) ?? []),
+      ...((correl.payload['forexs'] as string[]) ?? []),
+    ];
+    if (want.length === have.length && want.every((m, i) => m === have[i])) return;
+    writeCorrel(this, buildCorrelModel(this));
   }
   all(): WsObject[] {
     return this._objects();
@@ -237,7 +327,10 @@ export function writeCorrel(model: MarketModel, cm: CorrelModel): void {
   const fxNames = new Set(model.forexs().map((f) => f.name));
   const underlyings = cm.members.filter((m) => !fxNames.has(m));
   const forexs = cm.members.filter((m) => fxNames.has(m));
-  const payload = { underlyings, forexs, matrix: cm.matrix.flat() };
+  //! project the edited matrix back onto the valid (positive-definite, unit-diagonal) set so a
+  //! single off-diagonal edit can never make the engine reject `correl` as not SPD.
+  const repaired = repairCorrelation(cm.matrix).map((row) => row.map((x) => round(x)));
+  const payload = { underlyings, forexs, matrix: repaired.flat() };
   if (model.correlation()) model.replace('correl', payload, 'correlation_matrix');
   else model.upsert({ name: 'correl', kind: 'correlation_matrix', payload });
 }

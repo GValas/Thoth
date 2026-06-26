@@ -1,12 +1,14 @@
 //! Live spot endpoints:
 //!   GET /api/spots/latest?symbols=A,B   -> point-in-time snapshot (SpotTick[])
 //!   GET /api/spots/stream?symbols=A,B   -> Server-Sent Events, one per tick
-//! Both sit behind the global JwtAuthGuard. EventSource can't set an Authorization header,
+//!   GET /api/spots/correl/latest        -> latest universe correlation matrix (or null)
+//!   GET /api/spots/correl/stream        -> Server-Sent Events, one per correlation tick
+//! All sit behind the global JwtAuthGuard. EventSource can't set an Authorization header,
 //! so the Angular client streams these with fetch() + the Bearer token instead.
 
 import { Controller, Get, Query, Sse, type MessageEvent } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
-import { MarketFeedService, type SpotTick } from './market-feed.service';
+import { MarketFeedService, type CorrelSnapshot, type SpotTick } from './market-feed.service';
 
 function parseSymbols(symbols?: string): string[] | undefined {
   if (!symbols) return undefined;
@@ -31,5 +33,15 @@ export class MarketFeedController {
     const list = parseSymbols(symbols);
     const set = list ? new Set(list) : undefined;
     return this.feed.stream(set).pipe(map((tick): MessageEvent => ({ data: tick })));
+  }
+
+  @Get('correl/latest')
+  latestCorrel(): Promise<CorrelSnapshot | null> {
+    return this.feed.latestCorrel();
+  }
+
+  @Sse('correl/stream')
+  correlStream(): Observable<MessageEvent> {
+    return this.feed.correlStream().pipe(map((snap): MessageEvent => ({ data: snap })));
   }
 }

@@ -11,6 +11,7 @@ import { RatesSectionComponent } from './rates-section.component';
 import { FxSectionComponent } from './fx-section.component';
 import { CorrelationSectionComponent } from './correlation-section.component';
 import { LiveSpotsService } from './live-spots.service';
+import { LiveCorrelService } from './live-correl.service';
 
 //! Market-data DASHBOARD: pick a workspace, then edit its market data in four domain areas
 //! (equities · rates · fx · correlation). "Generate sample data" spawns a valid random set
@@ -36,21 +37,31 @@ export class MarketDataComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
   readonly live = inject(LiveSpotsService);
+  private readonly liveCorrel = inject(LiveCorrelService);
 
   readonly model = new MarketModel();
   readonly workspace = signal<Workspace | null>(null);
   readonly errors = signal<Record<string, string[]>>({});
   readonly busy = signal(false);
 
-  //! equity symbols to stream live spots for (stable reference between equity-set changes).
-  readonly equityNames = computed(() => this.model.equities().map((e) => e.name));
+  //! symbols to stream live: the workspace equities plus the pivot fx pairs (the induced
+  //! cross is derived in the UI, not streamed).
+  readonly liveSymbols = computed(() => [
+    ...this.model.equities().map((e) => e.name),
+    ...this.model.forexs().map((f) => f.name),
+  ]);
 
   constructor() {
-    //! drive the live feed from the Live toggle: on -> stream the workspace's equities,
-    //! off -> stop. Re-runs when the toggle flips or the equity set changes.
+    //! drive the live feeds from the Live toggle: on -> stream the workspace's spots + the
+    //! correlation matrix, off -> stop. Re-runs when the toggle flips or the symbol set changes.
     effect(() => {
-      if (this.live.enabled()) void this.live.start(this.equityNames());
-      else this.live.stop();
+      if (this.live.enabled()) {
+        void this.live.start(this.liveSymbols());
+        void this.liveCorrel.start();
+      } else {
+        this.live.stop();
+        this.liveCorrel.stop();
+      }
     });
   }
 
@@ -66,13 +77,29 @@ export class MarketDataComponent implements OnInit {
   private useWorkspace(ws: Workspace): void {
     this.workspace.set(ws);
     this.errors.set({});
-    this.api.listObjects(ws.id).subscribe((objs) => this.model.set(objs));
+    this.api.listObjects(ws.id).subscribe((objs) => {
+      // the canonical book (5 stocks, USD/EUR/JPY, induced fx, correlation) is always
+      // present: seed an empty workspace on first load instead of showing a blank tab.
+      if (objs.length === 0) this.seed(false);
+      else this.model.set(objs);
+    });
   }
 
   generate(): void {
+    this.seed(true);
+  }
+
+  //! (re)generate the canonical book server-side and load it. `confirmFirst` is true for the
+  //! Generate button (it overwrites edits) and false for the silent first-load auto-seed.
+  private seed(confirmFirst: boolean): void {
     const ws = this.workspace();
     if (!ws) return;
-    if (!confirm(`Replace ${ws.name}'s market data with a fresh random sample (5 stocks, 3 currencies)?`)) {
+    if (
+      confirmFirst &&
+      !confirm(
+        `Replace ${ws.name}'s market data with a fresh sample (5 stocks, 3 currencies USD/EUR/JPY, induced FX, correlation)?`,
+      )
+    ) {
       return;
     }
     this.busy.set(true);
@@ -82,7 +109,7 @@ export class MarketDataComponent implements OnInit {
         this.model.set(objs);
         this.errors.set({});
         this.busy.set(false);
-        this.snack.open('Sample data generated', 'OK', { duration: 2500 });
+        if (confirmFirst) this.snack.open('Sample data generated', 'OK', { duration: 2500 });
       },
       error: (e) => {
         this.busy.set(false);

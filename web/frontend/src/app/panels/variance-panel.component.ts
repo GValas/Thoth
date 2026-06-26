@@ -16,8 +16,8 @@ import { PanelActionsComponent } from './panel-actions.component';
 import { PanelResultComponent } from './panel-result.component';
 
 //! Variance swap panel: price one variance swap (volatility strike + notional) on an
-//! underlying, live off the feed. Variance swaps carry no per-contract Greeks, so the
-//! panel quotes premium only.
+//! underlying, live off the feed. Greeks (vega is the dominant one) come from the engine's
+//! generic bump-and-revalue pass, same as the other instruments.
 @Component({
   selector: 'app-variance-panel',
   standalone: true,
@@ -102,7 +102,6 @@ import { PanelResultComponent } from './panel-result.component';
 })
 export class VariancePanelComponent extends PricingPanelBase implements OnInit {
   readonly kind: InstrumentKind = 'variance_swap';
-  override readonly supportsGreeks = false; //!< variance swaps emit no per-contract Greeks
 
   volatilityStrike = 20;
   notional = 10000;

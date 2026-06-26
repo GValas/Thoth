@@ -43,6 +43,43 @@ describe('market-data seed generator', () => {
     expect((correl.payload.forexs as string[])).toHaveLength(2);
   });
 
+  it('emits a strictly positive-definite correlation matrix (engine requires SPD)', () => {
+    //! reconstruct the full matrix from the lower triangle and confirm a Cholesky factorisation
+    //! succeeds (all pivots > 0) — a raw random unit-diagonal matrix usually fails this, so this
+    //! guards the eigenvalue-clip repair in the generator across several seeds and member counts.
+    const choleskyOk = (m: number[][]): boolean => {
+      const n = m.length;
+      const L = Array.from({ length: n }, () => new Array(n).fill(0));
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j <= i; j++) {
+          let s = m[i][j];
+          for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+          if (i === j) {
+            if (s <= 1e-12) return false; // not positive-definite
+            L[i][i] = Math.sqrt(s);
+          } else {
+            L[i][j] = s / L[j][j];
+          }
+        }
+      }
+      return true;
+    };
+    for (const seed of [1, 7, 42, 123, 9999]) {
+      const objs = generateMarketData({ equities: 5, currencies: 6, seed });
+      const correl = objs.find((o) => o.kind === 'correlation_matrix')!;
+      const order = [
+        ...(correl.payload.underlyings as string[]),
+        ...(correl.payload.forexs as string[]),
+      ];
+      const n = order.length;
+      const tri = correl.payload.symmetric_matrix as number[];
+      const full = Array.from({ length: n }, () => new Array(n).fill(0));
+      let k = 0;
+      for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) full[i][j] = full[j][i] = tri[k++];
+      expect(choleskyOk(full)).toBe(true);
+    }
+  });
+
   it('is deterministic for a given seed', () => {
     expect(generateMarketData({ seed: 42 })).toEqual(generateMarketData({ seed: 42 }));
   });

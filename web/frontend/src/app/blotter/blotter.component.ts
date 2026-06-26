@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PanelContextService } from '../panels/panel-context.service';
+import { LiveSpotsService } from '../market-data/live-spots.service';
 import { BlotterService, BlotterRow } from './blotter.service';
 
 //! Global monitoring blotter: every product sent from a pricing panel becomes a live row.
@@ -32,12 +33,14 @@ import { BlotterService, BlotterRow } from './blotter.service';
 export class BlotterComponent implements OnInit {
   readonly b = inject(BlotterService);
   private readonly ctx = inject(PanelContextService);
+  private readonly live = inject(LiveSpotsService);
 
   //! fixed columns + whichever Greeks appear across the rows + the row actions.
   readonly columns = computed<string[]>(() => [
     'label',
     'kind',
     'underlying',
+    'spot',
     'engine',
     'premium',
     'ccy',
@@ -53,6 +56,19 @@ export class BlotterComponent implements OnInit {
 
   underlyingOf(row: BlotterRow): string {
     return (row.request.instrument['underlying'] as string) ?? '';
+  }
+
+  //! live spot for the row's underlying (keyed by ticker, same as the equities grid), or
+  //! undefined when Live is off or the symbol isn't streamed.
+  spotOf(row: BlotterRow): number | undefined {
+    if (!this.live.enabled()) return undefined;
+    return this.live.spots().get(this.underlyingOf(row))?.price;
+  }
+
+  //! +1/-1 on the last spot move, for the green/red tint (mirrors the equities grid).
+  spotDir(row: BlotterRow): number {
+    const q = this.live.spots().get(this.underlyingOf(row));
+    return q ? Math.sign(q.price - q.prev) : 0;
   }
 
   greekOf(row: BlotterRow, g: string): number | undefined {

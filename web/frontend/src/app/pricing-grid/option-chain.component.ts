@@ -6,6 +6,8 @@ import { GridMatrix, OptionChain } from '../core/models';
 
 const GREEKS = ['delta', 'gamma', 'vega', 'rho', 'theta'];
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 //! one grid row = one strike: the strike plus the call wing (c_*) and put wing (p_*) metrics.
 interface ChainRow {
   strike: number;
@@ -31,7 +33,7 @@ interface ChainBlock {
   template: `
     <mat-tab-group class="oc-tabs" mat-stretch-tabs="false" animationDuration="0ms">
       @for (block of blocks(); track block.maturity) {
-        <mat-tab [label]="block.maturity">
+        <mat-tab [label]="fmtMaturity(block.maturity)">
           <div class="oc-block">
             <ag-grid-angular
               class="ag-theme-quartz oc-grid"
@@ -211,6 +213,16 @@ export class OptionChainComponent {
     if (c.put) cols.push(wing('p', 'Puts', false));
     return cols;
   });
+
+  //! tab label: ISO maturity (YYYY-MM-DD) -> dd-MMM-yy, e.g. 2026-06-25 -> 25-Jun-26.
+  //! parsed by splitting the string (no Date) so it never shifts a day across timezones.
+  fmtMaturity(iso: string): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return iso;
+    const [, year, month, day] = m;
+    const mon = MONTHS[Number(month) - 1] ?? month;
+    return `${day}-${mon}-${year.slice(2)}`;
+  }
 
   readonly blocks = computed<ChainBlock[]>(() => {
     const c = this.chainSig();

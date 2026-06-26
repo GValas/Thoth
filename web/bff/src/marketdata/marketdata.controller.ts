@@ -13,7 +13,7 @@ class ObjectDto implements WsObject {
 class ReplaceObjectsDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => ObjectDto) objects!: ObjectDto[];
 }
-//! Options for "generate sample data" — counts default to 5 equities / 3 currencies.
+//! Options for "generate sample data" — counts default to 10 equities / 3 currencies.
 class SeedDto {
   @IsOptional() @IsInt() @Min(1) @Max(26) equities?: number;
   @IsOptional() @IsInt() @Min(1) @Max(6) currencies?: number;
