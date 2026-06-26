@@ -18,7 +18,6 @@ import {
   UpdateWorkspace,
   UserRole,
   UserRow,
-  ValidateResponse,
   Workspace,
   WsObject,
 } from './models';
@@ -71,12 +70,6 @@ export class ApiService {
   }
   replaceObjects(workspaceId: string, objects: WsObject[]): Observable<unknown> {
     return this.http.put(`${this.base}/workspaces/${workspaceId}/objects`, { objects });
-  }
-  validateObjects(workspaceId: string, objects: WsObject[]): Observable<ValidateResponse> {
-    return this.http.post<ValidateResponse>(
-      `${this.base}/workspaces/${workspaceId}/objects/validate`,
-      { objects },
-    );
   }
   //! generate a random sample market-data set; replaces the workspace's objects.
   seedObjects(workspaceId: string, req: SeedRequest = {}): Observable<WsObject[]> {

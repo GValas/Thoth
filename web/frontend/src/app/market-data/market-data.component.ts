@@ -15,8 +15,8 @@ import { LiveCorrelService } from './live-correl.service';
 
 //! Market-data DASHBOARD: pick a workspace, then edit its market data in four domain areas
 //! (equities · rates · fx · correlation). "Generate sample data" spawns a valid random set
-//! server-side; Check validates; Save PUTs the whole object set. All four areas share one
-//! MarketModel (the canonical object list).
+//! server-side; Save PUTs the whole object set (validating on the server and surfacing any
+//! errors). All four areas share one MarketModel (the canonical object list).
 @Component({
   selector: 'app-market-data',
   standalone: true,
@@ -115,21 +115,6 @@ export class MarketDataComponent implements OnInit {
         this.busy.set(false);
         this.handleError(e);
       },
-    });
-  }
-
-  check(): void {
-    const ws = this.workspace();
-    if (!ws) return;
-    this.api.validateObjects(ws.id, this.model.all()).subscribe({
-      next: (res) => {
-        this.errors.set(res.errors);
-        const n = Object.keys(res.errors).length;
-        this.snack.open(n === 0 ? 'All objects valid' : `${n} object(s) have errors`, 'OK', {
-          duration: 3000,
-        });
-      },
-      error: (e) => this.handleError(e),
     });
   }
 

@@ -2,6 +2,20 @@
   "version": "2.0.0",
   "tasks": [
     {
+      // Auto-launch Claude Code in bypass-permissions mode when the folder opens.
+      // Dedicated panel keeps it visible; `exec bash` keeps the terminal usable after Claude exits.
+      "label": "claude: start",
+      "type": "shell",
+      "command": "claude --dangerously-skip-permissions; exec bash",
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "claude"
+      },
+      "problemMatcher": []
+    },
+    {
       // Debug build (separate dir so the optimized Release build/ is untouched).
       // -g -O0 via CMAKE_BUILD_TYPE=Debug -> breakpoints land on the right lines.
       // THOTH_ENABLE_CUDA=ON so gpu::Available() uses the real device (not the

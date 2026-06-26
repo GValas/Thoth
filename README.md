@@ -118,7 +118,9 @@ incremental `tsc` emit nothing and the image build fails on the missing `dist`.
 run all three locally — `thoth -server 8080`, then in `web/bff` `npm i && npm run start:dev`
 (memory queue, no Redis needed), then in `web/frontend` `npm i && npm start` (proxies
 `/api` → `:3000`). An opt-in 3-container dev stack is in
-[`.devcontainer/docker-compose.dev.yml`](.devcontainer/docker-compose.dev.yml). BFF API
+[`.devcontainer/docker-compose.dev.yml`](.devcontainer/docker-compose.dev.yml). On open the
+container auto-launches the Claude CLI in a dedicated terminal (a `folderOpen` task in
+[`.vscode/tasks.json`](.vscode/tasks.json), bypass-permissions mode). BFF API
 docs are served at `/api/docs`. Design notes: [`todo-gui.md`](todo-gui.md).
 
 ## Repository map

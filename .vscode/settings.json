@@ -1,4 +1,9 @@
 {
+  // Run the folderOpen task (".vscode/tasks.json" → "claude: start") automatically,
+  // without the one-time "Allow Automatic Tasks in Folder" prompt. This is what
+  // auto-launches the Claude CLI in bypass-permissions mode when the container opens.
+  "task.allowAutomaticTasks": "on",
+
   // CMake Tools tente de configurer le projet à l'ouverture et, faute de kit
   // (toolchain) sélectionné, affiche la notification « Scan for kits… ».
   // On désactive la configuration auto : le build passe par make/CMake en CLI.

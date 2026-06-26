@@ -41,6 +41,24 @@
   border: 1px solid var(--thoth-border);
   border-radius: 8px;
   overflow: hidden;
+  font-size: 13px;
+
+  // Compact rows: shorter than the Material default for a dense monitoring view.
+  --mat-table-row-item-container-height: 32px;
+  --mat-table-header-container-height: 34px;
+
+  .mat-mdc-cell,
+  .mat-mdc-header-cell {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  // The remove icon-button otherwise forces the row taller than the text — shrink it
+  // to fit the compact row height.
+  .mat-mdc-icon-button {
+    width: 30px;
+    height: 30px;
+    padding: 3px;
+  }
 
   th.num,
   td.num {
