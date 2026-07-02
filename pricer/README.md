@@ -242,8 +242,12 @@ dividends, multi-asset consistency, engine-vs-engine agreement (incl. quanto),
 variance swaps (analytic vs the accumulated-variance PDE), baskets, composites,
 the SABR surface, Sobol QMC, the `!sequence` task, the bump-and-revalue Greeks
 (delta/gamma/vega/rho/theta vs Black-Scholes) and the model-parameter
-`vega_<param>` Greeks (Heston / SABR), book aggregation, determinism and config
-parsing. It is built alongside the binary:
+`vega_<param>` Greeks (Heston / SABR), book aggregation, determinism, config
+parsing, and term-structured curves (steep-curve European agreement across the
+three engines, plus the American LSM **and** the American PDE against an
+independent term-structure binomial oracle, the local-vol PDE repricing the
+SABR smile across strikes, and a three-engine quanto-on-SABR agreement pin —
+all engines apply the quanto drift correction at the ATM implied vol). It is built alongside the binary:
 
 ```bash
 cmake --build build -j           # builds thoth + thoth_tests
@@ -545,17 +549,31 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   dividend leg is a term-structured zero-rate node, and the spot diffuses at the
   per-step forward carry), so a sloped curve reaches the right MCL forward and the
   MCL/PDE/ANA prices agree on steep curves. A flat curve reduces exactly to the
-  previous single-rate behaviour.
+  previous single-rate behaviour. The **American LSM pass discounts each exercise
+  cashflow at the zero rate of its own date** (read off the premium-currency curve,
+  parallel-bumped for rho), consistent with the term-structured diffusion, and the
+  **PDE grid steps at the per-interval forward carry/discount rates** read off the
+  full curves (the last step pinned to the exact maturity, so the telescoped step
+  discounts reproduce the maturity df — European prices are unchanged by
+  construction while American interim exercise sees the true curve dynamics; a
+  flat curve keeps the assembled-once fast path). Both engines are pinned against
+  an independent term-structure binomial oracle in
+  `tests/test_term_structure.cpp` (they agree with it to <0.5% where the old
+  flat-maturity-rate treatments were 3.5% / 13.5% off on a 2%→10% curve).
 - Local volatility: the **MCL** engine diffuses a `sabr_volatility` surface as a
   full **Dupire local-vol** surface — the surface is sampled onto a
   per-diffusion-date log-spot grid and read along each path. Mono, **basket**
   (each component on its own local vol) and **composite** underlyings are covered
   (the composite's quanto drift correction uses the ATM vol, as ANA/PDE do).
-  The **ANA** engine uses the implied vol at the option's strike, while the
-  **PDE** engine uses a single ATM vol for vanillas (no local-vol grid) — except
-  the **variance-swap PDE**, whose accumulated-variance source is the **Dupire
-  local variance per grid node**, so it integrates the same smile the analytic
-  static replication does. `bs_volatility` (flat) is exact in every engine.
+  The **ANA** engine uses the implied vol at the option's strike, and the **PDE**
+  now reads the **Dupire local vol per grid node and per time step** for a mono
+  local-vol underlying (vanillas and barriers), so by the Dupire repricing
+  property its European prices match ANA at **every strike**, not just ATM —
+  pinned across strikes in `tests/test_features.cpp`. The **variance-swap PDE**
+  keeps its Dupire local-variance source, matching the analytic static
+  replication. `bs_volatility` (flat) is exact in every engine (and keeps the
+  assembled-once fast grid path). The ATM vol still sizes the PDE domain and
+  feeds the quanto drift correction.
 - GPU (CUDA) acceleration (`mcl` + `allow_gpu`) currently covers **single-asset
   European vanillas under GBM** only; American / barrier / stochastic-vol /
   multi-asset books run on the CPU `mcl` engine. Extending the kernel to Heston-QE

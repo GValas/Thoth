@@ -24,6 +24,7 @@ void PathRecorder::StartRecording( MonteCarloNode* Node,
     for ( size_t idx : DateIndices )
     {
         record.tau.push_back( YearFraction( DateList[0], DateList[idx] ) );
+        record.dates.push_back( DateList[idx] ); //!< kept for per-date curve reads (LSM discount)
     }
     //! [ nb_draws x nb_exercise_dates ] : one row per path, filled by RecordPath
     record.paths = la_matrix_alloc( NbDraws, DateIndices.size() );
@@ -72,6 +73,20 @@ vector<double> PathRecorder::RecordedTau( const string& NodeName ) const
         if ( r.node->GetName() == NodeName )
         {
             return r.tau;
+        }
+    }
+    return {};
+}
+
+//! calendar dates of the recorded columns for a node; empty if the node was not
+//! recorded. Parallel to RecordedTau — used to read per-date zero rates off the curve.
+vector<date> PathRecorder::RecordedDates( const string& NodeName ) const
+{
+    for ( const auto& r : _records )
+    {
+        if ( r.node->GetName() == NodeName )
+        {
+            return r.dates;
         }
     }
     return {};

@@ -22,6 +22,7 @@ class PathRecorder
         MonteCarloNode* node = nullptr;
         vector<size_t> date_index; //!< columns: diffusion-date indices
         vector<double> tau;        //!< year fraction of each column from today
+        vector<date> dates;        //!< calendar date of each column (curve reads: LSM discounting)
         LaMatrix paths;            //!< [ nb_draws x date_index.size() ]
         size_t row = 0;            //!< next draw to fill
     };
@@ -56,6 +57,10 @@ class PathRecorder
     //! year fractions of the recorded columns for a node (the tau grid for the LSM
     //! regression); empty vector if the node was not recorded.
     vector<double> RecordedTau( const string& NodeName ) const;
+
+    //! calendar dates of the recorded columns for a node (so the LSM pass can read
+    //! zero rates off the term-structured curve per exercise date); empty if not recorded.
+    vector<date> RecordedDates( const string& NodeName ) const;
 
     //! (node, date-index) pairs the topological sort must force-evaluate so every
     //! recorded column is computed: a diffusion spot is already scheduled at all dates

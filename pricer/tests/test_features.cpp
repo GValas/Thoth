@@ -432,6 +432,49 @@ TEST_CASE( "SABR local-vol MCL reprices the implied surface (matches ANA)" )
     }
 }
 
+// --- SABR local-vol PDE : the 1-D grid reads the Dupire local vol per node and per
+// time step (like the MCL diffusion), so by the Dupire repricing property a European
+// vanilla must reproduce the implied-vol (ANA) price AT EVERY STRIKE — not just ATM.
+// Before the local-vol grid the PDE diffused the single ATM vol, so with a genuine
+// smile (rho -0.3, nu 0.4) the OTM strikes mispriced vs ANA.
+TEST_CASE( "SABR local-vol PDE reprices the implied surface across strikes" )
+{
+    auto book = []( const std::string& method, double strike )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur," << ConfigRef( method )
+          << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( 1, 7, 4 ) //!< medium PDE grid; draws unused (no MCL cell here)
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0],"
+          << " rho: [-0.3], nu: [0.4], calendar: cal}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+          << "book: !book {contracts: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: eur, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, type: "
+          << ( strike < 100 ? "put" : "call" ) << ", exercise: european}\n";
+        return o.str();
+    };
+
+    //! OTM put, ATM call, OTM call: ANA prices each off the SABR implied vol AT THE
+    //! STRIKE; the local-vol PDE must land on the same price (Dupire repricing).
+    for ( double strike : { 80.0, 100.0, 120.0 } )
+    {
+        const double ana = Premium( Price( book( "ana", strike ) ) );
+        const double pde = Premium( Price( book( "pde", strike ) ) );
+        CAPTURE( strike );
+        CAPTURE( ana );
+        CAPTURE( pde );
+        //! 1.5% relative + a small absolute floor for the cheap OTM wings (grid +
+        //! Dupire finite-difference resolution)
+        CHECK( std::abs( pde - ana ) <= 0.015 * ana + 0.05 );
+    }
+}
+
 // --- basket local-vol : each component of a basket diffuses with its own Dupire
 // local vol. A basket of flat SABR surfaces (constant local vol = alpha) must match
 // the same basket priced with the equivalent bs_volatility, proving the local-vol

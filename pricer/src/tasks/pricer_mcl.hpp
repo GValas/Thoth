@@ -130,14 +130,19 @@ class PricerMCL : public Pricer
         vector<bool> has_fit;  //!< true where a continuation fit exists (enough ITM points)
     };
     void PriceAmerican();
+    //! ZeroRates[t] is the continuously-compounded zero rate from today to Tau[t],
+    //! read off the premium currency's curve at each recorded exercise date (parallel
+    //! to Tau) — NOT a single flat rate: the diffusion drifts at the per-step forward
+    //! carry, so discounting must follow the same term structure or a sloped curve
+    //! mis-discounts interior exercise cashflows by exp(-(r_T - r_t)·τ_t).
     AmericanPolicy FitAmericanPolicy( Contract* Contract,
                                       const la_matrix* Paths,
                                       const vector<double>& Tau,
-                                      double Rate );
+                                      const vector<double>& ZeroRates );
     double ApplyAmericanPolicy( Contract* Contract,
                                 const la_matrix* Paths,
                                 const vector<double>& Tau,
-                                double Rate,
+                                const vector<double>& ZeroRates,
                                 const AmericanPolicy& Policy,
                                 double& Trust );
 

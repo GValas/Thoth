@@ -1073,14 +1073,32 @@ void PricerMCL::PriceAmerican()
         const string spot_name = AmericanSpotName( c );
         const la_matrix* S0 = _recorder.RecordedPaths( spot_name );
         vector<double> tau = _recorder.RecordedTau( spot_name );
-        double r = c->GetPremiumCurrency()->GetRate()->GetCurveValue( c->GetMaturityDate() );
+        vector<date> dates = _recorder.RecordedDates( spot_name );
+
+        //! per-exercise-date zero rates off the premium currency's curve (parallel to
+        //! tau). The diffusion drifts at the per-step forward carry of the SAME curve,
+        //! so LSM discounting must follow it too: a single flat maturity-zero rate would
+        //! mis-discount interior exercise cashflows by exp(-(r_T - r_t)·τ_t) on a
+        //! sloped curve (the European legs, discounted by ContractNode, already follow
+        //! the term structure).
+        auto zero_rates_of = [&]( const vector<date>& ExerciseDates )
+        {
+            vector<double> rs;
+            rs.reserve( ExerciseDates.size() );
+            for ( const date& d : ExerciseDates )
+            {
+                rs.push_back( c->GetPremiumCurrency()->GetRate()->GetCurveValue( d ) );
+            }
+            return rs;
+        };
+        const vector<double> rates = zero_rates_of( dates );
 
         //! fit the exercise policy once on the base paths
-        AmericanPolicy policy = FitAmericanPolicy( c, S0, tau, r );
+        AmericanPolicy policy = FitAmericanPolicy( c, S0, tau, rates );
 
         //! base premium = apply the frozen policy to the base paths
         double trust = 0;
-        double premium = ApplyAmericanPolicy( c, S0, tau, r, policy, trust );
+        double premium = ApplyAmericanPolicy( c, S0, tau, rates, policy, trust );
         Result( c ).premium = premium;
         Result( c ).premium_trust = trust;
         std::ostringstream oss;
@@ -1105,15 +1123,25 @@ void PricerMCL::PriceAmerican()
             double euro_c = euro_node ? euro_node->GetIndicatorValue( 0 ) : 0;
 
             //! bumped paths (spot/vol/rate). The rho scenario also discounts (and
-            //! drifts, already in the path) at the bumped rate
+            //! drifts, already in the path) at the bumped rates
             const la_matrix* Sb = _recorder.RecordedPaths( spot_name + tag );
             vector<double> taub = _recorder.RecordedTau( spot_name + tag );
+            vector<date> datesb = _recorder.RecordedDates( spot_name + tag );
             if ( !Sb )
             {
                 Sb = S0;
                 taub = tau;
+                datesb = dates;
             }
-            double rb = ( tag == scenario_tag::RHO ) ? r + GREEK_RATE_BUMP : r;
+            vector<double> rb = zero_rates_of( datesb );
+            if ( tag == scenario_tag::RHO )
+            {
+                //! parallel curve bump, mirroring ApplyRateShift's rho convention
+                for ( double& x : rb )
+                {
+                    x += GREEK_RATE_BUMP;
+                }
+            }
 
             double tb = 0;
             double amer_c = ApplyAmericanPolicy( c, Sb, taub, rb, policy, tb );
@@ -1156,7 +1184,7 @@ void PricerMCL::PriceAmerican()
 PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
                                                         const la_matrix* Paths,
                                                         const vector<double>& Tau,
-                                                        double Rate )
+                                                        const vector<double>& ZeroRates )
 {
     AmericanPolicy pol;
     if ( !Paths || Paths->size2 < 2 )
@@ -1205,7 +1233,10 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
             _progress_bar->Update( ++_progress_step );
         }
 
-        double df = exp( -Rate * ( Tau[t + 1] - Tau[t] ) );
+        //! discount factor over [Tau[t], Tau[t+1]] as the ratio of the two zero-coupon
+        //! prices, exp(r_t·τ_t - r_{t+1}·τ_{t+1}) — follows the curve's term structure
+        //! (reduces to exp(-r·Δτ) on a flat curve)
+        double df = exp( ZeroRates[t] * Tau[t] - ZeroRates[t + 1] * Tau[t + 1] );
         for ( size_t p = 0; p < N; p++ )
         {
             cf[p] *= df; //!< discount future cashflow to this date
@@ -1269,13 +1300,14 @@ PricerMCL::AmericanPolicy PricerMCL::FitAmericanPolicy( Contract* Contract,
 //! forward and exercise at the first interior date whose intrinsic beats the
 //! frozen continuation estimate, otherwise take the maturity payoff. Returns the
 //! discounted MC mean (vs immediate exercise at the path-set's initial spot).
-//! Rate is the scenario's discount rate (bumped for rho); the moneyness is always
-//! normalised by the policy's basis_norm (the strike) so the frozen boundary stays
-//! comparable across the base and bumped path sets.
+//! ZeroRates are the scenario's per-exercise-date discount zero rates (parallel to
+//! Tau, curve-read, bumped for rho); the moneyness is always normalised by the
+//! policy's basis_norm (the strike) so the frozen boundary stays comparable across
+//! the base and bumped path sets.
 double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
                                        const la_matrix* Paths,
                                        const vector<double>& Tau,
-                                       double Rate,
+                                       const vector<double>& ZeroRates,
                                        const AmericanPolicy& Policy,
                                        double& Trust )
 {
@@ -1299,7 +1331,8 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
 
             if ( t == M - 1 ) //!< maturity : forced exercise (take the payoff)
             {
-                value = intrinsic * exp( -Rate * ( Tau[t] - Tau[0] ) );
+                //! discount to today at the zero rate of THIS date (Tau[0] = 0)
+                value = intrinsic * exp( -ZeroRates[t] * ( Tau[t] - Tau[0] ) );
                 break;
             }
 
@@ -1310,7 +1343,8 @@ double PricerMCL::ApplyAmericanPolicy( Contract* Contract,
                 double continuation = Policy.b0[t] + Policy.b1[t] * m + Policy.b2[t] * m * m;
                 if ( intrinsic >= continuation )
                 {
-                    value = intrinsic * exp( -Rate * ( Tau[t] - Tau[0] ) );
+                    //! discount to today at the zero rate of the EXERCISE date
+                    value = intrinsic * exp( -ZeroRates[t] * ( Tau[t] - Tau[0] ) );
                     break;
                 }
             }

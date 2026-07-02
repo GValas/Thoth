@@ -3,6 +3,7 @@
 #include "pricer.hpp"
 
 class Barrier;
+class Single;
 class VarianceSwap;
 
 /*
@@ -37,11 +38,37 @@ class PricerPDE : public Pricer
 
     // market data
     double _s;      // spot
-    double _v;      // vol
-    double _r;      // carry / drift rate (underlying ccy, quanto-corrected)
-    double _r_disc; // discount rate (premium ccy); equals r for non-quanto
+    double _v;      // ATM vol (grid sizing, quanto correction, wing boundaries)
+    double _r;      // carry / drift zero rate to maturity (underlying ccy, quanto-corrected)
+    double _r_disc; // discount zero rate to maturity (premium ccy); equals r for non-quanto
     date _maturity;
     bool _is_american;
+
+    //! per-step term structure (vanilla / barrier grid): forward carry and discount
+    //! rate over each backward step [i·k, (i+1)·k], read off the full curves in
+    //! InitGrid (the last step pinned to the exact maturity so the telescoped step
+    //! discounts reproduce the maturity df exactly). On a flat curve every entry
+    //! equals _r / _r_disc, _per_step_grid stays false and the Crank-Nicolson
+    //! diagonals are assembled once as before; a sloped curve (or a local-vol
+    //! surface) re-assembles them per time step.
+    vector<double> _fwd_carry;
+    vector<double> _fwd_disc;
+    bool _per_step_grid = false; //!< sloped curves: re-assemble the CN diagonals per step
+
+    //! local-vol mode (SABR): the vanilla/barrier grid reads the Dupire local vol
+    //! per node and per step — like the MCL diffusion and the variance-swap solve —
+    //! instead of the single ATM vol. _grid_single is the mono single whose surface
+    //! is read (null for multi-name underlyings, which keep the ATM vol).
+    bool _local_vol = false;
+    Single* _grid_single = nullptr;
+
+    //! operator inputs for the ROW being assembled: the vol at the current node
+    //! (_v, or the Dupire local vol in _local_vol mode) and the current step's
+    //! forward carry / discount rate (the maturity zeros on a flat curve — which
+    //! also keeps the variance-swap solve on its documented flat-drift behaviour).
+    double _v_row = 0;
+    double _r_step = 0;
+    double _r_disc_step = 0;
 
     // outputs
     double _price;

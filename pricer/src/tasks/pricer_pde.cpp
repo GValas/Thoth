@@ -214,6 +214,7 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! (Currency objects are singletons in the book graph), so this is exact.
     Currency* udl_ccy = Ctr->GetUnderlying()->GetCurrency();
     Currency* pre_ccy = Ctr->GetPremiumCurrency();
+    double quanto_spread = 0; //!< constant carry spread, also applied per forward step below
     if ( udl_ccy != pre_ccy )
     {
         if ( !_correlation )
@@ -223,7 +224,8 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
         }
         double v_fx = _correlation->GetFxVol( udl_ccy->GetName(), pre_ccy->GetName() );
         double rho = _correlation->GetValue( udl_ccy->GetName(), pre_ccy->GetName(), Und );
-        _r -= rho * _v * v_fx;
+        quanto_spread = rho * _v * v_fx;
+        _r -= quanto_spread;
     }
 
     // original grid
@@ -298,6 +300,66 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     _k = _t_max / (double)_n;              //!< uniform time step (dt)
     _u_up = _v_up;
     _u_dw = _v_dw;
+
+    //! operator inputs default to the flat maturity values (also what the
+    //! variance-swap solve keeps for its documented flat-drift behaviour); the
+    //! per-step vanilla/barrier path overwrites them before each assembly.
+    _v_row = _v;
+    _r_step = _r;
+    _r_disc_step = _r_disc;
+
+    //! per-step forward carry / discount rates off the full curves. Grid times
+    //! t_i = i·k map to calendar dates (ACT/365), the last step pinned to the exact
+    //! maturity, so the telescoped sum of step forwards reproduces the maturity
+    //! zero·t_max exactly — the European price is unchanged by construction, while
+    //! the American interim exercise now sees the true curve dynamics instead of
+    //! the flat-r_T world. Flat curves leave every entry at _r / _r_disc and keep
+    //! the assembled-once fast path.
+    _fwd_carry.assign( _n, _r );
+    _fwd_disc.assign( _n, _r_disc );
+    _per_step_grid = false;
+    {
+        Underlying* und = Ctr->GetUnderlying();
+        const YieldCurve* rate_udl = udl_ccy->GetRate();
+        const YieldCurve* rate_disc = pre_ccy->GetRate();
+        double z1 = 0, q1 = 0, zd1 = 0, t1 = 0; //!< t=0 terms vanish (z·t = 0)
+        for ( int i = 0; i < _n; i++ )
+        {
+            const bool last = ( i == _n - 1 );
+            const double t2 = last ? _t_max : ( i + 1 ) * _k;
+            const date d2 = last ? _maturity
+                                 : _today + boost::gregorian::days(
+                                                lround( t2 * NB_OF_DAYS_A_YEAR ) );
+            const double z2 = rate_udl->GetCurveValue( d2 );
+            const double q2 = und->DividendRepoYield( d2 );
+            const double zd2 = rate_disc->GetCurveValue( d2 );
+            _fwd_carry[i] = ( ( z2 - q2 ) * t2 - ( z1 - q1 ) * t1 ) / _k - quanto_spread;
+            _fwd_disc[i] = ( zd2 * t2 - zd1 * t1 ) / _k;
+            if ( std::abs( _fwd_carry[i] - _r ) > 1e-12 || std::abs( _fwd_disc[i] - _r_disc ) > 1e-12 )
+            {
+                _per_step_grid = true; //!< sloped curve: re-assemble per step
+            }
+            z1 = z2;
+            q1 = q2;
+            zd1 = zd2;
+            t1 = t2;
+        }
+    }
+
+    //! local-vol mode: a mono underlying with a local surface (SABR) — the grid
+    //! reads the Dupire local vol per node/step (like the MCL diffusion and the
+    //! variance-swap source) instead of the single ATM vol; _v keeps sizing the
+    //! domain, the wings and the quanto correction.
+    _grid_single = nullptr;
+    _local_vol = false;
+    {
+        SingleSet sset = Ctr->GetUnderlying()->GetSingleSet();
+        if ( sset.size() == 1 && ( *sset.begin() )->GetVolatility()->_is_local )
+        {
+            _grid_single = *sset.begin();
+            _local_vol = true;
+        }
+    }
 
     //! escrowed-dividend model: precompute the future-dividend PV at each grid time
     //! step so the American early-exercise test can recover the observed spot
@@ -390,38 +452,69 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
     // la_matrix_set_col (V, N, U_1);
     // PrintList(U_1);
 
-    // diagonals of the implicit matrix T_0 (constant in time, so assembled once).
-    // Rows 0 and _j are pinned to the identity (Dirichlet boundaries), interior rows
-    // take the three T_0 stencil entries.
+    // boundary rows of the implicit matrix T_0 are pinned to the identity
+    // (Dirichlet boundaries) — fixed across every time step.
     la_vector_set( diag_u, 0, 0 );
     la_vector_set( diag_m, 0, 1 );
     la_vector_set( diag_m, _j, 1 );
     la_vector_set( diag_d, _j - 1, 0 );
-    for ( int j = 1; j < _j; j++ )
-    {
-        la_vector_set( diag_u, j, T_0( j, j + 1 ) );     //!< super-diagonal
-        la_vector_set( diag_m, j, T_0( j, j ) );         //!< main diagonal
-        la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) ); //!< sub-diagonal
-    }
-    // PrintList(diag_u);
-    // PrintList(diag_m);
-    // PrintList(diag_d);
 
-    //! the explicit RHS matrix T_1 is time-independent too, so assemble its three interior
-    //! diagonals once here rather than recomputing T_1(j, .) — and the sinh/cosh transformed
-    //! grid coefficients behind it — for every node on every backward step. This turns the
-    //! backward loop into pure arithmetic and is the bulk of the per-contract speedup.
+    //! explicit RHS (T_1) interior diagonals, assembled together with T_0's below
     vector<double> t1_d( _j + 1, 0.0 ), t1_m( _j + 1, 0.0 ), t1_u( _j + 1, 0.0 );
-    for ( int j = 1; j < _j; j++ )
+
+    //! per-node vols for the step being assembled: the flat ATM vol, or the Dupire
+    //! local vol refilled per step in _local_vol mode (like the varswap source)
+    vector<double> sigma_node( _j + 1, _v );
+
+    //! flat curves + flat vol: the operator is time-independent, so the diagonals
+    //! are assembled once (the fast path). A sloped curve or a local-vol surface
+    //! makes them step-dependent and they are re-assembled per backward step.
+    const bool per_step = _per_step_grid || _local_vol;
+
+    //! assemble the interior T_0 / T_1 diagonals for one backward step: point the
+    //! operator inputs (_r_step / _r_disc_step / _v_row) at this step's forward
+    //! rates and node vols, then evaluate the three stencil entries per row (row j's
+    //! entries all read the row-j coefficients a/b/c, so one _v_row per row is exact).
+    auto assemble = [&]( int step )
     {
-        t1_d[j] = T_1( j, j - 1 ); //!< sub   (couples to U_1[j-1])
-        t1_m[j] = T_1( j, j );     //!< main  (couples to U_1[j])
-        t1_u[j] = T_1( j, j + 1 ); //!< super (couples to U_1[j+1])
-    }
+        if ( per_step )
+        {
+            _r_step = _fwd_carry[step];
+            _r_disc_step = _fwd_disc[step];
+            if ( _local_vol )
+            {
+                //! Dupire local vol at this step's calendar date (floored two days
+                //! ahead of today so the FD stays regular, as the varswap solve does)
+                long days_i = std::max( 2L, lround( (double)step * _k * NB_OF_DAYS_A_YEAR ) );
+                date t_i = _today + boost::gregorian::days( days_i );
+                for ( int j = 1; j < _j; j++ )
+                {
+                    sigma_node[j] = _grid_single->GetLocalVolatility( phi_node[j], t_i );
+                }
+            }
+        }
+        for ( int j = 1; j < _j; j++ )
+        {
+            _v_row = sigma_node[j];
+            la_vector_set( diag_u, j, T_0( j, j + 1 ) );     //!< super-diagonal
+            la_vector_set( diag_m, j, T_0( j, j ) );         //!< main diagonal
+            la_vector_set( diag_d, j - 1, T_0( j, j - 1 ) ); //!< sub-diagonal
+            t1_d[j] = T_1( j, j - 1 );                       //!< sub   (couples to U_1[j-1])
+            t1_m[j] = T_1( j, j );                           //!< main  (couples to U_1[j])
+            t1_u[j] = T_1( j, j + 1 );                       //!< super (couples to U_1[j+1])
+        }
+        _v_row = _v; //!< restore the flat default for any caller outside the loop
+    };
 
     // backwarding
     for ( int i = _n - 1; i >= 0; i-- )
     {
+        //! step coefficients: once on the first iteration for the time-independent
+        //! fast path, every step when the curve or the vol is time-dependent
+        if ( per_step || i == _n - 1 )
+        {
+            assemble( i );
+        }
 
         // right side
         la_vector_set( D_1, 0, _u_dw );  // down boundary (fonction de t?)
@@ -609,22 +702,26 @@ inline double PricerPDE::Psi( double X )
     return ( asinh( ( X - _x_0_orig ) / _cc ) - _bb ) / _aa;
 }
 //! diffusion coefficient of the Black-Scholes operator in X: 0.5 sigma^2 S^2 (the
-//! sign is carried so V_t = A V_XX + B V_X + C V matches the backward convention)
+//! sign is carried so V_t = A V_XX + B V_X + C V matches the backward convention).
+//! _v_row is the vol at the row being assembled: the ATM vol, or the Dupire local
+//! vol of the node in _local_vol mode.
 double PricerPDE::A( double x )
 {
-    return -.5 * _v * _v * x * x;
+    return -.5 * _v_row * _v_row * x * x;
 }
-//! drift coefficient: -r S (carry r, in the underlying currency)
+//! drift coefficient: -r S (the current step's forward carry, underlying currency;
+//! equals the maturity zero on a flat curve)
 double PricerPDE::B( double x )
 {
-    return -_r * x;
+    return -_r_step * x;
 }
-//! reaction (discount) coefficient: the premium-currency discount rate r_disc...
+//! reaction (discount) coefficient: the current step's forward discount rate
+//! (premium currency; the maturity zero on a flat curve)
 double PricerPDE::C( double /*x*/ )
 {
     //! variance-swap solve accumulates expected variance (an undiscounted
     //! expectation), so there is no reaction/discount term there.
-    return _variance_mode ? 0.0 : _r_disc;
+    return _variance_mode ? 0.0 : _r_disc_step;
 }
 //! transformed diffusion a(x) = A(Phi(x)) / Phi_x^2 (chain rule on V_XX -> u_xx)
 inline double PricerPDE::a( double x )
