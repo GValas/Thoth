@@ -8,7 +8,7 @@ repository:
 | Path | What it is |
 |------|------------|
 | [`pricer/`](pricer/README.md) | **The C++23 pricing engine** — Monte-Carlo, PDE and analytic pricers; multi-asset / multi-currency books; YAML-configured; usable as a batch tool or an HTTP service (`thoth -server`). This is the mature, fully-tested core. See **[`pricer/README.md`](pricer/README.md)**. |
-| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), compute strike × maturity vanilla price grids (an option-chain view + Greeks), price single products in dedicated **vanilla / barrier / variance** panels, and monitor them live in a global **blotter**. The engine is used unmodified as a pricing microservice. |
+| `web/` | **The web dashboard** — a NestJS BFF + Angular SPA over the engine: edit market data in an editable equities/rates/fx/correlation dashboard (with a random-sample generator), compute strike × maturity vanilla price grids (an option-chain view + Greeks), price single products in dedicated **vanilla / barrier / variance** panels, and monitor them live in a global **blotter**. The engine is used unmodified as a pricing microservice. `web/mcp/` additionally exposes the same engine to **LLM agents** as an MCP server (see below). |
 
 ## Engine quickstart
 
@@ -144,6 +144,33 @@ container auto-launches the Claude CLI in a dedicated terminal (a `folderOpen` t
 [`.vscode/tasks.json`](.vscode/tasks.json), bypass-permissions mode). BFF API
 docs are served at `/api/docs`. Design notes: [`todo-gui.md`](todo-gui.md).
 
+## MCP server (agent access to the engine)
+
+`web/mcp/` wraps the running `thoth -server` as a **Model Context Protocol** server
+(stdio), so MCP clients — Claude Code, Claude Desktop, any agent framework — can
+price with the C++ engine as ordinary tools. It reuses `@thoth/shared` (the same
+engine client / YAML builders the BFF uses) and reads the engine's JSON schema, so
+it stays in lock-step with the config format.
+
+Tools: `price_vanilla` (european/american, flat vol **or a SABR smile**, optional
+Greeks), `price_barrier` (the four knock types, continuous or discrete monitoring),
+`price_variance_swap` (incl. discrete fixing schedules), **`price_yaml_book`** (raw
+YAML pass-through — the full engine: Heston/Bates, quanto/composite/basket,
+`!sequence` matrices, `vega_<param>` Greeks), `get_config_schema` (author configs
+from the live schema) and `engine_health`.
+
+```bash
+cd web/shared && npm install && npm run build     # shared engine client
+cd ../mcp    && npm install && npm run build      # -> web/mcp/dist/index.js
+```
+
+The repo ships a project-scoped **`.mcp.json`**, so Claude Code picks the server up
+automatically. It connects to `THOTH_ENGINE_URL` (default `localhost:8080`); when
+`THOTH_ENGINE_BIN` is set (as `.mcp.json` does, pointing at `pricer/build/thoth`)
+and nothing answers on that URL, the MCP server **spawns the engine itself** and
+tears it down on exit — a fully self-contained setup once the engine is built. For
+Claude Desktop, register `node <repo>/web/mcp/dist/index.js` with the same env.
+
 ## Repository map
 
 ```
@@ -157,6 +184,7 @@ Thoth/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid + instrument builders
 │   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, instrument, live spots)
 │   ├── spot-feed/       # fake real-time feed: GBM equity+fx spots & an OU correlation matrix -> Redis pub/sub
+│   ├── mcp/             # @thoth/mcp: MCP server (stdio) exposing the engine as agent tools
 │   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly): Vanilla Grid · Panels · Blotter
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/

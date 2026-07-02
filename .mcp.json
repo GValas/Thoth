@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "thoth-pricing": {
+      "command": "node",
+      "args": ["web/mcp/dist/index.js"],
+      "env": {
+        "THOTH_ENGINE_URL": "http://localhost:8080",
+        "THOTH_ENGINE_BIN": "pricer/build/thoth"
+      }
+    }
+  }
+}
