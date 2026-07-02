@@ -1,5 +1,6 @@
 #include <format>
 #include "thoth.hpp"
+#include "finance.hpp"
 #include "pricer_ana.hpp"
 #include "barrier.hpp"
 #include "cancellation.hpp"

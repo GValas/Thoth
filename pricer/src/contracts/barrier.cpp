@@ -1,4 +1,5 @@
 #include "thoth.hpp"
+#include "finance.hpp"
 #include "barrier.hpp"
 #include "enums.hpp"
 #include "object_reader.hpp"

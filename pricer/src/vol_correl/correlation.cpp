@@ -12,6 +12,7 @@
 //! in the three GetValue overloads.
 
 #include "thoth.hpp"
+#include "maths.hpp"
 #include "correlation.hpp"
 #include "object_reader.hpp"
 

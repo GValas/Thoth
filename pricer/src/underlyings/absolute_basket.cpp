@@ -1,4 +1,6 @@
 #include "thoth.hpp"
+#include "finance.hpp"
+#include "maths.hpp"
 #include "absolute_basket.hpp"
 #include "correlation.hpp"
 #include "object_reader.hpp"

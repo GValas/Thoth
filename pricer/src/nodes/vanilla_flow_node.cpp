@@ -1,4 +1,5 @@
 #include "thoth.hpp"
+#include "finance.hpp"
 #include "nodes.hpp"
 
 //************************************************************************/

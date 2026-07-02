@@ -1,13 +1,14 @@
 #pragma once
 
 //! ----------------------------------------------------------------------------
-//! thoth.hpp : the project's umbrella / precompiled-style header. Almost every
-//! translation unit includes this first, so it gathers the common third-party
-//! and standard-library includes, the curated `using` imports that let the code
-//! write bare names (string, vector, date, ...), and the in-repo headers that
-//! define the shared vocabulary (constants, enums, RAII helpers, math/finance
-//! utilities). Keeping this single header authoritative means individual .cpp
-//! files declare only what is genuinely local to them.
+//! thoth.hpp : the project's umbrella header for the STABLE shared vocabulary.
+//! Almost every translation unit includes this first, so it gathers the common
+//! standard-library includes, the curated `using` imports that let the code
+//! write bare names (string, vector, date, ...), and the small, rarely-edited
+//! in-repo headers everyone speaks (constants, enums, RAII, logging, the object
+//! sets). Frequently-edited DOMAIN headers (finance.hpp, maths.hpp) are
+//! deliberately NOT here: a TU that prices or interpolates includes them
+//! directly, so editing a Black-Scholes formula no longer rebuilds the world.
 //! ----------------------------------------------------------------------------
 
 //! C standard library (math + process/IO primitives used throughout)
@@ -39,8 +40,8 @@
 //! dense vector/matrix containers (in-repo; GSL has been fully removed)
 #include "linalg.hpp"
 
-//! boost
-#include <boost/algorithm/string.hpp>
+//! boost (calendar only — the heavy boost string algorithms were dropped: their
+//! single bare-name import, to_lower_copy, had no remaining user)
 #include <boost/date_time/gregorian/gregorian.hpp>
 
 //! Targeted using-declarations instead of blanket `using namespace std/boost`,
@@ -76,9 +77,6 @@ using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
-//! boost helpers used as bare identifiers
-using boost::algorithm::to_lower_copy;
-
 //! boost.gregorian calendar types/functions used as bare identifiers
 using boost::gregorian::date;
 using boost::gregorian::days;
@@ -91,13 +89,11 @@ using boost::gregorian::to_simple_string;
 //!   enums        : engine-wide enumerations (option type, method, ...)
 //!   raii         : scope-guard / resource wrappers
 //!   object_sets  : the registry of object kinds the YAML books can declare
-//!   finance      : day-count, discounting and other market conventions
-//!   maths        : numerical helpers (interpolation, roots, distributions, ...)
 //!   misc         : logging (LOG/ERR), timing (WallClockSeconds/TaskTime), ToString
+//! (finance.hpp / maths.hpp are NOT vocabulary: the TUs that price or run
+//! numerics include them directly — see the header comment above.)
 #include "constants.hpp"
 #include "enums.hpp"
 #include "raii.hpp"
 #include "object_sets.hpp"
-#include "finance.hpp"
-#include "maths.hpp"
 #include "misc.hpp"
