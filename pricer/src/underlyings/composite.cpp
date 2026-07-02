@@ -159,7 +159,7 @@ MonteCarloNode* Composite::GetCorrelNode( NodeCollector& NC,
     //! cache key encodes both the composite identity and the target FX pair so two
     //! different quanto targets don't collide on one node.
     string node_name = _underlying->GetName() + "_compo_" + _currency->GetName() +
-                       "#" + UnderlyingCurrency + "_" + BaseCurrency + node_name::CORREL;
+                       node_name::SEP + UnderlyingCurrency + "_" + BaseCurrency + node_name::CORREL;
     return NC.GetOrCreate<CompositeCorrelNode>(
         node_name,
         [&]( CompositeCorrelNode* C )
@@ -227,7 +227,9 @@ MonteCarloNode* Composite::GetNode( NodeCollector& NC )
         // quote->settlement quanto effect (so the product below is consistent with
         // the closed-form quanto forward). Cached under its own key for reuse.
         MonteCarloNode* M;
-        string mono_name = eq + "#spot#quanto_" + cpo_ccy;
+        //! same "<udl>#spot#quanto_<ccy>" spelling as Contract::GetUnderlyingNode's
+        //! quanto wrap — via the shared constants, so the two sites cannot drift
+        string mono_name = eq + node_name::SPOT + node_name::QUANTO_PREFIX + cpo_ccy;
         if ( !( M = NC.GetNode( mono_name ) ) )
         {
             M = _underlying->GetNode( NC ); //!< raw (un-adjusted) asset spot node

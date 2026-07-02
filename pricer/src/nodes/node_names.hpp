@@ -30,4 +30,9 @@ inline constexpr char RATE[] = "#rate";                       //!< short-rate / 
 inline constexpr char FX[] = "#fx";                           //!< FX rate node
 inline constexpr char CHOLESKY[] = "#cholesky";               //!< Cholesky-correlated factor
 inline constexpr char QUANTO_PREFIX[] = "#quanto_";           //!< prefix: "#quanto_<ccy>" (quanto-adjusted spot)
+
+//! separator between two OBJECT names inside one composite key (e.g. the pair
+//! correlation "eur_usd#eq#correl") — distinct from the role suffixes above,
+//! which always start the tail of the name.
+inline constexpr char SEP[] = "#";
 } // namespace node_name

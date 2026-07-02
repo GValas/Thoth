@@ -598,7 +598,7 @@ MonteCarloNode* Correlation::GetCorrelNode( NodeCollector& NC,
                                             const string& Underlying )
 {
     return NC.GetOrCreate<ConstantNode>(
-        UnderlyingCurrency + "_" + BaseCurrency + "#" + Underlying + node_name::CORREL,
+        UnderlyingCurrency + "_" + BaseCurrency + node_name::SEP + Underlying + node_name::CORREL,
         [&]( ConstantNode* C )
         { C->SetConstantValue( GetValue( UnderlyingCurrency, BaseCurrency, Underlying ) ); } );
 }
@@ -659,7 +659,7 @@ MonteCarloNode* Correlation::GetCorrelNode( NodeCollector& NC,
                                             const string& BaseCurrency2 )
 {
     return NC.GetOrCreate<ConstantNode>(
-        UnderlyingCurrency1 + "_" + BaseCurrency1 + "#" +
+        UnderlyingCurrency1 + "_" + BaseCurrency1 + node_name::SEP +
             UnderlyingCurrency2 + "_" + BaseCurrency2 + node_name::CORREL,
         [&]( ConstantNode* C )
         {
@@ -678,7 +678,7 @@ MonteCarloNode* Correlation::GetCholeskyNode( NodeCollector& NC,
                                               const string& Underlying2 )
 {
     return NC.GetOrCreate<ConstantNode>(
-        Underlying1 + "#" + Underlying2 + node_name::CHOLESKY,
+        Underlying1 + node_name::SEP + Underlying2 + node_name::CHOLESKY,
         [&]( ConstantNode* C )
         { C->SetConstantValue( GetCholeskyValue( Underlying1, Underlying2 ) ); } );
 }
