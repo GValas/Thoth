@@ -229,7 +229,8 @@
         "premium_currency": { "$ref": "#/$defs/ref" },
         "maturity": { "$ref": "#/$defs/date" },
         "volatility_strike": { "type": "number", "description": "Vol strike in percent." },
-        "notional": { "type": "number" }
+        "notional": { "type": "number" },
+        "observation_period_days": { "type": "integer", "minimum": 0, "description": "Days between realized-variance fixings (today + k*period up to maturity). 0/absent = continuous observation (every diffusion step)." }
       }
     },
 

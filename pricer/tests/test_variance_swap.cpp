@@ -14,13 +14,14 @@ namespace
 //! one variance swap on a single flat-vol equity. vol_pct / rate_pct in percent;
 //! strike_vol_pct is the variance strike expressed as a vol, in percent.
 std::string VarSwapCfg( double vol_pct, double rate_pct, double strike_vol_pct,
-                        double notional, const std::string& method )
+                        double notional, const std::string& method,
+                        int obs_days = 0, int draws = 1 )
 {
     std::ostringstream o;
     o << "root: pricer\n"
       << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
       << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
-      << CfgBlock( 1, 30, 5 )
+      << CfgBlock( draws, 30, 5 )
       << "eur: !currency {rate: rate}\n"
       << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: ["
       << rate_pct << ", " << rate_pct << "]}\n"
@@ -31,7 +32,12 @@ std::string VarSwapCfg( double vol_pct, double rate_pct, double strike_vol_pct,
       << "book: !book {contracts: [vs]}\n"
       << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
       << " maturity: 2000-12-31, volatility_strike: " << strike_vol_pct
-      << ", notional: " << notional << "}\n";
+      << ", notional: " << notional;
+    if ( obs_days > 0 )
+    {
+        o << ", observation_period_days: " << obs_days;
+    }
+    o << "}\n";
     return o.str();
 }
 
@@ -73,4 +79,70 @@ TEST_CASE( "variance swap is ~zero when the strike equals the vol" )
     auto res = Price( VarSwapCfg( vol * 100, r * 100, vol * 100, notl, "ana" ) );
     //! sigma^2 - K_var = 0, so only the strip's tiny integration residual remains
     CHECK( std::abs( Premium( res ) ) <= 0.01 * notl );
+}
+
+// --- discrete observation ----------------------------------------------------
+//
+// A discretely-observed swap samples the realized variance on its fixing schedule
+// (today + k*period up to maturity) instead of every diffusion step. Per interval
+// E[(log S_{t2}/S_{t1})^2] = sigma^2*dt + mean^2 with mean = (r - sigma^2/2)*dt
+// under flat BS, so the fair variance gains the deterministic Sum(mean_i^2)/T on
+// top of the continuous sigma^2. The MCL path sampling produces the term
+// naturally; ANA and PDE add it via VarianceSwap::ObservationDriftVariance.
+TEST_CASE( "discretely-observed variance swap adds the drift^2 term (3 engines)" )
+{
+    //! high carry + low vol makes the drift^2 term material: (r - sigma^2/2) =
+    //! 0.095, monthly fixings on a 1y swap -> ~7% of the continuous fair variance
+    const double vol = 0.10, r = 0.10, notl = 10000;
+    const int obs = 30; //!< monthly fixings
+
+    //! reference add-on, replicating the engine's schedule convention exactly:
+    //! fixings at today + 30k (k>=1, < maturity), plus maturity (365d, leap 2000)
+    const double b = r - 0.5 * vol * vol;
+    double sum_m2 = 0;
+    int prev = 0;
+    for ( int d = obs; d < 365; d += obs )
+    {
+        const double dt = ( d - prev ) / 365.0;
+        sum_m2 += ( b * dt ) * ( b * dt );
+        prev = d;
+    }
+    const double dt_last = ( 365 - prev ) / 365.0; //!< stub interval to maturity
+    sum_m2 += ( b * dt_last ) * ( b * dt_last );
+    const double addon_pv = notl * std::exp( -r * T1 ) * sum_m2 / T1;
+
+    //! ANA / PDE: the discrete-minus-continuous DIFFERENCE isolates the drift^2
+    //! add-on (the shared strip / grid error cancels in the difference)
+    const double ana_c = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "ana" ) ) );
+    const double ana_d = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "ana", obs ) ) );
+    CAPTURE( ana_c );
+    CAPTURE( ana_d );
+    CAPTURE( addon_pv );
+    CHECK( ana_d - ana_c == doctest::Approx( addon_pv ).epsilon( 0.01 ) );
+
+    const double pde_c = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "pde" ) ) );
+    const double pde_d = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "pde", obs ) ) );
+    CAPTURE( pde_c );
+    CAPTURE( pde_d );
+    CHECK( pde_d - pde_c == doctest::Approx( addon_pv ).epsilon( 0.01 ) );
+
+    //! MCL prices the discrete swap directly off the sampled path (fixing dates are
+    //! forced into the diffusion grid); it must agree with the corrected ANA value
+    auto mr = Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "mcl", obs, 200000 ) );
+    const double mcl_d = Premium( mr );
+    CAPTURE( mcl_d );
+    CHECK( std::abs( mcl_d - ana_d ) <= 6.0 * Trust( mr ) + 0.01 * ana_d );
+}
+
+TEST_CASE( "daily observation converges to the continuous variance swap" )
+{
+    //! with daily fixings the drift^2 add-on is (b^2/365)/T of variance — a few
+    //! bp of the continuous value — so the discrete swap sits on top of it
+    const double vol = 0.30, r = 0.05, notl = 10000;
+    const double cont = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "ana" ) ) );
+    const double daily = Premium( Price( VarSwapCfg( vol * 100, r * 100, 0, notl, "ana", 1 ) ) );
+    CAPTURE( cont );
+    CAPTURE( daily );
+    CHECK( daily == doctest::Approx( cont ).epsilon( 0.001 ) );
+    CHECK( daily >= cont ); //!< the drift^2 add-on is non-negative
 }

@@ -19,6 +19,9 @@ class VarianceSwapFlowNode : public MonteCarloNode
     double _strike_variance = 0;          //!< K_var (decimal^2)
     double _notional = 1;                 //!< variance notional (cash per unit of variance)
     size_t _flow_date_index = 0;          //!< maturity date index at which the swap settles
+    //! discrete observation schedule as sorted date indices (today's index 0 is the
+    //! implicit first fixing). Empty -> continuous observation (every diffusion step).
+    vector<size_t> _observation_date_index;
 
   public:
     //! at the flow date, compute annualized realized variance and emit the swap cash
@@ -34,6 +37,8 @@ class VarianceSwapFlowNode : public MonteCarloNode
     void SetStrikeVariance( double StrikeVariance ); //!< set K_var
     void SetNotional( double Notional );             //!< set the variance notional
     void SetFlowDateIndex( size_t DateIndex );       //!< set the maturity date index
+    //! set the discrete fixing schedule (sorted date indices; empty = continuous)
+    void SetObservationDateIndices( const vector<size_t>& DateIndices );
 
     VarianceSwapFlowNode( const string& Name );
     ~VarianceSwapFlowNode() override;

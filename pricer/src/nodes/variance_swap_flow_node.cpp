@@ -19,23 +19,35 @@ void VarianceSwapFlowNode::ComputeValue( size_t DateIndex )
         return;
     }
 
-    //! Annualized realized variance = the discretised quadratic variation over the
-    //! whole simulated path: squared log-returns at EVERY diffusion step, / T. This
-    //! is a continuously-observed variance swap (no intermediate fixing schedule —
-    //! GetFixingDates() is just the maturity), so summing all steps is the correct
-    //! estimator and it converges to / agrees with the continuous ANA replication
-    //! and PDE accumulated-variance fair value. A discretely-observed swap would
-    //! instead sum only over its fixing dates.
-    //! accumulate the sum of squared log-returns (quadratic variation). Seed prev
-    //! with S_0, then roll forward so each step uses ln(S_j / S_{j-1}).
+    //! Annualized realized variance = sum of squared log-returns / T. Continuous
+    //! observation (empty schedule) sums EVERY diffusion step — the discretised
+    //! quadratic variation, matching the continuous ANA replication and the PDE
+    //! accumulated-variance fair value. A discrete schedule sums only over its
+    //! fixing dates (today is the implicit first fixing), which adds the
+    //! deterministic drift^2 term the ANA/PDE correct for via
+    //! VarianceSwap::ObservationDriftVariance.
+    //! Seed prev with S_0, then roll forward so each interval uses ln(S_j / S_i).
     double sum2 = 0;
     double prev = _spot_node->GetValue( 0 );
-    for ( size_t j = 1; j <= _flow_date_index; j++ )
+    if ( _observation_date_index.empty() )
     {
-        double s = _spot_node->GetValue( j );
-        double r = log( s / prev );
-        sum2 += r * r;
-        prev = s;
+        for ( size_t j = 1; j <= _flow_date_index; j++ )
+        {
+            double s = _spot_node->GetValue( j );
+            double r = log( s / prev );
+            sum2 += r * r;
+            prev = s;
+        }
+    }
+    else
+    {
+        for ( size_t j : _observation_date_index )
+        {
+            double s = _spot_node->GetValue( j );
+            double r = log( s / prev );
+            sum2 += r * r;
+            prev = s;
+        }
     }
     double T = _t_list[_flow_date_index]; //!< year-fraction to maturity (annualizer)
     double realized_variance = ( T > 0 ) ? sum2 / T : 0;
@@ -50,14 +62,28 @@ void VarianceSwapFlowNode::GetDateDependencies( size_t DateIndex,
                                                 vector<size_t>& DateList )
 {
     //! the maturity flow needs the spot at every observation date up to maturity
+    //! (the whole grid when continuous, only the fixing schedule when discrete)
     if ( DateIndex != _flow_date_index )
     {
         return;
     }
-    for ( size_t j = 0; j <= _flow_date_index; j++ )
+    if ( _observation_date_index.empty() )
     {
-        NodeList.push_back( _spot_node );
-        DateList.push_back( j );
+        for ( size_t j = 0; j <= _flow_date_index; j++ )
+        {
+            NodeList.push_back( _spot_node );
+            DateList.push_back( j );
+        }
+    }
+    else
+    {
+        NodeList.push_back( _spot_node ); //!< today (index 0): the first fixing
+        DateList.push_back( 0 );
+        for ( size_t j : _observation_date_index )
+        {
+            NodeList.push_back( _spot_node );
+            DateList.push_back( j );
+        }
     }
 }
 
@@ -83,4 +109,10 @@ void VarianceSwapFlowNode::SetNotional( double Notional )
 void VarianceSwapFlowNode::SetFlowDateIndex( size_t DateIndex )
 {
     _flow_date_index = DateIndex;
+}
+
+//! set the discrete fixing schedule (sorted date indices; empty = continuous).
+void VarianceSwapFlowNode::SetObservationDateIndices( const vector<size_t>& DateIndices )
+{
+    _observation_date_index = DateIndices;
 }

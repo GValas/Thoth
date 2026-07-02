@@ -670,8 +670,13 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
         la_vector_memcpy( U_1, U_0 );
     }
 
-    const double fair_var = ( _t_max > 0 ) ? GetGridPrice( _x_0, U_0 ) / _t_max : atm_var;
+    double fair_var = ( _t_max > 0 ) ? GetGridPrice( _x_0, U_0 ) / _t_max : atm_var;
     _variance_mode = false;
+
+    //! discrete observation: the grid solves the continuous expected accumulated
+    //! variance; a discrete fixing schedule adds the same deterministic drift^2
+    //! term the ANA strip adds (see VarianceSwap::ObservationDriftVariance)
+    fair_var += Ctr->ObservationDriftVariance( _today, _v );
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
     const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( _maturity );

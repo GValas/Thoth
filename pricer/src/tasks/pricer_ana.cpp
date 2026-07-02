@@ -250,6 +250,13 @@ void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
     //! integrate the 1/K^2-weighted OTM strip into the fair variance, then assemble
     //! PV = notional * DF * (fair_var - strike_var)
     double k_fair = VarSwap_FairVariance( fwd, t, df, strikes, vols );
+
+    //! discrete observation: the strip replicates E[integral sigma^2 dt]/T (the
+    //! continuous quadratic variation); a discrete fixing schedule adds the
+    //! deterministic per-interval drift^2 term (exact under flat BS, ATM approx
+    //! under a smile) — the same term the MCL path sampling produces naturally.
+    k_fair += Swap->ObservationDriftVariance( _today, sigma_atm );
+
     double k_var = Swap->GetVolatilityStrike() * Swap->GetVolatilityStrike(); //!< strike vol -> strike variance
 
     out.premium = VarSwap_Price( Swap->GetNotional(), df, k_fair, k_var );

@@ -121,7 +121,14 @@ underlying's surface exposes is silently skipped.
   **analytically** by static replication (the 1/K²-weighted option strip, so a
   smile feeds in), or by **PDE** (the fair variance as a backward
   expected-accumulated-variance grid solve). The three agree (1y, 30% flat,
-  ~461).
+  ~461). **Discrete observation** via `observation_period_days` (fixings at
+  `today + k*period` up to maturity): the MCL samples the realized variance on
+  that schedule (the fixing dates are forced into the diffusion grid), while ANA
+  and PDE add the deterministic per-interval drift² term
+  `Σ (log(F(t₂)/F(t₁)) − σ²Δt/2)² / T` on top of their continuous fair variance
+  (exact under flat BS, ATM approximation under a smile) — the three engines
+  agree on a monthly-fixing swap where the add-on is ~7% of the fair variance.
+  `0`/absent keeps the continuous convention (every diffusion step).
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /

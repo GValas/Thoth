@@ -13,17 +13,34 @@ class VarianceSwap : public Contract
 
   private:
     date _maturity_date;
-    double _volatility_strike = 0; //!< strike expressed as a volatility (decimal)
-    double _notional = 1;          //!< variance notional
+    double _volatility_strike = 0;    //!< strike expressed as a volatility (decimal)
+    double _notional = 1;             //!< variance notional
+    int _observation_period_days = 0; //!< fixing schedule period; 0 = continuous
+                                      //!< observation (every diffusion step)
 
   public:
-    //! read own fields from the configuration (maturity / volatility_strike / notional)
+    //! read own fields from the configuration (maturity / volatility_strike /
+    //! notional / observation_period_days)
     void Configure( ObjectReader& reader ) override;
 
     //! getter
     date GetMaturityDate() const override;
     double GetVolatilityStrike() const { return _volatility_strike; }
     double GetNotional() const { return _notional; }
+
+    //! discrete observation: realized variance is sampled on the fixing schedule
+    //! today + k*period up to (and always including) maturity, instead of on every
+    //! diffusion step. 0/absent keeps the continuous-observation behaviour.
+    bool IsDiscretelyObserved() const { return _observation_period_days > 0; }
+    set<date> GetObservationDates(); //!< the discrete fixing schedule
+
+    //! Deterministic add-on to the continuous fair variance for a discrete fixing
+    //! schedule: E[(log S_{t2}/S_{t1})^2] = var + mean^2 per interval, and the mean
+    //! log-return over [t1,t2] is log(F(t2)/F(t1)) - atm_vol^2/2*dt (the forward
+    //! carries the full term-structured, quanto-corrected drift). Returns
+    //! sum(mean_i^2)/T — exact under flat BS, an ATM approximation under a smile;
+    //! 0 for a continuously-observed swap (the term vanishes as dt -> 0).
+    double ObservationDriftVariance( const date& Today, double AtmVol );
 
     //! mcl node (not supported)
     MonteCarloNode* GetFlowNode( NodeCollector& NC,
