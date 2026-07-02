@@ -1,4 +1,6 @@
 #include "helpers.hpp"
+#include "single.hpp"     //!< direct surface queries (SABR wing tests)
+#include "volatility.hpp" //!< direct surface queries (SABR wing tests)
 #include <doctest/doctest.h>
 
 // Coverage for features the rest of the suite did not exercise: variance swap,
@@ -724,4 +726,112 @@ TEST_CASE( "yield curve: linear rate interpolation between pillars" )
     CAPTURE( mid );
     CHECK( lo < mid );
     CHECK( mid < hi );
+}
+
+// --- SABR arbitrage-free wings : beyond ±2.5 ATM-sigma of log-moneyness the
+// surface switches from Hagan's expansion (whose implied density turns negative
+// in the far wings) to Benaim-Dodgson-Kainth power-law price tails matched in
+// value and slope at the cutoff. The implied density must therefore stay
+// positive across the whole scanned strike range, the vol must be continuous at
+// the junction, and the Dupire local variance the MCL/PDE consume must no longer
+// hit its 1e-8 emergency floor in the wings.
+TEST_CASE( "SABR wings are butterfly-arbitrage-free (positive implied density)" )
+{
+    //! CEV smile (beta 0.5, 3y): raw Hagan develops 25 butterfly violations on
+    //! this fixture's scan grid, ALL beyond 4.8 ATM-sigma — i.e. wings-only, which
+    //! is exactly what the matched power-law tails (cutoff 2.5 sigma) repair. At
+    //! extreme nu*sqrt(T) (e.g. nu ~ 1, T >= 5) Hagan also violates INSIDE the
+    //! liquid band, where no wing treatment can help — that is the expansion
+    //! itself failing (use shorter pillars or a genuine stochastic-vol model).
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !sabr_volatility {maturities: [3.0], alpha: [3.0], beta: [0.5],"
+      << " rho: [-0.3], nu: [0.5], calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {contracts: [c]}\n"
+      << "c: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2003-01-01, type: call, exercise: european}\n";
+
+    //! build + run once (the run cascades today into the market objects), then
+    //! query the surface and the single directly
+    std::streambuf* saved = std::cout.rdbuf();
+    std::ostringstream sink;
+    std::cout.rdbuf( sink.rdbuf() );
+    ObjectManager manager( YamlConfig::from_string_t{}, o.str() );
+    manager.ReadObjects( ROOT_NODE );
+    manager.ExecuteTask();
+    std::cout.rdbuf( saved );
+
+    auto* vol = manager.collector().Get<Volatility>( "vol" );
+    auto* eq = manager.collector().Get<Single>( "eq" );
+    REQUIRE( vol != nullptr );
+    REQUIRE( eq != nullptr );
+
+    const date maturity( 2003, 1, 1 );
+    const double F = 100;            //!< r = 0 -> forward = spot
+    const double T = 1096.0 / 365.0; //!< 2000-01-01 -> 2003-01-01
+    const double atm = vol->GetImplicitVol( 0, F, maturity );
+    const double band = atm * std::sqrt( T );
+
+    //! undiscounted Black call off the surface vol
+    auto call = [&]( double K )
+    {
+        const double v = vol->GetImplicitVol( K, F, maturity );
+        const double s = v * std::sqrt( T );
+        const double d1 = std::log( F / K ) / s + 0.5 * s;
+        return F * NormCdf( d1 ) - K * NormCdf( d1 - s );
+    };
+
+    //! (1) butterfly positivity: C(K) convex in K across ±5.5 ATM sigma —
+    //! second differences on a geometric strike grid must be non-negative
+    const int n = 220;
+    const double k_lo = -5.5 * band, k_hi = 5.5 * band;
+    const double dk = ( k_hi - k_lo ) / n;
+    int violations = 0;
+    double worst = 0;
+    for ( int i = 1; i < n; i++ )
+    {
+        const double k = k_lo + i * dk;
+        const double Km = F * std::exp( k - dk ), K0 = F * std::exp( k ), Kp = F * std::exp( k + dk );
+        //! central second difference on the non-uniform (geometric) grid
+        const double fly = ( call( Kp ) - call( K0 ) ) / ( Kp - K0 ) -
+                           ( call( K0 ) - call( Km ) ) / ( K0 - Km );
+        if ( fly < -1e-12 * F )
+        {
+            violations++;
+            worst = std::min( worst, fly );
+        }
+    }
+    CAPTURE( worst );
+    CHECK( violations == 0 );
+
+    //! (2) the vol is continuous across the wing junctions
+    for ( double side : { -1.0, 1.0 } )
+    {
+        const double Kc = F * std::exp( side * 2.5 * band );
+        const double v_in = vol->GetImplicitVol( Kc * ( 1 - side * 1e-4 ), F, maturity );
+        const double v_out = vol->GetImplicitVol( Kc * ( 1 + side * 1e-4 ), F, maturity );
+        CAPTURE( side );
+        CHECK( std::abs( v_out - v_in ) <= 2e-3 );
+    }
+
+    //! (3) the Dupire local variance no longer hits its 1e-8 emergency floor in
+    //! the wings (sqrt -> exactly 1e-4): scan ±4.5 sigma of log-spot
+    int floor_hits = 0;
+    for ( int i = 0; i <= 80; i++ )
+    {
+        const double k = -4.5 * band + i * ( 9.0 * band / 80 );
+        const double lv = eq->GetLocalVolatility( F * std::exp( k ), maturity );
+        if ( lv <= 1.0001e-4 )
+        {
+            floor_hits++;
+        }
+    }
+    CHECK( floor_hits == 0 );
 }

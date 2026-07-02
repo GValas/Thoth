@@ -150,8 +150,13 @@ underlying's surface exposes is silently skipped.
   the PV of the still-future dividends), not the dividend-stripped escrowed value,
   so the PDE and MCL American prices agree on dividend-paying equities.
 - Volatilities: `bs_volatility` (flat Black-Scholes vol), `sabr_volatility`
-  (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`)
-  and `heston_volatility` (genuine stochastic vol — see below).
+  (Hagan 2002 lognormal SABR implied surface, per-maturity `alpha`/`beta`/`rho`/`nu`,
+  with **arbitrage-free wings**: beyond ±2.5 ATM-sigma of log-moneyness the surface
+  switches to Benaim-Dodgson-Kainth power-law price tails matched in value and
+  slope to the Hagan prices at the cutoff — the tails have a strictly positive
+  implied density by construction, so the far wings no longer poison the Dupire
+  local-vol surface the MCL/PDE engines diffuse) and `heston_volatility` (genuine
+  stochastic vol — see below).
 
 **Stochastic volatility (Heston / Bates)** — `heston_volatility` (`init_vol`/`long_vol`/
 `kappa`/`vol_of_vol`, vols in percent; the spot/variance correlation ρ lives in
@@ -581,6 +586,13 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   replication. `bs_volatility` (flat) is exact in every engine (and keeps the
   assembled-once fast grid path). The ATM vol still sizes the PDE domain and
   feeds the quanto drift correction.
+- SABR wing treatment scope: the power-law tails make the surface butterfly-
+  arbitrage-free **beyond the ±2.5-sigma cutoff** (pinned by a density-positivity
+  test). At extreme `nu*sqrt(T)` (vol-of-vol ~1 on multi-year pillars) Hagan's
+  expansion can also violate **inside** the liquid band, where no wing treatment
+  applies — use shorter parameter pillars or a genuine stochastic-vol model
+  (`heston_volatility`) there. Calendar (in-T) arbitrage is likewise out of scope;
+  the Dupire local-variance floor remains as the backstop for it.
 - GPU (CUDA) acceleration (`mcl` + `allow_gpu`) currently covers **single-asset
   European vanillas under GBM** only; American / barrier / stochastic-vol /
   multi-asset books run on the CPU `mcl` engine. Extending the kernel to Heston-QE
