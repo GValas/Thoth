@@ -7,6 +7,11 @@
 //! diagonal. Publishing the whole universe matrix lets any workspace slice out the sub-matrix
 //! for its own members — a principal sub-matrix of a valid correlation matrix is itself valid.
 
+//! NOTE: jacobiEigen / repairCorrelation below are a deliberate copy of the BFF's
+//! web/bff/src/common/correlation-math.ts — this service builds from its own docker
+//! context (no cross-package imports), so keep the two in sync when touching the
+//! algorithm (in particular the eigenvalue floor, whose rationale lives there).
+
 //! stable hash of an unordered pair -> [0, 1), so a pair's mean-reversion target is fixed
 //! across restarts and independent of member order.
 function pairHash(a: string, b: string): number {
@@ -62,10 +67,15 @@ function jacobiEigen(aIn: number[][]): { d: number[]; V: number[][] } {
 
 //! Project a symmetric matrix onto the nearest valid correlation matrix: clip eigenvalues to
 //! a small positive floor (restores PSD), reconstruct, then rescale to a unit diagonal.
+//!
+//! The floor must dominate the LATER 1e-4 rounding in matrix(): rounding perturbs the
+//! spectrum by up to n·5e-5, so a tiny floor (1e-8) can leave the published (rounded) matrix
+//! indefinite — and the engine hard-rejects a non-SPD correlation. 1e-3 is financially
+//! immaterial yet safely above the worst-case rounding perturbation.
 function repairCorrelation(m: number[][]): number[][] {
   const n = m.length;
   const { d, V } = jacobiEigen(m);
-  const dc = d.map((x) => Math.max(x, 1e-8));
+  const dc = d.map((x) => Math.max(x, 1e-3));
   const out = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
   for (let i = 0; i < n; i++) {
     for (let j = i; j < n; j++) {

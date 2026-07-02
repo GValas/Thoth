@@ -91,9 +91,19 @@ a global monitoring book: every product sent from a panel becomes a row showing 
 **live spot** (next to the underlying) and a premium re-priced for the whole book in **live
 mode** (throttled, off the live spots), tinted green/red on each move; rows survive
 tab navigation and a reload (persisted in `localStorage`). Both are backed by a synchronous
-`POST /api/instrument/price` endpoint (`live: true` overlays the live spots) that builds a
-one-contract book — the single-product counterpart of the grid pipeline.
-Auth is JWT + rotating refresh cookie with an admin RBAC tab.
+`POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
+correlation matrix** — each streamed pair takes its live value, the rest keep their stored
+one, and the blend is Cholesky-gated back to the stored matrix if mixing would break
+positive-definiteness) that builds a one-contract book — the single-product counterpart of
+the grid pipeline; the grid's live mode applies the same two overlays, so the priced market
+always matches what the Market Data screen shows. Validation flags non-SPD correlations and
+non-increasing curve dates **before** pricing (both are engine hard-rejects), and the
+correlation repair floors eigenvalues high enough (1e-3) that the 1e-4 payload rounding can
+never push a repaired matrix back to indefinite.
+Auth is JWT + rotating refresh cookie with an admin RBAC tab; the stored refresh-token hash
+is a bcrypt of the token's **sha256 digest** (bcrypt alone reads only the first 72 bytes,
+which are identical across a user's JWTs — hashing the digest keeps rotation/replay
+detection effective).
 
 **Look & feel:** the whole SPA shares a dense, finance-grade charte driven by a single
 design-token layer (`web/frontend/src/styles/_tokens.scss` — palette, a px **type scale**,

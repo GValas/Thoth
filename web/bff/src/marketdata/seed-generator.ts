@@ -5,6 +5,7 @@
 //! (see common/semantic-validation.ts). Pure (no Nest) and deterministic given `seed`,
 //! so it is easy to unit-test.
 
+import { repairCorrelation } from '../common/correlation-math';
 import type { WsObject } from '../common/semantic-validation';
 
 export interface SeedOptions {
@@ -56,72 +57,9 @@ function curve10(
   return { dates, values };
 }
 
-//! Jacobi eigenvalue decomposition of a small symmetric n×n matrix (A = V·diag(d)·Vᵀ),
-//! eigenvectors as columns of V. Used to project a random matrix onto the valid set.
-function jacobiEigen(aIn: number[][]): { d: number[]; V: number[][] } {
-  const n = aIn.length;
-  const a = aIn.map((r) => [...r]);
-  const V: number[][] = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
-  );
-  for (let sweep = 0; sweep < 100; sweep++) {
-    let off = 0;
-    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += a[p][q] * a[p][q];
-    if (off < 1e-14) break;
-    for (let p = 0; p < n; p++) {
-      for (let q = p + 1; q < n; q++) {
-        if (Math.abs(a[p][q]) < 1e-18) continue;
-        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
-        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-        const c = 1 / Math.sqrt(t * t + 1);
-        const s = t * c;
-        for (let k = 0; k < n; k++) {
-          const akp = a[k][p];
-          const akq = a[k][q];
-          a[k][p] = c * akp - s * akq;
-          a[k][q] = s * akp + c * akq;
-        }
-        for (let k = 0; k < n; k++) {
-          const apk = a[p][k];
-          const aqk = a[q][k];
-          a[p][k] = c * apk - s * aqk;
-          a[q][k] = s * apk + c * aqk;
-        }
-        for (let k = 0; k < n; k++) {
-          const vkp = V[k][p];
-          const vkq = V[k][q];
-          V[k][p] = c * vkp - s * vkq;
-          V[k][q] = s * vkp + c * vkq;
-        }
-      }
-    }
-  }
-  return { d: a.map((_, i) => a[i][i]), V };
-}
-
-//! Project a symmetric matrix onto the nearest valid correlation matrix: clip eigenvalues to
-//! a small positive floor (makes it strictly positive-definite — what the engine requires),
-//! reconstruct, then rescale to a unit diagonal. A random unit-diagonal matrix is very often
-//! not positive-definite, so the generator must repair it before emitting `correl`.
-function repairCorrelation(m: number[][]): number[][] {
-  const n = m.length;
-  const { d, V } = jacobiEigen(m);
-  const dc = d.map((x) => Math.max(x, 1e-6));
-  const out = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
-  for (let i = 0; i < n; i++) {
-    for (let j = i; j < n; j++) {
-      let s = 0;
-      for (let k = 0; k < n; k++) s += V[i][k] * dc[k] * V[j][k];
-      out[i][j] = out[j][i] = s;
-    }
-  }
-  const inv = out.map((_, i) => 1 / Math.sqrt(out[i][i] || 1));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) out[i][j] *= inv[i] * inv[j];
-    out[i][i] = 1;
-  }
-  return out;
-}
+//! (correlation numerics — Jacobi eigen-clip repair, PD checks — live in
+//! ../common/correlation-math, shared with the semantic validation and the live
+//! overlay; the repair floor rationale is documented there.)
 
 //! USD first so it is the pivot of the fx triangle (every pair shares it as underlying).
 const CCY_POOL = ['usd', 'eur', 'jpy', 'gbp', 'chf', 'cad'];

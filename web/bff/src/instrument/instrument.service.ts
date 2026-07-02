@@ -2,8 +2,9 @@
 //! product (vanilla / barrier / variance_swap) + the workspace's market data, price it
 //! SYNCHRONOUSLY on a leased replica, and pivot the result into {premium, greeks}. This is
 //! the single-product counterpart of GridService — used by the GUI's pricing panels and the
-//! monitoring blotter. With `live`, the latest live spots are overlaid onto the equities
-//! (exactly like GridService.priceLive) so a panel/blotter can quote off the live feed.
+//! monitoring blotter. With `live`, the latest live spots AND the live correlation matrix
+//! are overlaid onto the workspace objects (exactly like GridService.priceLive) so a
+//! panel/blotter quotes off the same live market the Market Data screen shows.
 
 import { Injectable, Logger } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import {
   type InstrumentRequest,
   type InstrumentResult,
 } from '@thoth/shared';
+import { overlayCorrelation, overlaySpots } from '../common/live-overlay';
 import { EngineService } from '../engine/engine.service';
 import { SchemaService } from '../schema/schema.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -71,16 +73,12 @@ export class InstrumentService {
       instrument: { kind: dto.kind, fields: dto.instrument },
     };
 
-    // support objects; overlay the latest live spots onto quoted equities when live.
+    // support objects; when live, overlay the latest spots onto quoted equities and the
+    // live correlation matrix onto the workspace correlation (PD-gated, stored fallback).
     let supportObjects = await this.marketData.listObjects(dto.workspaceId);
     if (dto.live) {
-      const live = await this.feed.latest();
-      const px = new Map(live.map((t) => [t.symbol, t.price]));
-      supportObjects = supportObjects.map((o) =>
-        o.kind === 'equity' && px.has(o.name)
-          ? { ...o, payload: { ...o.payload, spot: px.get(o.name) as number } }
-          : o,
-      );
+      const [live, correl] = await Promise.all([this.feed.latest(), this.feed.latestCorrel()]);
+      supportObjects = overlayCorrelation(overlaySpots(supportObjects, live), correl);
     }
 
     const ctx: InstrumentContext = {

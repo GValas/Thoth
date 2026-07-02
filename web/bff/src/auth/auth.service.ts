@@ -2,6 +2,7 @@
 //! a signed JWT whose HASH is stored on the user, so a refresh both verifies the token
 //! AND that it is the current (un-rotated, un-revoked) one. Logout clears the hash.
 
+import { createHash } from 'node:crypto';
 import { Injectable, OnModuleInit, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +15,15 @@ import type { JwtPayload } from './jwt.strategy';
 export interface Tokens {
   accessToken: string;
   refreshToken: string;
+}
+
+//! bcrypt only reads the first 72 BYTES of its input, and two refresh JWTs of the same
+//! user share their first 72 bytes (constant header + the payload's leading sub/email —
+//! iat/exp sit at the END of the payload), so bcrypt-ing the raw token would make every
+//! token of a user compare equal and turn the rotation check into a no-op. Digesting to
+//! a fixed 64-char sha256 hex first keeps the whole token significant.
+function tokenDigest(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 @Injectable()
@@ -67,7 +77,7 @@ export class AuthService implements OnModuleInit {
     if (!user || !user.enabled || !user.refreshTokenHash) {
       throw new UnauthorizedException('refresh not allowed');
     }
-    if (!(await bcrypt.compare(refreshToken, user.refreshTokenHash))) {
+    if (!(await bcrypt.compare(tokenDigest(refreshToken), user.refreshTokenHash))) {
       throw new UnauthorizedException('stale refresh token');
     }
     return this.issueTokens(user);
@@ -87,7 +97,9 @@ export class AuthService implements OnModuleInit {
       secret: this.config.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
       expiresIn: this.config.get<string>('JWT_REFRESH_TTL', '7d'),
     });
-    await this.users.update(user.id, { refreshTokenHash: await bcrypt.hash(refreshToken, 10) });
+    await this.users.update(user.id, {
+      refreshTokenHash: await bcrypt.hash(tokenDigest(refreshToken), 10),
+    });
     return { accessToken, refreshToken };
   }
 }

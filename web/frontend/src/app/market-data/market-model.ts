@@ -80,11 +80,16 @@ function jacobiEigen(aIn: number[][]): { d: number[]; V: number[][] } {
 //! a small positive floor (strictly positive-definite, as the engine requires), reconstruct,
 //! then rescale to a unit diagonal. A valid matrix is a near-fixed point, so applying this on
 //! every edit only nudges the values when an edit has actually broken positive-definiteness.
+//!
+//! The 1e-3 floor must DOMINATE the 1e-4 rounding writeCorrel applies afterwards: rounding
+//! perturbs the spectrum by up to n·5e-5, so a tiny floor (1e-6) could leave the emitted
+//! matrix indefinite and the engine would reject it. Keep in sync with the same algorithm in
+//! web/bff/src/common/correlation-math.ts and web/spot-feed/src/correl.ts.
 export function repairCorrelation(m: number[][]): number[][] {
   const n = m.length;
   if (n === 0) return m;
   const { d, V } = jacobiEigen(m);
-  const dc = d.map((x) => Math.max(x, 1e-6));
+  const dc = d.map((x) => Math.max(x, 1e-3));
   const out = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
   for (let i = 0; i < n; i++) {
     for (let j = i; j < n; j++) {

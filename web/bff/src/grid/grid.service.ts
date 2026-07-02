@@ -18,6 +18,7 @@ import {
   type GridRequest,
 } from '@thoth/shared';
 import { GridRun } from '../persistence/entities';
+import { overlayCorrelation, overlaySpots } from '../common/live-overlay';
 import { EngineService } from '../engine/engine.service';
 import { SchemaService } from '../schema/schema.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -77,9 +78,11 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
   }
 
   //! Live re-pricing: price the grid SYNCHRONOUSLY (no queue, no GridRun) with the latest
-  //! live spots overlaid onto the equities, returning the matrices directly. The frontend's
-  //! Live mode calls this on a throttle. Equities the feed does not quote keep their stored
-  //! spot, so a partial feed still prices.
+  //! live spots AND the live correlation matrix overlaid onto the workspace objects,
+  //! returning the matrices directly. The frontend's Live mode calls this on a throttle.
+  //! Equities the feed does not quote keep their stored spot (a partial feed still prices),
+  //! and the correlation blend falls back to the stored matrix if mixing live and stored
+  //! pairs would break positive-definiteness (see overlayCorrelation).
   async priceLive(dto: GridSubmitDto): Promise<{
     matrices: GridMatrix[];
     meta: { execMs: number; engineMs?: number; engineVersion?: string };
@@ -99,13 +102,8 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     };
 
     const support = await this.marketData.listObjects(dto.workspaceId);
-    const live = await this.feed.latest();
-    const px = new Map(live.map((t) => [t.symbol, t.price]));
-    const supportObjects = support.map((o) =>
-      o.kind === 'equity' && px.has(o.name)
-        ? { ...o, payload: { ...o.payload, spot: px.get(o.name) as number } }
-        : o,
-    );
+    const [live, correl] = await Promise.all([this.feed.latest(), this.feed.latestCorrel()]);
+    const supportObjects = overlayCorrelation(overlaySpots(support, live), correl);
 
     const ctx: GridContext = {
       pricerName: 'grid',

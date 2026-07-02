@@ -64,7 +64,12 @@ describe('market-data seed generator', () => {
       }
       return true;
     };
-    for (const seed of [1, 7, 42, 123, 9999]) {
+    //! broad sweep: the emitted entries are ROUNDED to 1e-4 after the eigenvalue-clip
+    //! repair, a perturbation of up to ~n·5e-5 on the spectrum — the repair floor must
+    //! dominate it or a clipped seed emits an indefinite matrix the engine rejects. On
+    //! random n=10 unit-diagonal matrices with these entry ranges, a 1e-6 floor left
+    //! ~34% of repaired-then-rounded matrices indefinite; the 1e-3 floor left none.
+    for (let seed = 1; seed <= 500; seed++) {
       const objs = generateMarketData({ equities: 5, currencies: 6, seed });
       const correl = objs.find((o) => o.kind === 'correlation_matrix')!;
       const order = [
@@ -76,7 +81,7 @@ describe('market-data seed generator', () => {
       const full = Array.from({ length: n }, () => new Array(n).fill(0));
       let k = 0;
       for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) full[i][j] = full[j][i] = tri[k++];
-      expect(choleskyOk(full)).toBe(true);
+      expect(choleskyOk(full), `seed ${seed}`).toBe(true);
     }
   });
 
