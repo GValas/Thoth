@@ -13,7 +13,7 @@ class YieldCurve : public Curve
   public:
     //! discount factor to MaturityDate: DF = exp(-r * tau) where r is the interpolated
     //! continuously-compounded zero rate and tau = YearFraction(today, MaturityDate)
-    double GetDiscountFactor( const date& MaturityDate ) const;
+    [[nodiscard]] double GetDiscountFactor( const date& MaturityDate ) const;
 
     //! contructor, destructor
     YieldCurve( const string& ObjectName );

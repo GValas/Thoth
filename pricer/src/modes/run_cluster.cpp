@@ -1,4 +1,5 @@
 #include "run_modes.hpp"
+#include "result_schema.hpp" //!< canonical result field names (shared with the producer)
 #include "object_manager.hpp"
 #include "sequence.hpp" //!< WriteSequenceSummary — shared sequence-summary schema
 
@@ -188,7 +189,7 @@ static string ClusterPriceByContract( const string& Body,
         for ( const string& key : r.GetChildKeys( result ) )
         {
             const string path = result + "." + key;
-            if ( key == "task_time" )
+            if ( key == result_schema::TASK_TIME )
             {
                 if ( r.IsDouble( path ) )
                 {
@@ -208,7 +209,7 @@ static string ClusterPriceByContract( const string& Body,
                     out.Set( path, v ); //!< slave 0's per-contract fields are already in `out`
                 }
             }
-            else if ( key == "premium_trust" )
+            else if ( key == result_schema::PREMIUM_TRUST )
             {
                 trust2 += v * v;
             }
@@ -223,8 +224,8 @@ static string ClusterPriceByContract( const string& Body,
     {
         out.Set( result + "." + key, v );
     }
-    out.Set( result + ".premium_trust", sqrt( trust2 ) );
-    out.Set( result + ".task_time", max_time );
+    out.Set( result + "." + result_schema::PREMIUM_TRUST, sqrt( trust2 ) );
+    out.Set( result + "." + result_schema::TASK_TIME, max_time );
     out.Set( "system_information.cluster",
              "book of " + std::to_string( contracts.size() ) + " contract(s) split over " +
                  std::to_string( N ) + " slave(s)" );
@@ -405,9 +406,6 @@ static string ClusterPrice( const string& Body,
     //! (sum of w^2*stderr^2) for the *_trust standard errors. task_time is a
     //! per-slave wall time (not poolable) and string fields (kind, *_graph) are
     //! left as the first slave's copy.
-    auto ends_with = []( const string& s, const string& suf )
-    { return s.size() >= suf.size() && s.compare( s.size() - suf.size(), suf.size(), suf ) == 0; };
-
     map<string, double> pooled; //!< path-weighted means (premium, Greeks, ...)
     map<string, double> trust2; //!< summed w^2 * stderr^2, square-rooted on write
     const vector<string> keys =
@@ -419,12 +417,12 @@ static string ClusterPrice( const string& Body,
         for ( const string& key : keys )
         {
             const string path = result + "." + key;
-            if ( key == "task_time" || !r.IsDouble( path ) )
+            if ( key == result_schema::TASK_TIME || !r.IsDouble( path ) )
             {
                 continue;
             }
             const double v = r.GetDouble( path, 0.0 );
-            if ( ends_with( key, "_trust" ) )
+            if ( result_schema::IsTrust( key ) )
             {
                 trust2[key] += w * w * v * v;
             }

@@ -47,9 +47,9 @@ class MonteCarloNode
     void SetDateList( const vector<date>& DateList );
 
     //! getter
-    const string& GetName() const;                //!< stable identifier / ordering key
-    double GetIndicatorValue( size_t DateIndex ); //!< MC mean estimate at this date (sum / count)
-    double GetIndicatorTrust( size_t DateIndex ); //!< MC standard error of that mean
+    const string& GetName() const;                              //!< stable identifier / ordering key
+    [[nodiscard]] double GetIndicatorValue( size_t DateIndex ); //!< MC mean estimate at this date (sum / count)
+    [[nodiscard]] double GetIndicatorTrust( size_t DateIndex ); //!< MC standard error of that mean
 
     //! current path's value at this date; virtual so ConstantNode can short-circuit
     inline virtual double GetValue( size_t DateIndex )

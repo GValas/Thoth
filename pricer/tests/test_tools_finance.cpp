@@ -77,6 +77,37 @@ TEST_CASE( "implied vol inverts the call price" )
     }
 }
 
+TEST_CASE( "implied vol: safeguarded Newton handles the extremes" )
+{
+    const double F = 100, df = std::exp( -0.05 );
+
+    //! deep OTM / deep ITM / short-dated / very high vol: the raw Newton step from a
+    //! 30% warm start overshoots or stalls on the flat vega here; the bisection
+    //! safeguard must still round-trip price -> vol -> price.
+    struct Case
+    {
+        double K, T, vol;
+    };
+    //! (deeper ITM than K=40 is ill-posed by nature: the price stops encoding the
+    //! vol to within the solver tolerance, so no inversion can recover it)
+    for ( const Case& c : { Case{ 300, 1.0, 0.20 },    //!< deep OTM, tiny vega
+                            Case{ 40, 1.0, 0.40 },     //!< deep ITM, price near its bounds
+                            Case{ 100, 0.01, 0.15 },   //!< short-dated
+                            Case{ 150, 0.5, 1.50 } } ) //!< very high target vol
+    {
+        CAPTURE( c.K );
+        CAPTURE( c.T );
+        CAPTURE( c.vol );
+        const double price = BS_Call_Price( F, c.K, c.T, c.vol, df );
+        const double iv = BS_Call_ImplicitVol( F, c.K, c.T, price, df );
+        CHECK( iv == Approx( c.vol ).epsilon( 1e-3 ) );
+    }
+
+    //! a price outside the no-arbitrage bounds has NO implied vol: fail loudly
+    CHECK_THROWS( BS_Call_ImplicitVol( F, 95, 1.0, df * F * 1.01, df ) ); //!< above df*F
+    CHECK_THROWS( BS_Call_ImplicitVol( F, 95, 1.0, df * 5 * 0.99, df ) ); //!< below intrinsic
+}
+
 TEST_CASE( "BS greek formulas are mutually consistent (finite differences)" )
 {
     double F = 100, K = 100, T = 1.0, vol = 0.30, df = std::exp( -0.05 );

@@ -5,6 +5,7 @@
 #include "object_reader.hpp"
 #include "raii.hpp" //!< ScopeGuard — restore bumped market state even if Reprice throws
 #include "progress_bar.hpp"
+#include "result_schema.hpp" //!< canonical result field names (shared with the cluster)
 
 //! constructor (members are initialised in-class). The concrete kind is supplied by
 //! the subclass (KIND_MCL_PRICER / KIND_PDE_PRICER / KIND_ANA_PRICER).
@@ -66,22 +67,26 @@ void Pricer::SetIndicatorRequestList( const vector<string>& IndicatorRequestList
         return std::find( _indicator_request_list.begin(), _indicator_request_list.end(), name ) !=
                _indicator_request_list.end();
     };
-    _request_premium = requested( "premium" );
-    _request_delta = requested( "delta" );
-    _request_gamma = requested( "gamma" );
-    _request_vega = requested( "vega" );
-    _request_rho = requested( "rho" );
-    _request_theta = requested( "theta" );
+    //! the indicator names ARE the result field names (result_schema), so the
+    //! request side and the emitted block can never drift apart
+    namespace rs = result_schema;
+    _request_premium = requested( rs::PREMIUM );
+    _request_delta = requested( rs::DELTA );
+    _request_gamma = requested( rs::GAMMA );
+    _request_vega = requested( rs::VEGA );
+    _request_rho = requested( rs::RHO );
+    _request_theta = requested( rs::THETA );
 
     //! model-parameter Greeks: any "vega_<param>" indicator (vega_alpha, vega_v0,
     //! vega_jump_vol, ...) requests a bump of that named parameter. "vega" alone is
     //! the standard parallel-vol vega handled above, not a parameter bump.
     _param_greek_list.clear();
+    const size_t plen = rs::PARAM_VEGA_PREFIX.size();
     for ( const string& ind : _indicator_request_list )
     {
-        if ( ind.rfind( "vega_", 0 ) == 0 && ind.size() > 5 )
+        if ( ind.rfind( rs::PARAM_VEGA_PREFIX, 0 ) == 0 && ind.size() > plen )
         {
-            _param_greek_list.push_back( ind.substr( 5 ) );
+            _param_greek_list.push_back( ind.substr( plen ) );
         }
     }
 }
@@ -514,40 +519,50 @@ void Pricer::WriteResults()
              "book trust = " + ToString( _book_result.premium_trust ) + greeks + ", " +
              "book time = " + ToString( _task_time ) + "sec" );
 
-    //! write cfg results
+    //! write cfg results. Every field name below comes from result_schema so the
+    //! producer and the cluster aggregator can never spell the wire differently.
+    namespace rs = result_schema;
     Task::WriteResults();
-    WriteResult( "premium", _book_result.premium );
-    WriteResult( "premium_trust", _book_result.premium_trust );
+    WriteResult( rs::PREMIUM, _book_result.premium );
+    WriteResult( rs::PREMIUM_TRUST, _book_result.premium_trust );
 
     //! engine-specific fields (the MCL node-graph .dot blocks, <tree>_mcl_graph);
     //! a no-op for ANA/PDE, which keep no such state
     WriteEngineResults();
 
+    //! the requested Greeks of one Valuation, each under Prefix+<greek> — used for
+    //! the book block (empty prefix) and each contract's "<name>_" block below, so
+    //! the two emit the same fields by construction
+    auto write_greeks = [&]( const string& Prefix, const Valuation& V )
+    {
+        if ( _request_delta )
+        {
+            WriteResult( Prefix + rs::DELTA, V.delta );
+        }
+        if ( _request_gamma )
+        {
+            WriteResult( Prefix + rs::GAMMA, V.gamma );
+        }
+        if ( _request_vega )
+        {
+            WriteResult( Prefix + rs::VEGA, V.vega );
+        }
+        if ( _request_rho )
+        {
+            WriteResult( Prefix + rs::RHO, V.rho );
+        }
+        if ( _request_theta )
+        {
+            WriteResult( Prefix + rs::THETA, V.theta );
+        }
+    };
+
     //! requested Greeks (book level), computed by bump-and-revalue
-    if ( _request_delta )
-    {
-        WriteResult( "delta", _book_result.delta );
-    }
-    if ( _request_gamma )
-    {
-        WriteResult( "gamma", _book_result.gamma );
-    }
-    if ( _request_vega )
-    {
-        WriteResult( "vega", _book_result.vega );
-    }
-    if ( _request_rho )
-    {
-        WriteResult( "rho", _book_result.rho );
-    }
-    if ( _request_theta )
-    {
-        WriteResult( "theta", _book_result.theta );
-    }
+    write_greeks( "", _book_result );
     //! model-parameter Greeks (book level), keyed vega_<param>
     for ( const auto& [param, value] : _param_greeks )
     {
-        WriteResult( "vega_" + param, value );
+        WriteResult( rs::ParamVega( param ), value );
     }
 
     //! per-contract premium (and, for the per-contract engines, per-contract
@@ -556,31 +571,12 @@ void Pricer::WriteResults()
     for ( Contract* c : _book->GetContractSet() )
     {
         const string n = c->GetName();
-        WriteResult( n + "_premium", Result( c ).premium );
-        WriteResult( n + "_premium_trust", Result( c ).premium_trust );
+        WriteResult( rs::ContractField( n, rs::PREMIUM ), Result( c ).premium );
+        WriteResult( rs::ContractField( n, rs::PREMIUM_TRUST ), Result( c ).premium_trust );
 
         if ( per_contract_greeks )
         {
-            if ( _request_delta )
-            {
-                WriteResult( n + "_delta", Result( c ).delta );
-            }
-            if ( _request_gamma )
-            {
-                WriteResult( n + "_gamma", Result( c ).gamma );
-            }
-            if ( _request_vega )
-            {
-                WriteResult( n + "_vega", Result( c ).vega );
-            }
-            if ( _request_rho )
-            {
-                WriteResult( n + "_rho", Result( c ).rho );
-            }
-            if ( _request_theta )
-            {
-                WriteResult( n + "_theta", Result( c ).theta );
-            }
+            write_greeks( n + "_", Result( c ) );
         }
     }
 }

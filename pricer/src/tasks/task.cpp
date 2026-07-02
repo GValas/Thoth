@@ -1,5 +1,6 @@
 #include "thoth.hpp"
 #include "task.hpp"
+#include "result_schema.hpp" //!< canonical result field names
 
 //! retain the config by pointer (not owned) so WriteResults can write back into
 //! the same document; the kind is forwarded to Object for registry construction.
@@ -23,8 +24,8 @@ void Task::SetResult( const string& Result )
 //! and stamp the elapsed wall-clock time. Concrete tasks call this, then add their own fields.
 void Task::WriteResults()
 {
-    WriteResult( "kind", ResultKind() );
-    WriteResult( "task_time", _task_time );
+    WriteResult( result_schema::KIND, ResultKind() );
+    WriteResult( result_schema::TASK_TIME, _task_time );
 }
 
 //! default result-block kind: the task's own kind suffixed with "_result"

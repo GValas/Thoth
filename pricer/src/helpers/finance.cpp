@@ -349,27 +349,58 @@ double BS_Call_ImplicitVol( const double Forward,
                             const double Price,
                             const double DiscountFactor )
 {
-
-    //! Newton-Raphson: vol_{k+1} = vol_k + (target_price - BS(vol_k)) / vega(vol_k).
-    //! vega is the derivative dPrice/dvol, so this is the standard Newton step.
-    double vega, vol_error, vol = INITIAL_IMPLICIT_VOL;
-    int i = 0;
-    do
+    //! no-arbitrage bounds: df*(F-K)+ < C < df*F. A target outside them has no
+    //! implied vol at all — fail loudly instead of letting Newton wander.
+    const double intrinsic = DiscountFactor * max( Forward - Strike, 0.0 );
+    const double upper = DiscountFactor * Forward;
+    if ( !( Price > intrinsic ) || !( Price < upper ) )
     {
-        if ( !( vega = BS_Vega( Forward, Strike, TimeToMaturity, vol, DiscountFactor ) ) )
+        ERR( "BS_Call_ImplicitVol: price " + ToString( Price ) +
+             " is outside the no-arbitrage bounds (" + ToString( intrinsic ) + ", " +
+             ToString( upper ) + "), no implied vol exists" );
+    }
+
+    //! bracket [lo, hi]: the call price is strictly increasing in vol, from the
+    //! intrinsic (vol -> 0) to df*F (vol -> inf). Expand hi until it over-prices
+    //! the target so bisection always has a valid interval to fall back on.
+    double lo = 0.0;
+    double hi = 4.0 * INITIAL_IMPLICIT_VOL; //!< 120% vol covers any market case
+    while ( BS_Call_Price( Forward, Strike, TimeToMaturity, hi, DiscountFactor ) < Price &&
+            hi < IMPLICIT_VOL_MAX )
+    {
+        hi *= 2;
+    }
+
+    //! safeguarded Newton: the quadratic Newton step is taken while it stays inside
+    //! the shrinking [lo, hi] bracket (near-flat vega or an overshoot would throw it
+    //! out — deep OTM/ITM targets); otherwise the step degrades to a bisection, so
+    //! the iteration always converges on a bracketable price.
+    double vol = INITIAL_IMPLICIT_VOL;
+    for ( int i = 0; i < IMPLICIT_VOL_MAX_ITERATIONS; i++ )
+    {
+        const double err = Price - BS_Call_Price( Forward, Strike, TimeToMaturity, vol, DiscountFactor );
+        if ( abs( err ) <= IMPLICIT_VOL_MAX_ERROR )
         {
-            //! zero vega: Newton cannot proceed — fail loudly rather than returning a -1 "vol"
-            ERR( "BS_Call_ImplicitVol: zero vega, cannot invert price " + ToString( Price ) );
+            return vol;
+        }
+        //! shrink the bracket around the root (price increasing in vol)
+        if ( err > 0 )
+        {
+            lo = vol; //!< under-priced: the root is above
         }
         else
         {
-            vol_error = Price - BS_Call_Price( Forward, Strike, TimeToMaturity, vol, DiscountFactor );
-            vol += vol_error / vega; //!< Newton update
+            hi = vol; //!< over-priced: the root is below
         }
-        //! stop once the PRICE residual is within tolerance, or the iteration cap hits
-    } while ( abs( vol_error ) > IMPLICIT_VOL_MAX_ERROR && ++i < IMPLICIT_VOL_MAX_ITERATIONS );
-
-    return vol;
+        const double vega = BS_Vega( Forward, Strike, TimeToMaturity, vol, DiscountFactor );
+        double next = ( vega > 0 ) ? vol + err / vega : lo; //!< Newton, or force the bisection below
+        if ( !( next > lo && next < hi ) )
+        {
+            next = 0.5 * ( lo + hi ); //!< Newton left the bracket -> bisect
+        }
+        vol = next;
+    }
+    return vol; //!< bracket midpoint after the cap: converged to bisection accuracy
 }
 //! ----------------------------------------------------------------------
 //! Heston European pricing via the characteristic function

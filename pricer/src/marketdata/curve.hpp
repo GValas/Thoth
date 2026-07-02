@@ -61,7 +61,7 @@ class Curve : public MarketData
 
     //! curve interpolated value — the continuously-compounded rate at Maturity, with
     //! the rho shift applied (see GetCurveValue in the .cpp for the interpolation rule)
-    double GetCurveValue( const date& Maturity ) const;
+    [[nodiscard]] double GetCurveValue( const date& Maturity ) const;
 
     //! constructor, destructor
     Curve( const string& ObjectName,

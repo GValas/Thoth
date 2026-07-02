@@ -106,3 +106,58 @@ TEST_CASE( "book premium is the sum of its contracts" )
     double sum = Premium( res, "c1" ) + Premium( res, "c2" );
     CHECK( total == doctest::Approx( sum ).epsilon( 1e-9 ) );
 }
+
+// --- quanto + SABR: the drift correction convention is pinned to the ATM implied
+// vol in ALL THREE engines. ANA applies it on the forward (Single::GetForward),
+// PDE as a carry spread (InitGrid, rho*v_atm*v_fx with the local-vol grid
+// underneath), and MCL wires the QuantoAdjustmentNode with Single::GetVolNode —
+// which for a local (SABR) surface deliberately returns a CONSTANT ATM vol node,
+// not the instantaneous local vol (see single.cpp GetVolNode). This test pins that
+// three-way agreement so a change of convention in any one engine shows up.
+TEST_CASE( "quanto vanilla on a SABR surface agrees across ANA/MCL/PDE" )
+{
+    auto cfg = []( const std::string& method, double strike, int draws )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd,"
+          << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( draws, 7, 5 )
+          << "eur: !currency {rate: eur_rate}\n"
+          << "eur_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [3, 3]}\n"
+          << "usd: !currency {rate: usd_rate}\n"
+          << "usd_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [6, 6]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          //! genuine smile (rho -0.3, nu 0.4) so the local-vol machinery is live
+          << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.30], beta: [1.0],"
+          << " rho: [-0.3], nu: [0.4], calendar: cal}\n"
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur,"
+          << " spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 12}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [eur/usd],"
+          << " matrix: [1, 0.4, 0.4, 1]}\n"
+          << "book: !book {contracts: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: usd, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1,"
+          << " type: call, exercise: european}\n";
+        return o.str();
+    };
+
+    for ( double strike : { 100.0, 120.0 } )
+    {
+        CAPTURE( strike );
+        const double ana = Premium( Price( cfg( "ana", strike, 1 ) ) );
+        const double pde = Premium( Price( cfg( "pde", strike, 1 ) ) );
+        auto mr = Price( cfg( "mcl", strike, 200000 ) );
+        const double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( pde );
+        CAPTURE( mcl );
+        //! ANA prices off the implied vol AT THE STRIKE, the PDE and MCL diffuse the
+        //! Dupire local vol — Dupire repricing makes them agree; the shared ATM
+        //! quanto correction keeps the drift identical across the three.
+        CHECK( std::abs( pde - ana ) <= 0.015 * ana + 0.05 );
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.015 * ana + 0.05 );
+    }
+}

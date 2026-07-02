@@ -163,9 +163,12 @@ double Heston_Put_Price( const double Forward,
                          const double JumpMean = 0,
                          const double JumpVol = 0 );
 
-//! Invert a call price back to its Black-Scholes implied volatility by
-//! Newton-Raphson (step = price_error / vega). Returns the annualised lognormal
-//! sigma. Throws (ERR) if vega collapses to zero so it never reports a bogus vol.
+//! Invert a call price back to its Black-Scholes implied volatility by a
+//! safeguarded Newton-Raphson (the Newton step is kept inside a shrinking
+//! [lo, hi] bracket and degrades to bisection when it overshoots or vega
+//! collapses — deep OTM/ITM targets). Returns the annualised lognormal sigma.
+//! Throws (ERR) when the price violates the no-arbitrage bounds
+//! (df*(F-K)+, df*F) — no implied vol exists there.
 double BS_Call_ImplicitVol( const double Forward,
                             const double Strike,
                             const double TimeToMaturity,
@@ -175,7 +178,8 @@ double BS_Call_ImplicitVol( const double Forward,
 //! Newton-Raphson implied-vol solver parameters
 inline constexpr double INITIAL_IMPLICIT_VOL = 0.3;     //!< warm start (30% vol)
 inline constexpr double IMPLICIT_VOL_MAX_ERROR = 1.e-8; //!< price-error tolerance (was 1e-30: never met)
-inline constexpr int IMPLICIT_VOL_MAX_ITERATIONS = 30;
+inline constexpr int IMPLICIT_VOL_MAX_ITERATIONS = 60;  //!< enough for pure bisection on [0, MAX]
+inline constexpr double IMPLICIT_VOL_MAX = 20.0;        //!< bracket cap (2000% vol; any real price sits below)
 
 //! Analytic basket (moment-matched) proxy call prices: the basket's true distribution
 //! is matched to a tractable proxy (inverse-gamma / lognormal / shifted-lognormal) and

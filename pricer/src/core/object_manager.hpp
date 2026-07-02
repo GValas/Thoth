@@ -37,6 +37,14 @@ class ObjectManager
     ObjectManager( YamlConfig::from_string_t, const string& YamlContent );
     ~ObjectManager();
 
+    //! non-copyable / non-movable: built objects capture the address of the
+    //! owned-by-value _yml (Task holds a YamlConfig*), so a copy or move would
+    //! leave them pointing into the abandoned instance.
+    ObjectManager( const ObjectManager& ) = delete;
+    ObjectManager& operator=( const ObjectManager& ) = delete;
+    ObjectManager( ObjectManager&& ) = delete;
+    ObjectManager& operator=( ObjectManager&& ) = delete;
+
     //! --- services used by the registry factories ---
 
     //! config tree (field access)
