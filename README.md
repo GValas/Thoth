@@ -171,20 +171,31 @@ and nothing answers on that URL, the MCP server **spawns the engine itself** and
 tears it down on exit — a fully self-contained setup once the engine is built. For
 Claude Desktop, register `node <repo>/web/mcp/dist/index.js` with the same env.
 
+Two transports: **stdio** (default — launched by the MCP client, as above) and
+**Streamable HTTP** (`MCP_TRANSPORT=http`, stateless, `POST /mcp` + a `GET /healthz`
+probe). The prod stack runs the HTTP mode as the **`mcp` compose service** on
+`http://localhost:7778/mcp`, wrapping cluster 1's master (so agent MCL books get
+path-split across its slaves like any dashboard job); `scripts/prod.sh` waits for
+its health and prints the ready-to-paste registration:
+
+```bash
+claude mcp add --transport http thoth-pricing http://localhost:7778/mcp
+```
+
 ## Repository map
 
 ```
 Thoth/
 ├── README.md            # this file (monorepo map)
 ├── CLAUDE.md            # agent mandate (build/test, README sync)
-├── docker-compose.yml   # prod: 2 GPU clusters (master+5 slaves) · redis · bff · web
+├── docker-compose.yml   # prod: 2 GPU clusters (master+5 slaves) · redis · bff · web · mcp
 ├── .env.example         # compose secrets (JWT, admin seed)
 ├── pricer/              # C++ engine (CMake, src/ tests/ samples/ schema/ docs/ scripts/)
 ├── web/
 │   ├── shared/          # @thoth/shared: engine client, pool, tag-YAML, grid + instrument builders
 │   ├── bff/             # NestJS BFF (auth, workspaces, marketdata, schema, grid, instrument, live spots)
 │   ├── spot-feed/       # fake real-time feed: GBM equity+fx spots & an OU correlation matrix -> Redis pub/sub
-│   ├── mcp/             # @thoth/mcp: MCP server (stdio) exposing the engine as agent tools
+│   ├── mcp/             # @thoth/mcp: MCP server (stdio + HTTP) exposing the engine as agent tools
 │   └── frontend/        # Angular SPA (Material + AG Grid + ngx-formly): Vanilla Grid · Panels · Blotter
 ├── .github/             # CI (runs the engine gates under pricer/)
 ├── .devcontainer/       # single-container dev (+ opt-in 3-container compose), .vscode/, .claude/

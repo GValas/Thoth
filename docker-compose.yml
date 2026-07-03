@@ -166,6 +166,31 @@ services:
       - "7777:80"
     networks: [thoth]
 
+  # ===== MCP server: the pricing engine as agent tools (Streamable HTTP) ================
+  # Exposes the same engine the dashboard uses to MCP clients (Claude Code / Desktop,
+  # agent frameworks) on http://<host>:7778/mcp — stateless HTTP transport, so any
+  # number of agents can price concurrently (each request leases the cluster like any
+  # other engine client; the engine serialises). Register in Claude Code with:
+  #   claude mcp add --transport http thoth-pricing http://localhost:7778/mcp
+  mcp:
+    build:
+      context: ./web
+      dockerfile: mcp/Dockerfile
+    restart: unless-stopped
+    depends_on: [c1master]
+    environment:
+      MCP_TRANSPORT: "http"
+      MCP_PORT: "3001"
+      # the MCP wraps cluster 1's master: MCL books get path-split across its slaves
+      THOTH_ENGINE_URL: "http://c1master:8080"
+      # the engine's JSON Schema, mounted read-only below (single-sourced from pricer/)
+      THOTH_SCHEMA_PATH: "/app/schema/thoth.schema.json"
+    ports:
+      - "7778:3001"
+    volumes:
+      - ./pricer/schema:/app/schema:ro
+    networks: [thoth]
+
 networks:
   thoth:
 

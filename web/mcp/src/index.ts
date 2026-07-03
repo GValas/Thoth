@@ -10,13 +10,20 @@
 //!                      is not answering, the server SPAWNS `<bin> -server <port>`
 //!                      itself and tears it down on exit — a self-contained setup.
 //!   THOTH_SCHEMA_PATH  pricer JSON schema      (default resolved from the repo)
+//!   MCP_TRANSPORT      'stdio' (default: launched by an MCP client) or 'http'
+//!                      (a standalone service: Streamable HTTP on POST /mcp,
+//!                      stateless — one server instance per request — plus a
+//!                      GET /healthz probe; used by the docker-compose prod stack)
+//!   MCP_PORT           HTTP port when MCP_TRANSPORT=http (default 3001)
 
 import { readFileSync } from 'node:fs';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { EngineClient, EngineError, type Engine } from '@thoth/shared';
 import { buildBook, parseBook, type EngineArgs, type MarketArgs } from './book.js';
@@ -147,9 +154,10 @@ async function guarded<T>(fn: () => Promise<T>) {
 
 //! ---- server ---------------------------------------------------------------------
 
-const server = new McpServer({ name: 'thoth-pricing-engine', version: '0.1.0' });
+function buildServer(): McpServer {
+  const server = new McpServer({ name: 'thoth-pricing-engine', version: '0.1.0' });
 
-server.registerTool(
+  server.registerTool(
   'price_vanilla',
   {
     title: 'Price a vanilla option',
@@ -181,7 +189,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+  server.registerTool(
   'price_barrier',
   {
     title: 'Price a barrier option',
@@ -225,7 +233,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+  server.registerTool(
   'price_variance_swap',
   {
     title: 'Price a variance swap',
@@ -261,7 +269,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+  server.registerTool(
   'price_yaml_book',
   {
     title: 'Price a raw Thoth YAML book',
@@ -283,7 +291,7 @@ server.registerTool(
     }),
 );
 
-server.registerTool(
+  server.registerTool(
   'get_config_schema',
   {
     title: 'Inspect the Thoth configuration schema',
@@ -304,7 +312,7 @@ server.registerTool(
     }),
 );
 
-server.registerTool(
+  server.registerTool(
   'engine_health',
   {
     title: 'Check the pricing engine',
@@ -319,9 +327,53 @@ server.registerTool(
     })),
 );
 
+  return server;
+}
+
 //! ---- main ------------------------------------------------------------------------
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
-//! stderr only: stdout carries the MCP protocol
-console.error(`thoth-mcp: serving ${KINDS.length} config kinds over stdio (engine: ${ENGINE_URL})`);
+if ((process.env['MCP_TRANSPORT'] ?? 'stdio') === 'http') {
+  //! standalone service mode (prod stack): stateless Streamable HTTP — a fresh
+  //! server+transport pair per POST (no session state to keep), torn down with the
+  //! response. GET /healthz answers the compose health probe.
+  const port = Number(process.env['MCP_PORT'] ?? 3001);
+  const http = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    if (req.method === 'GET' && req.url === '/healthz') {
+      const healthy = await engine.health();
+      res.writeHead(healthy ? 200 : 503, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ engine: ENGINE_URL, healthy }));
+      return;
+    }
+    if (req.method !== 'POST' || !(req.url === '/mcp' || req.url === '/')) {
+      res.writeHead(405, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'POST /mcp only (stateless server)' }, id: null }));
+      return;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const c of req) chunks.push(c as Buffer);
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const server = buildServer();
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      res.on('close', () => {
+        void transport.close();
+        void server.close();
+      });
+      await server.connect(transport);
+      await transport.handleRequest(req, res, body);
+    } catch (err) {
+      if (!res.headersSent) {
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message: String(err) }, id: null }));
+      }
+    }
+  });
+  http.listen(port, () => {
+    console.error(`thoth-mcp: Streamable HTTP on :${port}/mcp — ${KINDS.length} config kinds (engine: ${ENGINE_URL})`);
+  });
+} else {
+  const transport = new StdioServerTransport();
+  await buildServer().connect(transport);
+  //! stderr only: stdout carries the MCP protocol
+  console.error(`thoth-mcp: serving ${KINDS.length} config kinds over stdio (engine: ${ENGINE_URL})`);
+}
