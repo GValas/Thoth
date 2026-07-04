@@ -4,7 +4,8 @@
 #
 # Brings up the production stack defined in docker-compose.yml:
 #   redis · 2 GPU clusters (c1master/c2master + 5 CPU slaves each) · bff (NestJS) ·
-#   web (nginx + SPA) · mcp (the engine as agent tools, Streamable HTTP on :7778/mcp)
+#   web (nginx + SPA) · mcp (the engine as agent tools, Streamable HTTP; nginx proxies it
+#   at :7777/mcp — same public port as the dashboard)
 #   — then waits until the API and the MCP server are healthy and prints how to reach them.
 # Note: the clusters need the NVIDIA Container Toolkit + 2 GPUs (see docker-compose.yml).
 #
@@ -30,7 +31,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 WEB_PORT=7777   # host port the web/nginx service publishes (see docker-compose.yml)
-MCP_PORT=7778   # host port the mcp service publishes (Streamable HTTP, POST /mcp)
+                # nginx also reverse-proxies the MCP server at ${WEB_PORT}/mcp (no own host port)
 CMD="${1:-up}"
 
 # --- prerequisites ---------------------------------------------------------
@@ -89,11 +90,11 @@ if [[ "$HEALTHY" != "1" ]]; then
   exit 1   # EXIT trap tears the stack down
 fi
 
-# --- wait for the MCP server (it only needs its engine cluster, so this is quick) --
+# --- wait for the MCP server (via nginx on the web port; it only needs its engine cluster) --
 echo -n "==> waiting for the MCP server to become healthy"
 MCP_HEALTHY=0
 for _ in $(seq 1 30); do
-  if curl -fsS "http://localhost:${MCP_PORT}/healthz" >/dev/null 2>&1; then MCP_HEALTHY=1; break; fi
+  if curl -fsS "http://localhost:${WEB_PORT}/mcp/healthz" >/dev/null 2>&1; then MCP_HEALTHY=1; break; fi
   echo -n "."; sleep 2
 done
 echo
@@ -111,8 +112,8 @@ cat <<EOF
     API docs: http://localhost:${WEB_PORT}/api/docs
     login  : ${ADMIN_EMAIL:-<ADMIN_EMAIL from .env>} / <ADMIN_PASSWORD from .env>
 
-    MCP    : http://localhost:${MCP_PORT}/mcp   (engine tools for LLM agents; health: /healthz)
-             claude mcp add --transport http thoth-pricing http://localhost:${MCP_PORT}/mcp
+    MCP    : http://localhost:${WEB_PORT}/mcp   (engine tools for LLM agents; health: /mcp/healthz)
+             claude mcp add --transport http thoth-pricing http://localhost:${WEB_PORT}/mcp
 
     status : scripts/prod.sh ps   (in another shell)
     stop   : Ctrl-C here, or: scripts/prod.sh down

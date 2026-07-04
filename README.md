@@ -173,13 +173,15 @@ Claude Desktop, register `node <repo>/web/mcp/dist/index.js` with the same env.
 
 Two transports: **stdio** (default — launched by the MCP client, as above) and
 **Streamable HTTP** (`MCP_TRANSPORT=http`, stateless, `POST /mcp` + a `GET /healthz`
-probe). The prod stack runs the HTTP mode as the **`mcp` compose service** on
-`http://localhost:7778/mcp`, wrapping cluster 1's master (so agent MCL books get
-path-split across its slaves like any dashboard job); `scripts/prod.sh` waits for
-its health and prints the ready-to-paste registration:
+probe). The prod stack runs the HTTP mode as the **`mcp` compose service**, wrapping
+cluster 1's master (so agent MCL books get path-split across its slaves like any
+dashboard job). It has **no host port of its own**: nginx (the `web` service) reverse-
+proxies it, so it shares the dashboard's public port at `http://localhost:7777/mcp`
+(health at `/mcp/healthz`). `scripts/prod.sh` waits for its health and prints the
+ready-to-paste registration:
 
 ```bash
-claude mcp add --transport http thoth-pricing http://localhost:7778/mcp
+claude mcp add --transport http thoth-pricing http://localhost:7777/mcp
 ```
 
 ## Repository map
