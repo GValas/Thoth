@@ -8,7 +8,12 @@
 import { computed, signal } from '@angular/core';
 import type { WsObject } from '../core/models';
 
-export const VOL_KINDS = ['bs_volatility', 'sabr_volatility', 'heston_volatility'] as const;
+export const VOL_KINDS = [
+  'bs_volatility',
+  'sabr_volatility',
+  'heston_volatility',
+  'lsv_volatility',
+] as const;
 export const DIV_KINDS = ['continuous_dividends_curve', 'discrete_dividends'] as const;
 
 //! Kinds the dashboard renders natively; anything else falls to the "Advanced" editor.
@@ -113,6 +118,9 @@ export function defaultVol(kind: string, spot = 100): Record<string, unknown> {
       return { volatility: 20 };
     case 'heston_volatility':
       return { spot, init_vol: 20, long_vol: 20, kappa: 1, vol_of_vol: 0.5 };
+    case 'lsv_volatility':
+      //! surface: must be filled with the name of a deterministic vol object
+      return { spot, init_vol: 20, long_vol: 20, kappa: 1, vol_of_vol: 0.5, surface: '' };
     case 'sabr_volatility':
       return { maturities: [1], alpha: [0.2], beta: [1], rho: [0], nu: [0.4] };
     default:
@@ -269,13 +277,14 @@ export class MarketModel {
 //! ---- correlation view-model ------------------------------------------------------------
 
 //! Ordered members of the correlation matrix: each equity (then its `_var` pseudo-asset if
-//! it uses Heston/Bates vol), followed by the fx pairs.
+//! it uses a stochastic vol — Heston/Bates or LSV), followed by the fx pairs.
 export function correlMembers(model: MarketModel): string[] {
   const members: string[] = [];
   for (const eq of model.equities()) {
     members.push(eq.name);
     const vol = model.byName(eq.payload['volatility'] as string);
-    if (vol?.kind === 'heston_volatility') members.push(`${eq.name}_var`);
+    if (vol?.kind === 'heston_volatility' || vol?.kind === 'lsv_volatility')
+      members.push(`${eq.name}_var`);
   }
   for (const fx of model.forexs()) members.push(fx.name);
   return members;

@@ -266,6 +266,43 @@ export class EquitiesSectionComponent {
     if (field) this.setVolNum(field, e.data[field]);
   }
 
+  // --- LSV: the Heston scalar params (no jumps) + a reference to a deterministic
+  // target surface (another workspace vol object, typically SABR) the leverage is
+  // calibrated to. The engine rejects a stochastic target, so only bs/sabr are offered.
+  readonly lsvFields = ['spot', 'init_vol', 'long_vol', 'kappa', 'vol_of_vol'];
+  readonly lsvCols: ColDef[] = this.lsvFields.map((f) => ({
+    headerName: f,
+    field: f,
+    editable: true,
+    cellEditor: 'agNumberCellEditor',
+    valueParser: (p) => Number(p.newValue),
+    flex: 1,
+    minWidth: 80,
+    type: 'rightAligned',
+  }));
+  readonly lsvRows = computed<Record<string, number>[]>(() => {
+    const p = this.volObj()?.payload ?? {};
+    const row: Record<string, number> = {};
+    for (const f of this.lsvFields) row[f] = (p[f] as number) ?? 0;
+    return [row];
+  });
+  commitLsv(e: CellValueChangedEvent<Record<string, number>>): void {
+    const field = e.colDef.field;
+    if (field) this.setVolNum(field, e.data[field]);
+  }
+  readonly lsvSurfaceCandidates = computed<WsObject[]>(() =>
+    this.model
+      .objects()
+      .filter((o) => o.kind === 'bs_volatility' || o.kind === 'sabr_volatility'),
+  );
+  lsvSurface(): string {
+    return (this.volObj()?.payload['surface'] as string) ?? '';
+  }
+  setLsvSurface(name: string): void {
+    const vol = this.volObj();
+    if (vol) this.model.patch(vol.name, { surface: name });
+  }
+
   // --- combined repo + dividend term structure (one shared pillar table) ---
   // Repo and dividends share the same pillar dates and are edited in a single grid; every
   // commit rewrites BOTH curves with the same `dates`, so they always have an equal pillar

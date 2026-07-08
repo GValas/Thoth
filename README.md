@@ -42,8 +42,9 @@ the NVIDIA Container Toolkit + ≥1 GPU; by default both masters share GPU 0 —
 `THOTH_GPU_C2=1` to put the second cluster on a second card, and `THOTH_CUDA_ARCH` to the
 GPUs' compute capability — see `docker-compose.yml`.) Two tabs: **Market Data** — a domain dashboard with
 four editable areas (**Equities** spot/vol/repo/dividends · **Rates** · **FX** · **Correlation**
-matrix), AG-Grid inline editing, full vol term-structures (flat/SABR/Heston, both shown as
-editable pillar/parameter **tables**). The book is a **fixed canonical set** — at most **5 stocks
+matrix), AG-Grid inline editing, full vol term-structures (flat/SABR/Heston/LSV — the
+tabular kinds as editable pillar/parameter **tables**, LSV as the Heston parameter table
+plus a **target-surface picker** over the workspace's deterministic vols). The book is a **fixed canonical set** — at most **5 stocks
 + 3 currencies (USD/EUR/JPY) + induced FX + correlation** — that you **edit in place** (no adding
 or deleting items, fixed pillar sets); an empty workspace is **auto-seeded on first load**, and
 **Generate sample data** (`POST /api/workspaces/:id/objects/seed`) reshuffles it. Each stock's

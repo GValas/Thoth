@@ -47,6 +47,25 @@
             ></ag-grid-angular>
           </div>
         }
+        @case ('lsv_volatility') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Target surface</mat-label>
+            <mat-select [ngModel]="lsvSurface()" (ngModelChange)="setLsvSurface($event)">
+              @for (s of lsvSurfaceCandidates(); track s.name) {
+                <mat-option [value]="s.name">{{ s.name }} ({{ s.kind.replace('_volatility', '') }})</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <div class="sabr">
+            <ag-grid-angular
+              class="ag-theme-quartz grid"
+              [rowData]="lsvRows()"
+              [columnDefs]="lsvCols"
+              [domLayout]="'autoHeight'"
+              (cellValueChanged)="commitLsv($event)"
+            ></ag-grid-angular>
+          </div>
+        }
         @case ('sabr_volatility') {
           <div class="sabr">
             <ag-grid-angular
