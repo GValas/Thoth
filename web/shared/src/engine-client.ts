@@ -36,13 +36,14 @@ export class EngineClient {
   }
 
   //! Price a YAML book; resolves to the YAML result text, or throws EngineError if the
-  //! engine reported a failure. taskName maps to the X-Task-Name header.
-  async postPrice(bookYaml: string, taskName = 'root'): Promise<string> {
+  //! engine reported a failure. taskName maps to the X-Task-Name header; when omitted
+  //! the header is NOT sent, so the engine falls back to the book's own `root:`.
+  async postPrice(bookYaml: string, taskName?: string): Promise<string> {
     const body = await this.fetchText('/price', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-yaml',
-        'X-Task-Name': taskName,
+        ...(taskName !== undefined ? { 'X-Task-Name': taskName } : {}),
       },
       body: bookYaml,
     });

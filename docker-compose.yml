@@ -188,6 +188,10 @@ services:
       THOTH_ENGINE_URL: "http://c1master:8080"
       # the engine's JSON Schema, mounted read-only below (single-sourced from pricer/)
       THOTH_SCHEMA_PATH: "/app/schema/thoth.schema.json"
+      # bearer auth for POST /mcp (nginx forwards the Authorization header untouched).
+      # Optional but STRONGLY recommended: when empty the endpoint is open and the
+      # server logs a warning. Set it in the root .env (see .env.example).
+      MCP_API_KEY: "${MCP_API_KEY:-}"
     # no host port: only nginx (same compose network) talks to it, on :3001
     expose:
       - "3001"

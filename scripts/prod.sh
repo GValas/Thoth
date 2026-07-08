@@ -105,6 +105,14 @@ if [[ "$MCP_HEALTHY" != "1" ]]; then
 fi
 
 ADMIN_EMAIL="$(grep -E '^ADMIN_EMAIL=' "$ROOT/.env" | cut -d= -f2- || true)"
+# MCP auth: when MCP_API_KEY is set in .env, /mcp requires a bearer header — print the
+# matching registration. When unset, the endpoint is OPEN (the mcp service logs a warning).
+MCP_KEY="$(grep -E '^MCP_API_KEY=' "$ROOT/.env" | cut -d= -f2- || true)"
+if [[ -n "$MCP_KEY" ]]; then
+  MCP_REGISTER="claude mcp add --transport http thoth-pricing http://localhost:${WEB_PORT}/mcp --header \"Authorization: Bearer <MCP_API_KEY from .env>\""
+else
+  MCP_REGISTER="claude mcp add --transport http thoth-pricing http://localhost:${WEB_PORT}/mcp   (WARNING: MCP_API_KEY unset -> endpoint unauthenticated)"
+fi
 cat <<EOF
 
 ==> Thoth dashboard is up.
@@ -113,7 +121,7 @@ cat <<EOF
     login  : ${ADMIN_EMAIL:-<ADMIN_EMAIL from .env>} / <ADMIN_PASSWORD from .env>
 
     MCP    : http://localhost:${WEB_PORT}/mcp   (engine tools for LLM agents; health: /mcp/healthz)
-             claude mcp add --transport http thoth-pricing http://localhost:${WEB_PORT}/mcp
+             ${MCP_REGISTER}
 
     status : scripts/prod.sh ps   (in another shell)
     stop   : Ctrl-C here, or: scripts/prod.sh down

@@ -15,9 +15,14 @@
 //!                      stateless — one server instance per request — plus a
 //!                      GET /healthz probe; used by the docker-compose prod stack)
 //!   MCP_PORT           HTTP port when MCP_TRANSPORT=http (default 3001)
+//!   MCP_API_KEY        HTTP-mode auth: when set, every POST /mcp must carry
+//!                      `Authorization: Bearer <key>` (401 otherwise). When unset the
+//!                      endpoint is open and a prominent warning is logged at startup.
+//!                      Ignored in stdio mode (the client owns the process).
 
 import { readFileSync } from 'node:fs';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -25,13 +30,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { EngineClient, EngineError, type Engine } from '@thoth/shared';
+import { EngineClient, EngineError, EnginePool, loadBook, TAG_KEY, type Engine } from '@thoth/shared';
 import { buildBook, parseBook, type EngineArgs, type MarketArgs } from './book.js';
 
 //! ---- configuration -----------------------------------------------------------
 
 const ENGINE_URL = process.env['THOTH_ENGINE_URL'] ?? 'http://localhost:8080';
 const ENGINE_BIN = process.env['THOTH_ENGINE_BIN'];
+const MCP_API_KEY = process.env['MCP_API_KEY'] ?? '';
 const SCHEMA_PATH =
   process.env['THOTH_SCHEMA_PATH'] ??
   resolve(dirname(fileURLToPath(import.meta.url)), '../../../pricer/schema/thoth.schema.json');
@@ -44,7 +50,14 @@ const KINDS = Object.keys(schema.$defs).filter((k) => {
   return typeof d.title === 'string' && d.title.startsWith('!'); //!< tagged object kinds only
 });
 
+//! Engine access: a plain client for health probes / self-spawn, plus a shared
+//! EnginePool gating the actual pricing — the same gate the BFF uses. The pool holds
+//! TWO leases on the ONE wrapped engine (same URL twice), so at most 2 MCP requests
+//! are in flight against the cluster at a time; an agent burst queues here instead of
+//! piling onto the engine and starving the dashboard's own pool.
+const MCP_CONCURRENCY = 2;
 const engine = new EngineClient({ baseUrl: ENGINE_URL });
+const pool = new EnginePool(Array<string>(MCP_CONCURRENCY).fill(ENGINE_URL));
 
 //! ---- optional self-spawned engine ---------------------------------------------
 
@@ -91,8 +104,44 @@ async function quote(
     : ['premium'];
   const yaml = buildBook(m, e, kind, fields, indicators, KINDS);
   await ensureEngine();
-  const reply = await engine.postPrice(yaml, 'pricer');
+  const reply = await pool.withEngine((c) => c.postPrice(yaml, 'pricer'));
   return parseBook(reply, indicators, KINDS);
+}
+
+//! ---- raw-book resource bounds ---------------------------------------------------
+
+const MAX_SEQUENCE_TASKS = 50; //!< tasks per !sequence in a raw book
+const MAX_BOOK_PATHS = 1_000_000; //!< MCL paths per mcl_configuration in a raw book
+
+//! Cheap resource bounds on price_yaml_book input BEFORE it reaches the engine.
+//! `paths:` only exists on !mcl_configuration in the schema, so a conservative regex
+//! catches oversized path counts even in books js-yaml cannot digest. !sequence task
+//! counts need structure: the book is loaded with the same tag-preserving schema the
+//! builders use (every engine-valid book parses — tags only appear on top-level
+//! mappings, the verified contract); if a book dodges the loader yet still declares a
+//! !sequence, it is rejected rather than waved through unbounded.
+function checkBookBounds(bookYaml: string): void {
+  for (const m of bookYaml.matchAll(/\bpaths\s*:\s*(\d[\d_]*)/g)) {
+    const n = Number(m[1]!.replaceAll('_', ''));
+    if (n > MAX_BOOK_PATHS) {
+      throw new Error(`book rejected: paths ${n} exceeds the MCP cap of ${MAX_BOOK_PATHS}`);
+    }
+  }
+  if (!bookYaml.includes('!sequence')) return;
+  let doc: unknown;
+  try {
+    doc = loadBook(bookYaml, KINDS);
+  } catch (err) {
+    throw new Error(`book rejected: contains !sequence but could not be parsed for bounds checking (${String(err)})`);
+  }
+  for (const [name, obj] of Object.entries((doc ?? {}) as Record<string, unknown>)) {
+    const o = obj as { [TAG_KEY]?: string; tasks?: unknown } | null;
+    if (o && o[TAG_KEY] === 'sequence' && Array.isArray(o.tasks) && o.tasks.length > MAX_SEQUENCE_TASKS) {
+      throw new Error(
+        `book rejected: !sequence '${name}' has ${o.tasks.length} tasks, above the MCP cap of ${MAX_SEQUENCE_TASKS}`,
+      );
+    }
+  }
 }
 
 //! shared zod shapes (flat, LLM-friendly; percent conventions match the engine)
@@ -106,7 +155,7 @@ const marketShape = {
       beta: z.number().min(0).max(1),
       rho: z.number().gt(-1).lt(1),
       nu: z.number().min(0),
-      maturities: z.array(z.number().positive()).optional().describe('pillar maturities in years (default flat)'),
+      maturities: z.array(z.number().positive()).max(20).optional().describe('pillar maturities in years, at most 20 (default flat)'),
     })
     .optional()
     .describe('SABR smile (Hagan, arbitrage-free wings) instead of a flat vol; decimals (alpha 0.3 = 30%)'),
@@ -116,7 +165,7 @@ const marketShape = {
 };
 const engineShape = {
   engine: z.enum(['ana', 'pde', 'mcl']).describe('ana = closed form, pde = finite differences, mcl = Monte-Carlo'),
-  paths: z.number().int().min(1000).max(5_000_000).optional().describe('MCL paths (default 100000)'),
+  paths: z.number().int().min(1000).max(1_000_000).optional().describe('MCL paths (default 100000, max 1000000)'),
   max_day_step: z.number().int().min(1).max(90).optional().describe('MCL diffusion step in days (default 7)'),
   greeks: z.boolean().optional().describe('also compute delta/gamma/vega/rho/theta (default false)'),
 };
@@ -278,7 +327,8 @@ function buildServer(): McpServer {
       'composite / basket underlyings, Heston / Bates stochastic vol, term-structured curves, ' +
       'discrete dividends, !sequence task matrices, model-parameter vega_<param> Greeks, ...) and ' +
       'get the raw result YAML back. Use get_config_schema to author the config; the samples in ' +
-      'pricer/samples/ are good templates.',
+      'pricer/samples/ are good templates. Resource bounds: at most 50 tasks per !sequence and ' +
+      '1000000 Monte-Carlo paths per mcl_configuration.',
     inputSchema: {
       yaml: z.string().max(262144).describe('the complete YAML configuration (root: names the task)'),
       task_name: z.string().optional().describe("task to execute (default: the config's root)"),
@@ -286,8 +336,10 @@ function buildServer(): McpServer {
   },
   async (a) =>
     guarded(async () => {
+      checkBookBounds(a.yaml);
       await ensureEngine();
-      return await engine.postPrice(a.yaml, a.task_name ?? 'root');
+      //! task_name omitted -> no X-Task-Name header -> the engine uses the book's root:
+      return await pool.withEngine((c) => c.postPrice(a.yaml, a.task_name));
     }),
 );
 
@@ -316,15 +368,20 @@ function buildServer(): McpServer {
   'engine_health',
   {
     title: 'Check the pricing engine',
-    description: 'Reachability of the wrapped thoth -server instance (and its URL).',
+    description: 'Reachability and latency of the wrapped thoth -server instance.',
     inputSchema: {},
   },
   async () =>
-    guarded(async () => ({
-      url: ENGINE_URL,
-      healthy: await engine.health(),
-      spawnable: Boolean(ENGINE_BIN),
-    })),
+    guarded(async () => {
+      //! the engine URL is internal topology — report reachability + latency only
+      const t0 = Date.now();
+      const healthy = await engine.health();
+      return {
+        healthy,
+        latency_ms: healthy ? Date.now() - t0 : null,
+        spawnable: Boolean(ENGINE_BIN),
+      };
+    }),
 );
 
   return server;
@@ -332,21 +389,48 @@ function buildServer(): McpServer {
 
 //! ---- main ------------------------------------------------------------------------
 
+//! Bearer auth for the HTTP transport. When MCP_API_KEY is set, every /mcp POST must
+//! carry `Authorization: Bearer <key>`. The compare is constant-time: both sides are
+//! SHA-256 hashed first so timingSafeEqual always sees equal-length buffers and no
+//! length or prefix information leaks. When the key is unset, everything is allowed
+//! (an explicit startup warning covers that mode).
+function authorized(req: IncomingMessage): boolean {
+  if (!MCP_API_KEY) return true;
+  const header = req.headers.authorization ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  const digest = (s: string) => createHash('sha256').update(s).digest();
+  return timingSafeEqual(digest(token), digest(MCP_API_KEY));
+}
+
 if ((process.env['MCP_TRANSPORT'] ?? 'stdio') === 'http') {
   //! standalone service mode (prod stack): stateless Streamable HTTP — a fresh
   //! server+transport pair per POST (no session state to keep), torn down with the
   //! response. GET /healthz answers the compose health probe.
   const port = Number(process.env['MCP_PORT'] ?? 3001);
+  if (!MCP_API_KEY) {
+    console.error(
+      'thoth-mcp: WARNING — MCP_API_KEY is not set: POST /mcp is UNAUTHENTICATED. ' +
+        'Anyone who can reach this port (nginx proxies it on the public dashboard port) ' +
+        'can drive the pricing cluster. Set MCP_API_KEY and register clients with an ' +
+        "'Authorization: Bearer <key>' header.",
+    );
+  }
   const http = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'GET' && req.url === '/healthz') {
       const healthy = await engine.health();
       res.writeHead(healthy ? 200 : 503, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ engine: ENGINE_URL, healthy }));
+      //! no engine URL here: the probe is publicly reachable via nginx (/mcp/healthz)
+      res.end(JSON.stringify({ healthy }));
       return;
     }
     if (req.method !== 'POST' || !(req.url === '/mcp' || req.url === '/')) {
       res.writeHead(405, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'POST /mcp only (stateless server)' }, id: null }));
+      return;
+    }
+    if (!authorized(req)) {
+      res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: "unauthorized: this server requires 'Authorization: Bearer <MCP_API_KEY>'" }, id: null }));
       return;
     }
     try {

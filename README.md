@@ -158,7 +158,15 @@ Greeks), `price_barrier` (the four knock types, continuous or discrete monitorin
 `price_variance_swap` (incl. discrete fixing schedules), **`price_yaml_book`** (raw
 YAML pass-through — the full engine: Heston/Bates, quanto/composite/basket,
 `!sequence` matrices, `vega_<param>` Greeks), `get_config_schema` (author configs
-from the live schema) and `engine_health`.
+from the live schema) and `engine_health` (reachability + latency; the internal
+engine URL is not exposed).
+
+The tools are **resource-bounded** so an agent cannot monopolise the cluster: MCL
+`paths` ≤ 1,000,000 and SABR `maturities` ≤ 20 pillars on the synthesized-book
+tools; raw `price_yaml_book` configs are capped at 256 KB, at most 50 tasks per
+`!sequence` and 1,000,000 paths per `mcl_configuration`. At most **2 MCP pricing
+requests** run against the engine concurrently (the same `EnginePool` gate the BFF
+uses); further requests queue, so agent bursts cannot starve the dashboard.
 
 ```bash
 cd web/shared && npm install && npm run build     # shared engine client
@@ -179,10 +187,19 @@ cluster 1's master (so agent MCL books get path-split across its slaves like any
 dashboard job). It has **no host port of its own**: nginx (the `web` service) reverse-
 proxies it, so it shares the dashboard's public port at `http://localhost:7777/mcp`
 (health at `/mcp/healthz`). `scripts/prod.sh` waits for its health and prints the
-ready-to-paste registration:
+ready-to-paste registration.
+
+**Authentication (HTTP mode):** set **`MCP_API_KEY`** in the root `.env` (see
+`.env.example`; compose passes it to the `mcp` service) and every `POST /mcp` must
+then carry `Authorization: Bearer <key>` — requests without it get a 401
+(constant-time key compare; nginx forwards the header untouched). When the variable
+is unset the endpoint is **unauthenticated** and the server logs a prominent startup
+warning — acceptable only on trusted networks. Stdio mode is unaffected (the MCP
+client owns the process).
 
 ```bash
-claude mcp add --transport http thoth-pricing http://localhost:7777/mcp
+claude mcp add --transport http thoth-pricing http://localhost:7777/mcp \
+  --header "Authorization: Bearer $MCP_API_KEY"
 ```
 
 ## Repository map
