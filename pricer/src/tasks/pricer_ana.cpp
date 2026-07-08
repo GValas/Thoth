@@ -263,9 +263,10 @@ void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
 
     //! discrete observation: the strip replicates E[integral sigma^2 dt]/T (the
     //! continuous quadratic variation); a discrete fixing schedule adds the
-    //! deterministic per-interval drift^2 term (exact under flat BS, ATM approx
-    //! under a smile) — the same term the MCL path sampling produces naturally.
-    k_fair += Swap->ObservationDriftVariance( _today, sigma_atm );
+    //! deterministic per-interval drift^2 term (exact under flat BS, per-interval
+    //! ATM approx under a smile) — the same term the MCL path sampling produces
+    //! naturally.
+    k_fair += Swap->ObservationDriftVariance( _today );
 
     double k_var = Swap->GetVolatilityStrike() * Swap->GetVolatilityStrike(); //!< strike vol -> strike variance
 

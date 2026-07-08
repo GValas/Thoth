@@ -11,6 +11,12 @@
 #include "volatility.hpp"
 #include "object_reader.hpp"
 
+//! upper cap on the Dupire local vol, as a multiple of the node's implied vol:
+//! backstop against the D -> 0+ wing degeneracy of Hagan's expansion (see
+//! GetLocalVolatility). 5x the implied vol is far above any healthy local/implied
+//! ratio, so pricing is unchanged outside the degenerate nodes.
+static constexpr double LOCAL_VOL_CAP_FACTOR = 5.0;
+
 //! constructor: seed the day-weight with the project default (overridden later if
 //! the YAML names a calendar with its own non_working_days_weight)
 Volatility::Volatility( const string& ObjectName,
@@ -103,8 +109,21 @@ double Volatility::GetLocalVolatility( const double Strike,
     //! the variance at a tiny positive value: it only bites in those degenerate
     //! wing nodes (near-ATM paths are unaffected, so the Dupire repricing still
     //! matches the analytic price) and keeps the diffusion real and finite.
+    //!
+    //! The same wing arbitrage can also degenerate the OTHER way: at extreme
+    //! nu*sqrt(T) the denominator D collapses towards 0+ and N/D blows up to a
+    //! spuriously HUGE local variance that a floor alone lets through, distorting
+    //! the diffusion (PDE assembly and MC grids both read this). Cap the local vol
+    //! at LOCAL_VOL_CAP_FACTOR times the node's own implied vol V: in a healthy
+    //! surface the local/implied ratio stays far below that, so the cap only bites
+    //! in the same degenerate wing nodes the floor targets.
     const double local_var = N / D;
     const double floor = 1e-8; //!< (0.01% vol)^2
+    const double cap = LOCAL_VOL_CAP_FACTOR * V * ( LOCAL_VOL_CAP_FACTOR * V );
+    if ( local_var > cap )
+    {
+        return LOCAL_VOL_CAP_FACTOR * V;
+    }
     return sqrt( local_var > floor ? local_var : floor );
 }
 

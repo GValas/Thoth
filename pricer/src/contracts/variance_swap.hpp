@@ -36,11 +36,14 @@ class VarianceSwap : public Contract
 
     //! Deterministic add-on to the continuous fair variance for a discrete fixing
     //! schedule: E[(log S_{t2}/S_{t1})^2] = var + mean^2 per interval, and the mean
-    //! log-return over [t1,t2] is log(F(t2)/F(t1)) - atm_vol^2/2*dt (the forward
-    //! carries the full term-structured, quanto-corrected drift). Returns
-    //! sum(mean_i^2)/T — exact under flat BS, an ATM approximation under a smile;
+    //! log-return over [t1,t2] is log(F(t2)/F(t1)) - v_fwd/2, with v_fwd the
+    //! interval's FORWARD ATM implied variance sigma^2(t2) t2 - sigma^2(t1) t1 (the
+    //! forward carries the full term-structured, quanto-corrected drift). Returns
+    //! sum(mean_i^2)/T — exact under flat BS, a per-interval ATM approximation
+    //! under a smile (matching the per-interval variance the MCL sampling realises
+    //! on a term-structured surface, where a single maturity-ATM vol would not);
     //! 0 for a continuously-observed swap (the term vanishes as dt -> 0).
-    double ObservationDriftVariance( const date& Today, double AtmVol );
+    double ObservationDriftVariance( const date& Today );
 
     //! mcl node (not supported)
     MonteCarloNode* GetFlowNode( NodeCollector& NC,

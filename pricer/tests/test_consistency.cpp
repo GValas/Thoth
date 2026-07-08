@@ -161,3 +161,57 @@ TEST_CASE( "quanto vanilla on a SABR surface agrees across ANA/MCL/PDE" )
         CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.015 * ana + 0.05 );
     }
 }
+
+// Cross-engine agreement on a quanto vanilla under HESTON stochastic vol: a EUR
+// asset with a Heston surface paid in USD. All three engines apply the same
+// quanto drift correction with the same DETERMINISTIC vol proxy (the constant
+// sqrt(v0)-level ConstantNode in MCL equals the GetImplicitVol(0,.) the ANA/PDE
+// carry uses), so MCL == ANA == PDE by construction. This pins that equality: a
+// future per-path sqrt(v_t) quanto node would silently break the consistency
+// without this guard.
+TEST_CASE( "quanto vanilla under Heston agrees across ANA/MCL/PDE" )
+{
+    auto cfg = []( const std::string& method, double strike, int draws )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: usd,"
+          << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( draws, 5, 5 )
+          << "eur: !currency {rate: eur_rate}\n"
+          << "eur_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [3, 3]}\n"
+          << "usd: !currency {rate: usd_rate}\n"
+          << "usd_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [6, 6]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !heston_volatility {spot: 100, init_vol: 25, long_vol: 25, kappa: 2,"
+          << " vol_of_vol: 0.5, calendar: cal}\n"
+          << "eur/usd: !forex {base_currency: usd, underlying_currency: eur,"
+          << " spot: 1.5, volatility: fxvol}\n"
+          << "fxvol: !bs_volatility {volatility: 12}\n"
+          //! members: eq, its variance pseudo-underlying (spot/vol rho -0.6) and the
+          //! FX pair (equity/FX corr 0.4 drives the quanto drift; the variance is
+          //! left uncorrelated with the FX)
+          << "cor: !correlation_matrix {underlyings: [eq, eq_var], forexs: [eur/usd],"
+          << " matrix: [1, -0.6, 0.4,  -0.6, 1, 0,  0.4, 0, 1]}\n"
+          << "book: !book {contracts: [o]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: usd, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1,"
+          << " type: call, exercise: european}\n";
+        return o.str();
+    };
+
+    for ( double strike : { 90.0, 100.0, 110.0 } )
+    {
+        CAPTURE( strike );
+        const double ana = Premium( Price( cfg( "ana", strike, 1 ) ) );
+        const double pde = Premium( Price( cfg( "pde", strike, 1 ) ) );
+        auto mr = Price( cfg( "mcl", strike, 200000 ) );
+        const double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( pde );
+        CAPTURE( mcl );
+        CHECK( std::abs( pde - ana ) <= 0.01 * ana + 0.06 ); //!< 2-D ADI vs CF
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.05 );
+    }
+}

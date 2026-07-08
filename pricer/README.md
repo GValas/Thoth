@@ -125,9 +125,14 @@ underlying's surface exposes is silently skipped.
   `today + k*period` up to maturity): the MCL samples the realized variance on
   that schedule (the fixing dates are forced into the diffusion grid), while ANA
   and PDE add the deterministic per-interval drift² term
-  `Σ (log(F(t₂)/F(t₁)) − σ²Δt/2)² / T` on top of their continuous fair variance
-  (exact under flat BS, ATM approximation under a smile) — the three engines
-  agree on a monthly-fixing swap where the add-on is ~7% of the fair variance.
+  `Σ (log(F(t₂)/F(t₁)) − v_fwd/2)² / T` on top of their continuous fair variance,
+  with `v_fwd = σ²(t₂)t₂ − σ²(t₁)t₁` each interval's **forward ATM implied
+  variance** (exact under flat BS — where it reduces to `σ²Δt` — and a
+  per-interval ATM approximation under a smile, so a sloped term structure
+  prices each interval's convexity at its own vol; pinned against the engine's
+  own surface on a steep 15%→35% term structure in `tests/test_variance_swap.cpp`)
+  — the three engines agree on a monthly-fixing swap where the add-on is ~7% of
+  the fair variance.
   `0`/absent keeps the continuous convention (every diffusion step).
 
 **Underlyings**
@@ -616,7 +621,12 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   expansion can also violate **inside** the liquid band, where no wing treatment
   applies — use shorter parameter pillars or a genuine stochastic-vol model
   (`heston_volatility`) there. Calendar (in-T) arbitrage is likewise out of scope;
-  the Dupire local-variance floor remains as the backstop for it.
+  the Dupire local variance is backstopped **on both sides**: floored at a tiny
+  positive value (the sqrt stays real when the wing arbitrage turns it slightly
+  negative) and **capped at (5 × the node's implied vol)²** (the same degeneracy
+  can collapse the Dupire denominator towards 0⁺ and blow the local variance up
+  instead — the cap keeps those wing nodes from distorting the MCL/PDE diffusion;
+  pinned on an extreme `nu·sqrt(T) ≈ 2.2` fixture in `tests/test_features.cpp`).
 - LSV (`lsv_volatility`) scope: the leverage is calibrated by a **binned particle
   method** (fixed-seed 16k-path pre-pass, 30 log-spot bins), so the vanilla
   repricing carries a small calibration bias on top of the engines' own error

@@ -94,11 +94,14 @@ double BlackPut( double F, double K, double V, double T )
 //! RELATIVE price criterion: the far-wing tail premia span many orders of
 //! magnitude (down to ~1e-14), where the absolute-tolerance Newton solver of
 //! finance.cpp would accept any small vol. Bisection on the monotone Black price
-//! is impervious to the magnitude; 100 halvings of [0, 20] pin the vol to ~2e-13.
+//! is impervious to the magnitude; the interval-width break stops as soon as the
+//! vol is pinned beyond double precision (~1e-13 on [0, 20], i.e. ~57 halvings)
+//! instead of always burning the worst-case iteration count — this solver runs
+//! per wing node per PDE assembly step, so the saving is real.
 double TailImpliedVol( double F, double K, double T, double Price, bool IsCall )
 {
     double lo = 0.0, hi = IMPLICIT_VOL_MAX;
-    for ( int i = 0; i < 100; i++ )
+    for ( int i = 0; i < 100 && hi - lo > 1e-13; i++ )
     {
         const double mid = 0.5 * ( lo + hi );
         const double p = IsCall ? BlackCall( F, K, mid, T ) : BlackPut( F, K, mid, T );

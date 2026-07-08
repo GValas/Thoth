@@ -97,11 +97,15 @@ set<date> VarianceSwap::GetObservationDates()
 }
 
 //! deterministic drift^2 add-on for a discrete schedule (see the header): the mean
-//! log-return of each interval is log(F(t2)/F(t1)) - AtmVol^2/2*dt, squared and
-//! summed over the schedule, annualised by T. The forward carries the full curve
-//! term structure and the quanto correction, so ANA/PDE stay consistent with the
-//! MCL path sampling that produces this term naturally.
-double VarianceSwap::ObservationDriftVariance( const date& Today, double AtmVol )
+//! log-return of each interval is log(F(t2)/F(t1)) - v_fwd/2 with v_fwd the
+//! interval's forward ATM implied variance, squared and summed over the schedule,
+//! annualised by T. The forward carries the full curve term structure and the
+//! quanto correction, and the per-interval forward variance follows the ATM term
+//! structure (a single maturity-ATM vol would misprice each interval's convexity
+//! on a sloped surface), so ANA/PDE stay consistent with the MCL path sampling
+//! that produces this term naturally. Flat surface: v_fwd = AtmVol^2*dt, the old
+//! behaviour, exactly.
+double VarianceSwap::ObservationDriftVariance( const date& Today )
 {
     if ( !IsDiscretelyObserved() )
     {
@@ -115,16 +119,21 @@ double VarianceSwap::ObservationDriftVariance( const date& Today, double AtmVol 
     Underlying* u = GetUnderlying();
     Currency* ccy = GetPremiumCurrency();
     double sum = 0;
-    date d1 = Today;
-    double f1 = u->GetForward( d1, ccy ); //!< dt = 0 -> the spot
+    double f1 = u->GetForward( Today, ccy ); //!< dt = 0 -> the spot
+    double v1 = 0;                           //!< cumulative ATM implied variance sigma^2(t) t
     for ( const date& d2 : GetObservationDates() )
     {
         const double f2 = u->GetForward( d2, ccy );
-        const double dt = YearFraction( d1, d2 );
-        const double m = log( f2 / f1 ) - 0.5 * AtmVol * AtmVol * dt;
+        const double t2 = YearFraction( Today, d2 );
+        const double atm2 = u->GetImplicitVol( f2, d2 );
+        const double v2 = atm2 * atm2 * t2;
+        //! forward variance of the interval, floored at 0 (a decreasing cumulative
+        //! implied variance would mean calendar arbitrage in the quotes)
+        const double v_fwd = std::max( 0.0, v2 - v1 );
+        const double m = log( f2 / f1 ) - 0.5 * v_fwd;
         sum += m * m;
-        d1 = d2;
         f1 = f2;
+        v1 = v2;
     }
     return sum / T;
 }

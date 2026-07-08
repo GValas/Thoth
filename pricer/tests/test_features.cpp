@@ -835,3 +835,90 @@ TEST_CASE( "SABR wings are butterfly-arbitrage-free (positive implied density)" 
     }
     CHECK( floor_hits == 0 );
 }
+
+// --- Dupire local-vol upper cap: at extreme nu*sqrt(T) Hagan's expansion makes
+// the Dupire denominator collapse towards 0+ in the wings, which used to let a
+// spuriously HUGE local variance through (the old backstop only floored the
+// negative side). GetLocalVolatility now caps the local vol at 5x the node's own
+// implied vol, so the invariant below must hold at EVERY node of an extreme
+// fixture — while a healthy near-ATM region stays untouched (far below the cap).
+TEST_CASE( "Dupire local vol is capped in degenerate SABR wings" )
+{
+    //! nu = 1 on a 5y pillar: nu*sqrt(T) ~ 2.2, deep in the regime where the
+    //! expansion misbehaves (documented in the README as needing a backstop)
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !sabr_volatility {maturities: [5.0], alpha: [0.25], beta: [1.0],"
+      << " rho: [-0.6], nu: [1.0], calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {contracts: [c]}\n"
+      << "c: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2005-01-01, type: call, exercise: european}\n";
+
+    std::streambuf* saved = std::cout.rdbuf();
+    std::ostringstream sink;
+    std::cout.rdbuf( sink.rdbuf() );
+    ObjectManager manager( YamlConfig::from_string_t{}, o.str() );
+    manager.ReadObjects( ROOT_NODE );
+    manager.ExecuteTask();
+    std::cout.rdbuf( saved );
+
+    auto* vol = manager.collector().Get<Volatility>( "vol" );
+    auto* eq = manager.collector().Get<Single>( "eq" );
+    REQUIRE( vol != nullptr );
+    REQUIRE( eq != nullptr );
+
+    const date maturity( 2005, 1, 1 );
+    const double F = 100; //!< r = 0 -> forward = spot
+    const double T = YearFraction( date( 2000, 1, 1 ), maturity );
+    const double atm = vol->GetImplicitVol( 0, F, maturity );
+    const double band = atm * std::sqrt( T );
+
+    //! (1) cap invariant: local vol <= 5x the node's implied vol everywhere on a
+    //! wide ±6 sigma scan (the degenerate nodes clamp exactly to it, the healthy
+    //! ones sit far below)
+    for ( int i = 0; i <= 120; i++ )
+    {
+        const double k = -6.0 * band + i * ( 12.0 * band / 120 );
+        const double K = F * std::exp( k );
+        const double iv = vol->GetImplicitVol( K, F, maturity );
+        const double lv = eq->GetLocalVolatility( K, maturity );
+        CAPTURE( k );
+        CHECK( lv <= 5.0 * iv * 1.0001 );
+    }
+
+    //! (2) the cap does not bite near the money: on a HEALTHY fixture (the 1y
+    //! moderate smile below) the ATM local vol sits well under half the cap
+    std::ostringstream h;
+    h << "root: pricer\n"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [0, 0]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+      << "vol: !sabr_volatility {maturities: [1.0], alpha: [0.25], beta: [1.0],"
+      << " rho: [-0.3], nu: [0.4], calendar: cal}\n"
+      << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+      << "book: !book {contracts: [c]}\n"
+      << "c: !vanilla {underlying: eq, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n";
+    std::cout.rdbuf( sink.rdbuf() );
+    ObjectManager healthy( YamlConfig::from_string_t{}, h.str() );
+    healthy.ReadObjects( ROOT_NODE );
+    healthy.ExecuteTask();
+    std::cout.rdbuf( saved );
+    auto* heq = healthy.collector().Get<Single>( "eq" );
+    auto* hvol = healthy.collector().Get<Volatility>( "vol" );
+    REQUIRE( heq != nullptr );
+    const date mat1( 2000, 12, 31 );
+    const double iv1 = hvol->GetImplicitVol( 0, F, mat1 );
+    const double lv1 = heq->GetLocalVolatility( F, mat1 );
+    CHECK( lv1 < 2.5 * iv1 );
+}

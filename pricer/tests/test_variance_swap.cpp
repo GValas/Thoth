@@ -1,4 +1,7 @@
 #include "helpers.hpp"
+#include "single.hpp"
+#include "currency.hpp"
+#include "yield_curve.hpp"
 #include <doctest/doctest.h>
 
 using namespace test;
@@ -145,4 +148,111 @@ TEST_CASE( "daily observation converges to the continuous variance swap" )
     CAPTURE( daily );
     CHECK( daily == doctest::Approx( cont ).epsilon( 0.001 ) );
     CHECK( daily >= cont ); //!< the drift^2 add-on is non-negative
+}
+
+// --- discrete observation under a TERM-STRUCTURED surface ---------------------
+//
+// The drift^2 add-on uses each interval's FORWARD ATM implied variance
+// (sigma^2(t2) t2 - sigma^2(t1) t1), not a single maturity-ATM vol: on a sloped
+// term structure the early intervals carry the short vol and the late ones the
+// forward vol. The oracle below replicates the convention off the engine's OWN
+// implied surface (queried directly), so the test pins the schedule/variance
+// convention without re-deriving Hagan.
+TEST_CASE( "discrete variance swap uses per-interval forward variance on a term structure" )
+{
+    const double notl = 10000, r = 0.10;
+    const int obs = 30;
+
+    //! steep upward alpha term structure (15% -> 35%), no smile (beta 1, rho 0,
+    //! tiny nu) so the surface is a pure term structure of ATM vols
+    auto cfg = [&]( const std::string& method, int obs_days )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: eur,"
+          << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( 1, 30, 5 )
+          << "eur: !currency {rate: rate}\n"
+          << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [" << r * 100 << ", " << r * 100 << "]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], matrix: [1]}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !sabr_volatility {maturities: [0.25, 1.0], alpha: [0.15, 0.35],"
+          << " beta: [1.0, 1.0], rho: [0, 0], nu: [0.0001, 0.0001], calendar: cal}\n"
+          << "book: !book {contracts: [vs]}\n"
+          << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
+          << " maturity: 2000-12-31, volatility_strike: 0, notional: " << notl;
+        if ( obs_days > 0 )
+        {
+            o << ", observation_period_days: " << obs_days;
+        }
+        o << "}\n";
+        return o.str();
+    };
+
+    //! discrete-minus-continuous ANA difference isolates the drift^2 add-on
+    const double ana_c = Premium( Price( cfg( "ana", 0 ) ) );
+    const double ana_d = Premium( Price( cfg( "ana", obs ) ) );
+
+    //! oracle: the same schedule and forward-variance convention, evaluated on the
+    //! engine's own surface via direct object access (run once to cascade today)
+    std::streambuf* saved = std::cout.rdbuf();
+    std::ostringstream sink;
+    std::cout.rdbuf( sink.rdbuf() );
+    ObjectManager manager( YamlConfig::from_string_t{}, cfg( "ana", obs ) );
+    manager.ReadObjects( ROOT_NODE );
+    manager.ExecuteTask();
+    std::cout.rdbuf( saved );
+    auto* eq = manager.collector().Get<Single>( "eq" );
+    auto* ccy = manager.collector().Get<Currency>( "eur" );
+    REQUIRE( eq != nullptr );
+    REQUIRE( ccy != nullptr );
+
+    const date today( 2000, 1, 1 ), maturity( 2000, 12, 31 );
+    const double T = YearFraction( today, maturity );
+    std::set<date> schedule;
+    for ( date d = today + days( obs ); d < maturity; d += days( obs ) )
+    {
+        schedule.insert( d );
+    }
+    schedule.insert( maturity );
+
+    double sum_m2 = 0, f1 = eq->GetForward( today, ccy ), cum1 = 0;
+    for ( const date& d : schedule )
+    {
+        const double f2 = eq->GetForward( d, ccy );
+        const double t2 = YearFraction( today, d );
+        const double atm = eq->GetImplicitVol( f2, d );
+        const double cum2 = atm * atm * t2;
+        const double m = std::log( f2 / f1 ) - 0.5 * std::max( 0.0, cum2 - cum1 );
+        sum_m2 += m * m;
+        f1 = f2;
+        cum1 = cum2;
+    }
+    const double df = ccy->GetRate()->GetDiscountFactor( maturity );
+    const double addon_pv = notl * df * sum_m2 / T;
+
+    CAPTURE( ana_c );
+    CAPTURE( ana_d );
+    CAPTURE( addon_pv );
+    CHECK( ana_d - ana_c == doctest::Approx( addon_pv ).epsilon( 0.01 ) );
+
+    //! sanity: a single maturity-ATM vol (the OLD convention) yields a visibly
+    //! different add-on on this steep term structure — the test discriminates
+    const double atm_mat = eq->GetImplicitVol( eq->GetForward( maturity, ccy ), maturity );
+    double sum_old = 0;
+    double f1o = eq->GetForward( today, ccy );
+    date d1 = today;
+    for ( const date& d : schedule )
+    {
+        const double f2 = eq->GetForward( d, ccy );
+        const double dt = YearFraction( d1, d );
+        const double m = std::log( f2 / f1o ) - 0.5 * atm_mat * atm_mat * dt;
+        sum_old += m * m;
+        d1 = d;
+        f1o = f2;
+    }
+    const double addon_old = notl * df * sum_old / T;
+    CAPTURE( addon_old );
+    CHECK( std::abs( addon_pv - addon_old ) > 0.02 * addon_pv );
 }
