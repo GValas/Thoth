@@ -12,9 +12,10 @@ engine:
   a forward-measure surface (SABR) uses it, the flat surfaces ignore it.
 - `GetNode(NodeCollector&)` — the Monte-Carlo diffusion node.
 
-Two flags drive the dispatch: `_is_local` (the MCL engine must build a Dupire
-local-vol grid rather than a single constant) and `IsStochastic()` (a genuine
-variance factor — Heston/Bates).
+Three flags drive the dispatch: `_is_local` (the MCL engine must build a Dupire
+local-vol grid rather than a single constant), `IsStochastic()` (a genuine
+variance factor — Heston/Bates/LSV) and `IsLsv()` (the stochastic diffusion also
+carries a calibrated leverage — see §8).
 
 A shared calendar weight applies to every flat surface. `Volatility::GetDayWeight`
 returns `sqrt((5 + 2 w) / 7)` where `w = non_working_days_weight`, scaling the
@@ -238,15 +239,79 @@ heston_vol_bates: !heston_volatility
 
 ---
 
-## 8. Possible extensions
+## 8. LSV — `lsv_volatility` (local-stochastic vol)
+
+```
+dS = (r - q) S dt + L(S,t) sqrt(v) S dW^S
+dv = kappa (theta - v) dt + xi sqrt(v) dW^v,   d<W^S,W^v> = rho dt
+```
+
+A Heston variance factor whose spot diffusion is multiplied by a leverage
+`L(S,t)` calibrated so the model reprices a **target implied surface** — the
+`surface:` field, a reference to a deterministic vol (`sabr_volatility` or
+`bs_volatility`). The Dupire matching condition
+
+```
+L^2(s, t) * E[v_t | S_t = s] = sigma_dupire^2(s, t)
+```
+
+pins the vanilla surface to the target while the Heston factor keeps a realistic
+forward-smile dynamics — the standard exotic-desk setup (cliquets, autocalls)
+that pure local vol (wrong dynamics) and pure Heston (wrong vanillas) each miss.
+
+**Configuration** — the Heston fields (`spot`, `init_vol`, `long_vol`, `kappa`,
+`vol_of_vol`, vols in percent) plus `surface:`. Like Heston, the spot/variance
+correlation ρ comes from the `!correlation_matrix` (underlying vs `<name>_var`).
+Bates jumps are rejected (the Dupire matching does not strip a jump
+contribution), as is a stochastic target surface.
+
+**Calibration** (`Single::CalibrateLeverage`) — a binned particle method (a
+bin-kernel variant of Guyon & Henry-Labordère): a fixed-seed 16 384-path
+ensemble is diffused forward along the calibration dates with the exact engine
+schemes (Andersen QE variance + leveraged Andersen log-spot step, the same
+carry as the MCL drift node); before each step into date `t_k`, `E[v|S]` is
+estimated by 30 log-spot bins (thin bins inherit their nearest populated
+neighbour) and leverage layer `k` is built as
+`sigma_dupire(s, t_k) / sqrt(E[v_{k-1} | S = s])` on the same 201-point
+log-spot grid convention as the Dupire local-vol node, clamped to `[0.05, 10]`
+(the Dupire target has no upper cap in the far wings). Layer `k` is what the
+step *into* date `k` uses, both here and in the engines, so the pricing
+diffusion reproduces the calibrated ensemble.
+
+**Engines** —
+
+- **MCL** — the Heston QE variance node unchanged; the spot node takes an
+  optional leverage node (`<name>#leverage`, the `LocalVolatilityNode` grid
+  mechanics read at the previous spot) and folds `L` into the Andersen
+  `K0..K4` coefficients (`rho/xi` terms scale by `L`, variance terms by `L²`;
+  `L = 1` reproduces pure Heston exactly). Calibrated per Greek scenario with
+  common random numbers, so vega measures the target-surface sensitivity and
+  the `vega_<param>` Greeks the pure smile-dynamics effect.
+- **PDE** — the 2-D `(S,v)` Douglas ADI with `0.5 L² v S² V_SS` and
+  `rho xi L v S V_Sv`; the leverage is calibrated once on a day-granular
+  uniform date grid and looked up per S-column per time step (one value per
+  step so the explicit predictor and implicit corrector apply the same
+  operator). LSV **barriers** on the PDE fall back to the 1-D grid on the
+  target surface's vol (like the Heston barrier PDE) — prefer MCL there.
+- **ANA** — rejected: no closed form, and silently pricing the bare Heston
+  characteristic function would ignore the leverage.
+
+`GetImplicitVol` delegates to the target surface (the calibrated model's
+vanilla surface IS the target by construction), so the quanto drift, grid
+bounds and Dupire transform all read the right numbers. The repricing quality
+is pinned in `tests/test_lsv.cpp` (MCL and PDE vs ANA-on-target across strikes,
+plus the degenerate flat-target/xi→0 limit against Black-Scholes) and
+demonstrated by `samples/lsv.yaml`.
+
+---
+
+## 9. Possible extensions
 
 Honest, not-yet-implemented directions:
 
-- **Local-stochastic vol (LSV)** — a calibrated leverage surface `L(S, t)` on top
-  of Heston, multiplying the local instantaneous vol so the model reprices the
-  full implied surface *and* keeps Heston's forward-smile dynamics. The most
-  accurate option, but needs a particle/PDE leverage calibration on top of a
-  calibrated Heston — a sizeable addition.
+- **LSV refinements** — a kernel (rather than binned) conditional expectation,
+  an exact-fixing-date PDE leverage lookup, and leveraged PDE barriers on the
+  2-D grid.
 - **SABR Monte-Carlo** — diffuse the SABR SDE directly (stochastic `alpha`)
   rather than only its Dupire local-vol projection, to capture forward-smile
   dynamics SABR implies but the static surface loses.

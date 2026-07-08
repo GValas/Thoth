@@ -1,6 +1,7 @@
 #pragma once
 #include "underlying.hpp"
 #include "volatility.hpp"
+#include "leverage_surface.hpp"
 
 //! single.hpp — the single-name underlying (base of Equity / Forex).
 //!
@@ -106,6 +107,17 @@ class Single : public Underlying
     //! a per-diffusion-date log-spot grid (used for a local-vol surface like SABR);
     //! SpotNode is the spot path the surface is read along
     LocalVolatilityNode* BuildLocalVolNode( NodeCollector& NC, MonteCarloNode* SpotNode );
+
+    //! LSV leverage calibration (binned particle method): simulate the leveraged
+    //! Heston diffusion forward along Dates, matching at each date
+    //! L^2(s,t) * E[v_t | S_t = s] = sigma_dupire^2(s,t) on the target surface.
+    //! One leverage layer per date, same log-spot grid layout as the local-vol node.
+    LeverageSurface CalibrateLeverage( const vector<date>& Dates );
+
+    //! build the MCL leverage node (a per-date grid read at the previous spot, the
+    //! same mechanics as the Dupire local-vol node) from a fresh calibration on the
+    //! collector's diffusion dates; SpotNode is the spot path it is read along
+    LocalVolatilityNode* BuildLeverageNode( NodeCollector& NC, MonteCarloNode* SpotNode );
 
     //! constructor & destructor
     Single( const string& ObjectName,

@@ -18,6 +18,7 @@ class HestonSpotNode : public MonteCarloNode
     MonteCarloNode* _drift_node = nullptr;    //!< cumulative carry (r - q - repo) to each date
     MonteCarloNode* _noise_node = nullptr;    //!< independent N(0,1) for the residual (orthogonal to rho)
     MonteCarloNode* _jump_node = nullptr;     //!< optional Bates jump increment (null = pure Heston)
+    MonteCarloNode* _leverage_node = nullptr; //!< optional LSV leverage L(S_{i-1}, t_i) (null = pure Heston, L = 1)
 
   public:
     //! true only at date 0 (the fixed initial spot)
@@ -35,6 +36,7 @@ class HestonSpotNode : public MonteCarloNode
     void SetDriftNode( MonteCarloNode* N ) { _drift_node = N; }              //!< wire the cumulative-carry node
     void SetNoiseNode( MonteCarloNode* N ) { _noise_node = N; }              //!< wire the residual N(0,1) noise
     void SetJumpNode( MonteCarloNode* N ) { _jump_node = N; }                //!< wire the Bates jump node (optional)
+    void SetLeverageNode( MonteCarloNode* N ) { _leverage_node = N; }        //!< wire the LSV leverage node (optional)
     void SetSpot( double Spot );                                             //!< set S(0) and seed _value_list[0]
 
     HestonSpotNode( const string& Name );

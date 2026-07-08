@@ -11,7 +11,9 @@
 //! bounds); the engines that understand Heston read the parameters directly.
 class HestonVolatility : public Volatility
 {
-  private:
+  protected:
+    //! parameters are protected (not private) so the LSV surface — a Heston
+    //! diffusion with a calibrated leverage on top — can reuse them directly
     double _spot = 0;
     double _v0 = 0;    //!< initial variance (decimal^2, e.g. 0.09 = 30% vol)
     double _kappa = 0; //!< mean-reversion speed
@@ -80,7 +82,12 @@ class HestonVolatility : public Volatility
     HestonVolatility( const string& ObjectName );
     ~HestonVolatility() override;
 
-  private:
+  protected:
+    //! kind-forwarding constructor for the derived LSV surface (same parameters,
+    //! its own KIND_LSV_VOLATILITY tag)
+    HestonVolatility( const string& ObjectName,
+                      const string& ObjectKind );
+
     //! apply the parallel vol-level shift to a variance: (sqrt(v)+shift)^2
     double Shifted( double Variance ) const
     {

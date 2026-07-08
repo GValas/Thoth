@@ -40,6 +40,7 @@
 #include "bs_volatility.hpp"
 #include "sabr_volatility.hpp"
 #include "heston_volatility.hpp"
+#include "lsv_volatility.hpp"
 #include "correlation.hpp"
 #include "simple_fixing_data.hpp"
 
@@ -101,6 +102,7 @@ Object* ObjectManager::Build( const string& ObjectName )
         { KIND_DISCRETE_DIVIDENDS, &Create<DiscreteDividends> },
         { KIND_BS_VOLATILITY, &Create<BsVolatility> },
         { KIND_HESTON_VOLATILITY, &Create<HestonVolatility> },
+        { KIND_LSV_VOLATILITY, &Create<LsvVolatility> },
         { KIND_SABR_VOLATILITY, &Create<SabrVolatility> },
         { KIND_CORRELATION_MATRIX, &Create<Correlation> },
         // ---- configurations (engine-parameter objects, referenced by the pricers) ----

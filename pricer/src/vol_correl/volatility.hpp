@@ -80,6 +80,12 @@ class Volatility : public MarketData
     //! SpotDiffusionNode. Deterministic vols (bs / sabr) return false.
     [[nodiscard]] virtual bool IsStochastic() const { return false; }
 
+    //! true for a local-stochastic-vol (LSV) model: a stochastic-vol diffusion whose
+    //! spot coefficient is multiplied by a calibrated leverage L(S,t) so the model
+    //! reprices a target implied surface. The engines that support it (MCL / PDE)
+    //! calibrate and apply the leverage; ANA rejects it (no closed form).
+    [[nodiscard]] virtual bool IsLsv() const { return false; }
+
     //! stochastic-vol (Heston / Bates) parameters for the engines; default empty.
     //! Override in a stochastic-vol surface; every engine reads this instead of
     //! down-casting to the concrete model.

@@ -155,8 +155,9 @@ underlying's surface exposes is silently skipped.
   switches to Benaim-Dodgson-Kainth power-law price tails matched in value and
   slope to the Hagan prices at the cutoff — the tails have a strictly positive
   implied density by construction, so the far wings no longer poison the Dupire
-  local-vol surface the MCL/PDE engines diffuse) and `heston_volatility` (genuine
-  stochastic vol — see below).
+  local-vol surface the MCL/PDE engines diffuse), `heston_volatility` (genuine
+  stochastic vol — see below) and `lsv_volatility` (local-stochastic vol — see
+  below).
 
 **Stochastic volatility (Heston / Bates)** — `heston_volatility` (`init_vol`/`long_vol`/
 `kappa`/`vol_of_vol`, vols in percent; the spot/variance correlation ρ lives in
@@ -172,6 +173,22 @@ on the QE spot), **ANA** (the closed-form jump characteristic function multiplie
 the Heston CF) and **PDE** (the Bates PIDE — the Heston ADI plus an explicit
 log-spot jump-integral term, IMEX, with the `−λk̄` compensator in the drift). The
 Heston, Bates and SABR cases are exercised by the cells in `samples/matrix.yaml`.
+
+**Local-stochastic volatility (LSV)** — `lsv_volatility` (the Heston fields plus
+`surface:`, a reference to a deterministic target surface — `sabr_volatility` or
+`bs_volatility`) diffuses a Heston variance factor whose spot coefficient is
+multiplied by a leverage `L(S,t)` calibrated so the model **reprices the target
+implied surface** (Dupire matching `L²(s,t)·E[v_t|S_t=s] = σ²_dupire(s,t)`,
+estimated by a binned particle method — a fixed-seed 16k-path pre-pass in
+`Single::CalibrateLeverage`). Vanillas then match the target surface while
+exotics keep Heston's forward-smile dynamics — the standard exotic-desk setup a
+pure local-vol or pure Heston model can't deliver. Priced by **MCL** (the QE
+variance plus a leveraged Andersen spot step; the leverage grid is read along the
+path like the Dupire local-vol node) and **PDE** (the 2-D `(S,v)` ADI with
+`L²v`/`Lv` in the S-direction and cross coefficients); **ANA rejects it** (no
+closed form — silently pricing the bare Heston CF would ignore the leverage).
+Bates jumps are not supported under LSV. See `samples/lsv.yaml` for a
+calibration-quality demo (SABR reference vs LSV MCL/PDE on the same call).
 
 **Analytics objects**
 - `pricer`.
@@ -338,6 +355,12 @@ sweep with all Greeks. Its `mcl_configuration` sets `allow_gpu`, so the whole bo
 runs on the GPU GBM kernel on a CUDA build (CPU fallback otherwise). The helper
 `scripts/build_run.sh [--gpu] [input.yaml]` builds (with `-DTHOTH_ENABLE_CUDA=ON` when
 `--gpu` is passed) and prices it.
+
+`samples/lsv.yaml` is the LSV calibration-quality demo: one 1y ATM call priced
+three ways in a `!sequence` — ANA on the raw target SABR surface (the reference
+the calibrated model must reproduce), then the LSV model (a deliberately
+off-level Heston base + calibrated leverage) through MCL and PDE. The three
+premiums agree to MC / 2-D-grid error, demonstrating the Dupire matching.
 
 `samples/test.yaml` is a small cross-engine sanity book: three European vanillas
 (ATM call, OTM put, ITM call) on one equity, each priced by PDE, MCL and ANA — plus
@@ -515,12 +538,13 @@ Conventions: volatilities and curve values are in **percent** (`30` -> 0.30,
 matrices are flat number lists. Output YAML is emitted with fields in
 alphabetical order (stable, diff-friendly).
 
-`samples/` holds two runnable books: `simple_call.yaml` (the 1y ATM call above,
-Black-Scholes ~15.71, with the node-graph debug switch enabled) and `matrix.yaml`
+`samples/` holds the runnable books: `simple_call.yaml` (the 1y ATM call above,
+Black-Scholes ~15.71, with the node-graph debug switch enabled), `matrix.yaml`
 — a `!sequence` running the full pricer/product matrix (vanilla european/american,
 quanto, composite, basket / best-of / worst-of, continuous / discrete / knock-in
 barriers, variance swap, Heston, Bates, SABR local-vol, GPU `allow_gpu` cells, and
-the model-parameter `vega_<param>` Greeks, across PDE / MCL / ANA) in one process.
+the model-parameter `vega_<param>` Greeks, across PDE / MCL / ANA) in one process —
+and `lsv.yaml` (the LSV calibration-quality demo above).
 
 ---
 
@@ -593,6 +617,17 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   applies — use shorter parameter pillars or a genuine stochastic-vol model
   (`heston_volatility`) there. Calendar (in-T) arbitrage is likewise out of scope;
   the Dupire local-variance floor remains as the backstop for it.
+- LSV (`lsv_volatility`) scope: the leverage is calibrated by a **binned particle
+  method** (fixed-seed 16k-path pre-pass, 30 log-spot bins), so the vanilla
+  repricing carries a small calibration bias on top of the engines' own error
+  (pinned to ~0.1 on a 1y spot-100 call in `tests/test_lsv.cpp`). ANA rejects the
+  model (no closed form). Bates jumps under LSV are a configuration error. The
+  PDE prices LSV **vanillas** through the leveraged 2-D ADI; an LSV **barrier**
+  on the PDE falls back to the 1-D grid on the target surface's vol (like the
+  Heston barrier PDE today), so prefer MCL for LSV path-dependents. The Greek
+  bumps (vega and `vega_<param>`) **recalibrate the leverage per scenario** with
+  common random numbers, so vega measures the target-surface sensitivity and the
+  parameter vegas the pure smile-dynamics effect at a fixed vanilla surface.
 - GPU (CUDA) acceleration (`mcl` + `allow_gpu`) currently covers **single-asset
   European vanillas under GBM** only; American / barrier / stochastic-vol /
   multi-asset books run on the CPU `mcl` engine. Extending the kernel to Heston-QE

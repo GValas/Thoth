@@ -49,6 +49,11 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
     const double carry_drift = _drift_node->GetValue( DateIndex ) * _t_list[DateIndex] -
                                _drift_node->GetValue( DateIndex - 1 ) * _t_list[DateIndex - 1];
 
+    //! LSV: the spot diffusion coefficient is L(S_{i-1}, t_i) * sqrt(v) — the
+    //! leverage scales the rho-folded terms by L and the variance terms by L^2
+    //! (L = 1 without a leverage node reproduces the pure-Heston coefficients)
+    const double L = _leverage_node ? _leverage_node->GetValue( DateIndex ) : 1.0;
+
     double step;
     if ( _xi > 1e-12 )
     {
@@ -58,11 +63,12 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
         //! correlated normal, which is what makes K0..K2 carry rho; K3/K4 weight the
         //! orthogonal residual variance (1-rho^2) split over the two endpoints.
         const double g = 0.5;
-        const double K0 = -_rho * _kappa * _theta / _xi * dt;                  //!< constant drift offset
-        const double K1 = g * dt * ( _kappa * _rho / _xi - 0.5 ) - _rho / _xi; //!< weight on v_t
-        const double K2 = g * dt * ( _kappa * _rho / _xi - 0.5 ) + _rho / _xi; //!< weight on v_{t+dt}
-        const double K3 = g * dt * ( 1.0 - _rho * _rho );                      //!< residual variance from v_t
-        const double K4 = K3;                                                  //!< residual variance from v_{t+dt}
+        const double K0 = -L * _rho * _kappa * _theta / _xi * dt; //!< constant drift offset
+        const double a = g * dt * ( L * _kappa * _rho / _xi - 0.5 * L * L );
+        const double K1 = a - L * _rho / _xi;                     //!< weight on v_t
+        const double K2 = a + L * _rho / _xi;                     //!< weight on v_{t+dt}
+        const double K3 = g * dt * ( 1.0 - _rho * _rho ) * L * L; //!< residual variance from v_t
+        const double K4 = K3;                                     //!< residual variance from v_{t+dt}
         double var = K3 * vp + K4 * vc;
         //! floor the residual variance: QE variance can dip slightly negative numerically
         if ( var < 0 )
@@ -73,8 +79,8 @@ void HestonSpotNode::ComputeValue( size_t DateIndex )
     }
     else //!< degenerate (no vol-of-vol): plain log-Euler on the (still CIR) variance
     {
-        //! -0.5 v dt is the Ito convexity term of d(log S); rho is irrelevant when xi=0
-        step = carry_drift - 0.5 * vp * dt + sqrt( vp * dt ) * z;
+        //! -0.5 (Lv) dt is the Ito convexity term of d(log S); rho is irrelevant when xi=0
+        step = carry_drift - 0.5 * L * L * vp * dt + L * sqrt( vp * dt ) * z;
     }
 
     //! Bates : add the compound-Poisson jump increment (compensator + realised
@@ -110,6 +116,12 @@ void HestonSpotNode::GetDateDependencies( size_t DateIndex,
         if ( _jump_node )
         {
             NodeList.push_back( _jump_node );
+            DateList.push_back( DateIndex );
+        }
+        //! LSV leverage at this date (itself a function of the previous spot, so no cycle)
+        if ( _leverage_node )
+        {
+            NodeList.push_back( _leverage_node );
             DateList.push_back( DateIndex );
         }
         NodeList.push_back( this );

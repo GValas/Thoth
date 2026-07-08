@@ -24,6 +24,7 @@ inline constexpr char DIVIDEND[] = "#dividend";               //!< discrete-divi
 inline constexpr char VOL[] = "#vol";                         //!< scalar (constant) vol
 inline constexpr char ATM_VOL[] = "#atmvol";                  //!< representative ATM vol (local-vol surfaces)
 inline constexpr char LOCAL_VOL[] = "#localvol";              //!< Dupire local-vol grid
+inline constexpr char LEVERAGE[] = "#leverage";               //!< LSV leverage grid L(S,t)
 inline constexpr char CORREL[] = "#correl";                   //!< correlation node
 inline constexpr char FLOW[] = "#flow";                       //!< contract payoff / flow
 inline constexpr char RATE[] = "#rate";                       //!< short-rate / discount node

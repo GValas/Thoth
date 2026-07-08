@@ -75,6 +75,7 @@
         { "$ref": "#/$defs/discrete_dividends" },
         { "$ref": "#/$defs/bs_volatility" },
         { "$ref": "#/$defs/heston_volatility" },
+        { "$ref": "#/$defs/lsv_volatility" },
         { "$ref": "#/$defs/sabr_volatility" },
         { "$ref": "#/$defs/correlation_matrix" },
         { "$ref": "#/$defs/simple_weighted_calendar" },
@@ -380,6 +381,23 @@
         "jump_intensity": { "type": "number", "description": "Bates: jump frequency per year (lambda). 0 = pure Heston." },
         "jump_mean": { "type": "number", "description": "Bates: mean of the log jump size (mu)." },
         "jump_vol": { "type": "number", "description": "Bates: vol of the log jump size (sigma)." },
+        "calendar": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "lsv_volatility": {
+      "type": "object",
+      "title": "!lsv_volatility",
+      "description": "Local-stochastic volatility: a Heston variance factor whose spot diffusion carries a leverage L(S,t) calibrated so the model reprices the target implied surface (`surface`, a deterministic !bs_volatility / !sabr_volatility). The spot/vol correlation (rho) is set via the !correlation_matrix (underlying `<name>_var`), not here. Priced by MCL and PDE only (no closed form); Bates jumps are not supported.",
+      "additionalProperties": false,
+      "required": ["spot", "init_vol", "long_vol", "kappa", "vol_of_vol", "surface"],
+      "properties": {
+        "spot": { "type": "number" },
+        "init_vol": { "type": "number", "description": "Initial vol in percent (-> v0)." },
+        "long_vol": { "type": "number", "description": "Long-run vol in percent (-> theta)." },
+        "kappa": { "type": "number", "description": "Mean-reversion speed." },
+        "vol_of_vol": { "type": "number", "description": "Vol of variance (xi)." },
+        "surface": { "$ref": "#/$defs/ref", "description": "Target implied surface the leverage is calibrated to (a deterministic volatility: !bs_volatility or !sabr_volatility)." },
         "calendar": { "$ref": "#/$defs/ref" }
       }
     },

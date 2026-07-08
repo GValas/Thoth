@@ -19,6 +19,14 @@ HestonVolatility::HestonVolatility( const string& ObjectName )
     _is_local = false;
 }
 
+//! kind-forwarding constructor used by the derived LSV surface
+HestonVolatility::HestonVolatility( const string& ObjectName,
+                                    const string& ObjectKind )
+    : Volatility( ObjectName, ObjectKind )
+{
+    _is_local = false;
+}
+
 HestonVolatility::~HestonVolatility() = default;
 
 //! read own fields (Heston + optional Bates jumps), then the common calendar

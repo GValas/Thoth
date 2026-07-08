@@ -832,16 +832,19 @@ void Thomas( vector<double>& a, vector<double>& d, vector<double>& c, vector<dou
 }
 } // namespace
 
-//! Douglas ADI for the Heston PDE
-//!   V_t + 0.5 v S^2 V_SS + rho xi v S V_Sv + 0.5 xi^2 v V_vv
+//! Douglas ADI for the Heston (or LSV) PDE
+//!   V_t + 0.5 L^2 v S^2 V_SS + rho xi L v S V_Sv + 0.5 xi^2 v V_vv
 //!        + b S V_S + kappa(theta - v) V_v - r_d V = 0
-//! with b the carry (from the forward) and r_d the premium-currency discount.
-//! Cross term explicit; S- and v-sweeps implicit (theta = 1/2). European or,
-//! if requested, American by intrinsic projection after each step.
+//! with b the carry (from the forward), r_d the premium-currency discount and
+//! L(S,t) the LSV leverage (identically 1 for pure Heston; calibrated against
+//! the target surface via Single::CalibrateLeverage for an LSV vol). Cross term
+//! explicit; S- and v-sweeps implicit (theta = 1/2). European or, if requested,
+//! American by intrinsic projection after each step.
 PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
 {
     Single* single = *Ctr->GetUnderlying()->GetSingleSet().begin();
     const StochasticVolParams hv = single->GetVolatility()->StochasticParams();
+    const bool lsv = single->GetVolatility()->IsLsv();
 
     const date mat = Ctr->GetMaturityDate();
     const double T = YearFraction( _today, mat );
@@ -897,9 +900,17 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     }
     const double bdrift = b - lambda * kbar; //!< == b for pure Heston
 
-    //! grid extents
+    //! grid extents. For LSV the effective spot variance is L^2 v, which tracks the
+    //! target surface — widen the S-domain with the target ATM variance so a
+    //! high-vol target on a low-v0 Heston base still fits the grid.
+    double vgrid = std::max( v0, th );
+    if ( lsv )
+    {
+        const double atm = single->GetImplicitVol( 0, mat );
+        vgrid = std::max( vgrid, atm * atm );
+    }
     const double vmax = std::max( 1.0, HESTON_VMAX_FACTOR * std::max( v0, th ) );
-    const double smax = std::max( HESTON_SMAX_MIN_FACTOR * S0, S0 * exp( HESTON_SMAX_SIGMA_FACTOR * sqrt( std::max( v0, th ) * std::max( T, 1.0 ) ) ) );
+    const double smax = std::max( HESTON_SMAX_MIN_FACTOR * S0, S0 * exp( HESTON_SMAX_SIGMA_FACTOR * sqrt( vgrid * std::max( T, 1.0 ) ) ) );
     //! grid resolution from the book's vanilla_precision (see the constants above)
     int NS = HESTON_GRID_NS_MEDIUM, Nv = HESTON_GRID_NV_MEDIUM, Nt = HESTON_GRID_NT_MEDIUM;
     switch ( _pde->_vanilla_precision )
@@ -918,6 +929,29 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double dv = vmax / Nv;
     const double dt = T / Nt;
     const double q = 0.5; //!< ADI implicitness (Crank-Nicolson directional)
+
+    //! LSV leverage: calibrate on a (day-granular) uniform date grid to maturity;
+    //! lev_col holds the per-S-column leverage of the current time step, refilled
+    //! once per step so the explicit predictor and the implicit corrector apply
+    //! the SAME S-operator (a Douglas-ADI consistency requirement). Identically 1
+    //! for pure Heston.
+    LeverageSurface lev;
+    if ( lsv )
+    {
+        const long total_days = ( mat - _today ).days();
+        const int ncal = (int)std::max<long>( 1, std::min<long>( Nt, total_days ) );
+        vector<date> cal_dates{ _today };
+        for ( int n = 1; n <= ncal; n++ )
+        {
+            const date d = _today + days( ( total_days * n ) / ncal );
+            if ( d > cal_dates.back() )
+            {
+                cal_dates.push_back( d );
+            }
+        }
+        lev = single->CalibrateLeverage( cal_dates );
+    }
+    vector<double> lev_col( NS + 1, 1.0 );
 
     auto S = [&]( int i )
     { return i * dS; };
@@ -965,9 +999,10 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     auto A1 = [&]( int i, int j, const vector<double>& g ) //!< S-direction (+ half discount)
     {
         double si = S( i ), vj = V( j );
+        double lij = lev_col[i]; //!< LSV leverage of this S-column (1 for pure Heston)
         double vss = ( g[IX( i + 1, j )] - 2 * g[IX( i, j )] + g[IX( i - 1, j )] ) / ( dS * dS );
         double vs = ( g[IX( i + 1, j )] - g[IX( i - 1, j )] ) / ( 2 * dS );
-        return 0.5 * vj * si * si * vss + bdrift * si * vs - 0.5 * rd * g[IX( i, j )];
+        return 0.5 * lij * lij * vj * si * si * vss + bdrift * si * vs - 0.5 * rd * g[IX( i, j )];
     };
     auto A2 = [&]( int i, int j, const vector<double>& g ) //!< v-direction (+ half discount)
     {
@@ -989,7 +1024,8 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
         }
         double vsv = ( g[IX( i + 1, j + 1 )] - g[IX( i + 1, j - 1 )] - g[IX( i - 1, j + 1 )] + g[IX( i - 1, j - 1 )] ) /
                      ( 4 * dS * dv );
-        return rho * xi * V( j ) * S( i ) * vsv;
+        //! d<S,v> = rho xi (L sqrt(v)) sqrt(v) S dt: the leverage scales the cross term linearly
+        return rho * xi * lev_col[i] * V( j ) * S( i ) * vsv;
     };
 
     auto fill_boundaries = [&]( vector<double>& g, double tau )
@@ -1013,6 +1049,16 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     for ( int n = 1; n <= Nt; n++ )
     {
         const double tau = n * dt;
+        //! LSV: the leverage of this step's calendar time (tau is time since
+        //! maturity — the grid marches backward), one value per S-column
+        if ( lsv )
+        {
+            const double t_cal = std::max( 0.0, T - tau );
+            for ( int i = 0; i <= NS; i++ )
+            {
+                lev_col[i] = lev.GetLeverage( S( i ), t_cal );
+            }
+        }
         fill_boundaries( U, ( n - 1 ) * dt );
 
         //! explicit full-operator step Y0 = U + dt*(A0+A1+A2)U
@@ -1037,7 +1083,8 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
             for ( int i = 1; i < NS; i++ )
             {
                 double si = S( i );
-                double diff = 0.5 * vj * si * si / ( dS * dS );
+                double lij = lev_col[i]; //!< must match the A1 operator above
+                double diff = 0.5 * lij * lij * vj * si * si / ( dS * dS );
                 double drift = bdrift * si / ( 2 * dS );
                 double lo = diff - drift, up = diff + drift, di = -2 * diff - 0.5 * rd;
                 int idx = i - 1;

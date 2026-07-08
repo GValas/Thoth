@@ -36,6 +36,7 @@ inline constexpr char KIND_BASKET[] = "basket";
 inline constexpr char KIND_RAINBOW[] = "rainbow";
 inline constexpr char KIND_FOREX[] = "forex";
 inline constexpr char KIND_HESTON_VOLATILITY[] = "heston_volatility";
+inline constexpr char KIND_LSV_VOLATILITY[] = "lsv_volatility";
 inline constexpr char KIND_MCL_CONFIGURATION[] = "mcl_configuration";
 inline constexpr char KIND_SABR_VOLATILITY[] = "sabr_volatility";
 inline constexpr char KIND_PDE_CONFIGURATION[] = "pde_configuration";

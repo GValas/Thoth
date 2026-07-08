@@ -85,6 +85,15 @@ void PricerANA::PriceBook()
 //! The contract is a pure description: dispatch on its type and evaluate here.
 void PricerANA::PriceContract( Contract* Ctr )
 {
+    //! LSV has no closed form: the Heston characteristic function would ignore the
+    //! calibrated leverage and silently price the wrong model. MCL / PDE carry the
+    //! leverage; ANA rejects it. Checked here (not PreCheck) because a composite's
+    //! GetSingleSet needs the correlation, which is only wired by InitPricing.
+    if ( Volatility* mv = MonoVol( Ctr->GetUnderlying() ); mv && mv->IsLsv() )
+    {
+        ERR( Ctr->GetName() + " can't be ANA-priced (LSV volatility has no closed form; use mcl or pde)" );
+    }
+
     if ( Vanilla* v = dynamic_cast<Vanilla*>( Ctr ) )
     {
         PriceVanilla( v );
