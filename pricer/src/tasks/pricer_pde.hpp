@@ -39,6 +39,8 @@ class PricerPDE : public Pricer
     // market data
     double _s;      // spot
     double _v;      // ATM vol (grid sizing, quanto correction, wing boundaries)
+    double _v_diff; // diffusion vol of the flat-vol grid: the vol at the contract's
+                    // strike (== _v for a strike-less contract or in local-vol mode)
     double _r;      // carry / drift zero rate to maturity (underlying ccy, quanto-corrected)
     double _r_disc; // discount zero rate to maturity (premium ccy); equals r for non-quanto
     date _maturity;

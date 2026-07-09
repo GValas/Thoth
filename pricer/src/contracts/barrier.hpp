@@ -16,9 +16,14 @@ class Barrier : public Contract
     BarrierMonitoring _barrier_monitoring_type = BarrierMonitoring::Continuous; //!< continuous vs discrete
     int _monitoring_period_days = 0;                                            //!< discrete monitoring step (days); 0 = unset
     date _maturity_date;
-    double _strike = 0; //!< vanilla strike K of the terminal payoff
+    double _strike = 0; //!< resolved cash strike K of the terminal payoff (see SetToday)
     OptionType _type = OptionType::Call;
 
+  private:
+    double _strike_input = 0;        //!< configured strike (cash, or % of spot)
+    bool _is_absolute_strike = true; //!< false: strike is a percent of the spot
+
+  public:
     //! discrete monitoring helpers — true iff the barrier is only checked on a
     //! scheduled grid (vs every instant for continuous monitoring)
     bool IsDiscrete() const
@@ -27,6 +32,11 @@ class Barrier : public Contract
     }
     //! read own fields from the configuration (strike / maturity / type / barrier)
     void Configure( ObjectReader& reader ) override;
+
+    //! roll the valuation date, then resolve a relative strike against the base
+    //! (unbumped) spot so the cash strike stays fixed through Greek bumps. The
+    //! barrier levels are always absolute.
+    void SetToday( const date& Today ) override;
 
     //! monitoring schedule: today + k*period (k>=1) up to and including maturity
     set<date> GetMonitoringDates();

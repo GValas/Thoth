@@ -95,6 +95,11 @@ delta/gamma respond instead of cancelling — ANA and MCL agree (e.g. a 1y ATM b
 call: delta ≈0.673 on both). The PDE prices a basket on a 1-D grid in basket-spot
 space, so it reports the grid's own `dV/dS` delta (matches ANA/MCL); its grid
 *gamma* there is second-difference-noisy (use ANA/MCL for an accurate basket gamma).
+The moment-matched basket vol is **strike-dependent** (the shifted-lognormal fit
+has skew), so the PDE grid diffuses the vol at the **contract's strike** — the
+same vol the ANA closed form prices at — keeping the two engines in agreement
+away from the money even when the component vols are widely dispersed (the ATM
+"representative" vol still sizes the grid and the quanto correction).
 
 **Model-parameter Greeks** — for the stochastic / local-vol surfaces you can also
 request `vega_<param>` indicators that bump one model parameter and revalue (per
@@ -109,7 +114,11 @@ underlying's surface exposes is silently skipped.
 
 **Instruments**
 - `vanilla` — call / put, **european** or **american**, absolute or
-  relative strike. **Quanto** (a foreign-currency asset paid in the book
+  relative strike (`is_absolute_strike: false` books the strike as a **percent of
+  the underlying's spot** at the valuation date — the rebased 100 for a basket /
+  rainbow — resolved once against the unbumped spot, so the Greeks bump the spot
+  and never the strike; the same convention covers a `barrier`'s vanilla strike,
+  while barrier *levels* stay absolute). **Quanto** (a foreign-currency asset paid in the book
   currency) is supported by all three engines — the drift correction
   `F *= exp(-ρ·σ_S·σ_X·t)` lives in the MCL node graph, ANA's quanto forward and
   the PDE carry, and the three agree (American quanto via PDE / MCL).
@@ -272,7 +281,9 @@ runs on the CPU).
 ### Tests
 
 A doctest suite (`tests/`) covers European/American vanillas, barriers,
-dividends, multi-asset consistency, engine-vs-engine agreement (incl. quanto),
+dividends, relative strikes (the relative booking pricing exactly as its
+absolute-cash twin — premium and Greeks — plus the basket PDE agreeing with ANA
+away from the money), multi-asset consistency, engine-vs-engine agreement (incl. quanto),
 variance swaps (analytic vs the accumulated-variance PDE), baskets, composites,
 the SABR surface, Sobol QMC, the `!sequence` task, the bump-and-revalue Greeks
 (delta/gamma/vega/rho/theta vs Black-Scholes) and the model-parameter

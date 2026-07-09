@@ -19,10 +19,25 @@ Vanilla::~Vanilla() = default;
 void Vanilla::Configure( ObjectReader& reader )
 {
     Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
-    _strike = reader.Get<double>( "strike" );
+    _strike_input = reader.Get<double>( "strike" );
+    _is_absolute_strike = reader.Get<bool>( "is_absolute_strike", true );
+    _strike = _strike_input; //!< a relative strike is resolved in SetToday
     _exercise_mode = ParseExerciseMode( reader.Get<string>( "exercise" ) );
     _maturity_date = reader.Get<date>( "maturity" );
     _type = ParseOptionType( reader.Get<string>( "type" ) );
+}
+
+//! Resolve the cash strike: a relative strike is a percent of the underlying's
+//! spot as of the valuation date (basket/rainbow spots are their rebased-100
+//! level, so 100 stays ATM in both conventions). Resolution happens here — the
+//! Greek bump engine mutates the spot *without* re-anchoring today — so the cash
+//! strike is fixed against the base spot and never follows a bump scenario. The
+//! theta roll re-enters with the spot restored, making the resolution idempotent.
+void Vanilla::SetToday( const date& Today )
+{
+    Contract::SetToday( Today );
+    _strike = _is_absolute_strike ? _strike_input
+                                  : _strike_input / 100 * _underlying->GetSpot();
 }
 
 //! getter

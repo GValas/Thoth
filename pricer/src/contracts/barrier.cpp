@@ -20,7 +20,9 @@ Barrier::~Barrier() = default;
 void Barrier::Configure( ObjectReader& reader )
 {
     Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
-    _strike = reader.Get<double>( "strike" );
+    _strike_input = reader.Get<double>( "strike" );
+    _is_absolute_strike = reader.Get<bool>( "is_absolute_strike", true );
+    _strike = _strike_input; //!< a relative strike is resolved in SetToday
     _maturity_date = reader.Get<date>( "maturity" );
     _type = ParseOptionType( reader.Get<string>( "type" ) );
     _barrier_type = ParseBarrierType( reader.Get<string>( "barrier_type" ) );
@@ -28,6 +30,16 @@ void Barrier::Configure( ObjectReader& reader )
     _monitoring_period_days = reader.Get<int>( "monitoring_period_days", 0 );
     _barrier_up_level = reader.Get<double>( "barrier_up_level", 0 );
     _barrier_down_level = reader.Get<double>( "barrier_down_level", 0 );
+}
+
+//! Resolve the cash strike (see Vanilla::SetToday: same convention — a relative
+//! strike is a percent of the base spot, fixed before any Greek bump; barrier
+//! levels stay absolute).
+void Barrier::SetToday( const date& Today )
+{
+    Contract::SetToday( Today );
+    _strike = _is_absolute_strike ? _strike_input
+                                  : _strike_input / 100 * _underlying->GetSpot();
 }
 
 //! getter

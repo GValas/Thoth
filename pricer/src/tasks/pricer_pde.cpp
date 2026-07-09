@@ -362,6 +362,33 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
         }
     }
 
+    //! diffusion vol of the flat-vol grid: query the surface at the contract's
+    //! strike when it has one. A moment-matched basket's equivalent vol is
+    //! strike-dependent (the shifted-lognormal fit has skew) and the ANA engine
+    //! prices at the strike's vol, so the grid must diffuse that same vol to
+    //! agree away from the money. _v (the ATM query) keeps sizing the domain,
+    //! the wings and the quanto correction — the documented ATM convention all
+    //! three engines share; in local-vol mode the Dupire surface overrides per
+    //! node, so the strike query is skipped.
+    _v_diff = _v;
+    if ( !_local_vol )
+    {
+        double k = 0;
+        if ( auto* van = dynamic_cast<Vanilla*>( Ctr ) )
+        {
+            k = van->GetStrike();
+        }
+        else if ( auto* bar = dynamic_cast<Barrier*>( Ctr ) )
+        {
+            k = bar->_strike;
+        }
+        if ( k > 0 )
+        {
+            _v_diff = Ctr->GetUnderlying()->GetImplicitVol( k, _maturity );
+        }
+    }
+    _v_row = _v_diff; //!< re-anchor the flat default (set above, before _v_diff existed)
+
     //! escrowed-dividend model: precompute the future-dividend PV at each grid time
     //! step so the American early-exercise test can recover the observed spot
     //! (escrowed value + PV) instead of testing on the escrowed value alone, which
@@ -465,7 +492,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 
     //! per-node vols for the step being assembled: the flat ATM vol, or the Dupire
     //! local vol refilled per step in _local_vol mode (like the varswap source)
-    vector<double> sigma_node( _j + 1, _v );
+    vector<double> sigma_node( _j + 1, _v_diff );
 
     //! flat curves + flat vol: the operator is time-independent, so the diagonals
     //! are assembled once (the fast path). A sloped curve or a local-vol surface
@@ -504,7 +531,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
             t1_m[j] = T_1( j, j );                           //!< main  (couples to U_1[j])
             t1_u[j] = T_1( j, j + 1 );                       //!< super (couples to U_1[j+1])
         }
-        _v_row = _v; //!< restore the flat default for any caller outside the loop
+        _v_row = _v_diff; //!< restore the flat default for any caller outside the loop
     };
 
     // backwarding

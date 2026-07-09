@@ -194,7 +194,7 @@
         "type": { "enum": ["call", "put"] },
         "exercise": { "enum": ["european", "american"] },
         "nominal": { "type": "number", "description": "Accepted but currently unused (defaults apply)." },
-        "is_absolute_strike": { "type": "boolean", "description": "Accepted but currently unused." }
+        "is_absolute_strike": { "type": "boolean", "description": "true (default): strike is a cash level. false: strike is a percent of the underlying spot at the valuation date (resolved once against the unbumped spot, so Greeks bump the spot, not the strike). Barrier levels are always absolute." }
       }
     },
 
@@ -216,7 +216,7 @@
         "barrier_up_level": { "type": "number" },
         "barrier_down_level": { "type": "number" },
         "nominal": { "type": "number", "description": "Accepted but currently unused." },
-        "is_absolute_strike": { "type": "boolean", "description": "Accepted but currently unused." }
+        "is_absolute_strike": { "type": "boolean", "description": "true (default): strike is a cash level. false: strike is a percent of the underlying spot at the valuation date (resolved once against the unbumped spot, so Greeks bump the spot, not the strike). Barrier levels are always absolute." }
       }
     },
 
