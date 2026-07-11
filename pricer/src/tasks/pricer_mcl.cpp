@@ -105,9 +105,13 @@ bool GpuGbmParamsFor( Contract* Ctr, const date& Today, GpuGbmParams& Out )
     }
 
     Currency* ccy = v->GetPremiumCurrency();
+    if ( ccy->GetRateModel() )
+    {
+        return false; //!< stochastic rates: the GBM kernel's flat df/drift would misprice
+    }
     const date maturity = v->GetMaturityDate();
     Out.t = YearFraction( Today, maturity );
-    Out.df = ccy->GetRate()->GetDiscountFactor( maturity );
+    Out.df = ccy->GetDiscountRate()->GetDiscountFactor( maturity );
     Out.forward = u->GetForward( maturity, ccy );
     Out.vol = u->GetImplicitVol( v->GetStrike(), maturity );
     Out.strike = v->GetStrike();
@@ -193,6 +197,48 @@ void PricerMCL::PreCheck()
     if ( !_correlation )
     {
         ERR( "book pricing '" + _name + "' requires a correlation matrix" );
+    }
+
+    //! stochastic rates (Hull-White): the supported scope is a same-currency book
+    //! of European contracts on BS-vol equities. FX under stochastic rates, quanto
+    //! drifts, local/stochastic vol mixing and the deterministic-discounting LSM
+    //! American pass are all out of scope — fail loudly rather than misprice.
+    bool hybrid = false;
+    for ( Currency* c : _book->GetCurrencySet() )
+    {
+        hybrid |= ( c->GetRateModel() != nullptr );
+    }
+    if ( hybrid )
+    {
+        for ( Single* s : _book->GetSingleSet() )
+        {
+            if ( s->IsForex() )
+            {
+                ERR( "book pricing '" + _name + "' : FX factor '" + s->GetName() +
+                     "' is not supported under stochastic rates (hull_white)" );
+            }
+            if ( s->GetVolatility()->IsStochastic() || s->GetVolatility()->_is_local )
+            {
+                ERR( "book pricing '" + _name + "' : underlying '" + s->GetName() +
+                     "' must carry a bs_volatility under stochastic rates (hull_white)" );
+            }
+        }
+        for ( Contract* c : _book->GetContractSet() )
+        {
+            if ( c->IsAmerican() )
+            {
+                ERR( "book pricing '" + _name + "' : American contract '" + c->GetName() +
+                     "' is not supported under stochastic rates (LSM discounting is "
+                     "deterministic)" );
+            }
+            if ( c->GetPremiumCurrency() != c->GetUnderlying()->GetCurrency() ||
+                 c->GetPremiumCurrency() != _currency )
+            {
+                ERR( "book pricing '" + _name + "' : contract '" + c->GetName() +
+                     "' must settle in the (single) book currency under stochastic "
+                     "rates (quanto / cross-currency hybrids are not supported)" );
+            }
+        }
     }
 
     //! GPU acceleration is opt-in (allow_gpu) and falls back to the CPU path when a
@@ -583,49 +629,68 @@ void PricerMCL::ComputeGreeks()
 //! correlation matrix. Single-asset books skip this (no correlation to impose).
 void PricerMCL::CorrelateBrownianNodes()
 {
-    //! more than 1 asset : correlation of noises
-    if ( _single_set.size() > 1 )
+    //! the correlated factor set: the singles plus one "<ccy>_ir" rate factor per
+    //! Hull-White currency (whose OU node consumes its correlated noise directly —
+    //! there is no Brownian for a rate factor)
+    vector<string> factor_names;
+    set<string> rate_factor_names;
+    for ( Single* s : _single_set )
+    {
+        factor_names.push_back( s->GetName() );
+    }
+    for ( Currency* c : _currency_set )
+    {
+        if ( c->GetRateModel() )
+        {
+            factor_names.push_back( c->IrFactorName() );
+            rate_factor_names.insert( c->IrFactorName() );
+        }
+    }
+
+    //! more than 1 factor : correlation of noises
+    if ( factor_names.size() > 1 )
     {
 
         //! compute cholesky matrix : L with L L^T = correlation (so L*Z is correlated)
         ComputeCholeskyMatrix();
 
-        //! correlated noises = sum product
-        SingleSet::iterator u, v;
-        for ( u = _single_set.begin();
-              u != _single_set.end();
-              u++ )
+        //! correlated noises = sum product. A factor gets its CorrelatedNoiseNode
+        //! "<name>#noise" when something consumes it: a single's Brownian (below),
+        //! or a rate factor's HullWhiteFactorNode (fetches it by name). A Heston
+        //! spot reads its white noise directly, so it gets none (as before).
+        for ( const string& u : factor_names )
         {
-
-            //! brownian exist at this date, for this underlying
-            if ( BrownianNode* B = _collector.GetBrownianNode( ( *u )->GetName() + node_name::BROWNIAN ) )
+            BrownianNode* B = _collector.GetBrownianNode( u + node_name::BROWNIAN );
+            if ( !B && !rate_factor_names.count( u ) )
             {
+                continue;
+            }
 
-                //! noise = sum product correl/white_noise
-                string node_name = ( *u )->GetName() + node_name::NOISE;
-                CorrelatedNoiseNode* correlated_noise_node = _collector.NewNode<CorrelatedNoiseNode>( node_name );
+            //! noise = sum product correl/white_noise
+            CorrelatedNoiseNode* correlated_noise_node =
+                _collector.NewNode<CorrelatedNoiseNode>( u + node_name::NOISE );
 
-                //! correlated noise for u = sum_v L[u][v] * white_noise[v]; the
-                //! Cholesky factor is lower-triangular, so the zero entries above the
-                //! diagonal are skipped (no node wired for them)
-                for ( v = _single_set.begin();
-                      v != _single_set.end();
-                      v++ )
+            //! correlated noise for u = sum_v L[u][v] * white_noise[v]; the
+            //! Cholesky factor is lower-triangular, so the zero entries above the
+            //! diagonal are skipped (no node wired for them). For a term-structured
+            //! correlation the factor varies by date, so the whole lower triangle
+            //! is wired (CholeskyMayBeNonZero folds both rules).
+            for ( const string& v : factor_names )
+            {
+                if ( _correlation->CholeskyMayBeNonZero( u, v ) )
                 {
-
-                    double x = _correlation->GetCholeskyValue( ( *u )->GetName(), ( *v )->GetName() );
-                    if ( x != 0 )
-                    {
-                        MonteCarloNode* n = _collector.GetNode( ( *v )->GetName() + node_name::WHITE_NOISE );
-                        MonteCarloNode* c = _correlation->GetCholeskyNode( _collector,
-                                                                           ( *u )->GetName(),
-                                                                           ( *v )->GetName() ); // constant correlation
-                        correlated_noise_node->PushNoiseNode( n );
-                        correlated_noise_node->PushCholeskyNode( c );
-                    }
+                    MonteCarloNode* n = _collector.GetNode( v + node_name::WHITE_NOISE );
+                    MonteCarloNode* c = _correlation->GetCholeskyNode( _collector, u,
+                                                                       v ); // constant, or per-step for a term structure
+                    correlated_noise_node->PushNoiseNode( n );
+                    correlated_noise_node->PushCholeskyNode( c );
                 }
+            }
 
-                //! link to brownian brownian link
+            //! link to brownian (a rate factor has no Brownian: its OU node
+            //! fetches the correlated noise by name instead)
+            if ( B )
+            {
                 B->SetNoiseNode( correlated_noise_node );
             }
         }
@@ -682,6 +747,17 @@ void PricerMCL::CreateBrownianNodes()
                 JN->SetRandomGenerator( &_rng );
                 JN->SetJumpParameters( h.jump_intensity, h.jump_mean, h.jump_vol );
             }
+        }
+    }
+
+    //! stochastic rates: one white noise per Hull-White currency ("<ccy>_ir"),
+    //! appended after the singles so their Sobol dimensions are unchanged
+    for ( Currency* c : _currency_set )
+    {
+        if ( c->GetRateModel() )
+        {
+            NoiseNode* N = _collector.NewNode<NoiseNode>( c->IrFactorName() + node_name::WHITE_NOISE );
+            N->SetRandomGenerator( &_rng );
         }
     }
 }
@@ -746,6 +822,15 @@ void PricerMCL::ComputeCholeskyMatrix()
         }
     }
     single_name_list.insert( single_name_list.end(), fx_name_list.begin(), fx_name_list.end() );
+    //! Hull-White rate factors join last ("<ccy>_ir" must be listed in the
+    //! matrix's underlyings, like the Heston "<name>_var" convention)
+    for ( Currency* c : _currency_set )
+    {
+        if ( c->GetRateModel() )
+        {
+            single_name_list.push_back( c->IrFactorName() );
+        }
+    }
     _correlation->ComputeCholeskyMatrix( single_name_list );
 }
 
@@ -1087,7 +1172,7 @@ void PricerMCL::PriceAmerican()
             rs.reserve( ExerciseDates.size() );
             for ( const date& d : ExerciseDates )
             {
-                rs.push_back( c->GetPremiumCurrency()->GetRate()->GetCurveValue( d ) );
+                rs.push_back( c->GetPremiumCurrency()->GetDiscountRate()->GetCurveValue( d ) );
             }
             return rs;
         };

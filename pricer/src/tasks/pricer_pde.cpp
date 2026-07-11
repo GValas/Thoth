@@ -61,6 +61,18 @@ double PricerPDE::GetGridPrice( double x, la_vector* Uy )
 //! is resolved as a required reference in Configure, so it is always non-null here)
 void PricerPDE::PreCheck()
 {
+    //! stochastic rates (Hull-White) would need a 2-D (S, r) ADI grid — not
+    //! implemented yet (see TODO); MCL and ANA cover the hybrid scope.
+    for ( Currency* c : _book->GetCurrencySet() )
+    {
+        if ( c->GetRateModel() )
+        {
+            ERR( "book pricing '" + _name + "' : the PDE engine does not support "
+                                            "stochastic rates (hull_white on '" +
+                 c->GetName() + "') yet" );
+        }
+    }
+
     for ( Contract* c : _book->GetContractSet() )
     {
         //! the PDE grid handles a vanilla, a barrier or a variance swap on a
@@ -204,7 +216,7 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! forward and the MCL drift node so the three engines agree
     _r = Ctr->GetUnderlying()->GetCurrency()->GetRate()->GetCurveValue( _maturity ) -
          Ctr->GetUnderlying()->DividendRepoYield( _maturity );
-    _r_disc = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( _maturity );
+    _r_disc = Ctr->GetPremiumCurrency()->GetDiscountRate()->GetCurveValue( _maturity );
 
     //! quanto drift correction (payoff currency != underlying currency): the
     //! carry becomes r - rho(S,FX)*sigma_S*sigma_X while discounting stays in the
@@ -215,7 +227,9 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     //! (Currency objects are singletons in the book graph), so this is exact.
     Currency* udl_ccy = Ctr->GetUnderlying()->GetCurrency();
     Currency* pre_ccy = Ctr->GetPremiumCurrency();
-    double quanto_spread = 0; //!< constant carry spread, also applied per forward step below
+    double quanto_spread = 0; //!< maturity-average carry spread (grid centring / flat path)
+    double quanto_v_fx = 0;   //!< sigma_FX, reused by the per-step forward spread below
+    bool quanto_term = false; //!< term-structured rho: spread re-averaged per forward step
     if ( udl_ccy != pre_ccy )
     {
         if ( !_correlation )
@@ -223,9 +237,13 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             ERR( "book pricing '" + _name + "': quanto contract '" + Ctr->GetName() +
                  "' requires a correlation matrix" );
         }
-        double v_fx = _correlation->GetFxVol( udl_ccy->GetName(), pre_ccy->GetName() );
-        double rho = _correlation->GetValue( udl_ccy->GetName(), pre_ccy->GetName(), Und );
-        quanto_spread = rho * _v * v_fx;
+        quanto_v_fx = _correlation->GetFxVol( udl_ccy->GetName(), pre_ccy->GetName() );
+        quanto_term = _correlation->IsTermStructured();
+        //! rho over the whole horizon [0, T]: the running average (== the constant
+        //! entry for a constant matrix), so the flat carry matches ANA's forward
+        double rho = _correlation->GetTermValue( udl_ccy->GetName(), pre_ccy->GetName(), Und,
+                                                 YearFraction( _today, _maturity ) );
+        quanto_spread = rho * _v * quanto_v_fx;
         _r -= quanto_spread;
     }
 
@@ -322,7 +340,7 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
     {
         Underlying* und = Ctr->GetUnderlying();
         const YieldCurve* rate_udl = udl_ccy->GetRate();
-        const YieldCurve* rate_disc = pre_ccy->GetRate();
+        const YieldCurve* rate_disc = pre_ccy->GetDiscountRate();
         double z1 = 0, q1 = 0, zd1 = 0, t1 = 0; //!< t=0 terms vanish (z·t = 0)
         for ( int i = 0; i < _n; i++ )
         {
@@ -334,7 +352,18 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             const double z2 = rate_udl->GetCurveValue( d2 );
             const double q2 = und->DividendRepoYield( d2 );
             const double zd2 = rate_disc->GetCurveValue( d2 );
-            _fwd_carry[i] = ( ( z2 - q2 ) * t2 - ( z1 - q1 ) * t1 ) / _k - quanto_spread;
+            //! term-structured quanto: telescope int_0^t rho = rho_bar(t)*t exactly
+            //! like the zero rates, so the summed per-step spreads reproduce the
+            //! maturity integral; constant rho keeps the historic flat spread
+            double quanto_step = quanto_spread;
+            if ( quanto_term )
+            {
+                quanto_step =
+                    ( _correlation->GetTermValue( udl_ccy->GetName(), pre_ccy->GetName(), Und, t2 ) * t2 -
+                      _correlation->GetTermValue( udl_ccy->GetName(), pre_ccy->GetName(), Und, t1 ) * t1 ) /
+                    _k * _v * quanto_v_fx;
+            }
+            _fwd_carry[i] = ( ( z2 - q2 ) * t2 - ( z1 - q1 ) * t1 ) / _k - quanto_step;
             _fwd_disc[i] = ( zd2 * t2 - zd1 * t1 ) / _k;
             if ( std::abs( _fwd_carry[i] - _r ) > 1e-12 || std::abs( _fwd_disc[i] - _r_disc ) > 1e-12 )
             {
@@ -707,10 +736,28 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
     fair_var += Ctr->ObservationDriftVariance( _today );
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();
-    const double df = Ctr->GetPremiumCurrency()->GetRate()->GetDiscountFactor( _maturity );
+    const double df = Ctr->GetPremiumCurrency()->GetDiscountRate()->GetDiscountFactor( _maturity );
+
+    //! seasoned swap: time-weight the realised past leg (from the fixings) with
+    //! the grid's future fair variance — fair_total = (past + fair*T_fut)/T_total;
+    //! the last-fixing -> spot bridge gives the analytic delta/gamma (matching the
+    //! ANA treatment, so the two engines report the same Greeks)
+    double delta = 0, gamma = 0;
+    if ( Ctr->IsSeasoned() )
+    {
+        const double t_fut = YearFraction( _today, _maturity );
+        const double t_tot = Ctr->GetTotalYearFraction();
+        fair_var = ( Ctr->PastSumSquaredReturns() + fair_var * t_fut ) / t_tot;
+        const double s = Ctr->GetUnderlying()->GetSpot();
+        const double scale = Ctr->GetNotional() * df / t_tot;
+        const double log_bridge = Ctr->LastFixingLogBridge();
+        delta = scale * 2 * log_bridge / s;
+        gamma = scale * 2 * ( 1 - log_bridge ) / ( s * s );
+    }
+
     Result( Ctr ).premium = Ctr->GetNotional() * df * ( fair_var - k_var );
-    Result( Ctr ).delta = 0;
-    Result( Ctr ).gamma = 0;
+    Result( Ctr ).delta = delta;
+    Result( Ctr ).gamma = gamma;
 }
 
 //! coordinate change X = Phi(x): a sinh stretch that clusters grid points around
@@ -877,7 +924,7 @@ PricerPDE::GridResult PricerPDE::SolveHestonGrid( Contract* Ctr )
     const double T = YearFraction( _today, mat );
     const double S0 = single->GetSpot();
     const double F = Ctr->GetUnderlying()->GetForward( mat, Ctr->GetPremiumCurrency() );
-    const double rd = Ctr->GetPremiumCurrency()->GetRate()->GetCurveValue( mat );
+    const double rd = Ctr->GetPremiumCurrency()->GetDiscountRate()->GetCurveValue( mat );
     const double b = ( T > 0 ) ? log( F / S0 ) / T : 0.0;
     const double v0 = hv.v0;
     const double kap = hv.kappa;

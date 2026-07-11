@@ -71,7 +71,13 @@ MonteCarloNode* Contract::GetNode( NodeCollector& NC )
             {
                 C->PushFlowNode( GetFlowNode( NC, d ), NC.GetDateIndex( d ) );
             }
-            C->SetRateCurveNode( _premium_currency->GetRateNode( NC ) );
+            C->SetRateCurveNode( _premium_currency->GetDiscountRateNode( NC ) );
+            //! stochastic rates: add the pathwise Hull-White exponent so each
+            //! flow discounts at exp(-int r) instead of the deterministic df
+            if ( _premium_currency->GetRateModel() )
+            {
+                C->SetHwExponentNode( _premium_currency->GetHwExponentNode( NC ) );
+            }
         } );
 }
 

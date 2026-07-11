@@ -22,6 +22,11 @@ class VarianceSwapFlowNode : public MonteCarloNode
     //! discrete observation schedule as sorted date indices (today's index 0 is the
     //! implicit first fixing). Empty -> continuous observation (every diffusion step).
     vector<size_t> _observation_date_index;
+    //! seasoned swaps: realised past sum of squared log-returns (a constant, from
+    //! the fixings) and the whole-window annualizer YearFraction(start, maturity);
+    //! 0 keeps the spot-started behaviour (annualize by the grid's maturity time)
+    double _past_variance = 0;
+    double _total_year_fraction = 0;
 
   public:
     //! at the flow date, compute annualized realized variance and emit the swap cash
@@ -39,6 +44,8 @@ class VarianceSwapFlowNode : public MonteCarloNode
     void SetFlowDateIndex( size_t DateIndex );       //!< set the maturity date index
     //! set the discrete fixing schedule (sorted date indices; empty = continuous)
     void SetObservationDateIndices( const vector<size_t>& DateIndices );
+    void SetPastVariance( double PastSum2 );               //!< realised past sum of squared returns
+    void SetTotalYearFraction( double TotalYearFraction ); //!< start -> maturity annualizer
 
     VarianceSwapFlowNode( const string& Name );
     ~VarianceSwapFlowNode() override;

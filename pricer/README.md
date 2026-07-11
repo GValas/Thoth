@@ -12,8 +12,9 @@ usable as a batch tool or as an HTTP service.
 
 **Pricers** (each engine is its own kind/tag: `!mcl_pricer` / `!pde_pricer` / `!ana_pricer`)
 - **Monte-Carlo (`!mcl_pricer`)** — correlated geometric Brownian motion via a Cholesky
-  factorisation of the correlation matrix; exact log-Euler step for constant
-  volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`;
+  factorisation of the correlation matrix (one factor per diffusion step — of the
+  step-average matrix — when the correlation is term-structured); exact log-Euler
+  step for constant volatility (no discretisation bias). For a **local-vol** surface (`sabr_volatility`;
   mono, basket and composite underlyings) it diffuses the **Dupire** local vol
   sampled onto per-date log-spot grids, with a log-space **Milstein** step that
   cuts the state-dependent
@@ -143,6 +144,20 @@ underlying's surface exposes is silently skipped.
   — the three engines agree on a monthly-fixing swap where the add-on is ~7% of
   the fair variance.
   `0`/absent keeps the continuous convention (every diffusion step).
+  **Seasoned (in-life) swaps**: an optional `start` date in the past plus a
+  `fixings` reference (a `!simple_fixing_data` holding the realised
+  observations) price a swap already running: the realised leg is the sum of
+  squared log-returns over the past fixings — validated against the observation
+  schedule, closed by the **last-fixing → spot bridge** — and every engine
+  time-weights it with its own future fair leg,
+  `fair_total = (past_sum2 + fair_future·T_future)/T_total`. The discrete
+  schedule stays anchored on `start` so past and future fixings align; the
+  bridge makes the position spot-sensitive, and ANA/PDE report its analytic
+  delta/gamma (a fresh swap stays first-order neutral). Splitting the interval
+  running through today drops the drift-level cross term — the standard
+  mid-life convention, and exactly what the MC path (restarting at the live
+  spot) realises, so the three engines agree by construction
+  (`tests/test_seasoned_varswap.cpp`, demo `samples/seasoned_varswap.yaml`).
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
@@ -152,10 +167,47 @@ underlying's surface exposes is silently skipped.
 - `yield_curve`, `repo_curve`, `continuous_dividends_curve`,
   `discrete_dividends`, `correlation_matrix`. Curves carry a `dates`/`values` term structure and are
   read by **linear interpolation on the (continuously-compounded) rate** between
-  pillars (ACT/365 weight), held flat beyond the first/last pillar. A
+  pillars (ACT/365 weight), held flat beyond the first/last pillar.
+  A `currency` names its **projection / funding** curve (`rate` — every forward
+  and drift grows on it) and, optionally, a distinct **OIS / collateral** curve
+  (`discount_rate`) that all cash flows are **discounted** on (multi-curve): the
+  ANA discount factors, the PDE per-step discount rates, the MCL `ContractNode`
+  and the American LSM discounting all read the OIS curve, while forwards, FX
+  covered-parity drifts and quanto carries stay on the projection curve. The rho
+  Greek bumps both curves in parallel. Omitting `discount_rate` reduces exactly
+  to the historic single-curve behaviour. See `samples/multicurve.yaml`.
+  A `currency` may further carry a **stochastic short rate** (`rate_model`, a
+  `hull_white` object: `mean_reversion` a > 0, `volatility` σ_r in percent) —
+  the one-factor **Hull-White equity-rate hybrid**. The initial discount curve
+  is fitted **by construction** (the engine works on the OU factor
+  x, r = x + α(t), with the ∫α convexity in closed form — θ(t) never appears):
+  the **MCL** diffuses x with the exact OU transition, discounts **pathwise**
+  with exp(−∫r) and drifts the equity at the stochastic rate (the only
+  discretisation bias is the trapezoid ∫x, second order in the step); the
+  **ANA** prices the BS+HW European vanilla in closed form — unchanged forward
+  and OIS df, effective T-forward variance
+  σ_eff²T = σ_S²T + 2ρσ_Sσ_r∫B + σ_r²∫B², B(t) = (1−e^{−a(T−t)})/a. The
+  equity/rate correlation ρ is the matrix entry against the pseudo-single
+  **`<currency>_ir`** (the `<name>_var` convention; pillar-constant under a
+  term-structured matrix, validated). Calibration of (a, σ_r) to swaptions is
+  out of scope: both are direct inputs. See `samples/hull_white.yaml`.
   A `correlation_matrix` takes either a full row-major `matrix` or a lower-triangular
   `symmetric_matrix` (diagonal included, length `n(n+1)/2`); either way it must be
-  symmetric positive-definite (validated at load).
+  symmetric positive-definite (validated at load). With an optional `maturities`
+  pillar list (year fractions, strictly increasing) the same flat field carries one
+  matrix per pillar **concatenated**, and the correlation becomes **term-structured**:
+  entries are interpolated linearly in time between pillars and held flat beyond
+  (a convex combination of correlation matrices stays one, so every interpolated
+  matrix is valid; each pillar is validated positive-definite at load). The engines
+  consume exact integrated views of the piecewise-linear structure: the analytic
+  quanto / composite / basket-moment formulas read the running average
+  `rho_bar(T) = (1/T)*int_0^T rho`, the PDE telescopes the per-step quanto carry,
+  and the Monte-Carlo correlates each step's increments with the Cholesky factor
+  of the **step-average** matrix (so the integrated covariance is reproduced
+  exactly wherever the diffusion dates fall). The spot/variance `<name>_var`
+  entries of a stochastic-vol underlying must be identical across pillars (the
+  engines consume a single scalar ρ; validated at load). See
+  `samples/term_correlation.yaml`.
   `discrete_dividends` is an (ex-`dates`, cash `amounts`) schedule on an equity,
   priced by the **escrowed-dividend model**: the forward (and the MCL diffusion
   spot) net the present value of the dividends due before maturity off the spot,
@@ -378,6 +430,31 @@ the calibrated model must reproduce), then the LSV model (a deliberately
 off-level Heston base + calibrated leverage) through MCL and PDE. The three
 premiums agree to MC / 2-D-grid error, demonstrating the Dupire matching.
 
+`samples/seasoned_varswap.yaml` is the in-life variance swap demo: a swap
+started 6 months ago (30-day observations, realised leg from a
+`!simple_fixing_data` at ~40% realised vol vs a 20% future implied), priced by
+the three engines — they agree (~−44.9 on 10000 notional, strike 25), and all
+three report the same bridge delta (ANA/PDE analytic, MCL by bump — identical
+to 10 decimals, the future strip being first-order neutral).
+
+`samples/hull_white.yaml` is the equity-rate hybrid demo: a 1y ATM call on a
+EUR equity whose currency carries a Hull-White short rate (a = 10%, σ_r = 2%,
+ρ(eq, eur_ir) = +0.5) over the multi-curve setup — ANA (effective-vol closed
+form, ≈ 16.38) and MCL (pathwise stochastic discounting) agree within the MC
+error; the positive equity/rate correlation raises the price vs the
+deterministic-rate 16.19.
+
+`samples/multicurve.yaml` is the multi-curve / OIS demo: one 1y ATM call priced
+by the three engines with an 8% projection curve and a 5% OIS `discount_rate`
+on the currency — all three agree on Black(F at 8%, df at 5%) ≈ 16.19, and the
+ANA/MCL rho Greeks agree under the joint two-curve bump.
+
+`samples/term_correlation.yaml` is the term-structured correlation demo: a 3m/9m
+two-pillar matrix over two equities and one FX pair (asset/FX correlation decaying
+0.8 → −0.4, eq/eq 0.9 → −0.3), pricing a 1y USD-quanto call by ANA (exact
+integrated ρ) and MCL (per-step Cholesky — agrees within MC error) plus a 50/50
+basket call under the decaying eq/eq correlation.
+
 `samples/test.yaml` is a small cross-engine sanity book: three European vanillas
 (ATM call, OTM put, ITM call) on one equity, each priced by PDE, MCL and ANA — plus
 the ATM call also on the GPU MCL engine (`allow_gpu`, CPU fallback off-CUDA) — as a
@@ -589,6 +666,28 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
 
 ## Notes & limitations
 
+- **Hull-White hybrid scope**: a book with a `rate_model` currency must be
+  single-currency (no FX factors, quanto or composite settlements), on
+  **`bs_volatility` equities only**, and **European** (the LSM American pass
+  discounts deterministically — rejected). The **ANA** engine additionally
+  restricts to the mono-equity European vanilla (barriers / variance swaps have
+  no deterministic-df closed form under stochastic rates and are rejected);
+  MCL prices any supported European payoff pathwise. The **PDE** engine rejects
+  the hybrid entirely (a 2-D (S, r) ADI grid is a TODO). Rho bumps the curves
+  only — (a, σ_r) sensitivities are not produced.
+- **Term-structured correlation** interpolates the pillar matrices with **constant
+  FX vols** in the pivot-triangle algebra (the same constant-vol convention the
+  triangle formulas already assume): the products corr×vol consumed by the quanto /
+  composite drifts are linear in the instantaneous entries, so the running-average
+  entries make those drifts exact integrals. One path is an approximation: a
+  **composite used as a correlated leg** of a further quanto (the
+  composite-vol / composite-correl nodes take a `sqrt` of the averaged entry,
+  which is nonlinear in ρ) — exact for a constant matrix, second-order in the
+  pillar spread otherwise. Basket **moment matching** pairs the
+  `[0, T]`-averaged correlations with the components' total vols — exact for
+  constant component vols, the usual ATM approximation otherwise. The
+  spot/variance `<name>_var` entries must be pillar-independent (validated), and
+  the leverage calibration / Heston QE keep reading that single scalar ρ.
 - **American vanilla** exercise is supported by **both** the PDE pricer and the
   Monte-Carlo pricer (Longstaff-Schwartz least-squares MC, a lower bound on the
   true value). American basket / path-dependent payoffs are not yet covered. An

@@ -231,7 +231,9 @@
         "maturity": { "$ref": "#/$defs/date" },
         "volatility_strike": { "type": "number", "description": "Vol strike in percent." },
         "notional": { "type": "number" },
-        "observation_period_days": { "type": "integer", "minimum": 0, "description": "Days between realized-variance fixings (today + k*period up to maturity). 0/absent = continuous observation (every diffusion step)." }
+        "observation_period_days": { "type": "integer", "minimum": 0, "description": "Days between realized-variance fixings (anchor + k*period up to maturity; anchor = start for a seasoned swap, today otherwise). 0/absent = continuous observation (every diffusion step)." },
+        "start": { "$ref": "#/$defs/date", "description": "Optional observation start in the past (seasoned / in-life swap): the realised leg is read from `fixings`, the future leg is priced from today and both are time-weighted over [start, maturity]." },
+        "fixings": { "$ref": "#/$defs/ref", "description": "Name of the !simple_fixing_data with the past observations (required with a past `start`; must include the start date, and every past schedule date for a discrete swap)." }
       }
     },
 
@@ -305,7 +307,21 @@
       "additionalProperties": false,
       "required": ["rate"],
       "properties": {
-        "rate": { "$ref": "#/$defs/ref", "description": "Name of the !yield_curve." }
+        "rate": { "$ref": "#/$defs/ref", "description": "Name of the !yield_curve (projection / funding: forwards and drifts; also discounts when discount_rate is absent)." },
+        "discount_rate": { "$ref": "#/$defs/ref", "description": "Optional name of the OIS / collateral !yield_curve cash flows are discounted on (multi-curve); defaults to rate." },
+        "rate_model": { "$ref": "#/$defs/ref", "description": "Optional name of a !hull_white stochastic short-rate model on this currency (equity-rate hybrid; the equity/rate correlation is the matrix entry against '<currency>_ir')." }
+      }
+    },
+
+    "hull_white": {
+      "type": "object",
+      "title": "!hull_white",
+      "description": "One-factor Hull-White short-rate model, attached to a !currency via rate_model. The initial discount curve is fitted by construction; MCL diffuses the exact OU factor with pathwise discounting, ANA prices the BS+HW European vanilla with the effective (T-forward) variance, PDE rejects it (no 2-D (S,r) grid yet).",
+      "additionalProperties": false,
+      "required": ["mean_reversion", "volatility"],
+      "properties": {
+        "mean_reversion": { "type": "number", "description": "a > 0, absolute (e.g. 0.03)." },
+        "volatility": { "type": "number", "description": "sigma_r in percent (1.0 -> 0.01), >= 0." }
       }
     },
 
@@ -420,15 +436,16 @@
     "correlation_matrix": {
       "type": "object",
       "title": "!correlation_matrix",
-      "description": "Correlation between underlyings (and optionally forexs). Provide exactly one of `matrix` (full, row-major) or `symmetric_matrix` (lower triangle).",
+      "description": "Correlation between underlyings (and optionally forexs). Provide exactly one of `matrix` (full, row-major) or `symmetric_matrix` (lower triangle). With `maturities` (year fractions, strictly increasing) the same field carries one matrix per pillar CONCATENATED; entries are interpolated linearly in time between pillars and flat beyond (term-structured correlation).",
       "additionalProperties": false,
       "anyOf": [
         { "required": ["matrix"] },
         { "required": ["symmetric_matrix"] }
       ],
       "properties": {
-        "matrix": { "$ref": "#/$defs/numberList", "description": "Full row-major correlation matrix." },
-        "symmetric_matrix": { "$ref": "#/$defs/numberList", "description": "Lower-triangle correlation entries." },
+        "matrix": { "$ref": "#/$defs/numberList", "description": "Full row-major correlation matrix; with `maturities`, the P pillar matrices concatenated (length = P * n^2)." },
+        "symmetric_matrix": { "$ref": "#/$defs/numberList", "description": "Lower-triangle correlation entries; with `maturities`, the P pillar triangles concatenated (length = P * n(n+1)/2)." },
+        "maturities": { "$ref": "#/$defs/numberList", "description": "Optional pillar maturities (year fractions, strictly increasing) making the matrix term-structured. Spot/variance `<name>_var` and rate-factor `<ccy>_ir` entries must be identical across pillars." },
         "underlyings": { "$ref": "#/$defs/refList" },
         "forexs": { "$ref": "#/$defs/refList" }
       }

@@ -1,0 +1,140 @@
+root: term_correl_demo
+
+# Term-structured correlation demo. The !correlation_matrix carries a
+# `maturities` pillar list (year fractions) and one matrix per pillar,
+# CONCATENATED in the same flat field; entries are interpolated linearly in
+# time between pillars and held flat beyond. Here the (asset, EUR/USD FX)
+# correlation decays from +0.8 (short-dated) to -0.4 (beyond 9 months), and the
+# eq_a/eq_b pair from 0.9 to -0.3 — a typical "short-term co-crash, long-term
+# decoupling" shape.
+#
+# Three pricings on one 1y horizon so the integrated handling is comparable:
+#   - quanto_ana:  the quanto call's drift integrates rho exactly
+#                  (running average rho_bar(T) in the closed form)
+#   - quanto_mcl:  the same contract diffused with one Cholesky factor per
+#                  step (of the step-average matrix) and the running-average
+#                  quanto adjustment -> agrees with ANA within the MC error
+#   - basket_mcl:  a 50/50 two-asset basket call under the decaying eq/eq
+#                  correlation; its terminal law only depends on the
+#                  integrated covariance, so it prices like the equivalent
+#                  constant matrix at rho_bar(T)
+
+term_correl_demo: !sequence
+  result: term_correl_demo_result
+  tasks: [quanto_ana, quanto_mcl, basket_mcl]
+
+quanto_ana: !ana_pricer
+  today: 2000-01-01
+  book: quanto_book
+  currency: usd
+  correlation: correl
+  indicators: [premium]
+  result: quanto_ana_result
+
+quanto_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: quanto_book
+  currency: usd
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium, delta]
+  result: quanto_mcl_result
+
+basket_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: basket_book
+  currency: eur
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium]
+  result: basket_mcl_result
+
+mcl_config: !mcl_configuration
+  max_day_step: 15
+  min_day_step: -1
+  paths: 200000
+  vol_year_step: 0.01
+  use_sobol: true
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: eur_rate
+eur_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [8, 8]
+
+usd: !currency
+  rate: usd_rate
+usd_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [5, 5]
+
+eq_a: !equity
+  spot: 100
+  volatility: vol_a
+  currency: eur
+vol_a: !bs_volatility
+  volatility: 30
+  calendar: calendar
+
+eq_b: !equity
+  spot: 100
+  volatility: vol_b
+  currency: eur
+vol_b: !bs_volatility
+  volatility: 20
+  calendar: calendar
+
+eur/usd: !forex
+  base_currency: usd
+  underlying_currency: eur
+  spot: 1.5
+  volatility: fx_vol
+fx_vol: !bs_volatility
+  volatility: 15
+
+# 3 singles (eq_a, eq_b, eur/usd) x 2 pillars (3m, 9m). Row/column order is
+# [eq_a, eq_b, eur/usd]; each pillar is one full row-major 3x3 block.
+correl: !correlation_matrix
+  underlyings: [eq_a, eq_b]
+  forexs: [eur/usd]
+  maturities: [0.25, 0.75]
+  matrix: [
+    #  3m pillar
+    1.0, 0.9, 0.8,
+    0.9, 1.0, 0.6,
+    0.8, 0.6, 1.0,
+    #  9m pillar
+    1.0, -0.3, -0.4,
+    -0.3, 1.0, 0.1,
+    -0.4, 0.1, 1.0,
+  ]
+
+quanto_book: !book
+  contracts: [quanto_call]
+quanto_call: !vanilla
+  underlying: eq_a
+  premium_currency: usd
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
+
+basket_book: !book
+  contracts: [basket_call]
+basket: !basket
+  underlyings: [eq_a, eq_b]
+  weights: [0.5, 0.5]
+basket_call: !vanilla
+  underlying: basket
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european

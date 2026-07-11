@@ -95,9 +95,12 @@ double AbsoluteBasket::GetImplicitVol( const double Strike,
 
     //! moment matching: pull the component cross-correlation sub-matrix (ordered to
     //! match udl_list), then compute the first four central moments M1..M4 of the
-    //! weighted lognormal sum. ExtractMatrix needs the same name order as fwds/vols.
+    //! weighted lognormal sum. ExtractTermMatrix needs the same name order as
+    //! fwds/vols; its [0, T]-averaged entries pair with the TOTAL vols sigma*sqrt(T)
+    //! so each cross moment carries the integrated covariance (exact under constant
+    //! component vols, the same approximation as the vols themselves otherwise).
     double M1, M2, M3, M4;
-    LaMatrix correls = _correlation->ExtractMatrix( udl_list, fx_list );
+    LaMatrix correls = _correlation->ExtractTermMatrix( udl_list, fx_list, dt );
     LN_to_M4( fwds, vols, correls, M1, M2, M3, M4 );
 
     //! shifted log normal formula: fit an SLN (mean Mu, var Var, shift D) to the

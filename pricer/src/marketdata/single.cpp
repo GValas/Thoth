@@ -103,8 +103,16 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
             } );
     }
 
-    return NC.GetOrCreate<SpotDiffusionNode>(
-        _name + node_name::SPOT,
+    //! stochastic rates (Hull-White on the currency): the deterministic-carry
+    //! diffusion is built under a "#carry" sub-key and wrapped by a HybridSpotNode
+    //! that multiplies by exp( int x + V/2 ) — the wrapper takes over the "#spot"
+    //! key, so payoffs / barriers / recordings read the hybrid spot transparently
+    //! (same pattern as the quanto adjustment). BS-vol only (validated upstream).
+    const bool hybrid = ( _currency->GetRateModel() != nullptr );
+    const string spot_key = _name + node_name::SPOT + ( hybrid ? node_name::CARRY : "" );
+
+    MonteCarloNode* spot = NC.GetOrCreate<SpotDiffusionNode>(
+        spot_key,
         [&]( SpotDiffusionNode* S )
         {
             S->SetBrownianNode( NC.GetNode( _name + node_name::BROWNIAN ) );
@@ -129,6 +137,18 @@ MonteCarloNode* Single::GetNode( NodeCollector& NC )
             {
                 S->SetLocalVolNode( GetVolNode( NC ) );
             }
+        } );
+
+    if ( !hybrid )
+    {
+        return spot;
+    }
+    return NC.GetOrCreate<HybridSpotNode>(
+        _name + node_name::SPOT,
+        [&]( HybridSpotNode* H )
+        {
+            H->SetSpotNode( spot );
+            H->SetExponentNode( _currency->GetHwExponentNode( NC ) );
         } );
 }
 
@@ -504,7 +524,11 @@ double Single::GetForward( const date& MaturityDate,
         double dt = YearFraction( _today, MaturityDate );
         double v_s = GetImplicitVol( 0, MaturityDate );
         double v_fx = _correlation->GetFxVol( _currency->GetName(), QuantoCurrency->GetName() );
-        double rho = _correlation->GetValue( _currency->GetName(), QuantoCurrency->GetName(), _name );
+        //! rho averaged over [0, dt]: rho_bar*dt = int_0^dt rho(u) du, so the quanto
+        //! drift is the exact integral for a term-structured correlation (and the
+        //! constant entry otherwise)
+        double rho = _correlation->GetTermValue( _currency->GetName(), QuantoCurrency->GetName(),
+                                                 _name, dt );
         f *= exp( -rho * v_s * v_fx * dt );
     }
     return f;

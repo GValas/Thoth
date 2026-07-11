@@ -49,10 +49,24 @@ void VarianceSwapFlowNode::ComputeValue( size_t DateIndex )
             prev = s;
         }
     }
-    double T = _t_list[_flow_date_index]; //!< year-fraction to maturity (annualizer)
-    double realized_variance = ( T > 0 ) ? sum2 / T : 0;
+    //! annualizer: the whole observation window for a seasoned swap (start ->
+    //! maturity, with the realised past sum added), the grid's maturity time
+    //! otherwise — the historic spot-started behaviour, bit for bit
+    double T = ( _total_year_fraction > 0 ) ? _total_year_fraction
+                                            : _t_list[_flow_date_index];
+    double realized_variance = ( T > 0 ) ? ( _past_variance + sum2 ) / T : 0;
 
     _value_list[DateIndex] = _notional * ( realized_variance - _strike_variance );
+}
+
+void VarianceSwapFlowNode::SetPastVariance( double PastSum2 )
+{
+    _past_variance = PastSum2;
+}
+
+void VarianceSwapFlowNode::SetTotalYearFraction( double TotalYearFraction )
+{
+    _total_year_fraction = TotalYearFraction;
 }
 
 //! At maturity, declare the spot at every date 0..maturity (the variance estimator

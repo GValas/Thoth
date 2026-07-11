@@ -6,7 +6,8 @@
 #include "cancellation.hpp"
 #include "enums.hpp"
 #include "progress_bar.hpp"
-#include "single.hpp" //!< Volatility / StochasticVolParams (MonoVol helper)
+#include "hull_white.hpp" //!< sigma_eff of the BS+HW European vanilla
+#include "single.hpp"     //!< Volatility / StochasticVolParams (MonoVol helper)
 #include "vanilla.hpp"
 #include "variance_swap.hpp"
 
@@ -70,6 +71,24 @@ void PricerANA::PreCheck()
         {
             ERR( msg );
         }
+
+        //! stochastic rates (Hull-White): the only ANA closed form is the BS+HW
+        //! European vanilla on a mono equity settling in its own currency — the
+        //! barrier / variance-swap formulas assume deterministic discounting.
+        Currency* pc = c->GetPremiumCurrency();
+        Currency* uc = c->GetUnderlying()->GetCurrency();
+        if ( pc->GetRateModel() || uc->GetRateModel() )
+        {
+            Volatility* mvol = MonoVol( c->GetUnderlying() );
+            const bool hw_ok = van && !van->IsAmerican() && pc == uc &&
+                               c->GetUnderlying()->IsMono() && mvol &&
+                               !mvol->IsStochastic() && !mvol->_is_local;
+            if ( !hw_ok )
+            {
+                ERR( msg + " under stochastic rates (hull_white): only a European "
+                           "vanilla on a same-currency BS-vol equity has a closed form" );
+            }
+        }
     }
 }
 
@@ -128,7 +147,7 @@ void PricerANA::PriceVanilla( Vanilla* Opt )
     //! bs inputs: year fraction, discount factor, drift-carrying forward, implied
     //! vol at this strike/maturity
     double t = YearFraction( _today, maturity );
-    double df = ccy->GetRate()->GetDiscountFactor( maturity );
+    double df = ccy->GetDiscountRate()->GetDiscountFactor( maturity );
     double f = u->GetForward( maturity, ccy );
     double v = u->GetImplicitVol( k, maturity );
 
@@ -147,6 +166,26 @@ void PricerANA::PriceVanilla( Vanilla* Opt )
                                               h.jump_intensity, h.jump_mean, h.jump_vol );
         out.delta = out.gamma = 0;
         return;
+    }
+
+    //! stochastic rates (Hull-White on the premium currency): a BS-vol European
+    //! vanilla stays closed-form under the T-forward measure — the forward and the
+    //! OIS df are unchanged, only the variance gains the rate/bond term
+    //!   sigma_eff^2 t = v^2 t + 2 rho v sigma_r int B + sigma_r^2 int B^2
+    //! with rho = corr(equity, "<ccy>_ir") from the correlation matrix. PreCheck
+    //! restricts HW books to exactly this case (mono BS equity, same currency).
+    if ( HullWhite* hw = ccy->GetRateModel() )
+    {
+        if ( !_correlation )
+        {
+            ERR( "ANA pricing '" + _name + "': stochastic rates need a correlation matrix "
+                                           "(equity / rate-factor correlation)" );
+        }
+        const double rho = _correlation->GetValue( u->GetName(), ccy->IrFactorName() );
+        if ( t > 0 )
+        {
+            v = sqrt( v * v + hw->EffectiveVarianceAddOn( v, rho, t ) / t );
+        }
     }
 
     //! deterministic-vol Black-Scholes: closed-form premium + delta per option type
@@ -189,7 +228,7 @@ void PricerANA::PriceBarrier( Barrier* Bar )
 
     //! market data (same conventions as the vanilla)
     double t = YearFraction( _today, maturity );
-    double df = ccy->GetRate()->GetDiscountFactor( maturity );
+    double df = ccy->GetDiscountRate()->GetDiscountFactor( maturity );
     double f = u->GetForward( maturity, ccy );
     double s = u->GetSpot();
     double v = u->GetImplicitVol( Bar->_strike, maturity );
@@ -231,7 +270,7 @@ void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
 
     //! year fraction, discount factor and the drift-carrying forward at maturity
     double t = YearFraction( _today, maturity );
-    double df = ccy->GetRate()->GetDiscountFactor( maturity );
+    double df = ccy->GetDiscountRate()->GetDiscountFactor( maturity );
     double fwd = u->GetForward( maturity, ccy );
 
     //! build the strike grid (+/- span ATM std devs around the forward) and sample
@@ -270,7 +309,25 @@ void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
 
     double k_var = Swap->GetVolatilityStrike() * Swap->GetVolatilityStrike(); //!< strike vol -> strike variance
 
+    //! seasoned swap: time-weight the realised past leg with the future fair
+    //! variance over the whole window — fair_total = (past + fair*T_fut)/T_total.
+    //! The bridge log(S/F_last) makes the position spot-sensitive; its delta and
+    //! gamma are analytic — d(bridge^2)/dS = 2 log(S/F_last)/S and
+    //! d2 = 2(1 - log(S/F_last))/S^2 — while the future strip stays first-order
+    //! neutral by construction.
+    double delta = 0, gamma = 0;
+    if ( Swap->IsSeasoned() )
+    {
+        const double t_tot = Swap->GetTotalYearFraction();
+        k_fair = ( Swap->PastSumSquaredReturns() + k_fair * t ) / t_tot;
+        const double s = u->GetSpot();
+        const double scale = Swap->GetNotional() * df / t_tot;
+        const double log_bridge = Swap->LastFixingLogBridge();
+        delta = scale * 2 * log_bridge / s;
+        gamma = scale * 2 * ( 1 - log_bridge ) / ( s * s );
+    }
+
     out.premium = VarSwap_Price( Swap->GetNotional(), df, k_fair, k_var );
-    out.delta = 0; //!< first-order spot-neutral by construction (model-free strip)
-    out.gamma = 0;
+    out.delta = delta; //!< the seasoned bridge's analytic delta; 0 spot-started
+    out.gamma = gamma; //!< (a fresh swap is first-order neutral by construction)
 }

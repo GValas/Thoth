@@ -61,9 +61,12 @@ double Composite::GetImplicitVol( const double Strike,
     double v_eq = _underlying->GetImplicitVol( Strike, MaturityDate );
     double v_fx = _correlation->GetFxVol( _underlying->GetCurrency()->GetName(),
                                           _currency->GetName() );
-    double rho = _correlation->GetValue( _underlying->GetCurrency()->GetName(),
-                                         _currency->GetName(),
-                                         _underlying->Object::GetName() );
+    //! rho averaged over [0, T]: the composite log-variance is the integral of the
+    //! instantaneous covariance, so the term average is the exact entry here
+    double rho = _correlation->GetTermValue( _underlying->GetCurrency()->GetName(),
+                                             _currency->GetName(),
+                                             _underlying->Object::GetName(),
+                                             YearFraction( _today, MaturityDate ) );
     double v = sqrt( v_eq * v_eq + v_fx * v_fx + 2 * rho * v_eq * v_fx );
     return v;
 }
@@ -106,9 +109,11 @@ double Composite::GetForward( const date& MaturityDate,
         double v_fx = _correlation->GetFxVol( _currency->GetName(), QuantoCurrency->GetName() );
         //! sign flip: correlation is stored for ccy->quanto, but the drift uses the
         //! correlation of the asset with the *inverse* FX move, hence the leading minus.
-        double rho = -_correlation->GetValue( _currency->GetName(),
-                                              QuantoCurrency->GetName(),
-                                              _underlying->GetName() );
+        //! Averaged over [0, dt] so the quanto drift is the exact integral.
+        double rho = -_correlation->GetTermValue( _currency->GetName(),
+                                                  QuantoCurrency->GetName(),
+                                                  _underlying->GetName(),
+                                                  dt );
         //! quanto drift over [today,T]: exp((rho*sigma_fx*sigma_eq + sigma_fx^2)*dt).
         qto = exp( ( rho * v_fx * v_eq + v_fx * v_fx ) * dt );
     }

@@ -36,6 +36,13 @@ void ContractNode::ComputeValue( size_t DateIndex )
             double r1 = _rate_curve_node->GetValue( DateIndex );
             double r2 = _rate_curve_node->GetValue( _flow_date_index_list[i] );
             df = exp( dt1 * r1 - dt2 * r2 );
+            //! stochastic rates (Hull-White): the pathwise part of -int r is the
+            //! exponent X = int x + V/2, applied as the same forward/backward ratio
+            if ( _hw_exponent_node )
+            {
+                df *= exp( _hw_exponent_node->GetValue( DateIndex ) -
+                           _hw_exponent_node->GetValue( _flow_date_index_list[i] ) );
+            }
         }
         //! the flow's value is always taken at its own flow date, then discounted
         x += _flow_node_list[i]->GetValue( _flow_date_index_list[i] ) * df;
@@ -55,9 +62,16 @@ void ContractNode::SetRateCurveNode( MonteCarloNode* N )
 {
     _rate_curve_node = N;
 }
-//! independent of the valuation DateIndex: each flow is needed at its own pay date,
-//! together with the rate curve at that date for discounting
-void ContractNode::GetDateDependencies( size_t /*DateIndex*/,
+
+void ContractNode::SetHwExponentNode( MonteCarloNode* N )
+{
+    _hw_exponent_node = N;
+}
+//! each flow is needed at its own pay date, together with the rate curve (and the
+//! optional stochastic-rate exponent) at that date; the exponent is also needed
+//! at the valuation DateIndex itself (its value is pathwise, unlike the
+//! fill-once curve node whose DateIndex read needs no explicit edge)
+void ContractNode::GetDateDependencies( size_t DateIndex,
                                         vector<MonteCarloNode*>& NodeList,
                                         vector<size_t>& DateList )
 {
@@ -69,5 +83,12 @@ void ContractNode::GetDateDependencies( size_t /*DateIndex*/,
         DateList.push_back( _flow_date_index_list[i] );
         NodeList.push_back( _rate_curve_node );
         DateList.push_back( _flow_date_index_list[i] );
+        if ( _hw_exponent_node )
+        {
+            NodeList.push_back( _hw_exponent_node );
+            DateList.push_back( _flow_date_index_list[i] );
+            NodeList.push_back( _hw_exponent_node );
+            DateList.push_back( DateIndex );
+        }
     }
 }

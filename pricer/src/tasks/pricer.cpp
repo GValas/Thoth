@@ -200,12 +200,19 @@ void Pricer::ApplyVolShift( double Shift )
     }
 }
 
-//! parallel shift applied to every currency's yield curve
+//! parallel shift applied to every currency's yield curve(s): rho bumps the
+//! projection AND the (distinct) discounting curve — a parallel move of "rates"
+//! moves both in a multi-curve book (the same-object guard avoids double-bumping
+//! single-curve currencies)
 void Pricer::ApplyRateShift( double Shift )
 {
     for ( Currency* c : _currency_set )
     {
         c->GetRate()->ApplyShift( RISK_FACTOR_RATE, Shift );
+        if ( c->HasDistinctDiscountCurve() )
+        {
+            c->GetDiscountRate()->ApplyShift( RISK_FACTOR_RATE, Shift );
+        }
     }
 }
 
@@ -335,18 +342,25 @@ Pricer::BumpGreeks Pricer::BumpAndRevalueGreeks( double P0,
         g.vega = ( pu - P0 ) / GREEK_VOL_BUMP * 0.01;
     }
 
-    //! rho : one-sided parallel rate bump on every currency, per 1% (0.01)
+    //! rho : one-sided parallel rate bump on every currency, per 1% (0.01) —
+    //! projection AND (distinct) discounting curves together, as in ApplyRateShift
     if ( DoRho )
     {
-        for ( Currency* c : Currencies )
+        auto shift_rates = [&]( double Shift )
         {
-            c->GetRate()->ApplyShift( RISK_FACTOR_RATE, GREEK_RATE_BUMP );
-        }
+            for ( Currency* c : Currencies )
+            {
+                c->GetRate()->ApplyShift( RISK_FACTOR_RATE, Shift );
+                if ( c->HasDistinctDiscountCurve() )
+                {
+                    c->GetDiscountRate()->ApplyShift( RISK_FACTOR_RATE, Shift );
+                }
+            }
+        };
+        shift_rates( GREEK_RATE_BUMP );
         //! restore every shifted rate on scope exit, even if Reprice throws
         ScopeGuard restore_rate( [&]
-                                 {
-            for ( Currency* c : Currencies )
-                c->GetRate()->ApplyShift( RISK_FACTOR_RATE, 0 ); } );
+                                 { shift_rates( 0 ); } );
         TagRepriceGraph( "rho" );
         const double pu = Reprice();
         TagRepriceGraph( "" );

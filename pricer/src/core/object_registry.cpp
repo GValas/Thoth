@@ -42,6 +42,7 @@
 #include "heston_volatility.hpp"
 #include "lsv_volatility.hpp"
 #include "correlation.hpp"
+#include "hull_white.hpp"
 #include "simple_fixing_data.hpp"
 
 namespace
@@ -105,6 +106,7 @@ Object* ObjectManager::Build( const string& ObjectName )
         { KIND_LSV_VOLATILITY, &Create<LsvVolatility> },
         { KIND_SABR_VOLATILITY, &Create<SabrVolatility> },
         { KIND_CORRELATION_MATRIX, &Create<Correlation> },
+        { KIND_HULL_WHITE, &Create<HullWhite> },
         // ---- configurations (engine-parameter objects, referenced by the pricers) ----
         { KIND_DEBUG_CONFIGURATION, &Create<DebugConfiguration> },
         { KIND_PDE_CONFIGURATION, &Create<PdeConfiguration> },

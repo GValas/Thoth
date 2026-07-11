@@ -1,0 +1,92 @@
+root: seasoned_demo
+
+# Seasoned (in-life) variance swap demo. The swap started 6 months ago
+# (start 1999-07-05, 30-day observations, maturity 2000-12-31); the realised
+# leg comes from the !simple_fixing_data (a volatile path: ~40% realised vol vs
+# the 20% future implied), the future leg is priced from today (2000-01-01),
+# and the two are time-weighted over the whole window:
+#   fair_total = ( past_sum2 + fair_future * T_future ) / T_total
+# with the last-fixing -> spot bridge (99 -> 100) closing the realised leg.
+# All three engines share the convention and agree; the ANA/PDE report the
+# bridge's analytic delta/gamma (a seasoned swap is spot-sensitive, a fresh one
+# is first-order neutral).
+
+seasoned_demo: !sequence
+  result: seasoned_demo_result
+  tasks: [vs_ana, vs_pde, vs_mcl]
+
+vs_ana: !ana_pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  correlation: correl
+  indicators: [premium, delta]
+  result: vs_ana_result
+
+vs_pde: !pde_pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  pde_configuration: pde_config
+  correlation: correl
+  indicators: [premium, delta]
+  result: vs_pde_result
+
+vs_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium, delta]
+  result: vs_mcl_result
+
+mcl_config: !mcl_configuration
+  max_day_step: 15
+  min_day_step: -1
+  paths: 200000
+  vol_year_step: 0.01
+  use_sobol: true
+
+pde_config: !pde_configuration
+  vanilla_precision: high
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: rate
+rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [5, 5]
+
+eq: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+vol: !bs_volatility
+  volatility: 20
+  calendar: calendar
+
+correl: !correlation_matrix
+  underlyings: [eq]
+  matrix: [1]
+
+# the realised observations: every 30-day schedule date from start (inclusive)
+# up to today (exclusive) must have a value
+past_fixings: !simple_fixing_data
+  underlying: eq
+  dates: [1999-07-05, 1999-08-04, 1999-09-03, 1999-10-03, 1999-11-02, 1999-12-02]
+  values: [100, 92, 103, 96, 108, 99]
+
+book: !book
+  contracts: [vs]
+vs: !variance_swap
+  underlying: eq
+  premium_currency: eur
+  maturity: 2000-12-31
+  volatility_strike: 25
+  notional: 10000
+  observation_period_days: 30
+  start: 1999-07-05
+  fixings: past_fixings
