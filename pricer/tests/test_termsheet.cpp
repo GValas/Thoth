@@ -95,6 +95,28 @@ TEST_CASE( "termsheet: Phoenix autocallable renders the schedule and the memory"
     CHECK( doc.find( "(1 + m_k)" ) != std::string::npos );      //!< memory multiplier
 }
 
+TEST_CASE( "termsheet: Asian and ratchet render their formal payoff" )
+{
+    std::string asian = Doc( TsCfg(
+        "o: !asian {underlying: eq, premium_currency: eur, strike: 100,"
+        " is_absolute_strike: true, maturity: 2000-12-31, type: call, nominal: 1,"
+        " observation_period_days: 90}\n",
+        "o" ) );
+    CHECK( asian.find( "average-price Asian call" ) != std::string::npos );
+    CHECK( asian.find( "\\frac{1}{" ) != std::string::npos ); //!< the average formula
+    CHECK( asian.find( "Averaging fixings" ) != std::string::npos );
+
+    std::string ratchet = Doc( TsCfg(
+        "o: !ratchet {underlying: eq, premium_currency: eur, maturity: 2000-12-31,"
+        " nominal: 100, observation_period_days: 90, local_floor: -5, local_cap: 5,"
+        " global_floor: 0}\n",
+        "o" ) );
+    CHECK( ratchet.find( "ratchet (cliquet) note" ) != std::string::npos );
+    CHECK( ratchet.find( "locked in" ) != std::string::npos );
+    CHECK( ratchet.find( "R_i = S_{t_i}/S_{t_{i-1}}" ) != std::string::npos );
+    CHECK( ratchet.find( "Period boundaries" ) != std::string::npos );
+}
+
 TEST_CASE( "termsheet: a missing contract reference is rejected" )
 {
     std::string cfg = TsCfg( "o: !vanilla {underlying: eq, premium_currency: eur,"

@@ -5,6 +5,8 @@
 //! headers here when introducing a node kind.
 #include "node_names.hpp"
 #include "autocallable_flow_node.hpp"
+#include "asian_flow_node.hpp"
+#include "ratchet_flow_node.hpp"
 #include "barrier_flow_node.hpp"
 #include "book_node.hpp"
 #include "brownian_node.hpp"

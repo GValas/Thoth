@@ -37,6 +37,8 @@ root: matrix
 #   vanilla multi eu call best-of           mcl         (max of 2 assets; MCL-only)
 #   vanilla multi eu call worst-of          mcl         (min of 2 assets; MCL-only)
 #   variance swap mono                      ana   mcl   pde (ANA replication / MCL realized / PDE accumulated-variance)
+#   asian mono eu call (average-price)             mcl       (arithmetic average; MCL-only, ANA/PDE reject)
+#   ratchet mono (cliquet)                         mcl       (clipped period returns, global floor; MCL-only)
 #
 # 2026 features (each on its own market block — a term correlation / OIS curve /
 # Hull-White rate / past fixings — appended after the shared-market cells):
@@ -169,6 +171,9 @@ matrix: !sequence
     - autocallable_phoenix_mcl
     - autocallable_phoenix_pde
     - autocallable_phoenix_memory_mcl
+    #! path-dependent, Monte-Carlo only (ANA/PDE reject)
+    - asian_mono_eu_call_mcl
+    - ratchet_mono_mcl
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
@@ -1502,3 +1507,48 @@ c_ac_phoenix_mem: !autocallable
   coupon_barrier: 70
   coupon_memory: true
   nominal: 100
+
+# --- Asian (arithmetic average-price) — monthly-averaged 1y ATM call. The
+#     average damps the terminal variance, so it prices well below the vanilla
+#     call. Path-dependent -> MCL only (ANA/PDE reject).
+asian_mono_eu_call_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_asian
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta]
+  result: asian_mono_eu_call_mcl_result
+book_asian: !book
+  contracts: [c_asian]
+c_asian: !asian
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  nominal: 1
+  observation_period_days: 30
+
+# --- Ratchet (cliquet) — a 1y note, quarterly period returns clipped to
+#     [-5%, +5%], global floor 0 (capital-protected). Path-dependent -> MCL only.
+ratchet_mono_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_ratchet
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium]
+  result: ratchet_mono_mcl_result
+book_ratchet: !book
+  contracts: [c_ratchet]
+c_ratchet: !ratchet
+  underlying: eq
+  premium_currency: eur
+  maturity: 2000-12-31
+  nominal: 100
+  observation_period_days: 90
+  local_floor: -5
+  local_cap: 5
+  global_floor: 0

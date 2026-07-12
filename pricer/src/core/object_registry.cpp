@@ -25,6 +25,8 @@
 #include "barrier.hpp"
 #include "variance_swap.hpp"
 #include "autocallable.hpp"
+#include "asian.hpp"
+#include "ratchet.hpp"
 
 //! underlyings
 #include "equity.hpp"
@@ -93,6 +95,8 @@ Object* ObjectManager::Build( const string& ObjectName )
         { KIND_BARRIER, &Create<Barrier> },
         { KIND_VARIANCE_SWAP, &Create<VarianceSwap> },
         { KIND_AUTOCALLABLE, &Create<Autocallable> },
+        { KIND_ASIAN, &Create<Asian> },
+        { KIND_RATCHET, &Create<Ratchet> },
         // ---- underlyings (an equity / forex is itself a single-asset underlying) ----
         { KIND_EQUITY, &Create<Equity> },
         { KIND_BASKET, &Create<AbsoluteBasket> },

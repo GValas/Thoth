@@ -199,6 +199,22 @@ underlying's surface exposes is silently skipped.
   and closed-form coupon strips in `tests/test_autocallable.cpp` /
   `tests/test_phoenix.cpp`); **ANA rejects** the product (no closed form).
   Seasoned (already-running) autocallables are not supported yet.
+- `asian` — an **arithmetic average-price** option: at maturity pays
+  `nominal * max(ω*(A − K), 0)` with `A` the arithmetic mean of the spot over
+  the averaging schedule (`observation_period_days`, monthly by default, up to
+  and including maturity), `ω = ±1` for call/put and `K` absolute or relative
+  (percent of spot). Averaging damps the terminal variance, so it prices below
+  the equivalent vanilla. Path-dependent → **Monte-Carlo only** (a single
+  observation reduces exactly to the vanilla; ANA/PDE reject —
+  `tests/test_asian_ratchet.cpp`).
+- `ratchet` — a **cliquet** note: pays
+  `nominal * clip(Σ clip(Rᵢ, local_floor, local_cap), global_floor, global_cap)`
+  over the period returns `Rᵢ = S(tᵢ)/S(tᵢ₋₁) − 1` on the boundary schedule
+  (today, +k·period, …, maturity). A capped period gain is **locked in** (it
+  cannot be given back by a later fall), and the `global_floor` (default 0) is
+  the note's capital protection; `global_cap` is optional. Floors/caps are in
+  percent. Path-dependent → **Monte-Carlo only** (a locally-flat note pays the
+  deterministic global floor; ANA/PDE reject — `tests/test_asian_ratchet.cpp`).
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
@@ -446,7 +462,10 @@ To exercise every engine at once, `samples/matrix.yaml` is a `!sequence`
 task that runs the full pricer/product matrix (vanilla european/american — call &
 put, quanto, composite, basket / best-of / worst-of, up/down & in/out, continuous &
 discrete barriers, American Heston, variance swap, Heston, Bates, and **SABR
-local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL) in one
+local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL; plus the
+2026 features — **term correlation**, **multi-curve/OIS**, the **Hull-White
+hybrid**, **seasoned variance swaps**, **autocallables** (Athena / Phoenix /
+memory) and the path-dependent **Asian** and **ratchet** notes) in one
 process — price it like any other book (`-batch`, or post it to a server with the
 built-in `-client`). `scripts/run_local_client_matrix.sh` posts it and prints a
 per-product table (method, time, premium and every Greek) — see below.

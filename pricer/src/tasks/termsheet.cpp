@@ -2,6 +2,8 @@
 #include "thoth.hpp"
 #include "termsheet.hpp"
 #include "autocallable.hpp"
+#include "asian.hpp"
+#include "ratchet.hpp"
 #include "barrier.hpp"
 #include "currency.hpp"
 #include "enums.hpp"
@@ -145,6 +147,55 @@ string Termsheet::PayoffSection() const
         return o.str();
     }
 
+    if ( auto* as = dynamic_cast<Asian*>( _contract ) )
+    {
+        const bool call = ( as->GetType() == OptionType::Call );
+        const size_t n = as->GetObservationDates().size();
+        o << "An **arithmetic average-price Asian " << ( call ? "call" : "put" )
+          << "** on " << udl << ": at maturity it pays the option payoff on the "
+          << "**average** level of " << udl << " over " << n
+          << " observation dates (see schedule) rather than on the final level, "
+          << "with strike **K = " << Num( as->GetStrike() ) << "** and a notional of **"
+          << Num( as->GetNominal() ) << "**. Averaging damps the terminal variance, so "
+          << "the Asian is cheaper than the equivalent vanilla.\n\n"
+          << "Formally, with $t_1, \\dots, t_" << n << "$ the observation dates and $A$ "
+          << "the arithmetic mean:\n\n"
+          << "$$ A \\;=\\; \\frac{1}{" << n << "} \\sum_{i=1}^{" << n << "} S_{t_i}, "
+          << "\\qquad \\text{Payoff}(T) \\;=\\; N \\cdot \\max\\!\\big( "
+          << ( call ? "A - K" : "K - A" ) << ",\\; 0 \\big), \\qquad K = "
+          << Num( as->GetStrike() ) << ",\\; N = " << Num( as->GetNominal() ) << " $$\n";
+        return o.str();
+    }
+
+    if ( auto* rt = dynamic_cast<Ratchet*>( _contract ) )
+    {
+        const size_t n = rt->GetObservationDates().size();
+        o << "A **ratchet (cliquet) note** on " << udl << ": at maturity it pays a "
+          << "coupon built from the **period returns** of " << udl << " over "
+          << ( n - 1 ) << " consecutive periods (see schedule). Each period return is "
+          << "clipped to **[" << Num( 100 * rt->LocalFloor() ) << "%, "
+          << Num( 100 * rt->LocalCap() ) << "%]** — a capped gain is **locked in** and "
+          << "cannot be given back by a later fall — and the sum is floored at **"
+          << Num( 100 * rt->GlobalFloor() ) << "%**";
+        if ( rt->HasGlobalCap() )
+        {
+            o << " and capped at **" << Num( 100 * rt->GlobalCap() ) << "%**";
+        }
+        o << " (the global floor is the note's capital protection). Notional **"
+          << Num( rt->GetNominal() ) << "**.\n\n"
+          << "Formally, with $t_0, \\dots, t_" << ( n - 1 ) << "$ the period boundaries, "
+          << "$R_i = S_{t_i}/S_{t_{i-1}} - 1$, local clip $[f, c]$ and global floor $F$"
+          << ( rt->HasGlobalCap() ? " / cap $C$" : "" ) << ":\n\n"
+          << "$$ \\text{Payoff}(T) \\;=\\; N \\cdot "
+          << ( rt->HasGlobalCap() ? "\\min\\!\\Big( C,\\; " : "" )
+          << "\\max\\!\\Big( F,\\; \\sum_{i=1}^{" << ( n - 1 )
+          << "} \\min\\big( c, \\max(f, R_i) \\big) \\Big)"
+          << ( rt->HasGlobalCap() ? " \\Big)" : "" ) << ", \\qquad [f, c] = ["
+          << Num( rt->LocalFloor() ) << ", " << Num( rt->LocalCap() ) << "],\\; F = "
+          << Num( rt->GlobalFloor() ) << " $$\n";
+        return o.str();
+    }
+
     if ( auto* vs = dynamic_cast<VarianceSwap*>( _contract ) )
     {
         o << "At maturity the swap pays **notional x (realized variance - strike "
@@ -281,6 +332,30 @@ string Termsheet::ScheduleSection() const
         o << "## Observation schedule\n\n"
           << "Remaining variance fixings (the maturity date is always the last one):\n\n";
         for ( const date& d : vs->GetObservationDates() )
+        {
+            o << "- " << Iso( d ) << "\n";
+        }
+        o << "\n";
+        return o.str();
+    }
+
+    if ( auto* as = dynamic_cast<Asian*>( _contract ) )
+    {
+        o << "## Observation schedule\n\n"
+          << "Averaging fixings (the maturity date is always the last one):\n\n";
+        for ( const date& d : as->GetObservationDates() )
+        {
+            o << "- " << Iso( d ) << "\n";
+        }
+        o << "\n";
+        return o.str();
+    }
+
+    if ( auto* rt = dynamic_cast<Ratchet*>( _contract ) )
+    {
+        o << "## Observation schedule\n\n"
+          << "Period boundaries (consecutive dates bound each period return):\n\n";
+        for ( const date& d : rt->GetObservationDates() )
         {
             o << "- " << Iso( d ) << "\n";
         }

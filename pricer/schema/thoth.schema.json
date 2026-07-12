@@ -64,6 +64,8 @@
         { "$ref": "#/$defs/barrier" },
         { "$ref": "#/$defs/variance_swap" },
         { "$ref": "#/$defs/autocallable" },
+        { "$ref": "#/$defs/asian" },
+        { "$ref": "#/$defs/ratchet" },
         { "$ref": "#/$defs/termsheet" },
         { "$ref": "#/$defs/equity" },
         { "$ref": "#/$defs/basket" },
@@ -219,6 +221,43 @@
         "barrier_down_level": { "type": "number" },
         "nominal": { "type": "number", "description": "Accepted but currently unused." },
         "is_absolute_strike": { "type": "boolean", "description": "true (default): strike is a cash level. false: strike is a percent of the underlying spot at the valuation date (resolved once against the unbumped spot, so Greeks bump the spot, not the strike). Barrier levels are always absolute." }
+      }
+    },
+
+    "asian": {
+      "type": "object",
+      "title": "!asian",
+      "description": "Arithmetic average-price Asian option: at maturity pays nominal * max(omega*(A - K), 0) with A the arithmetic mean of the spot over the averaging schedule (today + k*observation_period_days, up to and including maturity). Path-dependent -> Monte-Carlo only (ANA/PDE reject).",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "maturity", "strike", "type"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "strike": { "type": "number", "description": "Strike; cash, or percent of the valuation-date spot when is_absolute_strike is false." },
+        "is_absolute_strike": { "type": "boolean", "description": "false: strike is a percent of spot (default true)." },
+        "type": { "type": "string", "enum": ["call", "put"] },
+        "nominal": { "type": "number", "description": "Payoff notional (default 1)." },
+        "observation_period_days": { "type": "integer", "minimum": 1, "description": "Days between averaging fixings (default 30). Schedule = today + k*period up to and including maturity." }
+      }
+    },
+
+    "ratchet": {
+      "type": "object",
+      "title": "!ratchet",
+      "description": "Ratchet / cliquet note: at maturity pays nominal * clip(sum_i clip(R_i, local_floor, local_cap), global_floor, global_cap), with R_i = S(t_i)/S(t_{i-1}) - 1 the period returns over the boundary schedule (today, today + k*period, ..., maturity). A capped period gain is locked in; the global floor (default 0) is the capital protection. Path-dependent -> Monte-Carlo only.",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "maturity", "local_floor", "local_cap"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "nominal": { "type": "number", "description": "Coupon notional (default 100)." },
+        "observation_period_days": { "type": "integer", "minimum": 1, "description": "Days between period boundaries (default 30)." },
+        "local_floor": { "type": "number", "description": "Per-period return floor, percent." },
+        "local_cap": { "type": "number", "description": "Per-period return cap, percent (>= local_floor)." },
+        "global_floor": { "type": "number", "description": "Coupon floor, percent (default 0 -> capital protected)." },
+        "global_cap": { "type": "number", "description": "Optional coupon cap, percent (>= global_floor)." }
       }
     },
 
