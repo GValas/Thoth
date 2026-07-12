@@ -22,13 +22,15 @@ log.txt
 # Engine TODO (local, untracked)
 /pricer/TODO.md
 
-# Claude local settings (runtime memory, worktrees, local settings stay local).
-# Ignore the CONTENTS (not the dir itself) so the agent defs below can be re-included.
-.claude/*
-# …but share the reusable agent definitions with the team
-!.claude/agents/
-.claude/agents/*
-!.claude/agents/*.md
+# Claude local files are per-user (runtime memory, worktrees, local settings) — ignore
+# every .claude/ at any depth (e.g. pricer/.claude/), EXCEPT the reusable agent
+# definitions at the repo root, which we share with the team.
+.claude/
+!/.claude/
+/.claude/*
+!/.claude/agents/
+/.claude/agents/*
+!/.claude/agents/*.md
 
 # ── Web (web/) ──
 web/**/node_modules/
