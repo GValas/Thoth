@@ -63,6 +63,7 @@
         { "$ref": "#/$defs/vanilla" },
         { "$ref": "#/$defs/barrier" },
         { "$ref": "#/$defs/variance_swap" },
+        { "$ref": "#/$defs/autocallable" },
         { "$ref": "#/$defs/equity" },
         { "$ref": "#/$defs/basket" },
         { "$ref": "#/$defs/rainbow" },
@@ -217,6 +218,26 @@
         "barrier_down_level": { "type": "number" },
         "nominal": { "type": "number", "description": "Accepted but currently unused." },
         "is_absolute_strike": { "type": "boolean", "description": "true (default): strike is a cash level. false: strike is a percent of the underlying spot at the valuation date (resolved once against the unbumped spot, so Greeks bump the spot, not the strike). Barrier levels are always absolute." }
+      }
+    },
+
+    "autocallable": {
+      "type": "object",
+      "title": "!autocallable",
+      "description": "Autocallable note, Athena or Phoenix flavour: at the first autocall date with S >= autocall_barrier it redeems early (Athena: nominal * (1 + k*coupon) snowball; Phoenix: bare nominal, the per-period coupons having detached at their own dates whenever S >= coupon_barrier, optionally with memory); at maturity it pays the redemption profile across the autocall/protection levels (linear capital at risk below). Levels are percent of the valuation-date spot (sticky-cash, like relative strikes). Priced by MCL (pathwise, composes with multi-curve and hull_white) and PDE (backward induction; coupon_memory rejected); ANA rejects.",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "maturity", "autocall_dates", "autocall_barrier", "protection_barrier", "coupon"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "maturity": { "$ref": "#/$defs/date" },
+        "autocall_dates": { "$ref": "#/$defs/dateList", "description": "Strictly increasing observation dates, after today and before maturity." },
+        "autocall_barrier": { "type": "number", "description": "Autocall trigger level, percent of the valuation-date spot (e.g. 100)." },
+        "protection_barrier": { "type": "number", "description": "Capital-protection level at maturity, percent of spot (<= autocall_barrier)." },
+        "coupon": { "type": "number", "description": "Per-observation coupon in percent: the Athena snowball accrues k*coupon at the k-th observation; a Phoenix (coupon_barrier set) detaches it per period." },
+        "coupon_barrier": { "type": "number", "description": "Optional Phoenix flavour: per-period coupon trigger, percent of spot (<= autocall_barrier); the coupon is paid at every alive observation with S at or above it, at its own date." },
+        "coupon_memory": { "type": "boolean", "description": "Phoenix only: a paying observation also recovers the consecutively missed coupons. MCL only (the PDE rejects the memory state)." },
+        "nominal": { "type": "number", "description": "Redemption notional (default 100)." }
       }
     },
 

@@ -158,6 +158,18 @@ class PricerPDE : public Pricer
     //! zero a solved layer in the knocked region (used at each monitoring step)
     void ApplyDiscreteBarrier( la_vector* U );
 
+    //! autocallable: backward-induction overwrites — at each observation step the
+    //! layer is set to the accrued rebate wherever the spot is at/above the
+    //! autocall level (the note redeems there, so the continuation value is the
+    //! rebate paid immediately). Empty map -> not an autocallable solve.
+    std::map<int, double> _autocall_steps;
+    double _autocall_level = 0; //!< only read when _autocall_steps is non-empty
+    //! Phoenix flavour: the per-period cash coupon added to the layer in the
+    //! [coupon level, autocall level) zone at each observation step (0 = Athena;
+    //! the memory flavour is path-dependent and rejected by PreCheck)
+    double _phoenix_coupon = 0;
+    double _phoenix_coupon_level = 0;
+
     //! escrowed-dividend model: future-dividend PV at each grid time step (size
     //! N+1, indexed by step i at year-fraction i*k). The grid diffuses the escrowed
     //! value X, so the observed spot at step i is X + _future_pv[i]; the American

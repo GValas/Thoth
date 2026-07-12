@@ -1,0 +1,173 @@
+root: autocall_demo
+
+# Autocallable (Athena) demo: a 2y note on a 20%-vol equity, three ~semiannual
+# autocall observations at 100% of the initial spot, 8% snowball coupon and a
+# 60% capital protection at maturity.
+#
+# Three pricings:
+#   - ac_pde:    backward induction — the layer is overwritten with the accrued
+#                rebate above the level at each observation step (with a
+#                Rannacher restart smoothing the discontinuity, and the top
+#                boundary following the discounted next rebate)
+#   - ac_mcl:    pathwise — one flow node per schedule date, the FIRST trigger
+#                pays; agrees with the PDE within the MC error
+#   - ac_mcl_hw: the same note under a Hull-White short rate (sigma_r 1.5%,
+#                rho(eq, eur_ir) = -0.3): the trigger flows discount pathwise,
+#                so the hybrid composes out of the box — the first genuinely
+#                rate-sensitive product of the book
+#   - phx_pde / phx_mcl: the PHOENIX flavour of the same note — a 2%-per-period
+#                coupon detaching at every alive observation above the 70%
+#                coupon barrier (three-zone PDE induction vs pathwise MCL)
+#   - phx_mem_mcl: the memory variant (missed coupons recovered at the next
+#                paying date) — path-dependent, MCL only
+# ANA rejects the product (no closed form).
+
+autocall_demo: !sequence
+  result: autocall_demo_result
+  tasks: [ac_pde, ac_mcl, ac_mcl_hw, phx_pde, phx_mcl, phx_mem_mcl]
+
+ac_pde: !pde_pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  pde_configuration: pde_config
+  indicators: [premium, delta]
+  result: ac_pde_result
+
+ac_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book
+  currency: eur
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium, delta]
+  result: ac_mcl_result
+
+ac_mcl_hw: !mcl_pricer
+  today: 2000-01-01
+  book: book_hw
+  currency: eur_hw
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium]
+  result: ac_mcl_hw_result
+
+phx_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_phx
+  currency: eur
+  pde_configuration: pde_config
+  indicators: [premium]
+  result: phx_pde_result
+
+phx_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_phx
+  currency: eur
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium]
+  result: phx_mcl_result
+
+phx_mem_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_phx_mem
+  currency: eur
+  mcl_configuration: mcl_config
+  correlation: correl
+  indicators: [premium]
+  result: phx_mem_mcl_result
+
+mcl_config: !mcl_configuration
+  max_day_step: 15
+  min_day_step: -1
+  paths: 200000
+  vol_year_step: 0.01
+  use_sobol: true
+
+pde_config: !pde_configuration
+  vanilla_precision: high
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: rate
+eur_hw: !currency
+  rate: rate
+  rate_model: hw
+hw: !hull_white
+  mean_reversion: 0.1
+  volatility: 1.5
+rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [3, 3]
+
+eq: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+eq_hw: !equity
+  spot: 100
+  volatility: vol
+  currency: eur_hw
+vol: !bs_volatility
+  volatility: 20
+  calendar: calendar
+
+correl: !correlation_matrix
+  underlyings: [eq, eq_hw, eur_hw_ir]
+  symmetric_matrix: [1,
+                     0, 1,
+                     0, -0.3, 1]
+
+book: !book
+  contracts: [ac]
+ac: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 8
+  nominal: 100
+
+book_phx: !book
+  contracts: [phx]
+phx: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 2
+  coupon_barrier: 70
+  nominal: 100
+
+book_phx_mem: !book
+  contracts: [phx_mem]
+phx_mem: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 2
+  coupon_barrier: 70
+  coupon_memory: true
+  nominal: 100
+
+book_hw: !book
+  contracts: [ac_hw]
+ac_hw: !autocallable
+  underlying: eq_hw
+  premium_currency: eur_hw
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 8
+  nominal: 100

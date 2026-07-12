@@ -6,6 +6,7 @@
 #include "cancellation.hpp"
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
+#include "autocallable.hpp"
 #include "variance_swap.hpp"
 #include "vanilla.hpp"
 
@@ -79,12 +80,22 @@ void PricerPDE::PreCheck()
         //! griddable underlying; dispatch on the type (RTTI) rather than the kind
         //! string, mirroring PriceContract / PricerANA::PreCheck.
         const bool supported = dynamic_cast<Vanilla*>( c ) || dynamic_cast<Barrier*>( c ) ||
-                               dynamic_cast<VarianceSwap*>( c );
+                               dynamic_cast<VarianceSwap*>( c ) ||
+                               dynamic_cast<Autocallable*>( c );
 
         if ( !c->GetUnderlying()->IsGriddable() || !supported )
         {
             std::string msg = std::format( "{} ({}) can't be PDE-priced", c->GetName(), c->GetKind() );
             ERR( msg );
+        }
+
+        //! Phoenix coupon MEMORY is path-dependent (the missed-coupon count is
+        //! not a function of the spot alone): the 1-D backward grid cannot carry
+        //! it without a state augmentation — MCL prices it pathwise instead.
+        if ( auto* ac = dynamic_cast<Autocallable*>( c ); ac && ac->HasCouponMemory() )
+        {
+            ERR( c->GetName() + " (autocallable) : the coupon_memory flavour needs the "
+                                "MCL engine (a 1-D grid cannot carry the missed-coupon state)" );
         }
     }
 }
@@ -103,6 +114,12 @@ void PricerPDE::PriceContract( Contract* Ctr )
     if ( auto* vs = dynamic_cast<VarianceSwap*>( Ctr ) )
     {
         SolveVarianceSwap( vs ); //!< expected-accumulated-variance grid (sets premium)
+    }
+    else if ( auto* ac = dynamic_cast<Autocallable*>( Ctr ) )
+    {
+        //! backward induction with the autocall overwrites set up by InitGrid
+        InitGrid( ac, false );
+        StoreResult( ac, SolveGrid( ac ) );
     }
     else if ( auto* bar = dynamic_cast<Barrier*>( Ctr ) )
     {
@@ -451,6 +468,35 @@ void PricerPDE::InitGrid( Contract* Ctr, bool ApplyBarrier )
             _discrete_monitor_steps.insert( step );
         }
     }
+
+    //! autocallable: map each observation date to its time step and record the
+    //! accrued rebate the layer is overwritten with above the autocall level.
+    //! Steps clamp to [1, n-1]: the terminal redemption payoff already handles
+    //! the >= level branch at n, and a step-0 overwrite would be DEAD (the
+    //! premium is read off U_0, which the overwrite hook never touches), so a
+    //! today-observation folds into the first step — one grid step late. Emplace
+    //! keeps the EARLIER date's rebate should a very coarse grid collapse two
+    //! observations onto one step (first trigger wins; the MCL keeps collapsed
+    //! dates distinct, so a coarse grid diverges there by construction).
+    _autocall_steps.clear();
+    _phoenix_coupon = 0;
+    _phoenix_coupon_level = 0;
+    if ( auto* ac = dynamic_cast<Autocallable*>( Ctr ) )
+    {
+        _autocall_level = ac->AutocallLevel();
+        if ( ac->IsPhoenix() )
+        {
+            _phoenix_coupon = ac->PeriodCoupon();
+            _phoenix_coupon_level = ac->CouponLevel();
+        }
+        const vector<date>& obs = ac->GetAutocallDates();
+        for ( size_t k = 0; k < obs.size(); k++ )
+        {
+            int step = (int)lround( YearFraction( _today, obs[k] ) / _k );
+            step = max( 1, min( _n - 1, step ) );
+            _autocall_steps.emplace( step, ac->Rebate( k + 1 ) );
+        }
+    }
 }
 
 //! zero the solved layer in the knocked region (called at each monitoring step)
@@ -563,19 +609,82 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         _v_row = _v_diff; //!< restore the flat default for any caller outside the loop
     };
 
+    //! autocallable: above the level the note redeems at the NEXT observation
+    //! with certainty, so the top Dirichlet boundary is that rebate (or the
+    //! terminal redemption after the last observation) DISCOUNTED to the current
+    //! step — a constant terminal-payoff boundary would leak its undiscounted,
+    //! full-coupon value into the interior across the whole sweep. The cumulative
+    //! per-step discount sum makes the boundary follow the engine's own curve.
+    //! The BOTTOM face keeps the constant linear-loss value N*x_min/S_ref: on the
+    //! linear leg the discounting and the forward growth cancel exactly under
+    //! flat rates, and the residual (the protection digital, ~0 at x_min) carries
+    //! negligible weight — no time dependence needed there.
+    vector<double> cum_disc;
+    if ( !_autocall_steps.empty() )
+    {
+        cum_disc.assign( _n + 1, 0.0 );
+        for ( int i = 1; i <= _n; i++ )
+        {
+            cum_disc[i] = cum_disc[i - 1] + _fwd_disc[i - 1] * _k;
+        }
+    }
+    auto up_boundary = [&]( int i )
+    {
+        if ( _autocall_steps.empty() )
+        {
+            return _u_up; //!< vanilla / barrier: the historic constant boundary
+        }
+        int m = _n;
+        double val = _u_up; //!< after the last observation: the terminal redemption
+        if ( auto next = _autocall_steps.upper_bound( i ); next != _autocall_steps.end() )
+        {
+            m = next->first;
+            val = next->second;
+        }
+        return val * exp( -( cum_disc[m] - cum_disc[i] ) );
+    };
+
+    //! Rannacher restart for the autocall overwrites: the overwrite drops a large
+    //! discontinuity (rebate vs continuation) into the layer, and Crank-Nicolson
+    //! (theta = 1/2) propagates such data with slowly-decaying oscillations that
+    //! poison the price by O(1) amounts. The standard cure: run the next few
+    //! backward steps FULLY IMPLICIT (unconditionally smoothing), then return to
+    //! CN. NOTE the engine's convention T_0 = I + k(1-theta)L puts the implicit
+    //! weight on (1 - theta), so fully implicit is theta = 0 here. The theta
+    //! switch forces an operator re-assembly on the flat fast path. (The
+    //! discrete-barrier zeroing needs none of this: an up-and-out value already
+    //! vanishes continuously at its barrier.)
+    constexpr int RANNACHER_STEPS = 2;
+    int rannacher_left = 0;
+
     // backwarding
     for ( int i = _n - 1; i >= 0; i-- )
     {
+        //! theta for THIS solve: fully implicit (theta = 0 in this engine's
+        //! convention) while a Rannacher restart is active, Crank-Nicolson otherwise
+        bool theta_switch = false;
+        const double want_theta = ( rannacher_left > 0 ) ? 0.0 : PDE_THETA;
+        if ( _theta != want_theta )
+        {
+            _theta = want_theta;
+            theta_switch = true;
+        }
+        if ( rannacher_left > 0 )
+        {
+            rannacher_left--;
+        }
+
         //! step coefficients: once on the first iteration for the time-independent
-        //! fast path, every step when the curve or the vol is time-dependent
-        if ( per_step || i == _n - 1 )
+        //! fast path, every step when the curve or the vol is time-dependent —
+        //! and whenever the Rannacher theta just switched
+        if ( per_step || i == _n - 1 || theta_switch )
         {
             assemble( i );
         }
 
         // right side
-        la_vector_set( D_1, 0, _u_dw );  // down boundary (fonction de t?)
-        la_vector_set( D_1, _j, _u_up ); // up boundary (fonction de t?)
+        la_vector_set( D_1, 0, _u_dw );             // down boundary (fonction de t?)
+        la_vector_set( D_1, _j, up_boundary( i ) ); // up boundary: discounted next rebate for an autocall
         for ( int j = 1; j < _j; j++ )
         {
             la_vector_set( D_1, j,
@@ -607,6 +716,27 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
         if ( _discrete_monitor_steps.count( i ) )
         {
             ApplyDiscreteBarrier( U_1 );
+        }
+
+        //! autocall observation: the note redeems at/above the level, so the
+        //! continuation value there IS the rebate (paid at this step); a Phoenix
+        //! additionally detaches its period coupon in the [coupon level, autocall
+        //! level) zone — the coupon rides ON TOP of the continuation. Either
+        //! discontinuity triggers a Rannacher restart.
+        if ( auto it = _autocall_steps.find( i ); it != _autocall_steps.end() )
+        {
+            for ( int j = 0; j < _j + 1; j++ )
+            {
+                if ( phi_node[j] >= _autocall_level )
+                {
+                    la_vector_set( U_1, j, it->second );
+                }
+                else if ( _phoenix_coupon > 0 && phi_node[j] >= _phoenix_coupon_level )
+                {
+                    la_vector_set( U_1, j, la_vector_get( U_1, j ) + _phoenix_coupon );
+                }
+            }
+            rannacher_left = RANNACHER_STEPS;
         }
         // la_matrix_set_col (V, i, U_0);
     }

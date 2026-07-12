@@ -44,6 +44,7 @@ inline constexpr char KIND_PDE_CONFIGURATION[] = "pde_configuration";
 inline constexpr char KIND_REPO_CURVE[] = "repo_curve";
 inline constexpr char KIND_SEQUENCE[] = "sequence";
 inline constexpr char KIND_SIMPLE_FIXING_DATA[] = "simple_fixing_data";
+inline constexpr char KIND_AUTOCALLABLE[] = "autocallable";
 inline constexpr char KIND_VANILLA[] = "vanilla";
 inline constexpr char KIND_YIELD_CURVE[] = "yield_curve";
 
