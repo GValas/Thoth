@@ -41,10 +41,12 @@ services:
       # DEV-ONLY throwaway secrets — this stack is never network-exposed and never deployed.
       # They are deliberately obvious placeholders; NEVER reuse them in prod (the prod
       # docker-compose.yml fails closed without real .env secrets). Override via env if needed.
+      # NOTE: the JWT secrets MUST be >= 32 chars, or the BFF's fail-fast secret guard
+      # (validateSecurityConfig / requiredSecret, MIN_SECRET_LENGTH = 32) refuses to boot.
       ADMIN_EMAIL: "admin@thoth.dev"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-dev-only-not-for-prod}"
-      JWT_SECRET: "${JWT_SECRET:-dev-only-access-not-for-prod}"
-      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-dev-only-refresh-not-for-prod}"
+      JWT_SECRET: "${JWT_SECRET:-dev-only-access-secret-not-for-production}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-dev-only-refresh-secret-not-for-production}"
     depends_on: [redis, pricer]
     volumes:
       - ..:/workspaces/Thoth:cached
