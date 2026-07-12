@@ -8,7 +8,7 @@
   "properties": {
     "root": {
       "type": "string",
-      "description": "Name of the task object to execute (an !mcl_pricer / !pde_pricer / !ana_pricer, a !sequence, or one of the historical computations)."
+      "description": "Name of the task object to execute (an !mcl_pricer / !pde_pricer / !ana_pricer, a !sequence, a !termsheet, or one of the historical computations)."
     }
   },
   "additionalProperties": {
@@ -64,6 +64,7 @@
         { "$ref": "#/$defs/barrier" },
         { "$ref": "#/$defs/variance_swap" },
         { "$ref": "#/$defs/autocallable" },
+        { "$ref": "#/$defs/termsheet" },
         { "$ref": "#/$defs/equity" },
         { "$ref": "#/$defs/basket" },
         { "$ref": "#/$defs/rainbow" },
@@ -451,6 +452,21 @@
         "rho": { "$ref": "#/$defs/numberList" },
         "nu": { "$ref": "#/$defs/numberList" },
         "calendar": { "$ref": "#/$defs/ref" }
+      }
+    },
+
+    "termsheet": {
+      "type": "object",
+      "title": "!termsheet",
+      "description": "Documentation task: renders one contract's booked description as a Markdown termsheet (header, indicative levels resolved against the as-of spot, the flavour-specific payoff clause, the observation schedule, a disclaimer) written into the result block as a `termsheet` literal field. No pricing involved.",
+      "additionalProperties": false,
+      "required": ["today", "contract", "result"],
+      "properties": {
+        "today": { "$ref": "#/$defs/date", "description": "As-of date the relative levels resolve against." },
+        "contract": { "$ref": "#/$defs/ref", "description": "The contract to document (vanilla / barrier / variance_swap / autocallable)." },
+        "title": { "type": "string", "description": "Optional document title (default: '<kind> on <underlying>')." },
+        "issuer": { "type": "string", "description": "Optional issuer line in the header." },
+        "result": { "type": "string", "description": "Name of the result block receiving the `termsheet` field." }
       }
     },
 

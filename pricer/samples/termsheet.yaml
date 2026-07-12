@@ -1,0 +1,138 @@
+root: gallery
+
+# Termsheet generation demo: one !termsheet task per contract flavour, run as a
+# !sequence. Each task renders its contract's YAML description as a Markdown
+# document (header, indicative levels resolved against the as-of spot, the
+# flavour-specific payoff clause, the observation schedule, a disclaimer) and
+# writes it into its result block as a `termsheet` literal field — no file on
+# disk, the documents travel in the output YAML like the MCL node graphs.
+
+gallery: !sequence
+  result: gallery_result
+  tasks: [ts_call, ts_amput, ts_barrier, ts_varswap, ts_athena, ts_phoenix]
+
+ts_call: !termsheet
+  today: 2000-01-01
+  contract: euro_call
+  title: 1y European Call on eq
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_call_result
+
+ts_amput: !termsheet
+  today: 2000-01-01
+  contract: am_put
+  title: 1y American Put on eq (95% strike)
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_amput_result
+
+ts_barrier: !termsheet
+  today: 2000-01-01
+  contract: dip
+  title: 1y Down-and-In Put on eq
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_barrier_result
+
+ts_varswap: !termsheet
+  today: 2000-01-01
+  contract: vs
+  title: In-life Variance Swap on eq
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_varswap_result
+
+ts_athena: !termsheet
+  today: 2000-01-01
+  contract: athena
+  title: 2y Athena Autocallable on eq
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_athena_result
+
+ts_phoenix: !termsheet
+  today: 2000-01-01
+  contract: phx
+  title: 2y Phoenix Autocallable on eq (memory coupons)
+  issuer: Thoth Demo Issuance Ltd
+  result: ts_phoenix_result
+
+calendar: !simple_weighted_calendar
+  non_working_days_weight: 1
+
+eur: !currency
+  rate: rate
+rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [3, 3]
+
+eq: !equity
+  spot: 100
+  volatility: vol
+  currency: eur
+vol: !bs_volatility
+  volatility: 20
+  calendar: calendar
+
+euro_call: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
+
+am_put: !vanilla
+  underlying: eq
+  premium_currency: eur
+  strike: 95
+  is_absolute_strike: false
+  maturity: 2000-12-31
+  nominal: 1
+  type: put
+  exercise: american
+
+dip: !barrier
+  underlying: eq
+  premium_currency: eur
+  strike: 100
+  maturity: 2000-12-31
+  nominal: 1
+  type: put
+  barrier_type: down&in
+  barrier_monitoring_type: continuous_monitoring
+  barrier_down_level: 80
+
+past_fixings: !simple_fixing_data
+  underlying: eq
+  dates: [1999-07-05, 1999-08-04, 1999-09-03, 1999-10-03, 1999-11-02, 1999-12-02]
+  values: [100, 92, 103, 96, 108, 99]
+vs: !variance_swap
+  underlying: eq
+  premium_currency: eur
+  maturity: 2000-12-31
+  volatility_strike: 25
+  notional: 10000
+  observation_period_days: 30
+  start: 1999-07-05
+  fixings: past_fixings
+
+athena: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 8
+  nominal: 100
+
+phx: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 2
+  coupon_barrier: 70
+  coupon_memory: true
+  nominal: 100

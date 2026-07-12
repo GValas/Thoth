@@ -17,6 +17,7 @@
 #include "pricer_pde.hpp"
 #include "debug_configuration.hpp"
 #include "sequence.hpp"
+#include "termsheet.hpp"
 
 //! instruments
 #include "book.hpp"
@@ -86,6 +87,7 @@ Object* ObjectManager::Build( const string& ObjectName )
         { KIND_PDE_PRICER, &Create<PricerPDE> },
         { KIND_ANA_PRICER, &Create<PricerANA> },
         { KIND_SEQUENCE, &Create<Sequence> },
+        { KIND_TERMSHEET, &Create<Termsheet> },
         // ---- instruments ----
         { KIND_VANILLA, &Create<Vanilla> },
         { KIND_BARRIER, &Create<Barrier> },

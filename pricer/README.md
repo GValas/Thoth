@@ -505,6 +505,14 @@ two-pillar matrix over two equities and one FX pair (asset/FX correlation decayi
 integrated ρ) and MCL (per-step Cholesky — agrees within MC error) plus a 50/50
 basket call under the decaying eq/eq correlation.
 
+`samples/termsheet.yaml` is the documentation-task demo: a `!termsheet` task
+renders the Phoenix autocallable's booked description as a Markdown termsheet
+(header with the levels resolved against the as-of spot, the flavour-specific
+payoff clause, the observation schedule, a disclaimer) into its result block as
+a `termsheet` literal field — supported for vanillas, barriers, variance swaps
+(incl. seasoned) and autocallables (Athena / Phoenix); pure documentation, no
+pricing.
+
 `samples/test.yaml` is a small cross-engine sanity book: three European vanillas
 (ATM call, OTM put, ITM call) on one equity, each priced by PDE, MCL and ANA — plus
 the ATM call also on the GPU MCL engine (`allow_gpu`, CPU fallback off-CUDA) — as a
