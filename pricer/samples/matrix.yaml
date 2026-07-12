@@ -38,6 +38,16 @@ root: matrix
 #   vanilla multi eu call worst-of          mcl         (min of 2 assets; MCL-only)
 #   variance swap mono                      ana   mcl   pde (ANA replication / MCL realized / PDE accumulated-variance)
 #
+# 2026 features (each on its own market block — a term correlation / OIS curve /
+# Hull-White rate / past fixings — appended after the shared-market cells):
+#   basket term correlation (50/50)         ana   mcl   pde (rho decays 0.9->0.2; integrated view)
+#   vanilla mono eu call multi-curve/OIS     ana   mcl   pde (8% projection forward, 5% OIS discount)
+#   vanilla mono eu call Hull-White hybrid   ana   mcl       (BS+HW effective vol / pathwise; PDE rejects)
+#   variance swap seasoned (in-life)         ana   mcl   pde (past realised leg + future, time-weighted)
+#   autocallable Athena (snowball)                 mcl   pde (early redeem N*(1+k*c); ANA rejects)
+#   autocallable Phoenix (conditional cpn)         mcl   pde (per-period coupon above the coupon barrier)
+#   autocallable Phoenix memory                    mcl       (missed-coupon catch-up; PDE rejects)
+#
 # The SABR cases exercise the Dupire local-vol Monte-Carlo (the SABR implied surface
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
 # implied vol, MCL diffuses the Dupire local vol, and they agree (Dupire repricing).
@@ -140,6 +150,25 @@ matrix: !sequence
     - vanilla_mono_am_put_heston_pde
     #! coverage fill: the pseudo-random (non-Sobol) MCL path
     - vanilla_mono_eu_call_mcl_pseudo
+    #! --- 2026 features (term correlation, multi-curve/OIS, Hull-White hybrid,
+    #!     seasoned varswap, autocallable Athena/Phoenix) — each on its own market
+    #!     block since these genuinely need a different correlation / curve / model
+    - basket_term_correl_ana
+    - basket_term_correl_mcl
+    - basket_term_correl_pde
+    - vanilla_mono_eu_call_ois_ana
+    - vanilla_mono_eu_call_ois_mcl
+    - vanilla_mono_eu_call_ois_pde
+    - vanilla_mono_eu_call_hw_ana
+    - vanilla_mono_eu_call_hw_mcl
+    - variance_swap_seasoned_ana
+    - variance_swap_seasoned_mcl
+    - variance_swap_seasoned_pde
+    - autocallable_athena_mcl
+    - autocallable_athena_pde
+    - autocallable_phoenix_mcl
+    - autocallable_phoenix_pde
+    - autocallable_phoenix_memory_mcl
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
@@ -1197,3 +1226,279 @@ eur/usd_vol: !bs_volatility
   volatility: 15
 #! the quanto / SABR / Heston / Bates correlations are all folded into the single
 #! `correl` matrix above; every pricer references it and extracts its own sub-block.
+
+# ===========================================================================
+# 2026 features — each on its own market block (a term-structured correlation,
+# an OIS discount curve, a Hull-White short rate, past fixings): they cannot
+# share the single flat `correl` / `eur` market the classic cells use, so the
+# supporting objects live here alongside the cells that reference them.
+# ===========================================================================
+
+# --- term-structured correlation: a 50/50 basket on (eq, eq2) whose pairwise
+#     correlation decays 0.9 (3m) -> 0.2 (9m). The engines read the exact
+#     integrated view (running average for ANA/basket moments, per-step Cholesky
+#     for MCL), so they agree like the constant-correlation basket does.
+basket_term_correl_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_bskt_term
+  currency: eur
+  correlation: correl_term
+  indicators: [premium, delta, gamma]
+  result: basket_term_correl_ana_result
+basket_term_correl_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_bskt_term
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl_term
+  indicators: [premium, delta, gamma]
+  result: basket_term_correl_mcl_result
+basket_term_correl_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_bskt_term
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl_term
+  indicators: [premium, delta]
+  result: basket_term_correl_pde_result
+book_bskt_term: !book
+  contracts: [c_bskt_term]
+c_bskt_term: !vanilla
+  underlying: bskt
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+# two pillars (3m, 9m); one full 2x2 matrix per pillar, concatenated row-major
+correl_term: !correlation_matrix
+  underlyings: [eq, eq2]
+  maturities: [0.25, 0.75]
+  matrix: [1, 0.9, 0.9, 1,
+           1, 0.2, 0.2, 1]
+
+# --- multi-curve / OIS: the same 1y ATM call, but the currency discounts on a
+#     distinct 5% OIS curve while the equity forward still grows on the 8%
+#     projection curve. All three engines discount on the OIS leg and agree.
+vanilla_mono_eu_call_ois_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_van_ois
+  currency: eur_ois
+  correlation: correl_ois
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_ois_ana_result
+vanilla_mono_eu_call_ois_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_van_ois
+  currency: eur_ois
+  mcl_configuration: shared_mcl
+  correlation: correl_ois
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_ois_mcl_result
+vanilla_mono_eu_call_ois_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_van_ois
+  currency: eur_ois
+  pde_configuration: shared_pde
+  correlation: correl_ois
+  indicators: [premium, delta, gamma, vega, rho, theta]
+  result: vanilla_mono_eu_call_ois_pde_result
+book_van_ois: !book
+  contracts: [c_van_ois]
+c_van_ois: !vanilla
+  underlying: eq_ois
+  premium_currency: eur_ois
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+eq_ois: !equity
+  spot: 100
+  volatility: vol
+  currency: eur_ois
+# projection = 8% (the shared eur_rate), OIS discounting = 5%
+eur_ois: !currency
+  rate: eur_rate
+  discount_rate: ois_rate
+ois_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [5, 5]
+correl_ois: !correlation_matrix
+  underlyings: [eq_ois]
+  matrix: [1]
+
+# --- Hull-White 1F equity-rate hybrid: the same 1y ATM call under a stochastic
+#     short rate (a=10%, sigma_r=1.5%, rho(eq, eur_hw_ir)=-0.3). ANA prices the
+#     BS+HW effective-variance closed form, MCL the pathwise stochastic
+#     discounting; they agree. PDE rejects the hybrid (no 2-D (S,r) grid yet).
+vanilla_mono_eu_call_hw_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_van_hw
+  currency: eur_hw
+  correlation: correl_hw
+  indicators: [premium, delta, gamma]
+  result: vanilla_mono_eu_call_hw_ana_result
+vanilla_mono_eu_call_hw_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_van_hw
+  currency: eur_hw
+  mcl_configuration: shared_mcl
+  correlation: correl_hw
+  indicators: [premium, delta, gamma]
+  result: vanilla_mono_eu_call_hw_mcl_result
+book_van_hw: !book
+  contracts: [c_van_hw]
+c_van_hw: !vanilla
+  underlying: eq_hw
+  premium_currency: eur_hw
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+eq_hw: !equity
+  spot: 100
+  volatility: vol
+  currency: eur_hw
+eur_hw: !currency
+  rate: eur_rate
+  rate_model: hw
+hw: !hull_white
+  mean_reversion: 0.1
+  volatility: 1.5
+# the equity/rate correlation lives against the "<ccy>_ir" pseudo-single
+correl_hw: !correlation_matrix
+  underlyings: [eq_hw, eur_hw_ir]
+  matrix: [1, -0.3, -0.3, 1]
+
+# --- seasoned (in-life) variance swap: the observation window opened 6 months
+#     before valuation; the realised leg is read from the booked fixings and
+#     time-weighted with the future fair leg. All three engines agree.
+variance_swap_seasoned_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_vswap_seasoned
+  currency: eur
+  correlation: correl
+  indicators: [premium, delta]
+  result: variance_swap_seasoned_ana_result
+variance_swap_seasoned_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_vswap_seasoned
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium]
+  result: variance_swap_seasoned_mcl_result
+variance_swap_seasoned_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_vswap_seasoned
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta]
+  result: variance_swap_seasoned_pde_result
+book_vswap_seasoned: !book
+  contracts: [c_vswap_seasoned]
+c_vswap_seasoned: !variance_swap
+  underlying: eq
+  premium_currency: eur
+  maturity: 2000-12-31
+  volatility_strike: 25
+  notional: 10000
+  observation_period_days: 30
+  start: 1999-07-05
+  fixings: vswap_past_fixings
+vswap_past_fixings: !simple_fixing_data
+  underlying: eq
+  dates: [1999-07-05, 1999-08-04, 1999-09-03, 1999-10-03, 1999-11-02, 1999-12-02]
+  values: [100, 92, 103, 96, 108, 99]
+
+# --- autocallable (Athena): a 2y note, three ~semiannual autocall observations
+#     at 100% of spot, 8% snowball coupon, 60% protection. MCL prices it
+#     pathwise, PDE by backward induction (Rannacher-damped); they agree. ANA
+#     rejects the product.
+autocallable_athena_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_ac_athena
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta]
+  result: autocallable_athena_mcl_result
+autocallable_athena_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_ac_athena
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta]
+  result: autocallable_athena_pde_result
+book_ac_athena: !book
+  contracts: [c_ac_athena]
+c_ac_athena: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 8
+  nominal: 100
+
+# --- autocallable (Phoenix): the same note with a per-period 2% conditional
+#     coupon paid above a 70% coupon barrier. MCL + PDE (memoryless).
+autocallable_phoenix_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_ac_phoenix
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta]
+  result: autocallable_phoenix_mcl_result
+autocallable_phoenix_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_ac_phoenix
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium, delta]
+  result: autocallable_phoenix_pde_result
+book_ac_phoenix: !book
+  contracts: [c_ac_phoenix]
+c_ac_phoenix: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 2
+  coupon_barrier: 70
+  nominal: 100
+
+# --- autocallable (Phoenix, memory): a paying observation recovers the
+#     consecutively missed coupons. Path-dependent -> MCL only (the 1-D PDE grid
+#     cannot carry the missed-coupon state; it rejects the memory flavour).
+autocallable_phoenix_memory_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_ac_phoenix_mem
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium, delta]
+  result: autocallable_phoenix_memory_mcl_result
+book_ac_phoenix_mem: !book
+  contracts: [c_ac_phoenix_mem]
+c_ac_phoenix_mem: !autocallable
+  underlying: eq
+  premium_currency: eur
+  maturity: 2001-12-31
+  autocall_dates: [2000-06-30, 2000-12-29, 2001-06-29]
+  autocall_barrier: 100
+  protection_barrier: 60
+  coupon: 2
+  coupon_barrier: 70
+  coupon_memory: true
+  nominal: 100
