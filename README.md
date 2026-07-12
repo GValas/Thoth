@@ -100,8 +100,9 @@ document (the engine's `!termsheet` documentation task, via `POST
 /api/instrument/termsheet`) and downloads it as a `.md` file — same form state as
 the Price button, no pricing involved. The **Blotter** tab is
 a global monitoring book: every product sent from a panel becomes a row showing its underlying's
-**live spot** (next to the underlying) and a premium re-priced for the whole book in **live
-mode** (throttled, off the live spots), tinted green/red on each move; rows survive
+**live spot** (next to the underlying), a premium re-priced for the whole book in **live
+mode** (throttled, off the live spots), tinted green/red on each move, and the **wall-clock time
+it was last priced** (also shown on each panel's status line); rows survive
 tab navigation and a reload (persisted in `localStorage`). On a **fresh install**
 the blotter self-seeds **10 random sample contracts** (vanillas / barriers / variance
 swaps / Asians / ratchets on the workspace's **equity** underlyings — where every kind/engine

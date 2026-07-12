@@ -53,6 +53,7 @@ export abstract class PricingPanelBase {
   readonly greeks = signal<Partial<Record<string, number>>>({});
   readonly resultCurrency = signal<string>('');
   readonly meta = signal<PanelMeta | null>(null);
+  readonly lastPricedAt = signal<Date | null>(null); //!< wall-clock time of the last successful price
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
 
@@ -168,6 +169,7 @@ export abstract class PricingPanelBase {
     this.greeks.set(res.result.greeks ?? {});
     this.resultCurrency.set(res.currency);
     this.meta.set(res.meta);
+    this.lastPricedAt.set(new Date());
   }
 
   // --- live mode: re-price off the live spots every `liveThrottleSec` seconds ---

@@ -58,6 +58,7 @@ export class BlotterComponent implements OnInit {
     'premium',
     'ccy',
     ...this.b.greekColumns(),
+    'priced',
     'status',
     'actions',
   ]);
@@ -122,6 +123,17 @@ export class BlotterComponent implements OnInit {
   fmt(v: number | null | undefined): string {
     if (v == null || !Number.isFinite(v)) return '—';
     return v.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  }
+
+  //! wall-clock time (HH:MM:SS) of a row's last successful pricing, or a dash.
+  fmtTime(d: Date | null): string {
+    if (!d) return '—';
+    return d.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
   }
 
   //! a word describing what an action targets (for the button label / snackbar):

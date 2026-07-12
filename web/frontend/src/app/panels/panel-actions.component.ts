@@ -1,4 +1,5 @@
 import { Component, Input } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +15,7 @@ import { PricingPanelBase } from './pricing-panel.base';
   selector: 'app-panel-actions',
   standalone: true,
   imports: [
+    DatePipe,
     FormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -73,7 +75,8 @@ import { PricingPanelBase } from './pricing-panel.base';
     @if (panel.meta(); as meta) {
       <p class="meta thoth-muted">
         <mat-icon>schedule</mat-icon>
-        @if (meta.server) { Priced on <code>{{ meta.server }}</code> · }
+        @if (panel.lastPricedAt(); as t) { Last priced at {{ t | date: 'HH:mm:ss' }} · }
+        @if (meta.server) { on <code>{{ meta.server }}</code> · }
         @if (meta.engineMs != null) { engine {{ meta.engineMs }} ms }
         @if (meta.execMs != null) { · round-trip {{ meta.execMs }} ms }
         @if (meta.engineVersion) { · {{ meta.engineVersion }} }

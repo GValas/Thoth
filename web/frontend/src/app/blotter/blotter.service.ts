@@ -22,6 +22,7 @@ export interface BlotterRow {
   greeks: Partial<Record<'delta' | 'gamma' | 'vega' | 'rho' | 'theta', number>>;
   currency: string;
   status: 'queued' | 'priced' | 'error';
+  pricedAt: Date | null; //!< wall-clock time of the last successful pricing (transient, not persisted)
   error?: string;
 }
 
@@ -150,6 +151,7 @@ export class BlotterService {
       greeks: {},
       currency: input.request.currency ?? '',
       status: 'queued',
+      pricedAt: null,
     };
     this.rows.update((rs) => [...rs, row]);
     this.persist();
@@ -258,6 +260,7 @@ export class BlotterService {
             greeks: res.result.greeks ?? {},
             currency: res.currency,
             status: 'priced',
+            pricedAt: new Date(),
             error: undefined,
           };
         }),
@@ -306,6 +309,7 @@ export class BlotterService {
         greeks: {},
         currency: s.request.currency ?? '',
         status: 'queued' as const,
+        pricedAt: null,
       })),
     );
     // re-quote the restored rows once so they aren't blank.
