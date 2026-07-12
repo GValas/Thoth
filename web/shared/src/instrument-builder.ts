@@ -7,7 +7,7 @@
 //! correlation synthesis mirrors grid-builder so a panel priced straight from the GUI (no
 //! configName) still references a valid !pde_configuration / !mcl_configuration.
 
-import { TAG_KEY, type CellResult, type Engine } from './types.js';
+import { TAG_KEY, sanitizeFields, type CellResult, type Engine } from './types.js';
 import { dumpBook } from './yaml.js';
 
 const PRICER_TAG: Record<Engine, string> = {
@@ -70,8 +70,10 @@ export function buildInstrumentDoc(
 ): Record<string, unknown> {
   const doc: Record<string, unknown> = { root: ctx.pricerName };
 
-  // the single contract, tagged by its kind, fields passed through verbatim.
-  doc[CONTRACT_NAME] = { [TAG_KEY]: req.instrument.kind, ...req.instrument.fields };
+  // the single contract, tagged by its kind, fields passed through verbatim. The tag is
+  // written AFTER the (sanitized) fields so a crafted `__tag` in the fields can never
+  // override the validated kind — the kind always wins.
+  doc[CONTRACT_NAME] = { ...sanitizeFields(req.instrument.fields), [TAG_KEY]: req.instrument.kind };
 
   const pricer: Record<string, unknown> = {
     [TAG_KEY]: PRICER_TAG[req.engine],
@@ -109,9 +111,47 @@ export function buildInstrumentDoc(
   doc[BOOK_NAME] = { [TAG_KEY]: 'book', contracts: [CONTRACT_NAME] };
 
   // merge the workspace's supporting market objects (a user object with the same name as a
-  // synthesised default deliberately wins — the user's config overrides ours).
+  // synthesised default deliberately wins — the user's config overrides ours). Payload is
+  // user-supplied, so sanitize it and keep the stored kind as the tag (tag after spread).
   for (const o of ctx.supportObjects) {
-    doc[o.name] = { [TAG_KEY]: o.kind, ...o.payload };
+    doc[o.name] = { ...sanitizeFields(o.payload), [TAG_KEY]: o.kind };
+  }
+  return doc;
+}
+
+//! A termsheet request: the same hand-entered instrument, documented instead of priced
+//! (the engine's !termsheet task renders its booked description as Markdown).
+export interface TermsheetRequest {
+  today: string; //!< as-of date the relative levels resolve against (YYYY-MM-DD)
+  instrument: InstrumentSpec;
+  title?: string; //!< optional document title
+  issuer?: string; //!< optional issuer header line
+}
+
+export const TERMSHEET_TASK_NAME = 'termsheet_task';
+export const TERMSHEET_RESULT_NAME = 'termsheet_result';
+
+//! Build the tagged document for a !termsheet task over the single contract: no pricer,
+//! no book, no engine config — just the task, the contract and the workspace's supporting
+//! market objects (the underlying/vol/curve/currency the contract references).
+export function buildTermsheetDoc(
+  req: TermsheetRequest,
+  supportObjects: InstrumentContext['supportObjects'],
+): Record<string, unknown> {
+  const doc: Record<string, unknown> = { root: TERMSHEET_TASK_NAME };
+  // tag after the (sanitized) fields so the validated kind always wins (see buildInstrumentDoc).
+  doc[CONTRACT_NAME] = { ...sanitizeFields(req.instrument.fields), [TAG_KEY]: req.instrument.kind };
+  const task: Record<string, unknown> = {
+    [TAG_KEY]: 'termsheet',
+    today: req.today,
+    contract: CONTRACT_NAME,
+    result: TERMSHEET_RESULT_NAME,
+  };
+  if (req.title) task.title = req.title;
+  if (req.issuer) task.issuer = req.issuer;
+  doc[TERMSHEET_TASK_NAME] = task;
+  for (const o of supportObjects) {
+    doc[o.name] = { ...sanitizeFields(o.payload), [TAG_KEY]: o.kind };
   }
   return doc;
 }

@@ -21,13 +21,13 @@ export class WorkspacesController {
   constructor(private readonly workspaces: WorkspacesService) {}
 
   @Get()
-  list() {
-    return this.workspaces.list();
+  list(@CurrentUser() user: AuthUser) {
+    return this.workspaces.list(user.userId, user.role === 'admin');
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.workspaces.get(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.workspaces.get(id, user.userId, user.role === 'admin');
   }
 
   @Post()
@@ -36,7 +36,7 @@ export class WorkspacesController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateWorkspaceDto) {
-    return this.workspaces.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateWorkspaceDto, @CurrentUser() user: AuthUser) {
+    return this.workspaces.update(id, dto, user.userId, user.role === 'admin');
   }
 }

@@ -9,15 +9,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   buildInstrumentDoc,
+  buildTermsheetDoc,
   dumpBook,
   loadBook,
   parseInstrumentResult,
   EngineError,
+  TERMSHEET_RESULT_NAME,
+  TERMSHEET_TASK_NAME,
   type Engine,
   type InstrumentContext,
   type InstrumentRequest,
   type InstrumentResult,
+  type TermsheetRequest,
 } from '@thoth/shared';
+import type { AuthUser } from '../common/decorators';
 import { overlayCorrelation, overlaySpots } from '../common/live-overlay';
 import { EngineService } from '../engine/engine.service';
 import { SchemaService } from '../schema/schema.service';
@@ -46,6 +51,22 @@ export interface InstrumentPriceResponse {
   meta: { server?: string; execMs: number; engineMs?: number; engineVersion?: string };
 }
 
+//! a termsheet request: the same hand-entered instrument, documented instead of priced
+//! (no engine, no indicators — the !termsheet task renders the description as Markdown).
+export interface InstrumentTermsheetDto {
+  workspaceId: string;
+  kind: string;
+  instrument: Record<string, unknown>;
+  today?: string;
+  title?: string;
+  issuer?: string;
+}
+
+export interface InstrumentTermsheetResponse {
+  termsheet: string; //!< the rendered Markdown document
+  filename: string; //!< a suggested download filename
+}
+
 @Injectable()
 export class InstrumentService {
   private readonly log = new Logger(InstrumentService.name);
@@ -60,9 +81,10 @@ export class InstrumentService {
 
   //! Price one instrument and return its premium + Greeks. Throws EngineError on an
   //! engine-reported failure (surfaced to the client as a 4xx by the controller).
-  async price(dto: InstrumentPriceDto): Promise<InstrumentPriceResponse> {
+  async price(dto: InstrumentPriceDto, user: AuthUser): Promise<InstrumentPriceResponse> {
     const t0 = Date.now();
-    const ws = await this.workspaces.get(dto.workspaceId);
+    //! authorize the workspace for the caller (404 if not theirs) before pricing off its data.
+    const ws = await this.workspaces.get(dto.workspaceId, user.userId, user.role === 'admin');
     const currency = dto.currency ?? ws.currency;
 
     const req: InstrumentRequest = {
@@ -113,5 +135,37 @@ export class InstrumentService {
         engineVersion: typeof sys['version'] === 'string' ? (sys['version'] as string) : undefined,
       },
     };
+  }
+
+  //! Render one instrument's termsheet: build a !termsheet-task document over the same
+  //! contract + workspace market objects, run it on the engine and return the Markdown.
+  async termsheet(
+    dto: InstrumentTermsheetDto,
+    user: AuthUser,
+  ): Promise<InstrumentTermsheetResponse> {
+    //! authorize the workspace for the caller (404 if not theirs) before reading its data.
+    const ws = await this.workspaces.get(dto.workspaceId, user.userId, user.role === 'admin');
+    const today = dto.today ?? ws.today;
+    const req: TermsheetRequest = {
+      today,
+      instrument: { kind: dto.kind, fields: dto.instrument },
+      title: dto.title,
+      issuer: dto.issuer,
+    };
+    const supportObjects = await this.marketData.listObjects(dto.workspaceId);
+
+    const bookYaml = dumpBook(buildTermsheetDoc(req, supportObjects), this.schema.kinds());
+    const { yaml: resultYaml } = await this.engine.priceNowWithServer(
+      bookYaml,
+      TERMSHEET_TASK_NAME,
+    );
+    const resultDoc = loadBook(resultYaml, this.schema.kinds()) as Record<string, unknown>;
+    const block = (resultDoc[TERMSHEET_RESULT_NAME] ?? {}) as Record<string, unknown>;
+    const termsheet = block['termsheet'];
+    if (typeof termsheet !== 'string' || termsheet.length === 0) {
+      throw new EngineError('the engine returned no termsheet document');
+    }
+    this.log.log(`termsheet rendered for kind=${dto.kind} (${termsheet.length} chars)`);
+    return { termsheet, filename: `termsheet_${dto.kind}_${today}.md` };
   }
 }

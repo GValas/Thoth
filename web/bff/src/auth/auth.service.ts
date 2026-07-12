@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../persistence/entities';
 import type { JwtPayload } from './jwt.strategy';
+import { requiredSecret } from '../common/secret-config';
 
 export interface Tokens {
   accessToken: string;
@@ -68,7 +69,8 @@ export class AuthService implements OnModuleInit {
     let payload: JwtPayload;
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(refreshToken, {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
+        //! fail-fast: no hardcoded fallback (see secret-config.ts).
+        secret: requiredSecret(this.config, 'JWT_REFRESH_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('invalid refresh token');
@@ -90,11 +92,12 @@ export class AuthService implements OnModuleInit {
   private async issueTokens(user: User): Promise<Tokens> {
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = await this.jwt.signAsync(payload, {
-      secret: this.config.get<string>('JWT_SECRET', 'dev-access-secret-change-me'),
+      //! fail-fast: no hardcoded fallback (see secret-config.ts).
+      secret: requiredSecret(this.config, 'JWT_SECRET'),
       expiresIn: this.config.get<string>('JWT_ACCESS_TTL', '15m'),
     });
     const refreshToken = await this.jwt.signAsync(payload, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
+      secret: requiredSecret(this.config, 'JWT_REFRESH_SECRET'),
       expiresIn: this.config.get<string>('JWT_REFRESH_TTL', '7d'),
     });
     await this.users.update(user.id, {

@@ -3,7 +3,14 @@
 //! replica and pivot the per-cell results into matrices. State lives in GridRun so the
 //! UI can poll status/progress and results survive a BFF restart (BullMQ driver).
 
-import { Injectable, NotFoundException, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +25,7 @@ import {
   type GridRequest,
 } from '@thoth/shared';
 import { GridRun } from '../persistence/entities';
+import type { AuthUser } from '../common/decorators';
 import { overlayCorrelation, overlaySpots } from '../common/live-overlay';
 import { EngineService } from '../engine/engine.service';
 import { SchemaService } from '../schema/schema.service';
@@ -68,10 +76,34 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     await this.queue?.close();
   }
 
-  //! Persist a queued GridRun and submit it; returns the job id to poll.
-  async submit(dto: GridSubmitDto, userId: string | null): Promise<{ jobId: string }> {
+  //! Total cell count a single grid may fan out to. Beyond this a request is rejected up
+  //! front, so no unbounded pricing job (memory + engine time) can be enqueued from one call.
+  private static readonly MAX_GRID_CELLS = 50_000;
+
+  //! Reject a grid whose fan-out (underlyings × types × strikes × maturities) exceeds the cap.
+  private assertGridSize(dto: GridSubmitDto): void {
+    const cells =
+      dto.underlyings.length * dto.types.length * dto.strikes.length * dto.maturities.length;
+    if (cells > GridService.MAX_GRID_CELLS) {
+      throw new BadRequestException(
+        `grid too large: ${cells} cells exceeds the ${GridService.MAX_GRID_CELLS} limit`,
+      );
+    }
+  }
+
+  //! Persist a queued GridRun and submit it; returns the job id to poll. Authorizes the
+  //! workspace for the caller (404 if not theirs) and bounds the grid size before enqueuing.
+  async submit(dto: GridSubmitDto, user: AuthUser): Promise<{ jobId: string }> {
+    const isAdmin = user.role === 'admin';
+    await this.workspaces.get(dto.workspaceId, user.userId, isAdmin);
+    this.assertGridSize(dto);
     const run = await this.runs.save(
-      this.runs.create({ workspaceId: dto.workspaceId, userId, status: 'queued', request: { ...dto } }),
+      this.runs.create({
+        workspaceId: dto.workspaceId,
+        userId: user.userId,
+        status: 'queued',
+        request: { ...dto },
+      }),
     );
     await this.queue.submit(run.id);
     return { jobId: run.id };
@@ -83,12 +115,17 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
   //! Equities the feed does not quote keep their stored spot (a partial feed still prices),
   //! and the correlation blend falls back to the stored matrix if mixing live and stored
   //! pairs would break positive-definiteness (see overlayCorrelation).
-  async priceLive(dto: GridSubmitDto): Promise<{
+  async priceLive(
+    dto: GridSubmitDto,
+    user: AuthUser,
+  ): Promise<{
     matrices: GridMatrix[];
     meta: { execMs: number; engineMs?: number; engineVersion?: string };
   }> {
     const t0 = Date.now();
-    const ws = await this.workspaces.get(dto.workspaceId);
+    //! authorize the workspace for the caller (404 if not theirs) and bound the fan-out.
+    const ws = await this.workspaces.get(dto.workspaceId, user.userId, user.role === 'admin');
+    this.assertGridSize(dto);
     const req: GridRequest = {
       engine: dto.engine,
       today: dto.today ?? ws.today,
@@ -133,15 +170,21 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     return { matrices, meta };
   }
 
-  async get(jobId: string): Promise<GridRun> {
+  //! Fetch a run and authorize the caller. A run belongs to the user who submitted it (its
+  //! stored userId) AND lives under a workspace; we require the run's userId to match (admins
+  //! bypass). A run of another user is reported as 404 to avoid job-id enumeration.
+  async get(jobId: string, user: AuthUser): Promise<GridRun> {
     const run = await this.runs.findOne({ where: { id: jobId } });
     if (!run) throw new NotFoundException('grid run not found');
+    if (user.role !== 'admin' && run.userId !== user.userId) {
+      throw new NotFoundException('grid run not found');
+    }
     return run;
   }
 
   //! Live progress for a running job (best-effort; null unless it is currently pricing).
-  async progress(jobId: string) {
-    const run = await this.get(jobId);
+  async progress(jobId: string, user: AuthUser) {
+    const run = await this.get(jobId, user);
     const live = await this.engine.jobProgress(jobId);
     return { status: run.status, progress: live };
   }
@@ -154,7 +197,9 @@ export class GridService implements OnModuleInit, OnModuleDestroy {
     const t0 = Date.now();
     try {
       await this.runs.update(jobId, { status: 'running' });
-      const ws = await this.workspaces.get(dto.workspaceId);
+      //! Internal worker: ownership was already enforced at submit() time, so resolve the
+      //! workspace with the admin bypass (isAdmin=true) rather than re-deriving a principal.
+      const ws = await this.workspaces.get(dto.workspaceId, run.userId ?? '', true);
       const req: GridRequest = {
         engine: dto.engine,
         today: dto.today ?? ws.today,

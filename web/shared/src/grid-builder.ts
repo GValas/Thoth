@@ -7,7 +7,7 @@
 //! bump scenarios per contract (see PricerMCL::ComputeGreeks). MCL's per-cell Greeks carry
 //! Monte-Carlo noise but are produced. The caller picks the engine (no default).
 
-import { TAG_KEY, type CellResult, type Engine, type GridMatrix, type GridRequest } from './types.js';
+import { TAG_KEY, sanitizeFields, type CellResult, type Engine, type GridMatrix, type GridRequest } from './types.js';
 import { dumpBook } from './yaml.js';
 
 //! mcl_gpu is the same !mcl_pricer as mcl; the GPU is selected via allow_gpu in its
@@ -146,8 +146,10 @@ export function buildGridDoc(req: GridRequest, ctx: GridContext): Record<string,
 
   // merge the workspace's supporting market objects (a workspace object with the same
   // name as a synthesised default deliberately wins — the user's config overrides ours).
+  // Payload is user-supplied, so sanitize it and keep the stored kind as the tag written
+  // AFTER the spread (a crafted `__tag` in the payload can never override the kind).
   for (const o of ctx.supportObjects) {
-    doc[o.name] = { [TAG_KEY]: o.kind, ...o.payload };
+    doc[o.name] = { ...sanitizeFields(o.payload), [TAG_KEY]: o.kind };
   }
   return doc;
 }

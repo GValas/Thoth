@@ -11,7 +11,7 @@
 //! tag), so loading leaves them as ordinary objects — exactly what we want.
 
 import yaml from 'js-yaml';
-import { TAG_KEY, type TaggedObject } from './types.js';
+import { TAG_KEY, sanitizeFields, type TaggedObject } from './types.js';
 
 //! Build a js-yaml schema with one mapping Type per kind. The kind list is injected
 //! (the BFF derives it from pricer/schema/thoth.schema.json $defs; tests pass a subset)
@@ -62,8 +62,10 @@ export function buildBookYaml(
   kinds: readonly string[],
 ): string {
   const doc: Record<string, unknown> = { root: rootTask };
+  // Payload is user-supplied: strip reserved keys and write the tag AFTER the spread so a
+  // crafted `__tag` in the payload can never override the stored (validated) kind.
   for (const o of objects) {
-    doc[o.name] = { [TAG_KEY]: o.kind, ...o.payload };
+    doc[o.name] = { ...sanitizeFields(o.payload), [TAG_KEY]: o.kind };
   }
   return dumpBook(doc, kinds);
 }

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AuthUser } from '../common/decorators';
+import { requiredSecret } from '../common/secret-config';
 
 export interface JwtPayload {
   sub: string;
@@ -17,7 +18,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET', 'dev-access-secret-change-me'),
+      //! fail-fast: no hardcoded fallback — a weak/missing secret aborts construction (boot).
+      secretOrKey: requiredSecret(config, 'JWT_SECRET'),
     });
   }
 

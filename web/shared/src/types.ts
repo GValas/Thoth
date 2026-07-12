@@ -11,6 +11,25 @@ export interface TaggedObject {
   [field: string]: unknown;
 }
 
+//! Keys that must never appear in free-form, user-supplied object fields. `__proto__`,
+//! `constructor` and `prototype` are prototype-pollution vectors; TAG_KEY is our internal
+//! kind discriminator (a crafted `__tag` in user fields could otherwise override the
+//! validated kind and make the engine price a different product than the one validated).
+//! We strip these in every builder as defense-in-depth so no controller/DTO boundary is
+//! the single line of defence.
+const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype', TAG_KEY]);
+
+//! Return a shallow copy of `fields` with the reserved keys removed. Used before spreading
+//! any user-supplied field bag into a tagged object.
+export function sanitizeFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(fields)) {
+    if (RESERVED_FIELD_KEYS.has(key)) continue;
+    out[key] = fields[key];
+  }
+  return out;
+}
+
 //! The single Greek/premium fields a pricer writes per contract / per book. Per-cell
 //! Greeks exist only on ANA/PDE/GPU-MCL (see pricer.cpp WriteResults gating); premium
 //! and premium_trust are always present.

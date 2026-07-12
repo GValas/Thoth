@@ -392,8 +392,8 @@ function buildServer(): McpServer {
 //! Bearer auth for the HTTP transport. When MCP_API_KEY is set, every /mcp POST must
 //! carry `Authorization: Bearer <key>`. The compare is constant-time: both sides are
 //! SHA-256 hashed first so timingSafeEqual always sees equal-length buffers and no
-//! length or prefix information leaks. When the key is unset, everything is allowed
-//! (an explicit startup warning covers that mode).
+//! length or prefix information leaks. In HTTP mode the key is guaranteed non-empty
+//! (startup fails closed otherwise), so this only accepts a matching bearer token.
 function authorized(req: IncomingMessage): boolean {
   if (!MCP_API_KEY) return true;
   const header = req.headers.authorization ?? '';
@@ -407,14 +407,22 @@ if ((process.env['MCP_TRANSPORT'] ?? 'stdio') === 'http') {
   //! server+transport pair per POST (no session state to keep), torn down with the
   //! response. GET /healthz answers the compose health probe.
   const port = Number(process.env['MCP_PORT'] ?? 3001);
+  //! FAIL-CLOSED: the HTTP transport is network-exposed (nginx proxies it on the public
+  //! dashboard port), so refuse to start without a key rather than silently serving an
+  //! unauthenticated pricing endpoint. stdio mode is unaffected — it has no network surface
+  //! and the client owns the process, so it never reaches this branch.
   if (!MCP_API_KEY) {
     console.error(
-      'thoth-mcp: WARNING — MCP_API_KEY is not set: POST /mcp is UNAUTHENTICATED. ' +
-        'Anyone who can reach this port (nginx proxies it on the public dashboard port) ' +
-        'can drive the pricing cluster. Set MCP_API_KEY and register clients with an ' +
+      'thoth-mcp: FATAL — MCP_API_KEY is unset in HTTP transport mode. POST /mcp is ' +
+        'network-exposed (nginx proxies it on the public dashboard port); refusing to start ' +
+        'an unauthenticated endpoint. Set MCP_API_KEY and register clients with an ' +
         "'Authorization: Bearer <key>' header.",
     );
+    process.exit(1);
   }
+  //! Cap the accumulated request body: JSON.parse over an unbounded stream is a trivial
+  //! memory-exhaustion vector. 1 MB is far above any legitimate MCP JSON-RPC call.
+  const MAX_BODY_BYTES = 1024 * 1024;
   const http = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'GET' && req.url === '/healthz') {
       const healthy = await engine.health();
@@ -435,7 +443,21 @@ if ((process.env['MCP_TRANSPORT'] ?? 'stdio') === 'http') {
     }
     try {
       const chunks: Buffer[] = [];
-      for await (const c of req) chunks.push(c as Buffer);
+      let received = 0;
+      for await (const c of req) {
+        const chunk = c as Buffer;
+        received += chunk.length;
+        if (received > MAX_BODY_BYTES) {
+          //! reject oversized bodies before they accumulate; 413 Payload Too Large.
+          req.destroy();
+          if (!res.headersSent) {
+            res.writeHead(413, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'request body too large (max 1 MB)' }, id: null }));
+          }
+          return;
+        }
+        chunks.push(chunk);
+      }
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       const server = buildServer();
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

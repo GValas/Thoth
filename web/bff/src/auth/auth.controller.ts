@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Get, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { CurrentUser, Public, type AuthUser } from '../common/decorators';
@@ -21,6 +22,9 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
+  //! Strict per-IP limit on the credential endpoints: 5 attempts/minute throttles
+  //! password-guessing / refresh-token brute force without hurting real users.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Public()
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
@@ -30,6 +34,7 @@ export class AuthController {
     return { accessToken: tokens.accessToken };
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Public()
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {

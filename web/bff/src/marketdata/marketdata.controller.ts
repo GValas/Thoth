@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { IsArray, IsInt, IsObject, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MarketDataService } from './marketdata.service';
+import { CurrentUser, type AuthUser } from '../common/decorators';
 import type { WsObject } from '../common/semantic-validation';
 
 class ObjectDto implements WsObject {
@@ -27,16 +28,20 @@ export class MarketDataController {
   constructor(private readonly md: MarketDataService) {}
 
   @Get()
-  list(@Param('id') workspaceId: string) {
-    return this.md.listObjects(workspaceId);
+  list(@Param('id') workspaceId: string, @CurrentUser() user: AuthUser) {
+    return this.md.listObjectsFor(workspaceId, user.userId, user.role === 'admin');
   }
 
   @Put()
-  replace(@Param('id') workspaceId: string, @Body() dto: ReplaceObjectsDto) {
-    return this.md.replaceObjects(workspaceId, dto.objects);
+  replace(
+    @Param('id') workspaceId: string,
+    @Body() dto: ReplaceObjectsDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.md.replaceObjectsFor(workspaceId, dto.objects, user.userId, user.role === 'admin');
   }
 
-  //! validate-only (no persistence) for the UI "check" affordance
+  //! validate-only (no persistence, no workspace read) for the UI "check" affordance
   @Post('validate')
   validate(@Body() dto: ReplaceObjectsDto) {
     return { errors: this.md.validate(dto.objects) };
@@ -44,7 +49,7 @@ export class MarketDataController {
 
   //! generate a random sample set and REPLACE the workspace's objects with it
   @Post('seed')
-  seed(@Param('id') workspaceId: string, @Body() dto: SeedDto) {
-    return this.md.seed(workspaceId, dto);
+  seed(@Param('id') workspaceId: string, @Body() dto: SeedDto, @CurrentUser() user: AuthUser) {
+    return this.md.seed(workspaceId, dto, user.userId, user.role === 'admin');
   }
 }

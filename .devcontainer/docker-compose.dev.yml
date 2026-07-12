@@ -38,10 +38,13 @@ services:
       REDIS_HOST: "redis"
       SCHEMA_PATH: "/workspaces/Thoth/pricer/schema/thoth.schema.json"
       DB_PATH: "/workspaces/Thoth/web/bff/data/thoth.sqlite"
+      # DEV-ONLY throwaway secrets — this stack is never network-exposed and never deployed.
+      # They are deliberately obvious placeholders; NEVER reuse them in prod (the prod
+      # docker-compose.yml fails closed without real .env secrets). Override via env if needed.
       ADMIN_EMAIL: "admin@thoth.dev"
-      ADMIN_PASSWORD: "adminpass123"
-      JWT_SECRET: "dev-access"
-      JWT_REFRESH_SECRET: "dev-refresh"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-dev-only-not-for-prod}"
+      JWT_SECRET: "${JWT_SECRET:-dev-only-access-not-for-prod}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-dev-only-refresh-not-for-prod}"
     depends_on: [redis, pricer]
     volumes:
       - ..:/workspaces/Thoth:cached

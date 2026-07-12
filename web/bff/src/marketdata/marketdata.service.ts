@@ -6,8 +6,9 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { buildBookYaml } from '@thoth/shared';
-import { ObjectEntity, Workspace } from '../persistence/entities';
+import { ObjectEntity } from '../persistence/entities';
 import { SchemaService } from '../schema/schema.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { validateObjects, type WsObject } from '../common/semantic-validation';
 import { generateMarketData, type SeedOptions } from './seed-generator';
 
@@ -15,13 +16,34 @@ import { generateMarketData, type SeedOptions } from './seed-generator';
 export class MarketDataService {
   constructor(
     @InjectRepository(ObjectEntity) private readonly objects: Repository<ObjectEntity>,
-    @InjectRepository(Workspace) private readonly workspaces: Repository<Workspace>,
+    private readonly workspaces: WorkspacesService,
     private readonly schema: SchemaService,
   ) {}
 
+  //! Public (controller) entry: authorize the workspace for the caller first (404 if it is
+  //! not theirs — see WorkspacesService.get), then read its objects. The unscoped internal
+  //! reader below is only reached AFTER the caller has been authorized on the workspace.
+  async listObjectsFor(workspaceId: string, userId: string, isAdmin: boolean): Promise<WsObject[]> {
+    await this.workspaces.get(workspaceId, userId, isAdmin);
+    return this.listObjects(workspaceId);
+  }
+
+  //! Internal, id-only reader — callers (GridService/InstrumentService) MUST have already
+  //! authorized the workspace through WorkspacesService.get before invoking this.
   async listObjects(workspaceId: string): Promise<WsObject[]> {
     const rows = await this.objects.find({ where: { workspaceId }, order: { name: 'ASC' } });
     return rows.map((o) => ({ name: o.name, kind: o.kind, payload: o.payload }));
+  }
+
+  //! Authorize then replace: the workspace must belong to the caller (or admin).
+  async replaceObjectsFor(
+    workspaceId: string,
+    objects: WsObject[],
+    userId: string,
+    isAdmin: boolean,
+  ): Promise<WsObject[]> {
+    await this.workspaces.get(workspaceId, userId, isAdmin);
+    return this.replaceObjects(workspaceId, objects);
   }
 
   //! Validate the proposed object set (ajv + semantic), then replace the workspace's
@@ -49,9 +71,15 @@ export class MarketDataService {
   //! Generate a coherent random market-data set (equities + currencies + fx + correlation)
   //! using the workspace's valuation date, then REPLACE the workspace's objects with it
   //! (a fresh sample book). Goes through the same validate+persist path as replaceObjects.
-  async seed(workspaceId: string, opts: SeedOptions = {}): Promise<WsObject[]> {
-    const ws = await this.workspaces.findOne({ where: { id: workspaceId } });
-    const objects = generateMarketData({ ...opts, today: opts.today ?? ws?.today });
+  async seed(
+    workspaceId: string,
+    opts: SeedOptions = {},
+    userId: string,
+    isAdmin: boolean,
+  ): Promise<WsObject[]> {
+    //! authorize + resolve the workspace (404 if not the caller's) before generating/persisting.
+    const ws = await this.workspaces.get(workspaceId, userId, isAdmin);
+    const objects = generateMarketData({ ...opts, today: opts.today ?? ws.today });
     return this.replaceObjects(workspaceId, objects);
   }
 
