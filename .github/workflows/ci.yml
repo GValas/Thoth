@@ -38,8 +38,12 @@ jobs:
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DTHOTH_WERROR=ON
 
+      # Cap parallelism at 2: the GitHub-hosted runner has 4 vCPUs but only
+      # ~16 GB RAM, and an unbounded `-j` compiles 4 template-heavy C++23 TUs
+      # at -O2 at once, which exhausts memory and gets the runner OOM-killed
+      # ("received a shutdown signal", exit 143). Two concurrent jobs fit.
       - name: Build
-        run: cmake --build build -j
+        run: cmake --build build -j 2
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
@@ -65,8 +69,11 @@ jobs:
       - name: Configure
         run: cmake -B build-san -DCMAKE_BUILD_TYPE=Debug -DTHOTH_SANITIZE=ON
 
+      # Same OOM cap as the Release job — the ASan/UBSan-instrumented Debug
+      # build is even more memory-hungry per TU, so keep -j at 2 to stay
+      # within the runner's RAM.
       - name: Build
-        run: cmake --build build-san -j
+        run: cmake --build build-san -j 2
 
       - name: Test (sanitized)
         env:
