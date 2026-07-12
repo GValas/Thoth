@@ -132,7 +132,11 @@ underlying's surface exposes is silently skipped.
   while barrier *levels* stay absolute). **Quanto** (a foreign-currency asset paid in the book
   currency) is supported by all three engines — the drift correction
   `F *= exp(-ρ·σ_S·σ_X·t)` lives in the MCL node graph, ANA's quanto forward and
-  the PDE carry, and the three agree (American quanto via PDE / MCL).
+  the PDE carry, and the three agree (American quanto via PDE / MCL). The settlement
+  FX (`σ_X`, spot) is **triangulated through the pivot** when the asset and payoff
+  currencies are both non-pivot (only the pivot basis, e.g. `usd/eur`, `usd/jpy`, is
+  ever stored): `var(eur/jpy) = var(usd/eur) + var(usd/jpy) − 2ρ·σ·σ`, so an
+  EUR-asset / JPY-payoff cross quanto prices (the `eur/jpy` cross is never a book object).
 - `barrier` — knock-out / digital payoffs, **continuous or
   discrete monitoring** (`monitoring_period_days`); PDE, MCL and (continuous-only)
   closed-form.

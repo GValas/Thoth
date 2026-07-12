@@ -979,6 +979,17 @@ double Correlation::GetFxSpot( const string& I,
     }
     else
     {
+        //! No direct I/J (or J/I) pair — a cross between two non-pivot currencies. Triangulate
+        //! through the pivot A, whose legs A/I and A/J always exist in the FX basis. With the
+        //! quote convention spot(A/X) = X-per-A, the cross spot(I/J) [= J-per-I] equals
+        //! spot(A/J) / spot(A/I). (The market only ever stores the pivot basis, so eur/jpy is
+        //! never a defined object; this is what makes an eur-underlying / jpy-payoff quanto price.)
+        Forex* AI = _pivot_currency.empty() ? nullptr : GetForex( _pivot_currency, I );
+        Forex* AJ = _pivot_currency.empty() ? nullptr : GetForex( _pivot_currency, J );
+        if ( AI && AJ )
+        {
+            return AJ->GetSpot() / AI->GetSpot();
+        }
         ERR( I + "/" + J + " is not defined" );
     }
 }
@@ -1000,6 +1011,21 @@ double Correlation::GetFxVol( const string& I,
     }
     else
     {
+        //! No direct pair — triangulate the cross vol through the pivot A. Since
+        //! ln(I/J) = ln(A/J) - ln(A/I), the cross variance is
+        //!   var(I/J) = var(A/I) + var(A/J) - 2 rho sigma_AI sigma_AJ,
+        //! with rho = corr(A/I, A/J) (both pivot legs are members of the correlation matrix).
+        //! Standard FX-triangle vol; floored at 0 for numerical safety.
+        Forex* AI = _pivot_currency.empty() ? nullptr : GetForex( _pivot_currency, I );
+        Forex* AJ = _pivot_currency.empty() ? nullptr : GetForex( _pivot_currency, J );
+        if ( AI && AJ )
+        {
+            const double sI = AI->GetConstantVol();
+            const double sJ = AJ->GetConstantVol();
+            const double rho = GetValue( AI->GetName(), AJ->GetName() );
+            const double var = sI * sI + sJ * sJ - 2 * rho * sI * sJ;
+            return sqrt( var > 0 ? var : 0 );
+        }
         ERR( I + "/" + J + " is not defined" );
     }
 }

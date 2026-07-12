@@ -81,6 +81,59 @@ TEST_CASE( "ANA, PDE and MCL agree on quanto European vanillas" )
     }
 }
 
+// Cross-currency quanto: a EUR asset paid in JPY. The market stores only the usd-pivot FX
+// basis (usd/eur, usd/jpy) — the eur/jpy cross is never a defined object, so the quanto FX
+// vol and spot are TRIANGULATED through the pivot (Correlation::GetFxVol / GetFxSpot):
+//   var(eur/jpy) = var(usd/eur) + var(usd/jpy) - 2 rho sigma_ue sigma_uj.
+// This previously failed with "eur/jpy is not defined". No closed form for the cross, so pin
+// the three-way engine agreement (all share the same triangulated quanto drift).
+TEST_CASE( "cross-currency quanto (EUR asset, JPY payoff) agrees across ANA/MCL/PDE" )
+{
+    auto cfg = []( const std::string& method, double strike, int draws )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: jpy,"
+          << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( draws, 7, 5 )
+          << "usd: !currency {rate: usd_rate}\n"
+          << "usd_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "eur: !currency {rate: eur_rate}\n"
+          << "eur_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "jpy: !currency {rate: jpy_rate}\n"
+          << "jpy_rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [1, 1]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+          //! usd-pivot basis: only usd/eur and usd/jpy exist; eur/jpy is triangulated.
+          << "usd/eur: !forex {base_currency: eur, underlying_currency: usd, spot: 1.1, volatility: fx_ue}\n"
+          << "fx_ue: !bs_volatility {volatility: 10, calendar: cal}\n"
+          << "usd/jpy: !forex {base_currency: jpy, underlying_currency: usd, spot: 150, volatility: fx_uj}\n"
+          << "fx_uj: !bs_volatility {volatility: 12, calendar: cal}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [usd/eur, usd/jpy],"
+          << " matrix: [1, 0.3, 0.2, 0.3, 1, 0.5, 0.2, 0.5, 1]}\n"
+          << "o: !vanilla {underlying: eq, premium_currency: jpy, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n"
+          << "book: !book {contracts: [o]}\n";
+        return o.str();
+    };
+
+    for ( double strike : { 90.0, 100.0, 120.0 } )
+    {
+        CAPTURE( strike );
+        const double ana = Premium( Price( cfg( "ana", strike, 1 ) ) );
+        const double pde = Premium( Price( cfg( "pde", strike, 1 ) ) );
+        auto mr = Price( cfg( "mcl", strike, 200000 ) );
+        const double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( pde );
+        CAPTURE( mcl );
+        CHECK( ana > 0 );                                                         //!< prices (no "not defined")
+        CHECK( std::abs( pde - ana ) <= 0.015 * ana + 0.05 );                     //!< closed form vs grid
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.015 * ana + 0.05 ); //!< MC error
+    }
+}
+
 // The book total equals the sum of its contract premiums (analytic, exact).
 TEST_CASE( "book premium is the sum of its contracts" )
 {
