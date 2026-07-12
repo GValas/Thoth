@@ -213,6 +213,59 @@ TEST_CASE( "composite underlying matches the closed form across ANA/MCL/PDE" )
     CHECK( std::abs( p_ana - p_mcl ) <= 6.0 * Trust( mcl ) + 5e-2 );
 }
 
+// --- CROSS-currency composite: a EUR asset composited into JPY, where the market only
+// stores the usd-pivot FX basis (usd/eur, usd/jpy) — the eur/jpy conversion is triangulated.
+// The MCL leg builds the cross FX from the two pivot legs as a ratio of lognormals, whose
+// convexity is removed by a deterministic exp(-(sigma_PA^2 - rho sigma_PA sigma_PB) t) factor
+// (Correlation::GetFxNode) so the composite forward matches the single-lognormal one ANA/PDE
+// use. Regression: without the convexity correction MCL over-forwards ~0.4% and disagrees.
+TEST_CASE( "cross-currency composite (EUR asset, JPY payoff) agrees across ANA/MCL/PDE" )
+{
+    auto cfg = []( const std::string& method, double strike, int draws )
+    {
+        std::ostringstream o;
+        o << "root: pricer\n"
+          << "pricer: !" << method << "_pricer {today: 2000-01-01, book: book, currency: jpy,"
+          << ConfigRef( method ) << " correlation: cor, indicators: [premium], result: res}\n"
+          << CfgBlock( draws, 5, 5 )
+          << "usd: !currency {rate: r_usd}\n"
+          << "r_usd: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [5, 5]}\n"
+          << "eur: !currency {rate: r_eur}\n"
+          << "r_eur: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+          << "jpy: !currency {rate: r_jpy}\n"
+          << "r_jpy: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [1, 1]}\n"
+          << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+          << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
+          << "vol: !bs_volatility {volatility: 30, calendar: cal}\n"
+          << "usd/eur: !forex {base_currency: eur, underlying_currency: usd, spot: 1.1, volatility: fx_ue}\n"
+          << "fx_ue: !bs_volatility {volatility: 10, calendar: cal}\n"
+          << "usd/jpy: !forex {base_currency: jpy, underlying_currency: usd, spot: 150, volatility: fx_uj}\n"
+          << "fx_uj: !bs_volatility {volatility: 12, calendar: cal}\n"
+          << "comp: !composite {equity: eq, composite_currency: jpy}\n"
+          << "cor: !correlation_matrix {underlyings: [eq], forexs: [usd/eur, usd/jpy],"
+          << " matrix: [1, 0.3, 0.2, 0.3, 1, 0.5, 0.2, 0.5, 1]}\n"
+          << "o: !vanilla {underlying: comp, premium_currency: jpy, strike: " << strike
+          << ", is_absolute_strike: true, maturity: 2000-12-31, type: call, exercise: european}\n"
+          << "book: !book {contracts: [o]}\n";
+        return o.str();
+    };
+
+    for ( double strike : { 12000.0, 13773.0 } ) // composite spot ~= 100*150/1.1 = 13636
+    {
+        CAPTURE( strike );
+        const double ana = Premium( Price( cfg( "ana", strike, 1 ) ) );
+        const double pde = Premium( Price( cfg( "pde", strike, 1 ) ) );
+        auto mr = Price( cfg( "mcl", strike, 400000 ) );
+        const double mcl = Premium( mr );
+        CAPTURE( ana );
+        CAPTURE( pde );
+        CAPTURE( mcl );
+        CHECK( ana > 0 );
+        CHECK( std::abs( pde - ana ) <= 0.01 * ana + 0.05 );                     //!< closed form vs grid
+        CHECK( std::abs( mcl - ana ) <= 6.0 * Trust( mr ) + 0.01 * ana + 0.05 ); //!< MC error (convexity fixed)
+    }
+}
+
 // --- composite on a dividend/repo-paying asset : the USD value S*FX is a traded
 // USD asset paying the wrapped equity's continuous carry q (= dividend yield +
 // repo), so under the USD measure it drifts at (r_usd - q) and the composite

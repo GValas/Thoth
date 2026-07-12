@@ -1165,21 +1165,59 @@ MonteCarloNode* Correlation::GetFxNode( NodeCollector& NC,
             N = AI_node;
         }
 
-        // neither leg is the pivot: the DIFFUSED cross rate A/B is NOT supported. Building it
-        // as the log-combination -(P/A)+(P/B) reproduces the correct cross DRIFT (r_B - r_A),
-        // vol and asset-correlation on paper, but the two pivot legs each diffuse under their
-        // OWN base-currency measure (Forex::GetDriftNode uses the native r_base - r_underlying),
-        // which is not the payoff (B) numeraire — the residual measure mismatch leaves a ~2%
-        // bias in the MCL composite (empirically ANA==PDE but MCL disagrees ~1.8% at 1e6 paths,
-        // while the direct-pivot composite agrees to MC error). A correct fix must diffuse A/B
-        // directly under the B measure (its own factor: drift r_B - r_A, triangulated vol, and
-        // triangulated correlations wired into the Cholesky), not compose pivot legs. Until then
-        // fail cleanly. The constant-vol quanto path (GetFxVol/GetFxSpot) is unaffected/correct.
+        // neither leg is the pivot: triangulate. The cross A/B = (P/B) / (P/A), so in log
+        // space log(A/B) = -log(P/A) + log(P/B) — a ProductNode of the two pivot legs (each
+        // diffusing with its native drift r_base - r_underlying, so the combined log-drift is
+        // r_B - r_A, the correct A/B drift). The realized vol and cross-correlations reduce to
+        // the same triangulated values ANA/PDE use.
+        //
+        // BUT a ratio of two lognormals is convex: E[(P/B)/(P/A)] = (E[P/B]/E[P/A]) *
+        // exp((sigma_PA^2 - rho sigma_PA sigma_PB) t), whereas the single-lognormal cross FX
+        // ANA/PDE assume has E = E[P/B]/E[P/A]. Left uncorrected this over-forwards the MCL
+        // composite by exactly that factor (empirically +0.4%). Remove it with a deterministic
+        // multiplier exp(-C t), C = sigma_PA^2 - rho sigma_PA sigma_PB, applied via a
+        // QuantoAdjustmentNode (it computes exp(-v w rho t)) fed constants v = sigma_PA,
+        // w = sigma_PA - rho sigma_PB, rho = 1, so v*w*rho = C.
         else
         {
-            ERR( "composite between two non-pivot currencies (" + UnderlyingCurrency + "/" +
-                 BaseCurrency + ") is not supported: quote one leg against the pivot " +
-                 _pivot_currency + ", or price it as a quanto" );
+            //! the convexity correction below uses a CONSTANT C = sigma_PA^2 - rho sigma_PA
+            //! sigma_PB (flat FX vol + a single rho). Under a term-structured correlation rho
+            //! varies over [0, t] and the exact correction is exp(-int_0^t C(u) du), not
+            //! exp(-C(0) t) — so refuse rather than silently mis-forward the composite. (Same
+            //! desync class ValidateTermVarEntries guards; term FX vol is flat regardless.)
+            if ( IsTermStructured() )
+            {
+                ERR( "cross-currency composite (" + UnderlyingCurrency + "/" + BaseCurrency +
+                     ") with a term-structured correlation is not supported (the ratio-convexity "
+                     "correction assumes a constant cross-FX correlation)" );
+            }
+
+            Forex* PA = GetForex( _pivot_currency, UnderlyingCurrency ); //!< P/A (denominator)
+            Forex* PB = GetForex( _pivot_currency, BaseCurrency );       //!< P/B (numerator)
+            MonteCarloNode* PA_Node = PA->Single::GetNode( NC );
+            MonteCarloNode* PB_Node = PB->Single::GetNode( NC );
+
+            ProductNode* raw = NC.NewNode<ProductNode>( node_name + "_raw" );
+            raw->PushNode( PA_Node, -1 ); //!< 1 / (P/A)
+            raw->PushNode( PB_Node, +1 ); //!< * (P/B)
+
+            const double sPA = PA->GetConstantVol();
+            const double sPB = PB->GetConstantVol();
+            const double rho = GetValue( PA->GetName(), PB->GetName() );
+
+            QuantoAdjustmentNode* Q = NC.NewNode<QuantoAdjustmentNode>( node_name );
+            Q->SetUdlSpotNode( raw );
+            Q->SetUdlVolNode( NC.GetOrCreate<ConstantNode>(
+                node_name + "_cvx_sPA", [&]( ConstantNode* C )
+                { C->SetConstantValue( sPA ); } ) );
+            Q->SetFxVolNode( NC.GetOrCreate<ConstantNode>(
+                node_name + "_cvx_w",
+                [&]( ConstantNode* C )
+                { C->SetConstantValue( sPA - rho * sPB ); } ) );
+            Q->SetUdlFxCorrelNode( NC.GetOrCreate<ConstantNode>(
+                node_name + "_cvx_one", [&]( ConstantNode* C )
+                { C->SetConstantValue( 1.0 ); } ) );
+            N = Q;
         }
     }
     return N;
