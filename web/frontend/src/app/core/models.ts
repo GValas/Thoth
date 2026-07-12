@@ -136,10 +136,25 @@ export interface GridProgress {
 // --- single-instrument pricing (panels + blotter) ---
 
 //! Instrument kinds the pricing panels can quote (engine `!<kind>` tags).
-export type InstrumentKind = 'vanilla' | 'barrier' | 'variance_swap';
+export type InstrumentKind = 'vanilla' | 'barrier' | 'variance_swap' | 'autocallable';
 
 //! Price one hand-entered instrument. `instrument` carries the kind's own fields
 //! (underlying, strike, maturity, barrier_type, …) verbatim; `live` overlays live spots.
+//! a termsheet request: the same instrument, documented instead of priced.
+export interface InstrumentTermsheetRequest {
+  workspaceId: string;
+  kind: InstrumentKind;
+  instrument: Record<string, unknown>;
+  today?: string;
+  title?: string;
+  issuer?: string;
+}
+
+export interface InstrumentTermsheetResponse {
+  termsheet: string; //!< the rendered Markdown document
+  filename: string; //!< suggested download filename
+}
+
 export interface InstrumentPriceRequest {
   workspaceId: string;
   engine: Engine;

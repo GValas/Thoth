@@ -2,9 +2,10 @@ import { Component, Input, computed, inject } from '@angular/core';
 import { AgGridAngular } from 'ag-grid-angular';
 import type { CellClassParams, ColDef, ValueFormatterParams } from 'ag-grid-community';
 import { buildCorrelModel, CorrelModel, MarketModel, round, writeCorrel } from './market-model';
-import { signedScale } from '../pricing-grid/heatmap';
+import { signedScale, textOn } from '../pricing-grid/heatmap';
 import { LiveSpotsService } from './live-spots.service';
 import { LiveCorrelService } from './live-correl.service';
+import { ThemeService } from '../core/theme.service';
 
 //! Correlation area: an editable N×N matrix over [equities (+ `_var` for Heston), fx].
 //! The matrix is symmetric (editing (i,j) mirrors (j,i)) with a locked unit diagonal; it
@@ -56,9 +57,19 @@ import { LiveCorrelService } from './live-correl.service';
 export class CorrelationSectionComponent {
   @Input({ required: true }) model!: MarketModel;
 
-  private readonly scale = signedScale([1, -1]); // fixed [-1,1] domain
   private readonly live = inject(LiveSpotsService);
   private readonly liveCorrel = inject(LiveCorrelService);
+  private readonly theme = inject(ThemeService);
+
+  //! the heat scale over the fixed [-1, 1] domain. Rebuilt whenever the theme flips:
+  //! signedScale() snapshots the theme's heat stops (the mid stop is the grid surface,
+  //! near-black in dark mode) at creation, so a frozen scale would keep the LIGHT stops
+  //! after a light->dark toggle and the matrix would stay on pale, unreadable cells.
+  //! Reading theme.mode() here makes `cols` recompute with a fresh scale on every switch.
+  private readonly scale = computed(() => {
+    this.theme.mode();
+    return signedScale([1, -1]);
+  });
 
   readonly cm = computed(() => buildCorrelModel(this.model));
 
@@ -112,7 +123,10 @@ export class CorrelationSectionComponent {
           Number.isFinite(p.value) ? (p.value as number).toFixed(2) : '',
         cellStyle: (p: CellClassParams) => ({
           textAlign: 'right',
-          backgroundColor: this.scale.bg(p.value as number),
+          backgroundColor: this.scale().bg(p.value as number),
+          //! contrast the number against its (theme-aware) heat cell: white on the
+          //! saturated blue/red wings, the theme text colour near the neutral mid
+          color: textOn(p.value as number, 1),
         }),
       })),
     ];

@@ -81,17 +81,32 @@ For **PDE/MCL** the grid builder synthesises a default engine-config object
 the request carries none, so those engines price straight from the GUI.
 
 Beyond the grid, the **Panels** tab prices a *single* hand-entered product with all its
-variations across three sub-panels — **Vanilla** (call/put, European/American, strike,
+variations across four sub-panels — **Vanilla** (call/put, European/American, strike,
 maturity, nominal, absolute/relative strike), **Barrier** (the four `up&out / up&in /
 down&out / down&in` types, continuous or discrete monitoring, barrier level, strike,
-maturity) and **Variance** (variance swap: volatility strike + notional) — each showing
+maturity), **Variance** (variance swap: volatility strike + notional) and
+**Autocallable** (an **Athena** snowball or a **Phoenix** conditional-coupon note with
+the **memory** variant — autocall / protection / coupon barriers as percent of spot, and
+a generated observation schedule from a first date + monthly frequency + count; pde / mcl
+only, no ANA closed form) — each showing
 premium + Greeks, each able to **re-price live** off the spot feed on a throttle, and each
 with a **Send to blotter** button (variance swaps now quote premium **and Greeks** — vega,
-rho, theta from the engine's generic bump pass — like the other panels). The **Blotter** tab is
+rho, theta from the engine's generic bump pass — like the other panels) and a
+**Termsheet** button that renders the product's booked description as a Markdown
+document (the engine's `!termsheet` documentation task, via `POST
+/api/instrument/termsheet`) and downloads it as a `.md` file — same form state as
+the Price button, no pricing involved. The **Blotter** tab is
 a global monitoring book: every product sent from a panel becomes a row showing its underlying's
 **live spot** (next to the underlying) and a premium re-priced for the whole book in **live
 mode** (throttled, off the live spots), tinted green/red on each move; rows survive
-tab navigation and a reload (persisted in `localStorage`). Both are backed by a synchronous
+tab navigation and a reload (persisted in `localStorage`). On a **fresh install**
+the blotter self-seeds **10 random sample contracts** (vanillas / barriers / variance
+swaps on the workspace's underlyings) so it opens on a live book rather than a blank
+tab — one-shot, guarded by a `localStorage` flag so a deliberate clear stays cleared.
+Each row has a **tick box** (plus a header select-all); the **Re-price** and
+**Termsheet** toolbar actions operate on the ticked rows (or the whole book when none
+are ticked), the Termsheet button rendering the selected products' termsheets and
+downloading them as **one Markdown file**. Both are backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
 correlation matrix** — each streamed pair takes its live value, the rest keep their stored
 one, and the blend is Cholesky-gated back to the stored matrix if mixing would break
@@ -104,7 +119,17 @@ never push a repaired matrix back to indefinite.
 Auth is JWT + rotating refresh cookie with an admin RBAC tab; the stored refresh-token hash
 is a bcrypt of the token's **sha256 digest** (bcrypt alone reads only the first 72 bytes,
 which are identical across a user's JWTs — hashing the digest keeps rotation/replay
-detection effective).
+detection effective). The BFF is **security-hardened**: it **refuses to boot** unless
+`JWT_SECRET`/`JWT_REFRESH_SECRET` are present, ≥32 chars and not a placeholder (no hardcoded
+fallback); every workspace and all workspace-derived data (market objects, grids, single
+pricings, termsheets) are **owner-scoped** (a workspace/run that is not yours reads back as a
+404, not a 403, so ids can't be enumerated — admins bypass); `@nestjs/throttler` rate-limits
+the API globally and **login/refresh strictly** (5/min per IP); a **1 MB JSON body limit**,
+grid **dimension caps** (≤200 strikes / 120 maturities / 20 underlyings / 8 types and
+≤50 000 total cells), **helmet** security headers and a **prod-gated Swagger** round it out.
+Free-form instrument/market-data fields are stripped of reserved keys (`__proto__`,
+`constructor`, `prototype`, `__tag`) and the validated kind tag is always written last, so a
+crafted `__tag` can't override the priced product.
 
 **Look & feel:** the whole SPA shares a dense, finance-grade charte driven by a single
 design-token layer (`web/frontend/src/styles/_tokens.scss` — palette, a px **type scale**,

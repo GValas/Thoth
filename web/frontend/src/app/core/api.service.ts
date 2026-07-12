@@ -11,6 +11,8 @@ import {
   GridSubmit,
   Health,
   InstrumentPriceRequest,
+  InstrumentTermsheetRequest,
+  InstrumentTermsheetResponse,
   InstrumentPriceResponse,
   SchemaResponse,
   SeedRequest,
@@ -96,6 +98,12 @@ export class ApiService {
   //! overlays the latest live spots, so panels/blotter can quote off the live feed.
   priceInstrument(dto: InstrumentPriceRequest): Observable<InstrumentPriceResponse> {
     return this.http.post<InstrumentPriceResponse>(`${this.base}/instrument/price`, dto);
+  }
+
+  //! render one instrument's termsheet (the engine's !termsheet documentation task);
+  //! the caller downloads the returned Markdown as a file.
+  instrumentTermsheet(dto: InstrumentTermsheetRequest): Observable<InstrumentTermsheetResponse> {
+    return this.http.post<InstrumentTermsheetResponse>(`${this.base}/instrument/termsheet`, dto);
   }
 
   // --- admin ---

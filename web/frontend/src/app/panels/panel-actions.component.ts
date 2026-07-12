@@ -52,6 +52,14 @@ import { PricingPanelBase } from './pricing-panel.base';
       >
         <mat-icon>playlist_add</mat-icon> Send to blotter
       </button>
+      <button
+        mat-stroked-button
+        [disabled]="!panel.canPrice || panel.busy()"
+        (click)="panel.downloadTermsheet()"
+        matTooltip="Render this product's termsheet (Markdown) and download it"
+      >
+        <mat-icon>description</mat-icon> Termsheet
+      </button>
     </div>
 
     @if (panel.error()) {

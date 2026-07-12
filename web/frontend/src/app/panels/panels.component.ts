@@ -3,14 +3,22 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { VanillaPanelComponent } from './vanilla-panel.component';
 import { BarrierPanelComponent } from './barrier-panel.component';
 import { VariancePanelComponent } from './variance-panel.component';
+import { AutocallablePanelComponent } from './autocallable-panel.component';
 
-//! Pricing panels: a tab each for the vanilla, barrier and variance-swap single-product
-//! panels. Each panel quotes one hand-entered instrument (live off the feed) and can push it
-//! to the global monitoring blotter — keeping the Vanilla Grid for strike x maturity sweeps.
+//! Pricing panels: a tab each for the vanilla, barrier, variance-swap and autocallable
+//! single-product panels. Each panel quotes one hand-entered instrument (live off the feed)
+//! and can push it to the global monitoring blotter — keeping the Vanilla Grid for
+//! strike x maturity sweeps.
 @Component({
   selector: 'app-panels',
   standalone: true,
-  imports: [MatTabsModule, VanillaPanelComponent, BarrierPanelComponent, VariancePanelComponent],
+  imports: [
+    MatTabsModule,
+    VanillaPanelComponent,
+    BarrierPanelComponent,
+    VariancePanelComponent,
+    AutocallablePanelComponent,
+  ],
   template: `
     <div class="panels-header">
       <h2 class="title">Pricing panels</h2>
@@ -24,6 +32,9 @@ import { VariancePanelComponent } from './variance-panel.component';
       </mat-tab>
       <mat-tab label="Variance">
         <div class="tab-body"><app-variance-panel></app-variance-panel></div>
+      </mat-tab>
+      <mat-tab label="Autocallable">
+        <div class="tab-body"><app-autocallable-panel></app-autocallable-panel></div>
       </mat-tab>
     </mat-tab-group>
   `,

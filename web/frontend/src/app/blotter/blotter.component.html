@@ -19,8 +19,21 @@
       >
         <mat-icon>{{ b.liveMode() ? 'sensors' : 'sensors_off' }}</mat-icon> Live
       </button>
-      <button mat-stroked-button [disabled]="!b.count()" (click)="b.repriceAll(false)" matTooltip="Re-price every row once">
-        <mat-icon>refresh</mat-icon> Re-price
+      <button
+        mat-stroked-button
+        [disabled]="!b.count()"
+        (click)="reprice()"
+        [matTooltip]="'Re-price ' + targetLabel() + ' row(s) once'"
+      >
+        <mat-icon>refresh</mat-icon> Re-price {{ targetLabel() }}
+      </button>
+      <button
+        mat-stroked-button
+        [disabled]="!b.count() || busy()"
+        (click)="termsheet()"
+        [matTooltip]="'Download the termsheet(s) of ' + targetLabel() + ' row(s) as one Markdown file'"
+      >
+        <mat-icon>description</mat-icon> Termsheet {{ targetLabel() }}
       </button>
       <span class="thoth-spacer"></span>
       @if (b.liveMode()) {
@@ -35,6 +48,23 @@
 
 @if (b.count()) {
   <table mat-table [dataSource]="b.rows()" class="bl-table">
+    <ng-container matColumnDef="select">
+      <th mat-header-cell *matHeaderCellDef class="tick">
+        <mat-checkbox
+          [checked]="b.allSelected()"
+          [indeterminate]="b.someSelected()"
+          (change)="b.toggleSelectAll()"
+          matTooltip="Select all / none"
+        ></mat-checkbox>
+      </th>
+      <td mat-cell *matCellDef="let r" class="tick">
+        <mat-checkbox
+          [checked]="b.isSelected(r.id)"
+          (change)="b.toggleSelect(r.id)"
+        ></mat-checkbox>
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="label">
       <th mat-header-cell *matHeaderCellDef>Product</th>
       <td mat-cell *matCellDef="let r">{{ r.label }}</td>

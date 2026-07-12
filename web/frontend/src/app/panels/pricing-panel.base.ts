@@ -1,7 +1,12 @@
 import { signal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
-import { Engine, InstrumentKind, InstrumentPriceRequest } from '../core/models';
+import {
+  Engine,
+  InstrumentKind,
+  InstrumentPriceRequest,
+  InstrumentTermsheetRequest,
+} from '../core/models';
 import { BlotterService } from '../blotter/blotter.service';
 import { PanelContextService } from './panel-context.service';
 
@@ -182,6 +187,50 @@ export abstract class PricingPanelBase {
       const ms = Math.max(1, this.liveThrottleSec) * 1000;
       this.liveTimer = setTimeout(() => void this.liveTick(), ms);
     }
+  }
+
+  //! render and download the current product's termsheet (the engine's !termsheet
+  //! documentation task) as a Markdown file. Reuses the panel's form state: same
+  //! contract fields the Price button sends, no pricing involved.
+  async downloadTermsheet(): Promise<void> {
+    const priced = this.buildRequest(false);
+    if (!priced) return;
+    const req: InstrumentTermsheetRequest = {
+      workspaceId: priced.workspaceId,
+      kind: priced.kind,
+      instrument: priced.instrument,
+      title: this.rowLabel(),
+    };
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const res = await firstValueFrom(this.api.instrumentTermsheet(req));
+      const blob = new Blob([res.termsheet], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      //! Derive the download name CLIENT-SIDE: never trust the server-supplied filename for
+      //! `a.download` (it could inject path/extension trickery). Build it from the sanitized
+      //! row label (or kind), and only fall back to the server name if it is a plain `*.md`.
+      a.download = this.termsheetFilename(res.filename);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      this.fail(e);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  //! build a safe termsheet download filename. Prefer a name derived from the panel's own
+  //! row label / kind (sanitized to `[A-Za-z0-9._-]`, spaces -> '_'); only accept the
+  //! server's name when it is already a bare `*.md`. Always ends in `.md`.
+  private termsheetFilename(serverName?: string): string {
+    if (serverName && /^[\w.\-]+\.md$/.test(serverName)) return serverName;
+    const raw = (this.rowLabel() || this.kind || 'termsheet').trim();
+    let name = raw.replace(/\s+/g, '_').replace(/[^A-Za-z0-9._-]/g, '');
+    if (!name) name = 'termsheet';
+    return name.toLowerCase().endsWith('.md') ? name : `${name}.md`;
   }
 
   //! push the current product to the global monitoring blotter.

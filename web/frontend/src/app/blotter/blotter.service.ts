@@ -1,7 +1,11 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
-import { InstrumentKind, InstrumentPriceRequest } from '../core/models';
+import {
+  InstrumentKind,
+  InstrumentPriceRequest,
+  InstrumentTermsheetRequest,
+} from '../core/models';
 
 //! One monitored line in the global blotter: the exact pricing request that produced it
 //! (so it can be re-priced — live or on demand) plus its last quote and the move direction
@@ -38,6 +42,49 @@ export class BlotterService {
 
   readonly count = computed(() => this.rows().length);
 
+  //! per-row tick selection (by id). The toolbar actions (re-price / termsheet)
+  //! operate on the ticked rows, or on the WHOLE book when nothing is ticked —
+  //! so the buttons stay useful without forcing a selection.
+  readonly selected = signal<Set<string>>(new Set());
+  readonly selectedCount = computed(() => {
+    const ids = this.selected();
+    return this.rows().filter((r) => ids.has(r.id)).length; //!< ignore stale ids
+  });
+  readonly allSelected = computed(
+    () => this.count() > 0 && this.selectedCount() === this.count(),
+  );
+  readonly someSelected = computed(
+    () => this.selectedCount() > 0 && !this.allSelected(),
+  );
+
+  isSelected(id: string): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelect(id: string): void {
+    this.selected.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  //! header checkbox: select all when not all are selected, else clear.
+  toggleSelectAll(): void {
+    this.selected.set(this.allSelected() ? new Set() : new Set(this.rows().map((r) => r.id)));
+  }
+
+  //! the rows an action targets: the ticked ones, or the whole book if none ticked.
+  private targets(): BlotterRow[] {
+    const ids = this.selected();
+    const ticked = this.rows().filter((r) => ids.has(r.id));
+    return ticked.length ? ticked : this.rows();
+  }
+
   //! which Greek columns to show: the union of Greeks present across the rows, in canonical
   //! order, so a blotter mixing instruments shows just the columns that carry a value
   //! somewhere (e.g. premium-only rows that were sent without the Greeks toggle).
@@ -48,9 +95,53 @@ export class BlotterService {
   });
 
   private readonly STORE_KEY = 'thoth.blotter';
+  //! set once the first-launch demo book has been generated, so it is never
+  //! re-seeded (clearing the blotter on purpose must not bring it back).
+  private readonly SEEDED_KEY = 'thoth.blotter.seeded';
 
   constructor() {
     this.restore();
+  }
+
+  //! whether the first-launch demo book has already been generated (or the user
+  //! has any persisted rows — an existing book is proof of a prior visit).
+  private alreadySeeded(): boolean {
+    try {
+      return localStorage.getItem(this.SEEDED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  //! First-launch demo: generate `count` random contracts (vanilla / barrier /
+  //! variance swap) on the given underlyings and add them to the blotter, so a
+  //! fresh install lands on a populated monitoring book instead of a blank tab.
+  //! No-op if the blotter is non-empty or the demo has already run once.
+  seedDemo(
+    workspaceId: string,
+    underlyings: string[],
+    currency: string,
+    today: string,
+    count = 10,
+  ): void {
+    if (!underlyings.length || this.rows().length || this.alreadySeeded()) return;
+    try {
+      localStorage.setItem(this.SEEDED_KEY, '1');
+    } catch {
+      /* storage unavailable — still seed this session, just don't persist the flag */
+    }
+    for (let i = 0; i < count; i++) {
+      const { label, kind, instrument } = randomContract(underlyings, today);
+      const request: InstrumentPriceRequest = {
+        workspaceId,
+        engine: 'ana',
+        kind,
+        instrument: { ...instrument, premium_currency: currency },
+        indicators: ['premium', 'delta', 'gamma', 'vega', 'rho', 'theta'],
+        currency,
+      };
+      this.add({ label, kind, request });
+    }
   }
 
   //! Add a product to the blotter (deep-copying the request so later panel edits don't
@@ -75,12 +166,18 @@ export class BlotterService {
 
   remove(id: string): void {
     this.rows.update((rs) => rs.filter((r) => r.id !== id));
+    this.selected.update((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
     this.persist();
   }
 
   clear(): void {
     this.stopLive();
     this.rows.set([]);
+    this.selected.set(new Set());
     this.persist();
   }
 
@@ -103,9 +200,52 @@ export class BlotterService {
     }
   }
 
-  //! one-off re-price of every row, off the live feed (used by the manual "Re-price" button).
+  //! one-off re-price of every row, off the live feed (used to re-quote restored rows).
   async repriceAll(live = false): Promise<void> {
     await Promise.all(this.rows().map((r) => this.priceRow(r.id, live)));
+  }
+
+  //! re-price the TARGETED rows once (the ticked ones, or the whole book if none
+  //! ticked) — the toolbar "Re-price" button.
+  async repriceSelected(live = false): Promise<void> {
+    await Promise.all(this.targets().map((r) => this.priceRow(r.id, live)));
+  }
+
+  //! render the termsheets of the targeted rows and download them as ONE Markdown
+  //! file (sections separated by a horizontal rule) — a single download instead of
+  //! N browser save dialogs. Returns the number of documents rendered.
+  async downloadTermsheets(): Promise<{ ok: number; failed: number }> {
+    const rows = this.targets();
+    let ok = 0;
+    let failed = 0;
+    const sections: string[] = [];
+    for (const r of rows) {
+      const req: InstrumentTermsheetRequest = {
+        workspaceId: r.request.workspaceId,
+        kind: r.kind,
+        instrument: r.request.instrument,
+        title: r.label,
+      };
+      try {
+        const res = await firstValueFrom(this.api.instrumentTermsheet(req));
+        sections.push(res.termsheet.trim());
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+    if (sections.length) {
+      const blob = new Blob([sections.join('\n\n---\n\n') + '\n'], {
+        type: 'text/markdown;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = sections.length === 1 ? 'termsheet.md' : `termsheets_${sections.length}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    return { ok, failed };
   }
 
   private async liveTick(): Promise<void> {
@@ -191,4 +331,70 @@ export class BlotterService {
     // re-quote the restored rows once so they aren't blank.
     void this.repriceAll(false);
   }
+}
+
+//! --- first-launch demo book: random contract generation ---------------------
+
+function pick<T>(xs: readonly T[]): T {
+  return xs[Math.floor(Math.random() * xs.length)];
+}
+
+//! a maturity `months` out from `today` (YYYY-MM-DD), returned in the same format.
+function maturityFrom(today: string, months: number): string {
+  const d = new Date(`${today}T00:00:00`);
+  d.setMonth(d.getMonth() + months);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+//! One random contract (vanilla / barrier / variance swap) on a random underlying:
+//! the `instrument` fields the panels build, plus a human label and the kind. The
+//! strike/barrier are booked as a PERCENT of spot (is_absolute_strike omitted /
+//! relative) so the sample is spot-agnostic across whatever underlyings exist.
+function randomContract(
+  underlyings: string[],
+  today: string,
+): { label: string; kind: InstrumentKind; instrument: Record<string, unknown> } {
+  const u = pick(underlyings);
+  const kind = pick(['vanilla', 'barrier', 'variance_swap'] as const);
+  const maturity = maturityFrom(today, pick([6, 12, 18, 24, 36]));
+
+  if (kind === 'variance_swap') {
+    const volStrike = 15 + Math.floor(Math.random() * 25); // 15..39 %
+    return {
+      kind,
+      label: `${u} var swap K=${volStrike}% ${maturity}`,
+      instrument: { underlying: u, maturity, volatility_strike: volStrike, notional: 10000 },
+    };
+  }
+
+  const type = pick(['call', 'put'] as const);
+  const strike = pick([80, 90, 95, 100, 105, 110, 120]); // percent of spot
+
+  if (kind === 'barrier') {
+    const barrierType = pick(['up&out', 'up&in', 'down&out', 'down&in'] as const);
+    const isDown = barrierType.startsWith('down');
+    const level = isDown ? pick([60, 70, 80]) : pick([120, 130, 140]); // percent of spot
+    return {
+      kind,
+      label: `${u} ${type} ${strike}% ${barrierType} ${level}% ${maturity}`,
+      instrument: {
+        underlying: u,
+        strike,
+        maturity,
+        type,
+        nominal: 1,
+        barrier_type: barrierType,
+        barrier_monitoring_type: 'continuous_monitoring',
+        [isDown ? 'barrier_down_level' : 'barrier_up_level']: level,
+      },
+    };
+  }
+
+  const exercise = pick(['european', 'american'] as const);
+  return {
+    kind,
+    label: `${u} ${type} ${strike}% ${maturity} (${exercise})`,
+    instrument: { underlying: u, strike, maturity, type, exercise, nominal: 1 },
+  };
 }
