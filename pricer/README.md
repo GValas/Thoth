@@ -476,7 +476,9 @@ discrete barriers, American Heston, variance swap, Heston, Bates, and **SABR
 local-vol** — across PDE / MCL / ANA, with Sobol and pseudo-random MCL; plus the
 2026 features — **term correlation**, **multi-curve/OIS**, the **Hull-White
 hybrid**, **seasoned variance swaps**, **autocallables** (Athena / Phoenix /
-memory) and the path-dependent **Asian** and **ratchet** notes) in one
+memory), the path-dependent **Asian** and **ratchet** notes, and the
+**cross-currency** (both-non-pivot, triangulated-FX) **quanto** and
+**composite**) in one
 process — price it like any other book (`-batch`, or post it to a server with the
 built-in `-client`). `scripts/run_local_client_matrix.sh` posts it and prints a
 per-product table (method, time, premium and every Greek) — see below.

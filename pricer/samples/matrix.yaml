@@ -49,6 +49,8 @@ root: matrix
 #   autocallable Athena (snowball)                 mcl   pde (early redeem N*(1+k*c); ANA rejects)
 #   autocallable Phoenix (conditional cpn)         mcl   pde (per-period coupon above the coupon barrier)
 #   autocallable Phoenix memory                    mcl       (missed-coupon catch-up; PDE rejects)
+#   vanilla mono eu call cross quanto (EUR->JPY)   ana   mcl   pde (both ccys non-pivot; FX triangulated)
+#   vanilla mono eu call cross composite (EUR->JPY) ana  mcl   pde (S*FX diffused; ratio-convexity fixed)
 #
 # The SABR cases exercise the Dupire local-vol Monte-Carlo (the SABR implied surface
 # is turned into a local-vol surface and diffused): ANA prices at the strike's
@@ -174,6 +176,13 @@ matrix: !sequence
     #! path-dependent, Monte-Carlo only (ANA/PDE reject)
     - asian_mono_eu_call_mcl
     - ratchet_mono_mcl
+    #! cross-currency (both non-pivot): triangulated FX quanto + composite
+    - vanilla_mono_eu_call_cross_quanto_ana
+    - vanilla_mono_eu_call_cross_quanto_pde
+    - vanilla_mono_eu_call_cross_quanto_mcl
+    - vanilla_mono_eu_call_cross_compo_ana
+    - vanilla_mono_eu_call_cross_compo_pde
+    - vanilla_mono_eu_call_cross_compo_mcl
 
 # --- pricers (one per matrix cell) -----------------------------------------
 # european vanilla
@@ -1552,3 +1561,121 @@ c_ratchet: !ratchet
   local_floor: -5
   local_cap: 5
   global_floor: 0
+
+# --- Cross-currency quanto & composite (2026): an EUR asset priced/settled in JPY, where the
+#     market keeps only the usd-PIVOT FX basis (usdeur_x, usdjpy_x) — the eur/jpy cross is never
+#     a stored object, it is TRIANGULATED. The quanto pays the EUR payoff in JPY via the fixed-FX
+#     drift correction; the composite diffuses S*FX (the eur/jpy conversion), with the MCL leg
+#     built from the two pivot legs and its ratio-of-lognormals convexity removed. Both price on
+#     ana/pde/mcl and the three agree. Reuses eur/usd/calendar + shared configs; adds jpy and the
+#     pivot-pair block, and its own correlation over [eq_x] + [usdeur_x, usdjpy_x].
+jpy_x: !currency
+  rate: jpy_x_rate
+jpy_x_rate: !yield_curve
+  dates: [2000-01-01, 2010-01-01]
+  values: [1, 1]
+usdeur_x: !forex
+  base_currency: eur
+  underlying_currency: usd
+  spot: 1.1
+  volatility: usdeur_x_vol
+usdeur_x_vol: !bs_volatility {volatility: 10, calendar: calendar}
+usdjpy_x: !forex
+  base_currency: jpy_x
+  underlying_currency: usd
+  spot: 150
+  volatility: usdjpy_x_vol
+usdjpy_x_vol: !bs_volatility {volatility: 12, calendar: calendar}
+eq_x: !equity
+  spot: 100
+  volatility: eq_x_vol
+  currency: eur
+eq_x_vol: !bs_volatility {volatility: 30, calendar: calendar}
+comp_x: !composite
+  equity: eq_x
+  composite_currency: jpy_x
+correl_x: !correlation_matrix
+  underlyings: [eq_x]
+  forexs: [usdeur_x, usdjpy_x]
+  matrix: [1,   0.3, 0.2,
+           0.3, 1,   0.5,
+           0.2, 0.5, 1]
+# A cross quanto is not GPU-eligible, but shared_mcl sets allow_gpu — and the GPU gate probes
+# the GBM forward before the pricer's correlation propagates to the equity, which a cross
+# quanto's (triangulated) forward needs. So the cross MCL cells use this CPU-only config.
+cross_mcl: !mcl_configuration
+  max_day_step: 1
+  min_day_step: -1
+  paths: 100000
+  vol_year_step: 0.01
+  use_sobol: true
+
+# cross quanto: EUR-asset call, strike in EUR (spot 100), paid in JPY
+vanilla_mono_eu_call_cross_quanto_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_cross_quanto
+  currency: jpy_x
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_quanto_ana_result
+vanilla_mono_eu_call_cross_quanto_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_cross_quanto
+  currency: jpy_x
+  pde_configuration: shared_pde
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_quanto_pde_result
+vanilla_mono_eu_call_cross_quanto_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_cross_quanto
+  currency: jpy_x
+  mcl_configuration: cross_mcl
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_quanto_mcl_result
+book_cross_quanto: !book
+  contracts: [c_cross_quanto]
+c_cross_quanto: !vanilla
+  underlying: eq_x
+  premium_currency: jpy_x
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  exercise: european
+
+# cross composite: the EUR asset viewed in JPY (S*FX diffused), strike in JPY (~100*150/1.1)
+vanilla_mono_eu_call_cross_compo_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_cross_compo
+  currency: jpy_x
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_compo_ana_result
+vanilla_mono_eu_call_cross_compo_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_cross_compo
+  currency: jpy_x
+  pde_configuration: shared_pde
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_compo_pde_result
+vanilla_mono_eu_call_cross_compo_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_cross_compo
+  currency: jpy_x
+  mcl_configuration: cross_mcl
+  correlation: correl_x
+  indicators: [premium]
+  result: vanilla_mono_eu_call_cross_compo_mcl_result
+book_cross_compo: !book
+  contracts: [c_cross_compo]
+c_cross_compo: !vanilla
+  underlying: comp_x
+  premium_currency: jpy_x
+  strike: 13636
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  exercise: european
