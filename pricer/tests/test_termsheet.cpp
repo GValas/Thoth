@@ -46,6 +46,7 @@ TEST_CASE( "termsheet: vanilla renders strike, style and dates" )
     CHECK( doc.find( "K = 110" ) != std::string::npos ); //!< resolved against spot 100
     CHECK( doc.find( "2000-12-31" ) != std::string::npos );
     CHECK( doc.find( "## Disclaimer" ) != std::string::npos );
+    CHECK( doc.find( "\\max(S_{\\tau} - K" ) != std::string::npos ); //!< LaTeX payoff (American call)
 }
 
 TEST_CASE( "termsheet: barrier renders flavour, level and monitoring" )
@@ -59,6 +60,7 @@ TEST_CASE( "termsheet: barrier renders flavour, level and monitoring" )
     CHECK( doc.find( "down-and-in put" ) != std::string::npos );
     CHECK( doc.find( "80" ) != std::string::npos );
     CHECK( doc.find( "activated" ) != std::string::npos );
+    CHECK( doc.find( "\\mathbf{1}" ) != std::string::npos ); //!< barrier-event indicator formula
 }
 
 TEST_CASE( "termsheet: seasoned variance swap mentions the in-life window" )
@@ -74,6 +76,7 @@ TEST_CASE( "termsheet: seasoned variance swap mentions the in-life window" )
     CHECK( doc.find( "25%" ) != std::string::npos );
     CHECK( doc.find( "in-life (seasoned)" ) != std::string::npos );
     CHECK( doc.find( "## Observation schedule" ) != std::string::npos );
+    CHECK( doc.find( "\\sigma^2_{\\mathrm{real}}" ) != std::string::npos ); //!< estimator formula
 }
 
 TEST_CASE( "termsheet: Phoenix autocallable renders the schedule and the memory" )
@@ -88,6 +91,8 @@ TEST_CASE( "termsheet: Phoenix autocallable renders the schedule and the memory"
     CHECK( doc.find( "coupon barrier of **70**" ) != std::string::npos );
     CHECK( doc.find( "| 3 | 2001-06-29 |" ) != std::string::npos ); //!< schedule table
     CHECK( doc.find( "protection barrier of **60**" ) != std::string::npos );
+    CHECK( doc.find( "\\begin{cases}" ) != std::string::npos ); //!< piecewise redemption
+    CHECK( doc.find( "(1 + m_k)" ) != std::string::npos );      //!< memory multiplier
 }
 
 TEST_CASE( "termsheet: a missing contract reference is rejected" )

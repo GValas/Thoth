@@ -53,9 +53,11 @@ void Termsheet::Configure( ObjectReader& reader )
     _issuer = reader.Get<string>( "issuer", "" );
 }
 
-//! the payoff clause for the concrete contract flavour. The dynamic_cast
-//! dispatch mirrors the engines (a contract is a pure description; what a
-//! consumer does with it is the consumer's decision).
+//! the payoff clause for the concrete contract flavour: plain-English prose
+//! followed by the formal payoff in LaTeX display math ($$...$$ — rendered by
+//! GitHub, KaTeX and pandoc alike). The dynamic_cast dispatch mirrors the
+//! engines (a contract is a pure description; what a consumer does with it is
+//! the consumer's decision).
 string Termsheet::PayoffSection() const
 {
     std::ostringstream o;
@@ -103,6 +105,43 @@ string Termsheet::PayoffSection() const
           << Num( ac->ProtectionLevel() ) << "**;\n"
           << "- otherwise **nominal x S_final / " << Num( ac->ReferenceSpot() )
           << "** (the capital is at risk one-for-one below the protection barrier).\n";
+
+        //! the formal clauses: the first-trigger time, the early redemption, the
+        //! (Phoenix) coupon stream and the maturity redemption profile
+        o << "\nFormally, with $S_t$ the closing level, $t_1,\\dots,t_" << n
+          << "$ the observation dates, $N = " << Num( ac->GetNominal() )
+          << "$ and the first autocall time\n\n"
+          << "$$ \\tau \\;=\\; \\min\\{\\, t_k : S_{t_k} \\ge B_{\\mathrm{AC}} \\,\\}, \\qquad B_{\\mathrm{AC}} = "
+          << Num( ac->AutocallLevel() ) << " $$\n\n";
+        if ( ac->IsPhoenix() )
+        {
+            o << "$$ \\text{Redemption}(\\tau = t_k) \\;=\\; N \\qquad\\text{(paid at } t_k\\text{)} $$\n\n"
+              << "$$ \\text{Coupon}(t_k) \\;=\\; c\\,N \\cdot \\mathbf{1}\\{\\tau \\ge t_k\\} \\cdot \\mathbf{1}\\{S_{t_k} \\ge B_{\\mathrm{cpn}}\\}"
+              << ( ac->HasCouponMemory() ? " \\cdot (1 + m_k)" : "" )
+              << ", \\qquad c\\,N = " << Num( ac->PeriodCoupon() )
+              << ",\\; B_{\\mathrm{cpn}} = " << Num( ac->CouponLevel() ) << " $$\n\n";
+            if ( ac->HasCouponMemory() )
+            {
+                o << "with $m_k$ the number of consecutively missed coupons since the last "
+                     "paying observation (memory).\n\n";
+            }
+            o << "$$ \\text{Redemption}(T) \\;=\\; \\begin{cases} N & S_T \\ge B_{\\mathrm{prot}} \\\\[2pt] "
+                 "N \\, S_T / S_{\\mathrm{ref}} & S_T < B_{\\mathrm{prot}} \\end{cases}, "
+                 "\\qquad B_{\\mathrm{prot}} = "
+              << Num( ac->ProtectionLevel() ) << ",\\; S_{\\mathrm{ref}} = "
+              << Num( ac->ReferenceSpot() ) << " $$\n";
+        }
+        else
+        {
+            o << "$$ \\text{Redemption}(\\tau = t_k) \\;=\\; N \\times (1 + k\\,c), \\qquad c = "
+              << Num( 100 * ac->Rebate( 1 ) / ac->GetNominal() - 100 ) << "\\% $$\n\n"
+              << "$$ \\text{Redemption}(T) \\;=\\; \\begin{cases} N\\,(1 + " << ( n + 1 )
+              << "\\,c) & S_T \\ge B_{\\mathrm{AC}} \\\\[2pt] N & B_{\\mathrm{prot}} \\le S_T < B_{\\mathrm{AC}} "
+                 "\\\\[2pt] N \\, S_T / S_{\\mathrm{ref}} & S_T < B_{\\mathrm{prot}} \\end{cases}, "
+                 "\\qquad B_{\\mathrm{prot}} = "
+              << Num( ac->ProtectionLevel() ) << ",\\; S_{\\mathrm{ref}} = "
+              << Num( ac->ReferenceSpot() ) << " $$\n";
+        }
         return o.str();
     }
 
@@ -126,6 +165,22 @@ string Termsheet::PayoffSection() const
               << Num( vs->GetTotalYearFraction() ) << " years).";
         }
         o << "\n";
+
+        //! the formal payoff and the realized-variance estimator
+        o << "\nFormally, with $S_{t_0}, \\dots, S_{t_n}$ the scheduled observations"
+          << ( vs->IsSeasoned() ? " (the past ones read from the booked fixings)" : "" )
+          << ":\n\n"
+          << "$$ \\text{Payoff}(T) \\;=\\; N_{\\mathrm{var}} \\times \\left( \\sigma^2_{\\mathrm{real}} - K_{\\mathrm{var}} \\right), "
+             "\\qquad N_{\\mathrm{var}} = "
+          << Num( vs->GetNotional() ) << ",\\; K_{\\mathrm{var}} = ("
+          << Num( 100 * vs->GetVolatilityStrike() ) << "\\%)^2 $$\n\n"
+          << "$$ \\sigma^2_{\\mathrm{real}} \\;=\\; \\frac{1}{T_{\\mathrm{tot}}} "
+             "\\sum_{i=1}^{n} \\ln^2\\!\\frac{S_{t_i}}{S_{t_{i-1}}}"
+          << ( vs->IsSeasoned()
+                   ? ", \\qquad T_{\\mathrm{tot}} = " + Num( vs->GetTotalYearFraction() ) +
+                         " \\text{ (from the window start)}"
+                   : ", \\qquad T_{\\mathrm{tot}} = \\text{time to maturity}" )
+          << " $$\n";
         return o.str();
     }
 
@@ -140,6 +195,23 @@ string Termsheet::PayoffSection() const
           << " the barrier level of **" << Num( bar->Level() ) << "** on any monitored date ("
           << ( bar->IsDiscrete() ? "discrete monitoring schedule" : "continuous monitoring" )
           << ").\n";
+
+        //! the formal payoff: vanilla intrinsic times the barrier-event indicator
+        const string extremum = bar->IsUp() ? "\\max" : "\\min";
+        const string cmp = bar->IsUp() ? "\\ge" : "\\le";
+        const string domain = bar->IsDiscrete() ? "t_i \\in \\text{monitoring dates}"
+                                                : "0 \\le t \\le T";
+        const string running = bar->IsDiscrete() ? extremum + "_{" + domain + "} S_{t_i}"
+                                                 : extremum + "_{" + domain + "} S_t";
+        const string intrinsic = call ? "\\max(S_T - K,\\, 0)" : "\\max(K - S_T,\\, 0)";
+        o << "\nFormally:\n\n"
+          << "$$ \\text{Payoff}(T) \\;=\\; " << intrinsic << " \\cdot \\mathbf{1}\\!\\left\\{ "
+          << running << " " << cmp << " H \\right\\}"
+          << ( bar->IsIn() ? "" : "^{\\complement}" ) << ", \\qquad K = " << Num( bar->_strike )
+          << ",\\; H = " << Num( bar->Level() ) << " $$\n"
+          << ( bar->IsIn() ? ""
+                           : "\n(the indicator's complement: the option pays only if the "
+                             "barrier is NEVER touched).\n" );
         return o.str();
     }
 
@@ -153,6 +225,25 @@ string Termsheet::PayoffSection() const
           << ( van->IsAmerican() ? "on any business day up to and including"
                                  : "at" )
           << " the maturity date.\n";
+
+        //! the formal payoff (exercise at the holder's chosen time for an American)
+        const string intrinsic = call ? "\\max(S_{%T%} - K,\\, 0)" : "\\max(K - S_{%T%},\\, 0)";
+        if ( van->IsAmerican() )
+        {
+            string body = intrinsic;
+            body.replace( body.find( "%T%" ), 3, "\\tau" );
+            o << "\nFormally, exercised at the holder's chosen time $\\tau \\le T$:\n\n"
+              << "$$ \\text{Payoff}(\\tau) \\;=\\; " << body << ", \\qquad K = "
+              << Num( van->GetStrike() ) << " $$\n";
+        }
+        else
+        {
+            string body = intrinsic;
+            body.replace( body.find( "%T%" ), 3, "T" );
+            o << "\nFormally:\n\n"
+              << "$$ \\text{Payoff}(T) \\;=\\; " << body << ", \\qquad K = "
+              << Num( van->GetStrike() ) << " $$\n";
+        }
         return o.str();
     }
 
