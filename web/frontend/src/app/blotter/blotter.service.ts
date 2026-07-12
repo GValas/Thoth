@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import {
+  Engine,
   InstrumentKind,
   InstrumentPriceRequest,
   InstrumentTermsheetRequest,
@@ -131,10 +132,10 @@ export class BlotterService {
       /* storage unavailable — still seed this session, just don't persist the flag */
     }
     for (let i = 0; i < count; i++) {
-      const { label, kind, instrument } = randomContract(underlyings, today);
+      const { label, kind, instrument, engine } = randomContract(underlyings, today);
       const request: InstrumentPriceRequest = {
         workspaceId,
-        engine: 'ana',
+        engine,
         kind,
         instrument: { ...instrument, premium_currency: currency },
         indicators: ['premium', 'delta', 'gamma', 'vega', 'rho', 'theta'],
@@ -347,22 +348,30 @@ function maturityFrom(today: string, months: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-//! One random contract (vanilla / barrier / variance swap) on a random underlying:
-//! the `instrument` fields the panels build, plus a human label and the kind. The
-//! strike/barrier are booked as a PERCENT of spot (is_absolute_strike omitted /
-//! relative) so the sample is spot-agnostic across whatever underlyings exist.
+//! One random contract on a random underlying: the `instrument` fields the panels
+//! build, a human label, the kind, and the ENGINE to price it on (path-dependent
+//! notes — Asian / ratchet — are Monte-Carlo only; the rest default to ana). The
+//! strike/barrier levels are booked as a PERCENT of spot (relative) so the sample
+//! is spot-agnostic across whatever underlyings exist.
 function randomContract(
   underlyings: string[],
   today: string,
-): { label: string; kind: InstrumentKind; instrument: Record<string, unknown> } {
+): { label: string; kind: InstrumentKind; instrument: Record<string, unknown>; engine: Engine } {
   const u = pick(underlyings);
-  const kind = pick(['vanilla', 'barrier', 'variance_swap'] as const);
+  const kind = pick([
+    'vanilla',
+    'barrier',
+    'variance_swap',
+    'asian',
+    'ratchet',
+  ] as const);
   const maturity = maturityFrom(today, pick([6, 12, 18, 24, 36]));
 
   if (kind === 'variance_swap') {
     const volStrike = 15 + Math.floor(Math.random() * 25); // 15..39 %
     return {
       kind,
+      engine: 'ana',
       label: `${u} var swap K=${volStrike}% ${maturity}`,
       instrument: { underlying: u, maturity, volatility_strike: volStrike, notional: 10000 },
     };
@@ -371,12 +380,50 @@ function randomContract(
   const type = pick(['call', 'put'] as const);
   const strike = pick([80, 90, 95, 100, 105, 110, 120]); // percent of spot
 
+  if (kind === 'asian') {
+    //! path-dependent -> Monte-Carlo only
+    return {
+      kind,
+      engine: 'mcl',
+      label: `${u} Asian ${type} ${strike}% ${maturity}`,
+      instrument: {
+        underlying: u,
+        strike,
+        is_absolute_strike: false,
+        maturity,
+        type,
+        nominal: 1,
+        observation_period_days: 30,
+      },
+    };
+  }
+
+  if (kind === 'ratchet') {
+    //! path-dependent -> Monte-Carlo only
+    const cap = pick([4, 5, 6, 8]);
+    return {
+      kind,
+      engine: 'mcl',
+      label: `${u} ratchet [-${cap},${cap}]% ${maturity}`,
+      instrument: {
+        underlying: u,
+        maturity,
+        nominal: 100,
+        observation_period_days: 90,
+        local_floor: -cap,
+        local_cap: cap,
+        global_floor: 0,
+      },
+    };
+  }
+
   if (kind === 'barrier') {
     const barrierType = pick(['up&out', 'up&in', 'down&out', 'down&in'] as const);
     const isDown = barrierType.startsWith('down');
     const level = isDown ? pick([60, 70, 80]) : pick([120, 130, 140]); // percent of spot
     return {
       kind,
+      engine: 'ana',
       label: `${u} ${type} ${strike}% ${barrierType} ${level}% ${maturity}`,
       instrument: {
         underlying: u,
@@ -394,7 +441,8 @@ function randomContract(
   const exercise = pick(['european', 'american'] as const);
   return {
     kind,
+    engine: exercise === 'american' ? 'mcl' : 'ana', //!< american vanilla has no ANA closed form
     label: `${u} ${type} ${strike}% ${maturity} (${exercise})`,
-    instrument: { underlying: u, strike, maturity, type, exercise, nominal: 1 },
+    instrument: { underlying: u, strike, is_absolute_strike: false, maturity, type, exercise, nominal: 1 },
   };
 }

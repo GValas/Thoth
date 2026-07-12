@@ -4,11 +4,13 @@ import { VanillaPanelComponent } from './vanilla-panel.component';
 import { BarrierPanelComponent } from './barrier-panel.component';
 import { VariancePanelComponent } from './variance-panel.component';
 import { AutocallablePanelComponent } from './autocallable-panel.component';
+import { AsianPanelComponent } from './asian-panel.component';
+import { RatchetPanelComponent } from './ratchet-panel.component';
 
-//! Pricing panels: a tab each for the vanilla, barrier, variance-swap and autocallable
-//! single-product panels. Each panel quotes one hand-entered instrument (live off the feed)
-//! and can push it to the global monitoring blotter — keeping the Vanilla Grid for
-//! strike x maturity sweeps.
+//! Pricing panels: a tab each for the vanilla, barrier, variance-swap, autocallable,
+//! Asian and ratchet single-product panels. Each panel quotes one hand-entered
+//! instrument (live off the feed) and can push it to the global monitoring blotter —
+//! keeping the Vanilla Grid for strike x maturity sweeps.
 @Component({
   selector: 'app-panels',
   standalone: true,
@@ -18,6 +20,8 @@ import { AutocallablePanelComponent } from './autocallable-panel.component';
     BarrierPanelComponent,
     VariancePanelComponent,
     AutocallablePanelComponent,
+    AsianPanelComponent,
+    RatchetPanelComponent,
   ],
   template: `
     <div class="panels-header">
@@ -35,6 +39,12 @@ import { AutocallablePanelComponent } from './autocallable-panel.component';
       </mat-tab>
       <mat-tab label="Autocallable">
         <div class="tab-body"><app-autocallable-panel></app-autocallable-panel></div>
+      </mat-tab>
+      <mat-tab label="Asian">
+        <div class="tab-body"><app-asian-panel></app-asian-panel></div>
+      </mat-tab>
+      <mat-tab label="Ratchet">
+        <div class="tab-body"><app-ratchet-panel></app-ratchet-panel></div>
       </mat-tab>
     </mat-tab-group>
   `,

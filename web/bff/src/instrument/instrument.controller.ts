@@ -20,7 +20,7 @@ import {
 class InstrumentDto implements InstrumentPriceDto {
   @IsString() workspaceId!: string;
   @IsIn(['ana', 'pde', 'mcl', 'mcl_gpu']) engine!: 'ana' | 'pde' | 'mcl' | 'mcl_gpu';
-  @IsIn(['vanilla', 'barrier', 'variance_swap', 'autocallable']) kind!: string;
+  @IsIn(['vanilla', 'barrier', 'variance_swap', 'autocallable', 'asian', 'ratchet']) kind!: string;
   //! free-form instrument fields — the engine validates the actual kind, so any variation
   //! it accepts (barrier_type, monitoring, nominal, is_absolute_strike, …) flows through.
   @IsObject() instrument!: Record<string, unknown>;
@@ -34,7 +34,7 @@ class InstrumentDto implements InstrumentPriceDto {
 
 class TermsheetDto implements InstrumentTermsheetDto {
   @IsString() workspaceId!: string;
-  @IsIn(['vanilla', 'barrier', 'variance_swap', 'autocallable']) kind!: string;
+  @IsIn(['vanilla', 'barrier', 'variance_swap', 'autocallable', 'asian', 'ratchet']) kind!: string;
   //! free-form instrument fields — the engine validates the actual kind (see InstrumentDto)
   @IsObject() instrument!: Record<string, unknown>;
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) today?: string;

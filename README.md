@@ -81,14 +81,16 @@ For **PDE/MCL** the grid builder synthesises a default engine-config object
 the request carries none, so those engines price straight from the GUI.
 
 Beyond the grid, the **Panels** tab prices a *single* hand-entered product with all its
-variations across four sub-panels — **Vanilla** (call/put, European/American, strike,
+variations across six sub-panels — **Vanilla** (call/put, European/American, strike,
 maturity, nominal, absolute/relative strike), **Barrier** (the four `up&out / up&in /
 down&out / down&in` types, continuous or discrete monitoring, barrier level, strike,
 maturity), **Variance** (variance swap: volatility strike + notional) and
 **Autocallable** (an **Athena** snowball or a **Phoenix** conditional-coupon note with
 the **memory** variant — autocall / protection / coupon barriers as percent of spot, and
 a generated observation schedule from a first date + monthly frequency + count; pde / mcl
-only, no ANA closed form) — each showing
+only, no ANA closed form), **Asian** (arithmetic average-price call/put, absolute/relative
+strike, averaging period) and **Ratchet** (cliquet: per-period return clip [local floor,
+cap] locked in, global floor/cap — both path-dependent, mcl only) — each showing
 premium + Greeks, each able to **re-price live** off the spot feed on a throttle, and each
 with a **Send to blotter** button (variance swaps now quote premium **and Greeks** — vega,
 rho, theta from the engine's generic bump pass — like the other panels) and a
@@ -101,7 +103,7 @@ a global monitoring book: every product sent from a panel becomes a row showing 
 mode** (throttled, off the live spots), tinted green/red on each move; rows survive
 tab navigation and a reload (persisted in `localStorage`). On a **fresh install**
 the blotter self-seeds **10 random sample contracts** (vanillas / barriers / variance
-swaps on the workspace's underlyings) so it opens on a live book rather than a blank
+swaps / Asians / ratchets on the workspace's underlyings, each on an engine that can price it) so it opens on a live book rather than a blank
 tab — one-shot, guarded by a `localStorage` flag so a deliberate clear stays cleared.
 Each row has a **tick box** (plus a header select-all); the **Re-price** and
 **Termsheet** toolbar actions operate on the ticked rows (or the whole book when none
