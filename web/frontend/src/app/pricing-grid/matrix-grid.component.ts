@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, ViewChild, inject, signal } from '@angular/core';
+import { Component, Input, OnChanges, ViewChild, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AgGridAngular } from 'ag-grid-angular';
 import type { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community';
 import { GridMatrix } from '../core/models';
+import { ThemeService } from '../core/theme.service';
 import { divergentScale, signedScale } from './heatmap';
 
 const SIGNED = new Set(['delta', 'gamma', 'vega', 'rho', 'theta']);
@@ -77,6 +78,21 @@ export class MatrixGridComponent implements OnChanges {
   @ViewChild(AgGridAngular) gridCmp?: AgGridAngular;
 
   private api?: GridApi;
+  private readonly theme = inject(ThemeService);
+
+  constructor() {
+    //! Recolour the heatmap the instant the theme flips. The heat scale snapshots the
+    //! theme's stops at build time and is captured in the cellStyle closures, so a plain
+    //! refreshCells would reuse the stale scale — rebuild to recreate it. Guarded until the
+    //! first `matrix` Input has arrived (the effect also runs once on construction).
+    effect(
+      () => {
+        this.theme.mode(); //!< dependency: re-run on every theme switch
+        if (this.matrix) this.rebuild(); //!< rebuild writes rowData/colDefs signals
+      },
+      { allowSignalWrites: true },
+    );
+  }
 
   readonly metric = signalDefault();
   readonly metrics = signal<string[]>(['premium']);

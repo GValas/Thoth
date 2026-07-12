@@ -1,6 +1,12 @@
-import { Component, Input, computed, inject } from '@angular/core';
+import { Component, Input, computed, effect, inject } from '@angular/core';
 import { AgGridAngular } from 'ag-grid-angular';
-import type { CellClassParams, ColDef, ValueFormatterParams } from 'ag-grid-community';
+import type {
+  CellClassParams,
+  ColDef,
+  GridApi,
+  GridReadyEvent,
+  ValueFormatterParams,
+} from 'ag-grid-community';
 import { buildCorrelModel, CorrelModel, MarketModel, round, writeCorrel } from './market-model';
 import { signedScale, textOn } from '../pricing-grid/heatmap';
 import { LiveSpotsService } from './live-spots.service';
@@ -25,6 +31,7 @@ import { ThemeService } from '../core/theme.service';
         [columnDefs]="cols()"
         [domLayout]="'autoHeight'"
         [getRowId]="rowId"
+        (gridReady)="onGridReady($event)"
         (cellValueChanged)="onCell($event)"
       ></ag-grid-angular>
       @if (liveOn()) {
@@ -61,11 +68,29 @@ export class CorrelationSectionComponent {
   private readonly liveCorrel = inject(LiveCorrelService);
   private readonly theme = inject(ThemeService);
 
+  private gridApi?: GridApi;
+
+  constructor() {
+    //! Re-skin the heat cells the instant the theme flips. The cellStyle callbacks read a
+    //! theme-aware `scale()`, but AG Grid caches rendered cells, so a class flip on <body>
+    //! alone leaves the JS-computed cell colours stale until the next incidental render (a
+    //! live tick / scroll / edit) — the reported lag. Force a cell refresh on every switch.
+    effect(() => {
+      this.theme.mode(); //!< dependency: re-run whenever the theme changes
+      this.gridApi?.refreshCells({ force: true });
+    });
+  }
+
+  onGridReady(e: GridReadyEvent): void {
+    this.gridApi = e.api;
+  }
+
   //! the heat scale over the fixed [-1, 1] domain. Rebuilt whenever the theme flips:
   //! signedScale() snapshots the theme's heat stops (the mid stop is the grid surface,
   //! near-black in dark mode) at creation, so a frozen scale would keep the LIGHT stops
   //! after a light->dark toggle and the matrix would stay on pale, unreadable cells.
-  //! Reading theme.mode() here makes `cols` recompute with a fresh scale on every switch.
+  //! Reading theme.mode() here gives the cellStyle callbacks a fresh scale on every switch;
+  //! the constructor effect above forces AG Grid to re-invoke them right away.
   private readonly scale = computed(() => {
     this.theme.mode();
     return signedScale([1, -1]);
