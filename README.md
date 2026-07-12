@@ -104,7 +104,9 @@ a global monitoring book: every product sent from a panel becomes a row showing 
 mode** (throttled, off the live spots), tinted green/red on each move; rows survive
 tab navigation and a reload (persisted in `localStorage`). On a **fresh install**
 the blotter self-seeds **10 random sample contracts** (vanillas / barriers / variance
-swaps / Asians / ratchets on the workspace's underlyings, each on an engine that can price it) so it opens on a live book rather than a blank
+swaps / Asians / ratchets on the workspace's **equity** underlyings — where every kind/engine
+combo has a griddable, diffusable underlying; barrier levels are booked as absolute cash off
+each equity's spot — each on an engine that can price it) so it opens on a live book rather than a blank
 tab — seeded once per session whenever the blotter is empty (an **in-memory** guard, so a
 stale flag can never permanently suppress it; once seeded the rows persist in `localStorage`).
 Each row has a **tick box** (plus a header select-all) driving the **Re-price** toolbar action

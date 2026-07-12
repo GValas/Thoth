@@ -46,8 +46,8 @@ export class BlotterComponent implements OnInit {
   //! the tick column first, fixed columns + whichever Greeks appear, then actions.
   readonly columns = computed<string[]>(() => [
     'select',
-    'label',
     'kind',
+    'label',
     'underlying',
     'spot',
     'engine',
@@ -68,7 +68,13 @@ export class BlotterComponent implements OnInit {
     // one legitimate signal write from this effect, in response to the loaded book.
     effect(
       () => {
-        const underlyings = this.ctx.underlyingObjects().map((o) => o.name);
+        // equities only: every (kind, engine) combo the seed generates needs a griddable
+        // underlying (ANA barriers/varswaps) with a diffusable vol — FX pairs trip those.
+        // Carry the spot so barriers book absolute cash levels (engine levels are absolute).
+        const underlyings = this.ctx
+          .underlyingObjects()
+          .filter((o) => o.kind === 'equity')
+          .map((o) => ({ name: o.name, spot: Number(o.payload['spot']) || 100 }));
         const ws = this.ctx.workspace();
         if (!underlyings.length || !ws) return;
         this.b.seedDemo(ws.id, underlyings, this.ctx.defaultCurrency(), ws.today);

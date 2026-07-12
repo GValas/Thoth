@@ -108,12 +108,14 @@ export class BlotterService {
   }
 
   //! First-launch demo: generate `count` random contracts (vanilla / barrier / variance /
-  //! Asian / ratchet …) on the given underlyings and add them to the blotter, so a fresh
-  //! install lands on a populated monitoring book instead of a blank tab. No-op if the
-  //! blotter already has rows or the demo was already seeded this session.
+  //! Asian / ratchet …) on the given **equity** underlyings and add them to the blotter, so
+  //! a fresh install lands on a populated monitoring book instead of a blank tab. No-op if
+  //! the blotter already has rows or the demo was already seeded this session. Each
+  //! underlying carries its spot so barriers can book absolute cash levels (the engine's
+  //! barrier levels are always absolute — a relative % is meaningless there).
   seedDemo(
     workspaceId: string,
-    underlyings: string[],
+    underlyings: DemoUnderlying[],
     currency: string,
     today: string,
     count = 10,
@@ -334,13 +336,24 @@ function maturityFrom(today: string, months: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-//! One random contract on a random underlying: the `instrument` fields the panels
-//! build, a human label, the kind, and the ENGINE to price it on (path-dependent
-//! notes — Asian / ratchet — are Monte-Carlo only; the rest default to ana). The
-//! strike/barrier levels are booked as a PERCENT of spot (relative) so the sample
-//! is spot-agnostic across whatever underlyings exist.
+//! One equity underlying available to the demo seed: its name and current spot
+//! (the spot lets barriers book absolute cash levels — see randomContract).
+export interface DemoUnderlying {
+  name: string;
+  spot: number;
+}
+
+//! One random contract on a random (equity) underlying: the `instrument` fields the
+//! panels build, a human label, the kind, and the ENGINE to price it on (path-dependent
+//! notes — Asian / ratchet — and American vanillas are Monte-Carlo only; the rest use
+//! ana). Strikes are booked as a PERCENT of spot (relative, spot-agnostic). Barrier
+//! LEVELS, however, are always absolute in the engine (Barrier::SetToday keeps them in
+//! cash), so they are booked as an absolute price = percent × spot here — otherwise a
+//! bare "140" would be a cash level far from a real spot and produce a degenerate barrier
+//! the closed form rejects. The demo stays on equities so every (kind, engine) combo has
+//! a griddable underlying (ANA barriers/varswaps need one) and a diffusable vol surface.
 function randomContract(
-  underlyings: string[],
+  underlyings: DemoUnderlying[],
   today: string,
 ): { label: string; kind: InstrumentKind; instrument: Record<string, unknown>; engine: Engine } {
   const u = pick(underlyings);
@@ -358,8 +371,8 @@ function randomContract(
     return {
       kind,
       engine: 'ana',
-      label: `${u} var swap K=${volStrike}% ${maturity}`,
-      instrument: { underlying: u, maturity, volatility_strike: volStrike, notional: 10000 },
+      label: `${u.name} var swap K=${volStrike}% ${maturity}`,
+      instrument: { underlying: u.name, maturity, volatility_strike: volStrike, notional: 10000 },
     };
   }
 
@@ -371,9 +384,9 @@ function randomContract(
     return {
       kind,
       engine: 'mcl',
-      label: `${u} Asian ${type} ${strike}% ${maturity}`,
+      label: `${u.name} Asian ${type} ${strike}% ${maturity}`,
       instrument: {
-        underlying: u,
+        underlying: u.name,
         strike,
         is_absolute_strike: false,
         maturity,
@@ -390,9 +403,9 @@ function randomContract(
     return {
       kind,
       engine: 'mcl',
-      label: `${u} ratchet [-${cap},${cap}]% ${maturity}`,
+      label: `${u.name} ratchet [-${cap},${cap}]% ${maturity}`,
       instrument: {
-        underlying: u,
+        underlying: u.name,
         maturity,
         nominal: 100,
         observation_period_days: 90,
@@ -406,20 +419,22 @@ function randomContract(
   if (kind === 'barrier') {
     const barrierType = pick(['up&out', 'up&in', 'down&out', 'down&in'] as const);
     const isDown = barrierType.startsWith('down');
-    const level = isDown ? pick([60, 70, 80]) : pick([120, 130, 140]); // percent of spot
+    const levelPct = isDown ? pick([60, 70, 80]) : pick([120, 130, 140]); // percent of spot
+    const barrierLevel = (levelPct / 100) * u.spot; //!< engine barrier levels are absolute cash
     return {
       kind,
       engine: 'ana',
-      label: `${u} ${type} ${strike}% ${barrierType} ${level}% ${maturity}`,
+      label: `${u.name} ${type} ${strike}% ${barrierType} ${levelPct}% ${maturity}`,
       instrument: {
-        underlying: u,
+        underlying: u.name,
         strike,
+        is_absolute_strike: false, //!< strike is % of spot (resolved in the engine)
         maturity,
         type,
         nominal: 1,
         barrier_type: barrierType,
         barrier_monitoring_type: 'continuous_monitoring',
-        [isDown ? 'barrier_down_level' : 'barrier_up_level']: level,
+        [isDown ? 'barrier_down_level' : 'barrier_up_level']: barrierLevel,
       },
     };
   }
@@ -428,7 +443,7 @@ function randomContract(
   return {
     kind,
     engine: exercise === 'american' ? 'mcl' : 'ana', //!< american vanilla has no ANA closed form
-    label: `${u} ${type} ${strike}% ${maturity} (${exercise})`,
-    instrument: { underlying: u, strike, is_absolute_strike: false, maturity, type, exercise, nominal: 1 },
+    label: `${u.name} ${type} ${strike}% ${maturity} (${exercise})`,
+    instrument: { underlying: u.name, strike, is_absolute_strike: false, maturity, type, exercise, nominal: 1 },
   };
 }
