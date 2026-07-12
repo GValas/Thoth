@@ -25,6 +25,8 @@ void NodeCollector::Reset()
     _brownian_node_map.clear();
     _node_list.clear();
     _date_index_list.clear();
+    _indicator_node_list.clear();
+    _indicator_date_index_list.clear();
     _scenario = {};
 }
 
@@ -122,6 +124,7 @@ date NodeCollector::PreviousDiffusionDate( const date& AsOfDate )
 vector<size_t> NodeCollector::DiffusionIndicesUpTo( const date& Maturity ) const
 {
     vector<size_t> indices;
+    indices.reserve( _date_list.size() );
     for ( size_t i = 0; i < _date_list.size(); i++ )
     {
         if ( _date_list[i] <= Maturity )
@@ -137,15 +140,24 @@ vector<size_t> NodeCollector::DiffusionIndicesUpTo( const date& Maturity ) const
 //! already computed before the node that reads it.
 void NodeCollector::PriceNodes()
 {
+    //! pass 1: every scheduled value (dependencies before dependents)
     const size_t n = _node_list.size();
     for ( size_t i = 0;
           i < n;
           i++ )
     {
-        MonteCarloNode* N = _node_list[i];
-        size_t j = _date_index_list[i]; //!< the date index this entry evaluates at
-        N->ComputeValue( j );           //!< the node's value for this draw at date j
-        N->UpdateIndicators( j );       //!< update running stats (barrier hits, max/min, ...)
+        _node_list[i]->ComputeValue( _date_index_list[i] );
+    }
+    //! pass 2: fold this path into the running statistics — only the indicator
+    //! entries (book / contracts / scenario roots). Indicators only READ their
+    //! _value_list, final after pass 1, so the split is order-safe and spares the
+    //! per-entry call+branch the interleaved loop paid on every diffusion node.
+    const size_t m = _indicator_node_list.size();
+    for ( size_t i = 0;
+          i < m;
+          i++ )
+    {
+        _indicator_node_list[i]->UpdateIndicators( _indicator_date_index_list[i] );
     }
 }
 
@@ -289,6 +301,13 @@ void NodeCollector::SortNodes( const vector<MonteCarloNode*>& Roots,
         {
             _node_list.push_back( n.first );
             _date_index_list.push_back( n.second );
+            //! indicator entries also join the statistics sub-schedule PriceNodes
+            //! runs as its second pass (a handful of book/contract entries)
+            if ( n.first->IsIndicator() )
+            {
+                _indicator_node_list.push_back( n.first );
+                _indicator_date_index_list.push_back( n.second );
+            }
         }
 
         //! does it have links with parents ? release each parent that depended on n.

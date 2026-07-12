@@ -36,6 +36,11 @@ class MonteCarloNode
     vector<double> _indicator_sum_list;   // container for sum, per date index
     vector<double> _indicator_sum2_list;  // container for sum2, per date index
     vector<double> _indicator_count_list; // number of samples accumulated, per date index
+    //! Kahan compensation for the two running sums: millions of paths accumulate
+    //! rounding in a naive sum (the trust reads a small difference of two large
+    //! numbers), the compensated sum keeps them accurate at negligible cost
+    vector<double> _indicator_sum_c;
+    vector<double> _indicator_sum2_c;
 
   public:
     //! constant
@@ -48,6 +53,7 @@ class MonteCarloNode
 
     //! getter
     const string& GetName() const;                              //!< stable identifier / ordering key
+    bool IsIndicator() const { return _is_indicator; }          //!< accumulates premium/trust stats
     [[nodiscard]] double GetIndicatorValue( size_t DateIndex ); //!< MC mean estimate at this date (sum / count)
     [[nodiscard]] double GetIndicatorTrust( size_t DateIndex ); //!< MC standard error of that mean
 

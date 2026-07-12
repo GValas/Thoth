@@ -34,6 +34,11 @@ class Vanilla : public Contract
     //! trade properties (intrinsic payoff + exercise style)
     double Intrinsic( const double spot ) override;
     bool IsAmerican() override;
+    //! LSM moneyness normaliser: the strike (the exercise boundary sits near it)
+    double LsmBasisNorm( double PathInitialSpot ) override
+    {
+        return ( GetStrike() > 0 ) ? GetStrike() : PathInitialSpot;
+    }
 
     //! fixing dates (single observation at maturity)
     set<date> GetFixingDates() override;

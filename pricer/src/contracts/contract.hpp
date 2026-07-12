@@ -66,6 +66,12 @@ class Contract : public Object
     virtual double Intrinsic( const double spot ) = 0;
     virtual bool IsAmerican() = 0;
 
+    //! the LSM regression's moneyness normaliser: the level the exercise boundary
+    //! sits near, so the regressors stay O(1) there. Default: the path's initial
+    //! spot; a Vanilla overrides with its strike. PathInitialSpot is the recorded
+    //! base-path spot at today.
+    virtual double LsmBasisNorm( double PathInitialSpot ) { return PathInitialSpot; }
+
     //! fixing dates: spot observations the diffusion must produce
     virtual set<date> GetFixingDates() = 0;
     //! flow dates: dates on which a cash flow settles (drive GetNode's sub-trees)

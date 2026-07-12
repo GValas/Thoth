@@ -74,9 +74,23 @@ void MonteCarloNode::UpdateIndicators( size_t DateIndex )
 {
     if ( _is_indicator )
     {
-        double x = _value_list[DateIndex];
-        _indicator_sum_list[DateIndex] += x;
-        _indicator_sum2_list[DateIndex] += x * x;
+        //! Kahan-compensated running sums: y is the correction-adjusted increment,
+        //! c recaptures the low-order bits the big sum drops. Keeps the mean and
+        //! especially the trust (a small difference of two large numbers) accurate
+        //! over millions of paths; merging by adding raw sums stays valid.
+        const double x = _value_list[DateIndex];
+        {
+            const double y = x - _indicator_sum_c[DateIndex];
+            const double t = _indicator_sum_list[DateIndex] + y;
+            _indicator_sum_c[DateIndex] = ( t - _indicator_sum_list[DateIndex] ) - y;
+            _indicator_sum_list[DateIndex] = t;
+        }
+        {
+            const double y = x * x - _indicator_sum2_c[DateIndex];
+            const double t = _indicator_sum2_list[DateIndex] + y;
+            _indicator_sum2_c[DateIndex] = ( t - _indicator_sum2_list[DateIndex] ) - y;
+            _indicator_sum2_list[DateIndex] = t;
+        }
         _indicator_count_list[DateIndex] += 1;
     }
 }
@@ -91,6 +105,8 @@ void MonteCarloNode::SetDateList( const vector<date>& DateList )
     _indicator_sum_list.resize( n );
     _indicator_sum2_list.resize( n );
     _indicator_count_list.resize( n );
+    _indicator_sum_c.resize( n );
+    _indicator_sum2_c.resize( n );
 
     //! precompute year-fractions once; these are identical on every MC path
     _dt_list.resize( n );

@@ -37,6 +37,13 @@ class NodeCollector
     //! two parallel arrays forming a flat list of (node, date-index) work items in
     //! topological order (every dependency precedes the node that reads it).
     //! (node,index)
+    //! indicator sub-schedule: the (node, date) entries of the sorted schedule
+    //! whose node accumulates statistics (the book + the contracts + the scenario
+    //! roots — a handful), so the hot loop skips the UpdateIndicators call/branch
+    //! for the thousands of intermediate diffusion entries.
+    vector<MonteCarloNode*> _indicator_node_list;
+    vector<size_t> _indicator_date_index_list;
+
     vector<MonteCarloNode*> _node_list;
     vector<size_t> _date_index_list;
 
@@ -109,6 +116,23 @@ class NodeCollector
     }
     void ClearScenario() { _scenario = {}; } //!< back to the base tree
     const ScenarioContext& Scenario() const { return _scenario; }
+
+    //! RAII pairing of SetScenario/ClearScenario: an exception while building a
+    //! Greek-bump sub-tree (e.g. an ERR inside a node factory) must not leave the
+    //! collector stuck in scenario mode — every later node would silently be
+    //! built suffixed into the wrong tree.
+    struct ScenarioScope
+    {
+        NodeCollector& nc;
+        ScenarioScope( NodeCollector& NC, const string& Suffix, bool BumpsRate, bool BumpsVol )
+            : nc( NC )
+        {
+            nc.SetScenario( Suffix, BumpsRate, BumpsVol );
+        }
+        ~ScenarioScope() { nc.ClearScenario(); }
+        ScenarioScope( const ScenarioScope& ) = delete;
+        ScenarioScope& operator=( const ScenarioScope& ) = delete;
+    };
 
     //! getter
     size_t GetDateIndex( const date& AsOfDate );

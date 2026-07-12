@@ -23,7 +23,14 @@ usable as a batch tool or as an HTTP service.
   drawn from a **Sobol** low-discrepancy sequence laid out by a **Brownian
   bridge** (the coarsest, most important path structure gets the lowest Sobol
   dimensions, the rest pseudo-random) — far faster convergence on smooth payoffs
-  (e.g. a 1y ATM call at 8k paths: pseudo error ~0.8, Sobol ~0.01). The Sobol
+  (e.g. a 1y ATM call at 8k paths: pseudo error ~0.8, Sobol ~0.01). The QMC
+  treatment covers **every Gaussian factor**: the spot noises (first, so a
+  pure-BS book's layout is unchanged), then the Heston/Bates **variance** noises
+  and the Hull-White **rate** noises appended after them; only the Bates jump
+  source stays pseudo-random (a compound-Poisson draw consumes a variable number
+  of uniforms, incompatible with a fixed Sobol dimension). When the
+  steps-times-factors budget exceeds the Joe-Kuo table the finest increments
+  fall back to pseudo-random, now with a log line saying so. The Sobol
   sequence uses the **Joe-Kuo** direction numbers (`new-joe-kuo-6.21201`,
   embedded), so the low-discrepancy treatment extends to several thousand
   dimensions (well beyond the classic 40-dimension limit) — multi-asset books and finely-stepped
@@ -43,7 +50,10 @@ usable as a batch tool or as an HTTP service.
   backend when the `mcl_configuration` sets `allow_gpu: true`, a usable NVIDIA GPU
   is present, and the whole book is GPU-supported (single-asset European-vanilla
   GBM: one thread per path, cuRAND, block-reduced payoff, per-contract bump Greeks
-  under a fixed kernel seed for common random numbers). Built only with
+  under a fixed kernel seed for common random numbers; NB the block-reduction
+  uses atomic float adds, so GPU premia are reproducible only up to FP summation
+  order — run-to-run wiggle at the last ulp — unlike the bit-reproducible CPU
+  engine). Built only with
   `-DTHOTH_ENABLE_CUDA=ON`; on a CPU-only build, a host with no GPU, or any book it
   does not yet support (American / barrier / stochastic vol / multi-asset) it
   **runs on the CPU `mcl` engine** instead — so `allow_gpu` is always safe to set.
@@ -158,6 +168,37 @@ underlying's surface exposes is silently skipped.
   mid-life convention, and exactly what the MC path (restarting at the live
   spot) realises, so the three engines agree by construction
   (`tests/test_seasoned_varswap.cpp`, demo `samples/seasoned_varswap.yaml`).
+- `autocallable` — an autocallable note, **Athena or Phoenix** flavour:
+  explicit `autocall_dates` (strictly between today and maturity); at the first
+  observation with the spot at or above `autocall_barrier` the note redeems
+  early. **Athena** (no `coupon_barrier`) pays `nominal * (1 + k*coupon)` on
+  redemption (the accrued "snowball" coupon, k the 1-based observation count)
+  and, at maturity, the full accrued coupon above the autocall level, the bare
+  nominal above `protection_barrier`, and `nominal * S_T/S_ref` below (linear
+  capital at risk). **Phoenix** (`coupon_barrier` set, ≤ the autocall level)
+  detaches the coupon **per period**: every alive observation (and maturity)
+  with the spot at or above the coupon barrier pays `coupon*nominal` **at its
+  own date** (own discounting — pathwise under Hull-White); the early
+  redemption pays the bare nominal (that date's coupon rides along), and with
+  `coupon_memory: true` a paying date also recovers the consecutively missed
+  coupons. Levels are **percent of the valuation-date spot**, resolved once
+  against the unbumped spot (the relative-strike sticky-cash convention, so all
+  Greeks bump the spot and never the levels). **MCL** prices every flavour
+  pathwise — one flow node per schedule date, only the first trigger redeems;
+  the autocall is an automatic trigger (not an optimal exercise), so no LSM is
+  involved and the per-date pathwise discounting composes with **multi-curve
+  and Hull-White** books out of the box. **PDE** runs a backward induction
+  overwriting the layer at each observation step (the rebate above the autocall
+  level; plus, for a Phoenix, the period coupon added in the [coupon, autocall)
+  zone) — with a **Rannacher restart** (two fully implicit steps after each
+  overwrite) damping the Crank-Nicolson oscillations the discontinuity would
+  otherwise inject, and the top Dirichlet boundary following the **discounted
+  next rebate**; the **memory flavour is MCL-only** (the missed-coupon count is
+  not a function of the spot alone, so the 1-D grid rejects it). PDE and MCL
+  agree (pinned against an independent transition-density convolution oracle
+  and closed-form coupon strips in `tests/test_autocallable.cpp` /
+  `tests/test_phoenix.cpp`); **ANA rejects** the product (no closed form).
+  Seasoned (already-running) autocallables are not supported yet.
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
@@ -430,6 +471,15 @@ the calibrated model must reproduce), then the LSV model (a deliberately
 off-level Heston base + calibrated leverage) through MCL and PDE. The three
 premiums agree to MC / 2-D-grid error, demonstrating the Dupire matching.
 
+`samples/autocallable.yaml` is the structured-note demo: a 2y Athena
+autocallable (three semiannual 100% observations, 8% snowball coupon, 60%
+protection) priced by the PDE backward induction and the pathwise MCL — they
+agree (~104.4 on a 100 nominal, matching the transition-density oracle) — plus
+the same note under a Hull-White short rate (the book's first genuinely
+rate-sensitive product), and the Phoenix flavour (2% per-period coupon above a
+70% coupon barrier: PDE ≈ MCL ≈ 99.54, and the memory variant worth ~0.06 more
+through the coupon catch-up, MCL).
+
 `samples/seasoned_varswap.yaml` is the in-life variance swap demo: a swap
 started 6 months ago (30-day observations, realised leg from a
 `!simple_fixing_data` at ~40% realised vol vs a 20% future implied), priced by
@@ -692,8 +742,9 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   Monte-Carlo pricer (Longstaff-Schwartz least-squares MC, a lower bound on the
   true value). American basket / path-dependent payoffs are not yet covered. An
   American MC run logs under the `AMC` label (vs `MCL` for a plain European run).
-- The `nominal` contract field is not yet wired into the engine (premiums are
-  per unit).
+- The `nominal` contract field is not wired for vanillas and barriers (their
+  premiums are per unit); the `variance_swap` (`notional`) and the
+  `autocallable` (`nominal`, default 100) DO scale their payoffs by it.
 - The HTTP server serialises pricing requests (single global engine state).
 - Yield/repo/dividend curves interpolate across their pillars in **every** engine:
   the MCL diffusion now follows the full curve term structure (each rate/repo/
