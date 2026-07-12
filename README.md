@@ -91,9 +91,10 @@ a generated observation schedule from a first date + monthly frequency + count; 
 only, no ANA closed form), **Asian** (arithmetic average-price call/put, absolute/relative
 strike, averaging period) and **Ratchet** (cliquet: per-period return clip [local floor,
 cap] locked in, global floor/cap — both path-dependent, mcl only) — each showing
-premium + Greeks, each able to **re-price live** off the spot feed on a throttle, and each
-with a **Send to blotter** button (variance swaps now quote premium **and Greeks** — vega,
-rho, theta from the engine's generic bump pass — like the other panels) and a
+premium + Greeks, each with a **Greeks** toggle that requests delta/gamma/vega/rho/theta
+from the engine's bump pass — meaningful even on the path-dependent notes (e.g. vega/rho/
+theta dominate on variance swaps and ratchets, where delta/gamma are ~0). Each panel can
+**re-price live** off the spot feed on a throttle, and has a **Send to blotter** button and a
 **Termsheet** button that renders the product's booked description as a Markdown
 document (the engine's `!termsheet` documentation task, via `POST
 /api/instrument/termsheet`) and downloads it as a `.md` file — same form state as
@@ -104,11 +105,11 @@ mode** (throttled, off the live spots), tinted green/red on each move; rows surv
 tab navigation and a reload (persisted in `localStorage`). On a **fresh install**
 the blotter self-seeds **10 random sample contracts** (vanillas / barriers / variance
 swaps / Asians / ratchets on the workspace's underlyings, each on an engine that can price it) so it opens on a live book rather than a blank
-tab — one-shot, guarded by a `localStorage` flag so a deliberate clear stays cleared.
-Each row has a **tick box** (plus a header select-all); the **Re-price** and
-**Termsheet** toolbar actions operate on the ticked rows (or the whole book when none
-are ticked), the Termsheet button rendering the selected products' termsheets and
-downloading them as **one Markdown file**. Both are backed by a synchronous
+tab — seeded once per session whenever the blotter is empty (an **in-memory** guard, so a
+stale flag can never permanently suppress it; once seeded the rows persist in `localStorage`).
+Each row has a **tick box** (plus a header select-all) driving the **Re-price** toolbar action
+(the ticked rows, or the whole book when none are ticked), and its own **Termsheet** button
+that downloads that single product's termsheet as a Markdown file. Pricing is backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
 correlation matrix** — each streamed pair takes its live value, the rest keep their stored
 one, and the blend is Cholesky-gated back to the stored matrix if mixing would break

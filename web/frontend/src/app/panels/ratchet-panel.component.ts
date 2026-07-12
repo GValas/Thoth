@@ -49,6 +49,10 @@ import { PanelResultComponent } from './panel-result.component';
               <mat-button-toggle value="mcl">mcl</mat-button-toggle>
               <mat-button-toggle value="mcl_gpu">mcl/gpu</mat-button-toggle>
             </mat-button-toggle-group>
+
+            <mat-checkbox [(ngModel)]="includeGreeks" matTooltip="Vega/rho/theta are meaningful; delta/gamma are ~0">
+              Greeks
+            </mat-checkbox>
           </div>
 
           <div class="row">
@@ -131,9 +135,6 @@ import { PanelResultComponent } from './panel-result.component';
 })
 export class RatchetPanelComponent extends PricingPanelBase implements OnInit {
   readonly kind: InstrumentKind = 'ratchet';
-  //! ratchet notes carry no per-contract Greeks worth showing (a coupon on
-  //! clipped returns) — request premium only
-  override readonly supportsGreeks = false;
 
   //! path-dependent: Monte-Carlo only
   override engine: Engine = 'mcl';

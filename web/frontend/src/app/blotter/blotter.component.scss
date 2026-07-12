@@ -68,6 +68,11 @@
   td.prem {
     font-weight: 600;
   }
+  // per-row action icons (termsheet + remove) side by side, no wrap
+  td.row-actions {
+    white-space: nowrap;
+    text-align: right;
+  }
   // live move tint, same green/red language as the option chain
   td.up {
     color: var(--thoth-positive);

@@ -96,28 +96,21 @@ export class BlotterService {
   });
 
   private readonly STORE_KEY = 'thoth.blotter';
-  //! set once the first-launch demo book has been generated, so it is never
-  //! re-seeded (clearing the blotter on purpose must not bring it back).
-  private readonly SEEDED_KEY = 'thoth.blotter.seeded';
+  //! in-memory, per-session guard: the demo book is seeded at most once per app load,
+  //! and only when the blotter is empty. Deliberately NOT persisted — a stale localStorage
+  //! flag from an earlier (possibly failed) launch must never permanently suppress the demo.
+  //! Once seeded, the rows persist (STORE_KEY), so a later reload restores them instead of
+  //! re-seeding; a genuinely empty blotter on a fresh load seeds again.
+  private demoSeeded = false;
 
   constructor() {
     this.restore();
   }
 
-  //! whether the first-launch demo book has already been generated (or the user
-  //! has any persisted rows — an existing book is proof of a prior visit).
-  private alreadySeeded(): boolean {
-    try {
-      return localStorage.getItem(this.SEEDED_KEY) === '1';
-    } catch {
-      return false;
-    }
-  }
-
-  //! First-launch demo: generate `count` random contracts (vanilla / barrier /
-  //! variance swap) on the given underlyings and add them to the blotter, so a
-  //! fresh install lands on a populated monitoring book instead of a blank tab.
-  //! No-op if the blotter is non-empty or the demo has already run once.
+  //! First-launch demo: generate `count` random contracts (vanilla / barrier / variance /
+  //! Asian / ratchet …) on the given underlyings and add them to the blotter, so a fresh
+  //! install lands on a populated monitoring book instead of a blank tab. No-op if the
+  //! blotter already has rows or the demo was already seeded this session.
   seedDemo(
     workspaceId: string,
     underlyings: string[],
@@ -125,12 +118,8 @@ export class BlotterService {
     today: string,
     count = 10,
   ): void {
-    if (!underlyings.length || this.rows().length || this.alreadySeeded()) return;
-    try {
-      localStorage.setItem(this.SEEDED_KEY, '1');
-    } catch {
-      /* storage unavailable — still seed this session, just don't persist the flag */
-    }
+    if (!underlyings.length || this.rows().length || this.demoSeeded) return;
+    this.demoSeeded = true;
     for (let i = 0; i < count; i++) {
       const { label, kind, instrument, engine } = randomContract(underlyings, today);
       const request: InstrumentPriceRequest = {
@@ -212,41 +201,29 @@ export class BlotterService {
     await Promise.all(this.targets().map((r) => this.priceRow(r.id, live)));
   }
 
-  //! render the termsheets of the targeted rows and download them as ONE Markdown
-  //! file (sections separated by a horizontal rule) — a single download instead of
-  //! N browser save dialogs. Returns the number of documents rendered.
-  async downloadTermsheets(): Promise<{ ok: number; failed: number }> {
-    const rows = this.targets();
-    let ok = 0;
-    let failed = 0;
-    const sections: string[] = [];
-    for (const r of rows) {
-      const req: InstrumentTermsheetRequest = {
-        workspaceId: r.request.workspaceId,
-        kind: r.kind,
-        instrument: r.request.instrument,
-        title: r.label,
-      };
-      try {
-        const res = await firstValueFrom(this.api.instrumentTermsheet(req));
-        sections.push(res.termsheet.trim());
-        ok++;
-      } catch {
-        failed++;
-      }
-    }
-    if (sections.length) {
-      const blob = new Blob([sections.join('\n\n---\n\n') + '\n'], {
-        type: 'text/markdown;charset=utf-8',
-      });
+  //! render ONE row's termsheet (the engine's !termsheet task) and download it as a
+  //! Markdown file named from the row label. Returns false if the render/request failed
+  //! (the caller surfaces it). Per-row so each product's termsheet is a self-contained file.
+  async downloadRowTermsheet(row: BlotterRow): Promise<boolean> {
+    const req: InstrumentTermsheetRequest = {
+      workspaceId: row.request.workspaceId,
+      kind: row.kind,
+      instrument: row.request.instrument,
+      title: row.label,
+    };
+    try {
+      const res = await firstValueFrom(this.api.instrumentTermsheet(req));
+      const blob = new Blob([res.termsheet.trim() + '\n'], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = sections.length === 1 ? 'termsheet.md' : `termsheets_${sections.length}.md`;
+      a.download = termsheetFilename(row.label);
       a.click();
       URL.revokeObjectURL(url);
+      return true;
+    } catch {
+      return false;
     }
-    return { ok, failed };
   }
 
   private async liveTick(): Promise<void> {
@@ -332,6 +309,15 @@ export class BlotterService {
     // re-quote the restored rows once so they aren't blank.
     void this.repriceAll(false);
   }
+}
+
+//! Build a safe termsheet download filename from a row label: sanitize to
+//! `[A-Za-z0-9._-]` (spaces -> '_'), never trust it for path/extension trickery,
+//! always end in `.md`. Mirrors the pricing panels' own filename derivation.
+function termsheetFilename(label: string): string {
+  let name = (label || 'termsheet').trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9._-]/g, '');
+  if (!name) name = 'termsheet';
+  return name.toLowerCase().endsWith('.md') ? name : `${name}.md`;
 }
 
 //! --- first-launch demo book: random contract generation ---------------------

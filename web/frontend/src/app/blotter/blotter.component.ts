@@ -39,7 +39,9 @@ export class BlotterComponent implements OnInit {
   private readonly live = inject(LiveSpotsService);
   private readonly snack = inject(MatSnackBar);
 
-  readonly busy = signal(false);
+  //! id of the row whose termsheet is currently being generated (for the per-row
+  //! button spinner), or null when idle.
+  readonly termsheetBusyId = signal<string | null>(null);
 
   //! the tick column first, fixed columns + whichever Greeks appear, then actions.
   readonly columns = computed<string[]>(() => [
@@ -118,17 +120,15 @@ export class BlotterComponent implements OnInit {
     void this.b.repriceSelected(false);
   }
 
-  //! render + download the targeted rows' termsheets as one Markdown file.
-  async termsheet(): Promise<void> {
-    this.busy.set(true);
+  //! render + download ONE row's termsheet as its own Markdown file. Tracks the
+  //! in-flight row id so the button can show a spinner and not be double-clicked.
+  async rowTermsheet(row: BlotterRow): Promise<void> {
+    this.termsheetBusyId.set(row.id);
     try {
-      const { ok, failed } = await this.b.downloadTermsheets();
-      const msg = failed
-        ? `${ok} termsheet(s) downloaded, ${failed} failed`
-        : `${ok} termsheet(s) downloaded`;
-      this.snack.open(msg, 'OK', { duration: 3000 });
+      const ok = await this.b.downloadRowTermsheet(row);
+      if (!ok) this.snack.open('Termsheet generation failed', 'OK', { duration: 3000 });
     } finally {
-      this.busy.set(false);
+      this.termsheetBusyId.set(null);
     }
   }
 }

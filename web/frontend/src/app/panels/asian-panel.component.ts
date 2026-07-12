@@ -54,6 +54,8 @@ import { PanelResultComponent } from './panel-result.component';
               <mat-button-toggle value="call">call</mat-button-toggle>
               <mat-button-toggle value="put">put</mat-button-toggle>
             </mat-button-toggle-group>
+
+            <mat-checkbox [(ngModel)]="includeGreeks">Greeks</mat-checkbox>
           </div>
 
           <div class="row">

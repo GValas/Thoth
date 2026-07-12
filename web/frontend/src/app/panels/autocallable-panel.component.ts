@@ -66,6 +66,8 @@ import { PanelResultComponent } from './panel-result.component';
                 Memory
               </mat-checkbox>
             }
+
+            <mat-checkbox [(ngModel)]="includeGreeks">Greeks</mat-checkbox>
           </div>
 
           <div class="row">

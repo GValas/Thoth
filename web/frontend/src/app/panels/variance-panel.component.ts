@@ -6,6 +6,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -29,6 +30,7 @@ import { PanelResultComponent } from './panel-result.component';
     MatInputModule,
     MatButtonModule,
     MatButtonToggleModule,
+    MatCheckboxModule,
     MatIconModule,
     MatTooltipModule,
     MatDatepickerModule,
@@ -47,6 +49,8 @@ import { PanelResultComponent } from './panel-result.component';
               <mat-button-toggle value="mcl">mcl</mat-button-toggle>
               <mat-button-toggle value="mcl_gpu">mcl/gpu</mat-button-toggle>
             </mat-button-toggle-group>
+
+            <mat-checkbox [(ngModel)]="includeGreeks">Greeks</mat-checkbox>
           </div>
 
           <div class="row">

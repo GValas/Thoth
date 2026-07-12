@@ -27,14 +27,6 @@
       >
         <mat-icon>refresh</mat-icon> Re-price {{ targetLabel() }}
       </button>
-      <button
-        mat-stroked-button
-        [disabled]="!b.count() || busy()"
-        (click)="termsheet()"
-        [matTooltip]="'Download the termsheet(s) of ' + targetLabel() + ' row(s) as one Markdown file'"
-      >
-        <mat-icon>description</mat-icon> Termsheet {{ targetLabel() }}
-      </button>
       <span class="thoth-spacer"></span>
       @if (b.liveMode()) {
         <span class="meta thoth-muted"><span class="dot-live"></span> Live — every {{ b.liveThrottleSec }}s off the live spots</span>
@@ -126,7 +118,15 @@
 
     <ng-container matColumnDef="actions">
       <th mat-header-cell *matHeaderCellDef></th>
-      <td mat-cell *matCellDef="let r">
+      <td mat-cell *matCellDef="let r" class="row-actions">
+        <button
+          mat-icon-button
+          [disabled]="termsheetBusyId() === r.id"
+          (click)="rowTermsheet(r)"
+          matTooltip="Download this product's termsheet (Markdown)"
+        >
+          <mat-icon>{{ termsheetBusyId() === r.id ? 'hourglass_top' : 'description' }}</mat-icon>
+        </button>
         <button mat-icon-button (click)="b.remove(r.id)" matTooltip="Remove from blotter">
           <mat-icon>close</mat-icon>
         </button>
