@@ -137,6 +137,10 @@ underlying's surface exposes is silently skipped.
   currencies are both non-pivot (only the pivot basis, e.g. `usd/eur`, `usd/jpy`, is
   ever stored): `var(eur/jpy) = var(usd/eur) + var(usd/jpy) − 2ρ·σ·σ`, so an
   EUR-asset / JPY-payoff cross quanto prices (the `eur/jpy` cross is never a book object).
+  *Limitation:* a **`composite`** underlying (S·FX diffused, not the fixed-FX quanto drift)
+  between **two non-pivot** currencies is **not** supported — its cross-FX must be *diffused*
+  under the payoff measure, which the pivot legs don't give directly; quote one leg against
+  the pivot, or price it as a quanto. (The direct-pivot composite is fully supported.)
 - `barrier` — knock-out / digital payoffs, **continuous or
   discrete monitoring** (`monitoring_period_days`); PDE, MCL and (continuous-only)
   closed-form.

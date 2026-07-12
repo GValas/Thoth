@@ -16,6 +16,12 @@
 #include "correlation.hpp"
 #include "object_reader.hpp"
 
+//! Below this the vol of a triangulated cross rate is treated as zero (a constant rate):
+//! its correlation with anything is then undefined, so the cross-correlation getters return 0
+//! instead of dividing by it. A pure numerical guard — for |rho| <= 1 the cross variance can
+//! only reach 0 in the degenerate equal-legs / rho=1 case.
+static constexpr double CROSS_VOL_FLOOR = 1e-12;
+
 //!
 Correlation::Correlation( const string& ObjectName ) : MarketData( ObjectName, KIND_CORRELATION_MATRIX )
 {
@@ -653,9 +659,18 @@ double Correlation::AvgValue( const string& I,
     double rho_AI_AJ = ( AI && AJ ? AvgEntryByName( AI->GetName(), AJ->GetName(), a, b ) : 0 ); //!< corr(A_I, A_J)
     double vol_AI = ( AI ? AI->GetConstantVol() : 0 );
     double vol_AJ = ( AJ ? AJ->GetConstantVol() : 0 );
-    //! implied vol of the cross rate I/J = A_J/A_I (variance of a difference)
-    double vol_IJ = sqrt( vol_AI * vol_AI + vol_AJ * vol_AJ - 2 * rho_AI_AJ * vol_AI * vol_AJ );
+    //! implied vol of the cross rate I/J = A_J/A_I (variance of a difference; floored at 0
+    //! against round-off)
+    double var_IJ = vol_AI * vol_AI + vol_AJ * vol_AJ - 2 * rho_AI_AJ * vol_AI * vol_AJ;
+    double vol_IJ = sqrt( var_IJ > 0 ? var_IJ : 0 );
 
+    //! a zero-vol cross rate (the two pivot legs move identically) is a constant and has no
+    //! defined correlation — return 0 rather than dividing by zero. Consistent with the
+    //! quanto drift, where rho*sigma_FX would carry sigma_FX = vol_IJ = 0 regardless.
+    if ( vol_IJ < CROSS_VOL_FLOOR )
+    {
+        return 0;
+    }
     return ( -rho_AI_S * vol_AI + rho_AJ_S * vol_AJ ) / vol_IJ;
 }
 
@@ -724,10 +739,17 @@ double Correlation::AvgValue( const string& I,
     double vol_AJ = ( AJ ? AJ->GetConstantVol() : 0 );
     double vol_AM = ( AM ? AM->GetConstantVol() : 0 );
     double vol_AN = ( AN ? AN->GetConstantVol() : 0 );
-    //! cross-rate vols (variance of a difference of pivot legs), as in the 3-arg case
-    double vol_IJ = sqrt( vol_AI * vol_AI + vol_AJ * vol_AJ - 2 * rho_AI_AJ * vol_AI * vol_AJ );
-    double vol_MN = sqrt( vol_AM * vol_AM + vol_AN * vol_AN - 2 * rho_AM_AN * vol_AM * vol_AN );
+    //! cross-rate vols (variance of a difference of pivot legs, floored), as in the 3-arg case
+    double var_IJ = vol_AI * vol_AI + vol_AJ * vol_AJ - 2 * rho_AI_AJ * vol_AI * vol_AJ;
+    double var_MN = vol_AM * vol_AM + vol_AN * vol_AN - 2 * rho_AM_AN * vol_AM * vol_AN;
+    double vol_IJ = sqrt( var_IJ > 0 ? var_IJ : 0 );
+    double vol_MN = sqrt( var_MN > 0 ? var_MN : 0 );
 
+    //! either cross rate degenerate (zero vol -> constant) => undefined correlation, return 0.
+    if ( vol_IJ < CROSS_VOL_FLOOR || vol_MN < CROSS_VOL_FLOOR )
+    {
+        return 0;
+    }
     //! signs follow from r_{I/J} = r_{A/J} - r_{A/I}, r_{M/N} = r_{A/N} - r_{A/M}:
     //! (+,-,-,+) for the (I&M, I&N, J&M, J&N) cross terms respectively
     return ( +rho_AI_AM * vol_AI * vol_AM +
@@ -1143,10 +1165,19 @@ MonteCarloNode* Correlation::GetFxNode( NodeCollector& NC,
             N = AI_node;
         }
 
-        // neither leg is the pivot: needs AI + IB, not yet implemented
+        // neither leg is the pivot: the DIFFUSED cross rate A/B is NOT supported. A naive
+        // log-combination -(P/A)+(P/B) has the right instantaneous vol but the WRONG
+        // risk-neutral drift under the payoff-currency measure (the pivot legs are diffused
+        // under the pivot measure, so combining them mis-drifts the cross), which makes the
+        // engines disagree ~1-2%. A correct implementation must diffuse A/B directly under
+        // the payoff measure (drift r_B - r_A) with the triangulated cross vol + correlations.
+        // The constant-vol quanto path (GetFxVol / GetFxSpot) IS triangulated and correct; only
+        // a *composite* underlying between two non-pivot currencies hits this.
         else
         {
-            ERR( " error " );
+            ERR( "composite between two non-pivot currencies (" + UnderlyingCurrency + "/" +
+                 BaseCurrency + ") is not supported: quote both against the pivot " +
+                 _pivot_currency + ", or price it as a quanto" );
         }
     }
     return N;
