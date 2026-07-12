@@ -111,7 +111,10 @@ tab — seeded once per session whenever the blotter is empty (an **in-memory** 
 stale flag can never permanently suppress it; once seeded the rows persist in `localStorage`).
 Each row has a **tick box** (plus a header select-all) driving the **Re-price** toolbar action
 (the ticked rows, or the whole book when none are ticked), and its own **Termsheet** button
-that downloads that single product's termsheet as a Markdown file. Pricing is backed by a synchronous
+that downloads that single product's termsheet as a Markdown file. **Double-clicking a row opens
+it in its pricing panel** — the Panels tab jumps to the matching sub-panel (Vanilla / Barrier /
+Variance / Autocallable / Asian / Ratchet) with the whole form prefilled from the booked
+contract, ready to tweak and re-price. Pricing is backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
 correlation matrix** — each streamed pair takes its live value, the rest keep their stored
 one, and the blend is Cholesky-gated back to the stored matrix if mixing would break

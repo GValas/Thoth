@@ -160,6 +160,21 @@ export class BarrierPanelComponent extends PricingPanelBase implements OnInit {
 
   ngOnInit(): void {
     this.init();
+    this.applyPrefill();
+  }
+
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['type'] === 'string') this.type = i['type'] as OptionType;
+    if (typeof i['strike'] === 'number') this.strike = i['strike'];
+    if (typeof i['nominal'] === 'number') this.nominal = i['nominal'];
+    this.absoluteStrike = i['is_absolute_strike'] === true;
+    if (typeof i['barrier_type'] === 'string') this.barrierType = i['barrier_type'] as BarrierType;
+    if (typeof i['barrier_monitoring_type'] === 'string')
+      this.monitoring = i['barrier_monitoring_type'] as Monitoring;
+    const level = i['barrier_up_level'] ?? i['barrier_down_level'];
+    if (typeof level === 'number') this.barrierLevel = level;
+    if (typeof i['monitoring_period_days'] === 'number')
+      this.monitoringPeriodDays = i['monitoring_period_days'];
   }
 
   protected buildFields(): Record<string, unknown> | null {

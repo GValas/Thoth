@@ -112,6 +112,12 @@ export class VariancePanelComponent extends PricingPanelBase implements OnInit {
 
   ngOnInit(): void {
     this.init();
+    this.applyPrefill();
+  }
+
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['volatility_strike'] === 'number') this.volatilityStrike = i['volatility_strike'];
+    if (typeof i['notional'] === 'number') this.notional = i['notional'];
   }
 
   protected buildFields(): Record<string, unknown> | null {

@@ -132,6 +132,16 @@ export class AsianPanelComponent extends PricingPanelBase implements OnInit {
 
   ngOnInit(): void {
     this.init();
+    this.applyPrefill();
+  }
+
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['type'] === 'string') this.type = i['type'] as OptionType;
+    if (typeof i['strike'] === 'number') this.strike = i['strike'];
+    if (typeof i['nominal'] === 'number') this.nominal = i['nominal'];
+    this.absoluteStrike = i['is_absolute_strike'] === true;
+    if (typeof i['observation_period_days'] === 'number')
+      this.observationPeriodDays = i['observation_period_days'];
   }
 
   protected buildFields(): Record<string, unknown> | null {

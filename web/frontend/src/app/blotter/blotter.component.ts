@@ -9,7 +9,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 import { PanelContextService } from '../panels/panel-context.service';
+import { PanelPrefillService } from '../panels/panel-prefill.service';
 import { LiveSpotsService } from '../market-data/live-spots.service';
 import { BlotterService, BlotterRow } from './blotter.service';
 
@@ -38,6 +40,8 @@ export class BlotterComponent implements OnInit {
   private readonly ctx = inject(PanelContextService);
   private readonly live = inject(LiveSpotsService);
   private readonly snack = inject(MatSnackBar);
+  private readonly router = inject(Router);
+  private readonly prefill = inject(PanelPrefillService);
 
   //! id of the row whose termsheet is currently being generated (for the per-row
   //! button spinner), or null when idle.
@@ -86,6 +90,12 @@ export class BlotterComponent implements OnInit {
   ngOnInit(): void {
     // ensure the shared workspace/objects are loaded (the blotter may be the first tab opened).
     this.ctx.init();
+  }
+
+  //! double-click a row -> open its contract in the matching pricing panel, prefilled.
+  openInPanel(row: BlotterRow): void {
+    this.prefill.request(row.kind, row.request.engine, row.request.instrument);
+    void this.router.navigate(['/panels']);
   }
 
   underlyingOf(row: BlotterRow): string {

@@ -200,6 +200,32 @@ export class AutocallablePanelComponent extends PricingPanelBase implements OnIn
         base.getDate(),
       );
     }
+    this.applyPrefill(); //!< a blotter double-click overrides the defaults above
+  }
+
+  //! reverse of buildFields: reconstruct the panel state (incl. the observation schedule:
+  //! first date + inferred monthly frequency + count) from a booked autocallable.
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['nominal'] === 'number') this.nominal = i['nominal'];
+    if (typeof i['coupon'] === 'number') this.coupon = i['coupon'];
+    if (typeof i['autocall_barrier'] === 'number') this.autocallBarrier = i['autocall_barrier'];
+    if (typeof i['protection_barrier'] === 'number') this.protectionBarrier = i['protection_barrier'];
+    const cb = i['coupon_barrier'];
+    this.flavour = typeof cb === 'number' ? 'phoenix' : 'athena';
+    if (typeof cb === 'number') this.couponBarrier = cb;
+    this.couponMemory = i['coupon_memory'] === true;
+    const dates = i['autocall_dates'];
+    if (Array.isArray(dates) && dates.length && typeof dates[0] === 'string') {
+      const iso = dates as string[];
+      this.firstObservation = new Date(`${iso[0]}T00:00:00`);
+      this.observations = iso.length;
+      if (iso.length >= 2) {
+        const d0 = new Date(`${iso[0]}T00:00:00`);
+        const d1 = new Date(`${iso[1]}T00:00:00`);
+        const months = (d1.getFullYear() - d0.getFullYear()) * 12 + (d1.getMonth() - d0.getMonth());
+        if (months >= 1) this.frequencyMonths = months;
+      }
+    }
   }
 
   //! the generated autocall schedule (ISO), every date strictly before maturity.

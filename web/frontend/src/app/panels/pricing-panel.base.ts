@@ -9,6 +9,7 @@ import {
 } from '../core/models';
 import { BlotterService } from '../blotter/blotter.service';
 import { PanelContextService } from './panel-context.service';
+import { PanelPrefillService } from './panel-prefill.service';
 
 const GREEK_INDICATORS = ['delta', 'gamma', 'vega', 'rho', 'theta'];
 
@@ -28,6 +29,7 @@ export abstract class PricingPanelBase {
   readonly ctx = inject(PanelContextService); //!< public: panel templates read it directly
   protected readonly api = inject(ApiService);
   protected readonly blotter = inject(BlotterService);
+  protected readonly prefillSvc = inject(PanelPrefillService);
 
   abstract readonly kind: InstrumentKind;
 
@@ -70,6 +72,25 @@ export abstract class PricingPanelBase {
       this.maturityDate = new Date(base.getFullYear() + 1, base.getMonth(), base.getDate());
     }
   }
+
+  //! Fill the form from a pending blotter prefill (double-click -> open in panel), if one
+  //! targets this panel's kind. Sets the shared fields here (underlying / maturity / currency
+  //! / engine), then defers to applyFields for the instrument-specific ones. Call AFTER init()
+  //! so it overrides the defaults. Does not auto-price — the user reviews then clicks Price.
+  protected applyPrefill(): void {
+    const p = this.prefillSvc.consume(this.kind);
+    if (!p) return;
+    this.engine = p.engine;
+    const i = p.instrument;
+    if (typeof i['underlying'] === 'string') this.underlying = i['underlying'];
+    if (typeof i['maturity'] === 'string') this.maturityDate = new Date(`${i['maturity']}T00:00:00`);
+    if (typeof i['premium_currency'] === 'string') this.currency = i['premium_currency'];
+    this.applyFields(i);
+  }
+
+  //! Subclass hook: map the booked instrument's own fields onto this panel's ngModel props
+  //! (the inverse of buildFields). Default no-op; each panel overrides it.
+  protected applyFields(_instrument: Record<string, unknown>): void {}
 
   //! re-default the currency if the picked one vanished (objects reloaded).
   refresh(): void {

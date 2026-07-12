@@ -148,6 +148,19 @@ export class RatchetPanelComponent extends PricingPanelBase implements OnInit {
 
   ngOnInit(): void {
     this.init();
+    this.applyPrefill();
+  }
+
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['nominal'] === 'number') this.nominal = i['nominal'];
+    if (typeof i['observation_period_days'] === 'number')
+      this.observationPeriodDays = i['observation_period_days'];
+    if (typeof i['local_floor'] === 'number') this.localFloor = i['local_floor'];
+    if (typeof i['local_cap'] === 'number') this.localCap = i['local_cap'];
+    if (typeof i['global_floor'] === 'number') this.globalFloor = i['global_floor'];
+    const gc = i['global_cap'];
+    this.useGlobalCap = typeof gc === 'number';
+    if (typeof gc === 'number') this.globalCap = gc;
   }
 
   protected buildFields(): Record<string, unknown> | null {

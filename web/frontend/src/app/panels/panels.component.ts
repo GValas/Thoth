@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
+import { InstrumentKind } from '../core/models';
+import { PanelPrefillService } from './panel-prefill.service';
 import { VanillaPanelComponent } from './vanilla-panel.component';
 import { BarrierPanelComponent } from './barrier-panel.component';
 import { VariancePanelComponent } from './variance-panel.component';
@@ -27,7 +29,7 @@ import { RatchetPanelComponent } from './ratchet-panel.component';
     <div class="panels-header">
       <h2 class="title">Pricing panels</h2>
     </div>
-    <mat-tab-group mat-stretch-tabs="false" animationDuration="0ms">
+    <mat-tab-group mat-stretch-tabs="false" animationDuration="0ms" [(selectedIndex)]="selectedIndex">
       <mat-tab label="Vanilla">
         <div class="tab-body"><app-vanilla-panel></app-vanilla-panel></div>
       </mat-tab>
@@ -60,4 +62,20 @@ import { RatchetPanelComponent } from './ratchet-panel.component';
     `,
   ],
 })
-export class PanelsComponent {}
+export class PanelsComponent {
+  //! sub-tab order in the template — used to open the tab matching a blotter double-click.
+  private static readonly TAB_INDEX: Record<string, number> = {
+    vanilla: 0,
+    barrier: 1,
+    variance_swap: 2,
+    autocallable: 3,
+    asian: 4,
+    ratchet: 5,
+  };
+
+  //! start on the sub-tab of a pending prefill (blotter double-click), else the first tab.
+  selectedIndex = ((): number => {
+    const p = inject(PanelPrefillService).peek();
+    return p ? (PanelsComponent.TAB_INDEX[p.kind as InstrumentKind] ?? 0) : 0;
+  })();
+}

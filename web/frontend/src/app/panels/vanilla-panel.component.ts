@@ -128,6 +128,15 @@ export class VanillaPanelComponent extends PricingPanelBase implements OnInit {
 
   ngOnInit(): void {
     this.init();
+    this.applyPrefill();
+  }
+
+  protected override applyFields(i: Record<string, unknown>): void {
+    if (typeof i['type'] === 'string') this.type = i['type'] as OptionType;
+    if (typeof i['exercise'] === 'string') this.exercise = i['exercise'] as Exercise;
+    if (typeof i['strike'] === 'number') this.strike = i['strike'];
+    if (typeof i['nominal'] === 'number') this.nominal = i['nominal'];
+    this.absoluteStrike = i['is_absolute_strike'] === true;
   }
 
   protected buildFields(): Record<string, unknown> | null {
