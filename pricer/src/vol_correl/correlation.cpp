@@ -320,6 +320,17 @@ void Correlation::SetForexList( const vector<Forex*>& ForexList )
 {
     //! set attributes
     _forex_list = ForexList;
+
+    //! No FX pairs (an equities-only or single-currency market): there is no pivot to
+    //! anchor and no basis to validate. Dereferencing begin() on the empty list below is
+    //! undefined behaviour (segfault), so leave the pivot empty and just rebuild the index.
+    if ( _forex_list.empty() )
+    {
+        _pivot_currency.clear();
+        SetSingleList();
+        return;
+    }
+
     _pivot_currency = ( *( _forex_list.begin() ) )->GetUnderlyingCurrency()->GetName();
 
     //! must be a basis, ex: ( EUR_USD, EUR_JPY )

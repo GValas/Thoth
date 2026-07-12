@@ -80,3 +80,26 @@ TEST_CASE( "multi-asset book: each option matches its own-spot Black-Scholes" )
     // and is close to the analytic sum
     CHECK( std::abs( sum_mc - sum_bs ) <= 0.01 * sum_bs );
 }
+
+TEST_CASE( "correlation with an explicit empty forex list prices (equities-only market)" )
+{
+    // Regression: Correlation::SetForexList dereferenced forexs.begin() unconditionally, so
+    // an explicit `forexs: []` — what the web BFF emits for a single-currency / equities-only
+    // market — segfaulted the engine on EVERY pricing. Guarded now: the correlation must
+    // configure and the book must price to a sane Black-Scholes value.
+    std::ostringstream o;
+    o << "root: pricer\n"
+      << "pricer: !ana_pricer {today: 2000-01-01, book: book, currency: eur,"
+      << " correlation: cor, indicators: [premium], result: res}\n"
+      << "eur: !currency {rate: rate}\n"
+      << "rate: !yield_curve {dates: [2000-01-01, 2010-01-01], values: [8, 8]}\n"
+      << "cal: !simple_weighted_calendar {non_working_days_weight: 1}\n"
+      << "cor: !correlation_matrix {underlyings: [eq_a], forexs: [], symmetric_matrix: [1]}\n"
+      << "eq_a: !equity {spot: 100, volatility: v, currency: eur}\n"
+      << "v: !bs_volatility {volatility: 30, calendar: cal}\n"
+      << "opt: !vanilla {underlying: eq_a, premium_currency: eur, strike: 100,"
+      << " is_absolute_strike: true, maturity: 2000-12-31, nominal: 1, type: call, exercise: european}\n"
+      << "book: !book {contracts: [opt]}\n";
+    auto res = Price( o.str() );
+    CHECK( Premium( res, "opt" ) == doctest::Approx( BsCall( 100, 100, 0.08, 0.30, T1 ) ).epsilon( 0.02 ) );
+}
