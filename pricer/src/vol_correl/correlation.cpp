@@ -1165,18 +1165,20 @@ MonteCarloNode* Correlation::GetFxNode( NodeCollector& NC,
             N = AI_node;
         }
 
-        // neither leg is the pivot: the DIFFUSED cross rate A/B is NOT supported. A naive
-        // log-combination -(P/A)+(P/B) has the right instantaneous vol but the WRONG
-        // risk-neutral drift under the payoff-currency measure (the pivot legs are diffused
-        // under the pivot measure, so combining them mis-drifts the cross), which makes the
-        // engines disagree ~1-2%. A correct implementation must diffuse A/B directly under
-        // the payoff measure (drift r_B - r_A) with the triangulated cross vol + correlations.
-        // The constant-vol quanto path (GetFxVol / GetFxSpot) IS triangulated and correct; only
-        // a *composite* underlying between two non-pivot currencies hits this.
+        // neither leg is the pivot: the DIFFUSED cross rate A/B is NOT supported. Building it
+        // as the log-combination -(P/A)+(P/B) reproduces the correct cross DRIFT (r_B - r_A),
+        // vol and asset-correlation on paper, but the two pivot legs each diffuse under their
+        // OWN base-currency measure (Forex::GetDriftNode uses the native r_base - r_underlying),
+        // which is not the payoff (B) numeraire — the residual measure mismatch leaves a ~2%
+        // bias in the MCL composite (empirically ANA==PDE but MCL disagrees ~1.8% at 1e6 paths,
+        // while the direct-pivot composite agrees to MC error). A correct fix must diffuse A/B
+        // directly under the B measure (its own factor: drift r_B - r_A, triangulated vol, and
+        // triangulated correlations wired into the Cholesky), not compose pivot legs. Until then
+        // fail cleanly. The constant-vol quanto path (GetFxVol/GetFxSpot) is unaffected/correct.
         else
         {
             ERR( "composite between two non-pivot currencies (" + UnderlyingCurrency + "/" +
-                 BaseCurrency + ") is not supported: quote both against the pivot " +
+                 BaseCurrency + ") is not supported: quote one leg against the pivot " +
                  _pivot_currency + ", or price it as a quanto" );
         }
     }
