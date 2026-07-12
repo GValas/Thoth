@@ -1600,15 +1600,6 @@ correl_x: !correlation_matrix
   matrix: [1,   0.3, 0.2,
            0.3, 1,   0.5,
            0.2, 0.5, 1]
-# A cross quanto is not GPU-eligible, but shared_mcl sets allow_gpu — and the GPU gate probes
-# the GBM forward before the pricer's correlation propagates to the equity, which a cross
-# quanto's (triangulated) forward needs. So the cross MCL cells use this CPU-only config.
-cross_mcl: !mcl_configuration
-  max_day_step: 1
-  min_day_step: -1
-  paths: 100000
-  vol_year_step: 0.01
-  use_sobol: true
 
 # cross quanto: EUR-asset call, strike in EUR (spot 100), paid in JPY
 vanilla_mono_eu_call_cross_quanto_ana: !ana_pricer
@@ -1630,7 +1621,7 @@ vanilla_mono_eu_call_cross_quanto_mcl: !mcl_pricer
   today: 2000-01-01
   book: book_cross_quanto
   currency: jpy_x
-  mcl_configuration: cross_mcl
+  mcl_configuration: shared_mcl
   correlation: correl_x
   indicators: [premium]
   result: vanilla_mono_eu_call_cross_quanto_mcl_result
@@ -1665,7 +1656,7 @@ vanilla_mono_eu_call_cross_compo_mcl: !mcl_pricer
   today: 2000-01-01
   book: book_cross_compo
   currency: jpy_x
-  mcl_configuration: cross_mcl
+  mcl_configuration: shared_mcl
   correlation: correl_x
   indicators: [premium]
   result: vanilla_mono_eu_call_cross_compo_mcl_result

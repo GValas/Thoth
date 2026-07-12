@@ -85,6 +85,14 @@ bool PricerMCL::BookIsGpuSupported()
     {
         return false;
     }
+    //! GpuGbmParamsFor reads each contract's forward, and a QUANTO forward needs the
+    //! correlation propagated to its underlying (spot/FX rho). This probe runs inside
+    //! PreCheck, which is BEFORE PriceBook -> InitPricing -> Book::Reset does that
+    //! propagation — so wire it here first (idempotent: InitPricing re-anchors the book
+    //! before the actual price). Without this a quanto book erroneously errors on the GPU
+    //! gate ("missing correlation for quanto adjustment") unless some earlier sequence cell
+    //! happened to set the correlation on the shared underlying.
+    _book->Reset( _today, _correlation );
     for ( Contract* c : _book->GetContractSet() )
     {
         GpuGbmParams p;
