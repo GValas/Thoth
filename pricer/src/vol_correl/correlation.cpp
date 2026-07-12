@@ -156,6 +156,14 @@ void Correlation::SetMatrix( LaVector Matrix )
     double n_sqrt = sqrt( (double)n );
     if ( n_sqrt == (int)n_sqrt ) //!< length is a perfect square -> reshape to square
     {
+        //! bound the dimension: an n x n dense matrix plus its O(n^3) Cholesky is
+        //! driven by the input list length, so cap it (untrusted-YAML trust
+        //! boundary; see constants.hpp) before allocating.
+        if ( (size_t)n_sqrt > (size_t)CORRELATION_MAX_DIM )
+        {
+            ERR( "correlation '" + _name + "' : matrix dimension exceeds " +
+                 std::to_string( CORRELATION_MAX_DIM ) );
+        }
         _matrix = ext_la_vector_to_matrix( Matrix, (size_t)n_sqrt );
         //! Matrix (the source la_vector) is freed by its RAII LaVector at return
         _cholesky_key.clear(); //!< invalidate any cached Cholesky factor

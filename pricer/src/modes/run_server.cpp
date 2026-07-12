@@ -42,6 +42,12 @@ int RunHttpServer( int Port )
 {
     httplib::Server server;
 
+    //! bound the request body: httplib defaults to SIZE_MAX, so an unauthenticated
+    //! client on the engine network could stream gigabytes into req.body and OOM
+    //! the process. The engine is the trust boundary (it parses untrusted YAML);
+    //! a few MB is far above any legitimate book. Oversized bodies get 413.
+    server.set_payload_max_length( SERVER_MAX_BODY_BYTES );
+
     //! pricing is serialised by price_mutex below, so a slave only ever handles
     //! one price at a time; cap the worker pool small (default is ~one thread per
     //! core) so a many-slave cluster on one box does not spawn hundreds of idle
@@ -109,7 +115,14 @@ int RunHttpServer( int Port )
                     done.store( true ); //!< signal the poll loop below that pricing finished
                 } );
 
-                //! poll the connection while the worker prices
+                //! poll the connection while the worker prices, enforcing a
+                //! server-side wall-clock deadline: one abusive request must not
+                //! hold the global price_mutex (and starve every other client)
+                //! indefinitely. On timeout we raise the same cancellation flag the
+                //! pricing loop already polls, so the worker unwinds cleanly.
+                const auto deadline = std::chrono::steady_clock::now() +
+                                      std::chrono::seconds( (long)SERVER_PRICING_DEADLINE_SEC );
+                bool timed_out = false;
                 while ( !done.load() )
                 {
                     if ( !sink.is_writable() ) //!< client gone
@@ -118,9 +131,28 @@ int RunHttpServer( int Port )
                         cancellation::Request();
                         break;
                     }
+                    if ( std::chrono::steady_clock::now() > deadline )
+                    {
+                        LOG( "HTTP", "client " + client + " pricing exceeded the " +
+                                         std::to_string( (long)SERVER_PRICING_DEADLINE_SEC ) +
+                                         "s deadline : cancelling" );
+                        cancellation::Request();
+                        timed_out = true;
+                        break;
+                    }
                     std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) );
                 }
                 worker.join();
+
+                //! a deadline hit still returns a body (the client gets the error,
+                //! unlike a client-disconnect where there is no one to send to)
+                if ( timed_out )
+                {
+                    const string msg = "error: pricing exceeded the server deadline\n";
+                    sink.write( msg.data(), msg.size() );
+                    sink.done();
+                    return true;
+                }
 
                 if ( cancellation::Requested() )
                 {

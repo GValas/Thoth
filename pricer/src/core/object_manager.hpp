@@ -94,6 +94,12 @@ class ObjectManager
     Task* _task_node = nullptr; //!< the resolved root task; null until ReadObjects
     string _task_name;          //!< name of the task being executed
     ObjectCollector _collector; //!< owns every built object (keyed by name)
+    //! reference-resolution recursion depth: Build -> Configure -> Ref -> Get ->
+    //! Build recurses one frame per chained reference. Cyclic refs are safe (the
+    //! object is cached before Configure runs), but a long LINEAR chain of a
+    //! crafted book would overflow the stack — this counter caps the depth and
+    //! turns it into a clean load error (untrusted-YAML trust boundary).
+    int _build_depth = 0;
 
     //! an object exists iff it carries a kind tag (e.g. `name: !equity { ... }`)
     bool IsObject( const string& Path );

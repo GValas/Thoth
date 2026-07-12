@@ -15,6 +15,19 @@ inline constexpr int DECIMAL_PRECISION = 9;
 //! name of the root node in the object/config tree
 inline constexpr char ROOT_NODE[] = "root";
 
+//! --- security / resource caps on YAML-driven sizes -------------------------
+//! The engine parses UNTRUSTED YAML directly (it is the trust boundary behind
+//! the web BFF), so every size that reaches an allocation or a compute loop is
+//! bounded here. These ceilings are far above any legitimate book yet stop a
+//! single crafted request from OOM-ing the process or holding the global
+//! pricing lock indefinitely. A value outside (0, cap] is a clean load error.
+inline constexpr int PDE_MAX_GRID_NODES = 20000;                  //!< custom_n_s / custom_n_t upper bound
+inline constexpr long MCL_MAX_PATHS = 200000000;                  //!< Monte-Carlo paths upper bound (2e8)
+inline constexpr int CORRELATION_MAX_DIM = 2000;                  //!< correlation matrix dimension (n x n)
+inline constexpr int MAX_OBJECT_REFERENCE_DEPTH = 512;            //!< reference-resolution recursion guard
+inline constexpr double SERVER_PRICING_DEADLINE_SEC = 300;        //!< per-request wall-clock ceiling
+inline constexpr size_t SERVER_MAX_BODY_BYTES = 16 * 1024 * 1024; //!< /price request body cap (16 MB)
+
 //! the relative spot bump for delta/gamma (1%). One canonical value, used two
 //! ways: the bump-and-revalue engine (Pricer::BumpAndRevalueGreeks) applies it
 //! one-sided (S -> S*(1+bump)); the PDE grid-read delta and the analytic barrier

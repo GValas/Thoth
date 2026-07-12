@@ -46,6 +46,20 @@ void PdeConfiguration::Configure( ObjectReader& reader )
     {
         _custom_n_t = reader.Get<int>( "custom_n_t" );
     }
+    //! bound the grid sizes: they drive la_vector allocations and the O(n_s * n_t)
+    //! backward sweep, so an unbounded (or negative -> huge size_t) value would OOM
+    //! or hang the engine. A value outside (0, cap] is a config error, not a silent
+    //! clamp — the caller sees why. (Untrusted-YAML trust boundary; see constants.hpp.)
+    if ( _custom_n_s <= 0 || _custom_n_s > PDE_MAX_GRID_NODES )
+    {
+        ERR( "pde_configuration '" + GetName() + "': custom_n_s must be in (0, " +
+             std::to_string( PDE_MAX_GRID_NODES ) + "]" );
+    }
+    if ( _custom_n_t <= 0 || _custom_n_t > PDE_MAX_GRID_NODES )
+    {
+        ERR( "pde_configuration '" + GetName() + "': custom_n_t must be in (0, " +
+             std::to_string( PDE_MAX_GRID_NODES ) + "]" );
+    }
     if ( reader.Has<double>( "custom_sigma_factor" ) )
     {
         _custom_sigma_factor = reader.Get<double>( "custom_sigma_factor" );

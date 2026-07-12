@@ -31,6 +31,15 @@ void MclConfiguration::Configure( ObjectReader& reader )
     {
         ERR( "mcl_configuration '" + GetName() + "': paths must be > 1" );
     }
+    //! upper-bound the path count: it sizes the LSM path matrices and the sweep, so
+    //! an unbounded value would OOM / hang the engine (untrusted-YAML trust boundary;
+    //! see constants.hpp). A cluster splits paths across slaves, so this caps a
+    //! SINGLE request, not the aggregate.
+    if ( _paths > MCL_MAX_PATHS )
+    {
+        ERR( "mcl_configuration '" + GetName() + "': paths must be <= " +
+             std::to_string( MCL_MAX_PATHS ) );
+    }
     if ( _max_day_step <= 0 )
     {
         ERR( "mcl_configuration '" + GetName() + "': max_day_step must be > 0 (days)" );

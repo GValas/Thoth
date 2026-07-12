@@ -126,5 +126,20 @@ Object* ObjectManager::Build( const string& ObjectName )
     {
         ERR( "unknown kind : " + kind ); //!< no factory for this tag -> configuration error
     }
+
+    //! reference-resolution depth guard: Create -> Configure -> Ref -> Get ->
+    //! Build recurses one frame per chained reference. Cap the linear-chain depth
+    //! so a crafted book cannot overflow the stack (a SIGSEGV the try/catch in the
+    //! server/batch driver could not contain). RAII-decremented so an ERR thrown
+    //! deeper still unwinds the counter.
+    if ( ++_build_depth > MAX_OBJECT_REFERENCE_DEPTH )
+    {
+        --_build_depth;
+        ERR( "object reference chain exceeds depth " +
+             std::to_string( MAX_OBJECT_REFERENCE_DEPTH ) + " (near '" + ObjectName +
+             "') — possible reference cycle or abusive book" );
+    }
+    ScopeGuard depth_guard( [this]
+                            { --_build_depth; } );
     return entry->second( *this, ObjectName ); //!< create + register + configure
 }
