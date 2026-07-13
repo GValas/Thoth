@@ -115,7 +115,9 @@ Each row has a **tick box** (plus a header select-all) driving the **Re-price** 
 that downloads that single product's termsheet as a Markdown file. **Double-clicking a row opens
 it in its pricing panel** — the Panels tab jumps to the matching sub-panel (Vanilla / Barrier /
 Variance / Autocallable / Asian / Ratchet) with the whole form prefilled from the booked
-contract, ready to tweak and re-price. Pricing is backed by a synchronous
+contract, ready to tweak and re-price. Every column **sorts** (click the header — asc / desc /
+off) and carries a **per-column text filter** in its header, so the book can be ordered by any
+field and narrowed live. Pricing is backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
 correlation matrix** — each streamed pair takes its live value, the rest keep their stored
 one, and the blend is Cholesky-gated back to the stored matrix if mixing would break

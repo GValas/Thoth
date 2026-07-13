@@ -45,12 +45,19 @@
 
   // Compact rows: shorter than the Material default for a dense monitoring view.
   --mat-table-row-item-container-height: 32px;
-  --mat-table-header-container-height: 34px;
+  // taller header: each column head stacks a sortable title + a filter box.
+  --mat-table-header-container-height: 56px;
 
-  .mat-mdc-cell,
-  .mat-mdc-header-cell {
+  .mat-mdc-cell {
     padding-top: 0;
     padding-bottom: 0;
+  }
+  // header cells top-align so the sortable title + filter box sit at the top and the
+  // filter-less heads (select / actions) line up with the titles.
+  .mat-mdc-header-cell {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    vertical-align: top;
   }
   // The remove icon-button otherwise forces the row taller than the text — shrink it
   // to fit the compact row height.

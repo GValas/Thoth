@@ -14,6 +14,7 @@ import { PanelContextService } from '../panels/panel-context.service';
 import { PanelPrefillService } from '../panels/panel-prefill.service';
 import { LiveSpotsService } from '../market-data/live-spots.service';
 import { BlotterService, BlotterRow } from './blotter.service';
+import { BlotterColHeaderComponent, SortDir } from './blotter-col-header.component';
 
 //! Global monitoring blotter: every product sent from a pricing panel becomes a live row.
 //! Live mode re-prices the whole book off the feed on a throttle, tinting each premium green/
@@ -31,6 +32,7 @@ import { BlotterService, BlotterRow } from './blotter.service';
     MatInputModule,
     MatTooltipModule,
     MatCheckboxModule,
+    BlotterColHeaderComponent,
   ],
   templateUrl: './blotter.component.html',
   styleUrl: './blotter.component.scss',
@@ -46,6 +48,98 @@ export class BlotterComponent implements OnInit {
   //! id of the row whose termsheet is currently being generated (for the per-row
   //! button spinner), or null when idle.
   readonly termsheetBusyId = signal<string | null>(null);
+
+  //! sort + per-column text filter state (any data column). The header component drives them.
+  readonly sortCol = signal<string | null>(null);
+  readonly sortAsc = signal(true);
+  readonly filters = signal<Record<string, string>>({});
+
+  //! click a header: cycle this column asc -> desc -> unsorted; a new column starts asc.
+  toggleSort(col: string): void {
+    if (this.sortCol() !== col) {
+      this.sortCol.set(col);
+      this.sortAsc.set(true);
+    } else if (this.sortAsc()) {
+      this.sortAsc.set(false);
+    } else {
+      this.sortCol.set(null); //!< third click clears the sort
+    }
+  }
+  sortDirFor(col: string): SortDir {
+    return this.sortCol() === col ? (this.sortAsc() ? 'asc' : 'desc') : null;
+  }
+  filterFor(col: string): string {
+    return this.filters()[col] ?? '';
+  }
+  setFilter(col: string, value: string): void {
+    this.filters.update((f) => ({ ...f, [col]: value }));
+  }
+
+  //! comparable value for sorting a (row, column) — a number where the cell is numeric.
+  private sortValue(row: BlotterRow, col: string): string | number | undefined {
+    switch (col) {
+      case 'kind':
+        return row.kind;
+      case 'label':
+        return row.label;
+      case 'underlying':
+        return this.underlyingOf(row);
+      case 'spot':
+        return this.spotOf(row);
+      case 'engine':
+        return row.request.engine;
+      case 'premium':
+        return row.premium ?? undefined;
+      case 'ccy':
+        return row.currency;
+      case 'priced':
+        return row.pricedAt ? row.pricedAt.getTime() : undefined;
+      case 'status':
+        return row.status;
+      default:
+        return this.greekOf(row, col); //!< a Greek column
+    }
+  }
+
+  //! the text a column filter matches against — the same string the cell displays.
+  private filterText(row: BlotterRow, col: string): string {
+    if (col === 'spot') return this.fmt(this.spotOf(row));
+    if (col === 'premium') return this.fmt(row.premium);
+    if (col === 'priced') return this.fmtTime(row.pricedAt);
+    const v = this.sortValue(row, col);
+    if (v == null) return '';
+    return typeof v === 'number' ? this.fmt(v) : String(v);
+  }
+
+  //! rows after the per-column text filters + an optional single-column sort. Reads the live
+  //! spots (via sortValue/filterText) so it re-orders as the feed re-prices.
+  readonly displayRows = computed<BlotterRow[]>(() => {
+    const rows = this.b.rows();
+    const active = Object.entries(this.filters()).filter(([, q]) => q.trim() !== '');
+    let out = active.length
+      ? rows.filter((r) =>
+          active.every(([col, q]) => this.filterText(r, col).toLowerCase().includes(q.trim().toLowerCase())),
+        )
+      : rows;
+
+    const col = this.sortCol();
+    if (col) {
+      const dir = this.sortAsc() ? 1 : -1;
+      out = [...out].sort((a, b) => {
+        const va = this.sortValue(a, col);
+        const vb = this.sortValue(b, col);
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1; //!< empty cells sort last, both directions
+        if (vb == null) return -1;
+        const c =
+          typeof va === 'number' && typeof vb === 'number'
+            ? va - vb
+            : String(va).localeCompare(String(vb));
+        return c * dir;
+      });
+    }
+    return out;
+  });
 
   //! the tick column first, fixed columns + whichever Greeks appear, then actions.
   readonly columns = computed<string[]>(() => [

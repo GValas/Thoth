@@ -39,7 +39,7 @@
 </mat-card>
 
 @if (b.count()) {
-  <table mat-table [dataSource]="b.rows()" class="bl-table">
+  <table mat-table [dataSource]="displayRows()" class="bl-table">
     <ng-container matColumnDef="select">
       <th mat-header-cell *matHeaderCellDef class="tick">
         <mat-checkbox
@@ -58,58 +58,108 @@
     </ng-container>
 
     <ng-container matColumnDef="kind">
-      <th mat-header-cell *matHeaderCellDef>Product</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Product" col="kind" [sortDir]="sortDirFor('kind')" [filter]="filterFor('kind')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('kind', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">{{ r.kind }}</td>
     </ng-container>
 
     <ng-container matColumnDef="label">
-      <th mat-header-cell *matHeaderCellDef>Description</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Description" col="label" [sortDir]="sortDirFor('label')" [filter]="filterFor('label')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('label', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">{{ r.label }}</td>
     </ng-container>
 
     <ng-container matColumnDef="underlying">
-      <th mat-header-cell *matHeaderCellDef>Underlying</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Underlying" col="underlying" [sortDir]="sortDirFor('underlying')" [filter]="filterFor('underlying')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('underlying', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">{{ underlyingOf(r) }}</td>
     </ng-container>
 
     <ng-container matColumnDef="spot">
-      <th mat-header-cell *matHeaderCellDef class="num">Spot</th>
+      <th mat-header-cell *matHeaderCellDef class="num">
+        <app-blotter-col-header
+          label="Spot" col="spot" [sortDir]="sortDirFor('spot')" [filter]="filterFor('spot')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('spot', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r" class="num" [class.up]="spotDir(r) > 0" [class.down]="spotDir(r) < 0">
         {{ fmt(spotOf(r)) }}
       </td>
     </ng-container>
 
     <ng-container matColumnDef="engine">
-      <th mat-header-cell *matHeaderCellDef>Engine</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Engine" col="engine" [sortDir]="sortDirFor('engine')" [filter]="filterFor('engine')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('engine', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">{{ r.request.engine }}</td>
     </ng-container>
 
     <ng-container matColumnDef="premium">
-      <th mat-header-cell *matHeaderCellDef class="num">Premium</th>
+      <th mat-header-cell *matHeaderCellDef class="num">
+        <app-blotter-col-header
+          label="Premium" col="premium" [sortDir]="sortDirFor('premium')" [filter]="filterFor('premium')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('premium', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r" class="num prem" [class.up]="r.dir > 0" [class.down]="r.dir < 0">
         {{ fmt(r.premium) }}
       </td>
     </ng-container>
 
     <ng-container matColumnDef="ccy">
-      <th mat-header-cell *matHeaderCellDef>Ccy</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Ccy" col="ccy" [sortDir]="sortDirFor('ccy')" [filter]="filterFor('ccy')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('ccy', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">{{ r.currency }}</td>
     </ng-container>
 
     @for (g of b.greekColumns(); track g) {
       <ng-container [matColumnDef]="g">
-        <th mat-header-cell *matHeaderCellDef class="num">{{ g }}</th>
+        <th mat-header-cell *matHeaderCellDef class="num">
+          <app-blotter-col-header
+            [label]="g" [col]="g" [sortDir]="sortDirFor(g)" [filter]="filterFor(g)"
+            (sort)="toggleSort($event)" (filterChange)="setFilter(g, $event)"
+          ></app-blotter-col-header>
+        </th>
         <td mat-cell *matCellDef="let r" class="num">{{ fmt(greekOf(r, g)) }}</td>
       </ng-container>
     }
 
     <ng-container matColumnDef="priced">
-      <th mat-header-cell *matHeaderCellDef>Priced</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Priced" col="priced" [sortDir]="sortDirFor('priced')" [filter]="filterFor('priced')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('priced', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r" class="thoth-muted">{{ fmtTime(r.pricedAt) }}</td>
     </ng-container>
 
     <ng-container matColumnDef="status">
-      <th mat-header-cell *matHeaderCellDef>Status</th>
+      <th mat-header-cell *matHeaderCellDef>
+        <app-blotter-col-header
+          label="Status" col="status" [sortDir]="sortDirFor('status')" [filter]="filterFor('status')"
+          (sort)="toggleSort($event)" (filterChange)="setFilter('status', $event)"
+        ></app-blotter-col-header>
+      </th>
       <td mat-cell *matCellDef="let r">
         @if (r.status === 'error') {
           <span class="thoth-error" [matTooltip]="r.error || ''"><mat-icon class="status-ic">error</mat-icon></span>
