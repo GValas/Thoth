@@ -32,6 +32,30 @@ double payoff_digital( const double spot,
                        const double barrier_up_level,
                        const double barrier_down_level );
 
+//! Terminal payoff of a European binary/digital struck at `strike`: cash-or-nothing
+//! pays `cash_amount`, asset-or-nothing pays `spot`, in both cases iff the option is
+//! in the money (spot > strike for a call, spot < strike for a put). Not discounted.
+double payoff_digital_option( const double spot,
+                              const double strike,
+                              const OptionType type,
+                              const bool is_cash,
+                              const double cash_amount );
+
+//! Black-Scholes European digital price (forward measure): with
+//!   d1 = (ln(F/K) + 0.5 v^2 t) / (v sqrt t),  d2 = d1 - v sqrt t,
+//! cash-or-nothing call = CashAmount * df * N(d2), put = CashAmount * df * N(-d2);
+//! asset-or-nothing call = df * F * N(d1), put = df * F * N(-d1). CashAmount is the
+//! fixed payout Q (ignored for asset-or-nothing). Degenerate inputs (v<=0, t<=0,
+//! F<=0 or K<=0) fall back to the discounted intrinsic on the forward.
+double BS_Digital_Price( const double Forward,
+                         const double Strike,
+                         const double TimeToMaturity,
+                         const double Volatility,
+                         const double DiscountFactor,
+                         const bool is_call,
+                         const bool is_cash,
+                         const double CashAmount );
+
 //! Black-Scholes-76 (forward-measure) call price = df * (F*N(d1) - K*N(d2)).
 //! Volatility is annualised lognormal sigma, TimeToMaturity in years, F & K in
 //! price units. Degenerate inputs (sigma<=0, T==0, ...) fall back to discounted

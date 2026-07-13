@@ -66,6 +66,7 @@
         { "$ref": "#/$defs/autocallable" },
         { "$ref": "#/$defs/asian" },
         { "$ref": "#/$defs/ratchet" },
+        { "$ref": "#/$defs/digital" },
         { "$ref": "#/$defs/termsheet" },
         { "$ref": "#/$defs/equity" },
         { "$ref": "#/$defs/basket" },
@@ -258,6 +259,25 @@
         "local_cap": { "type": "number", "description": "Per-period return cap, percent (>= local_floor)." },
         "global_floor": { "type": "number", "description": "Coupon floor, percent (default 0 -> capital protected)." },
         "global_cap": { "type": "number", "description": "Optional coupon cap, percent (>= global_floor)." }
+      }
+    },
+
+    "digital": {
+      "type": "object",
+      "title": "!digital",
+      "description": "European binary/digital option: at maturity pays a fixed cash amount (cash-or-nothing) or the spot (asset-or-nothing) iff in the money (S > K for a call, S < K for a put). Path-independent -> priced by ANA (closed form), PDE and MCL.",
+      "additionalProperties": false,
+      "required": ["underlying", "premium_currency", "strike", "maturity", "type"],
+      "properties": {
+        "underlying": { "$ref": "#/$defs/ref" },
+        "premium_currency": { "$ref": "#/$defs/ref" },
+        "strike": { "type": "number", "description": "Strike; cash, or percent of the valuation-date spot when is_absolute_strike is false." },
+        "is_absolute_strike": { "type": "boolean", "description": "false: strike is a percent of spot (default true)." },
+        "maturity": { "$ref": "#/$defs/date" },
+        "type": { "type": "string", "enum": ["call", "put"] },
+        "payout": { "type": "string", "enum": ["cash_or_nothing", "asset_or_nothing"], "description": "cash_or_nothing (default): pays cash_amount. asset_or_nothing: pays the spot." },
+        "cash_amount": { "type": "number", "description": "Fixed cash payout Q for cash-or-nothing (default 1)." },
+        "nominal": { "type": "number", "description": "Payoff notional (default 1)." }
       }
     },
 

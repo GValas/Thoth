@@ -27,6 +27,7 @@
 #include "autocallable.hpp"
 #include "asian.hpp"
 #include "ratchet.hpp"
+#include "digital.hpp"
 
 //! underlyings
 #include "equity.hpp"
@@ -97,6 +98,7 @@ Object* ObjectManager::Build( const string& ObjectName )
         { KIND_AUTOCALLABLE, &Create<Autocallable> },
         { KIND_ASIAN, &Create<Asian> },
         { KIND_RATCHET, &Create<Ratchet> },
+        { KIND_DIGITAL, &Create<Digital> },
         // ---- underlyings (an equity / forex is itself a single-asset underlying) ----
         { KIND_EQUITY, &Create<Equity> },
         { KIND_BASKET, &Create<AbsoluteBasket> },

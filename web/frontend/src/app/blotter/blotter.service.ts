@@ -367,6 +367,7 @@ function randomContract(
     'variance_swap',
     'asian',
     'ratchet',
+    'digital',
   ] as const);
   const maturity = maturityFrom(today, pick([6, 12, 18, 24, 36]));
 
@@ -416,6 +417,25 @@ function randomContract(
         local_floor: -cap,
         local_cap: cap,
         global_floor: 0,
+      },
+    };
+  }
+
+  if (kind === 'digital') {
+    //! European binary — path-independent, closed-form ANA
+    const payout = pick(['cash_or_nothing', 'asset_or_nothing'] as const);
+    return {
+      kind,
+      engine: 'ana',
+      label: `${u.name} ${payout === 'cash_or_nothing' ? 'digital' : 'asset-digital'} ${type} ${strike}% ${maturity}`,
+      instrument: {
+        underlying: u.name,
+        strike,
+        is_absolute_strike: false,
+        maturity,
+        type,
+        payout,
+        ...(payout === 'cash_or_nothing' ? { cash_amount: 1 } : {}),
       },
     };
   }

@@ -47,6 +47,7 @@ inline constexpr char KIND_TERMSHEET[] = "termsheet";
 inline constexpr char KIND_SIMPLE_FIXING_DATA[] = "simple_fixing_data";
 inline constexpr char KIND_AUTOCALLABLE[] = "autocallable";
 inline constexpr char KIND_ASIAN[] = "asian";
+inline constexpr char KIND_DIGITAL[] = "digital";
 inline constexpr char KIND_RATCHET[] = "ratchet";
 inline constexpr char KIND_VANILLA[] = "vanilla";
 inline constexpr char KIND_YIELD_CURVE[] = "yield_curve";

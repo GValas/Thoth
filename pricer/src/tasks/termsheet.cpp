@@ -5,6 +5,7 @@
 #include "asian.hpp"
 #include "ratchet.hpp"
 #include "barrier.hpp"
+#include "digital.hpp"
 #include "currency.hpp"
 #include "enums.hpp"
 #include "misc.hpp"
@@ -295,6 +296,28 @@ string Termsheet::PayoffSection() const
               << "$$ \\text{Payoff}(T) \\;=\\; " << body << ", \\qquad K = "
               << Num( van->GetStrike() ) << " $$\n";
         }
+        return o.str();
+    }
+
+    if ( auto* dig = dynamic_cast<Digital*>( _contract ) )
+    {
+        const bool call = ( dig->GetType() == OptionType::Call );
+        const bool cash = dig->IsCashOrNothing();
+        o << "A **European " << ( cash ? "cash-or-nothing" : "asset-or-nothing" ) << " "
+          << ( call ? "call" : "put" ) << "** (binary / digital) on " << udl
+          << ": at maturity it pays **" << ( cash ? ( Num( dig->GetCashAmount() ) + " in cash" ) : "the spot S" )
+          << "** if **" << ( call ? "S > K" : "S < K" ) << "** and nothing otherwise, with strike **K = "
+          << Num( dig->GetStrike() ) << "**.\n";
+
+        const string ind = call ? "\\mathbf{1}_{\\{S_T > K\\}}" : "\\mathbf{1}_{\\{S_T < K\\}}";
+        o << "\nFormally:\n\n"
+          << "$$ \\text{Payoff}(T) \\;=\\; " << ( cash ? "Q\\, " : "S_T\\, " ) << ind
+          << ", \\qquad K = " << Num( dig->GetStrike() );
+        if ( cash )
+        {
+            o << ", \\quad Q = " << Num( dig->GetCashAmount() );
+        }
+        o << " $$\n";
         return o.str();
     }
 

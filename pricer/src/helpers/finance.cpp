@@ -85,6 +85,54 @@ double BS_Call_Price( const double Forward,
     }
 }
 
+//! European binary/digital terminal payoff: cash-or-nothing pays the fixed cash amount,
+//! asset-or-nothing pays the spot, both iff in the money (spot > K call / spot < K put).
+double payoff_digital_option( const double spot,
+                              const double strike,
+                              const OptionType type,
+                              const bool is_cash,
+                              const double cash_amount )
+{
+    const bool in_the_money = ( type == OptionType::Call ) ? ( spot > strike ) : ( spot < strike );
+    if ( !in_the_money )
+    {
+        return 0;
+    }
+    return is_cash ? cash_amount : spot;
+}
+
+//! Black-Scholes European digital, forward measure (see the header for the formulas).
+double BS_Digital_Price( const double Forward,
+                         const double Strike,
+                         const double TimeToMaturity,
+                         const double Volatility,
+                         const double DiscountFactor,
+                         const bool is_call,
+                         const bool is_cash,
+                         const double CashAmount )
+{
+    //! degenerate cases: the lognormal collapses to a point mass at F, so the price is
+    //! the discounted terminal payoff evaluated at the forward.
+    if ( Volatility <= 0 || TimeToMaturity <= 0 || Strike <= 0 || Forward <= 0 )
+    {
+        const bool itm = is_call ? ( Forward > Strike ) : ( Forward < Strike );
+        if ( !itm )
+        {
+            return 0;
+        }
+        return DiscountFactor * ( is_cash ? CashAmount : Forward );
+    }
+
+    const double v_sqr_t = Volatility * sqrt( TimeToMaturity ); //!< total vol sigma*sqrt(T)
+    const double d1 = log( Forward / Strike ) / v_sqr_t + 0.5 * v_sqr_t;
+    const double d2 = d1 - v_sqr_t;
+    if ( is_cash )
+    {
+        return DiscountFactor * CashAmount * NormalCdf( is_call ? d2 : -d2 ); //!< Q df N(+/-d2)
+    }
+    return DiscountFactor * Forward * NormalCdf( is_call ? d1 : -d1 ); //!< asset: df F N(+/-d1)
+}
+
 //! bs put price, call/put parity
 double BS_Put_Price( const double Forward,
                      const double Strike,

@@ -12,6 +12,7 @@
 //! contract type + its underlying), not asked of the contract; no PDE grid is solved.
 
 class Vanilla;
+class Digital;
 class Barrier;
 class VarianceSwap;
 
@@ -28,6 +29,7 @@ class PricerANA : public Pricer
     //! per-type closed forms, each writing premium (+ any analytic Greeks) into the
     //! contract's Result() entry. Spot/forward/vol come from the (rolled) underlying.
     void PriceVanilla( Vanilla* Opt );
+    void PriceDigital( Digital* Opt ); //!< European binary (closed form BS_Digital_Price)
     void PriceBarrier( Barrier* Bar );
     void PriceVarianceSwap( VarianceSwap* Swap );
 

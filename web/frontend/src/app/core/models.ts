@@ -136,7 +136,14 @@ export interface GridProgress {
 // --- single-instrument pricing (panels + blotter) ---
 
 //! Instrument kinds the pricing panels can quote (engine `!<kind>` tags).
-export type InstrumentKind = 'vanilla' | 'barrier' | 'variance_swap' | 'autocallable' | 'asian' | 'ratchet';
+export type InstrumentKind =
+  | 'vanilla'
+  | 'barrier'
+  | 'variance_swap'
+  | 'autocallable'
+  | 'asian'
+  | 'ratchet'
+  | 'digital';
 
 //! Price one hand-entered instrument. `instrument` carries the kind's own fields
 //! (underlying, strike, maturity, barrier_type, …) verbatim; `live` overlays live spots.

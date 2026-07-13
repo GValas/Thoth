@@ -9,6 +9,7 @@
 #include "hull_white.hpp" //!< sigma_eff of the BS+HW European vanilla
 #include "single.hpp"     //!< Volatility / StochasticVolParams (MonoVol helper)
 #include "vanilla.hpp"
+#include "digital.hpp"
 #include "variance_swap.hpp"
 
 //! a closed-form pricer is just a Pricer; no engine state to initialise
@@ -60,10 +61,11 @@ void PricerANA::PreCheck()
         //! a closed form exists for a European vanilla, a continuous barrier, or a
         //! (model-free) variance swap; anything else has no analytic evaluator.
         auto* van = dynamic_cast<Vanilla*>( c );
+        auto* dig = dynamic_cast<Digital*>( c );
         auto* bar = dynamic_cast<Barrier*>( c );
         auto* vsw = dynamic_cast<VarianceSwap*>( c );
 
-        const bool supported = ( van && !van->IsAmerican() ) ||
+        const bool supported = ( van && !van->IsAmerican() ) || ( dig != nullptr ) ||
                                ( bar && !bar->IsDiscrete() ) ||
                                ( vsw != nullptr );
 
@@ -116,6 +118,10 @@ void PricerANA::PriceContract( Contract* Ctr )
     if ( Vanilla* v = dynamic_cast<Vanilla*>( Ctr ) )
     {
         PriceVanilla( v );
+    }
+    else if ( Digital* d = dynamic_cast<Digital*>( Ctr ) )
+    {
+        PriceDigital( d );
     }
     else if ( Barrier* b = dynamic_cast<Barrier*>( Ctr ) )
     {
@@ -203,6 +209,28 @@ void PricerANA::PriceVanilla( Vanilla* Opt )
     //! spot gamma (sign-independent of call/put); vega / rho / theta come from the
     //! per-contract bump-and-revalue in the generic Greek engine
     out.gamma = BS_Gamma( f, k, t, v, df );
+}
+
+//! European binary/digital closed form: BS_Digital_Price on the drift-carrying forward and
+//! the implied vol at the strike. Greeks come from the per-contract bump-and-revalue (the
+//! analytic ones are left zero), same as the vanilla; the digital delta/gamma are sharply
+//! peaked at the strike, so the generic finite-difference engine is the safer source.
+void PricerANA::PriceDigital( Digital* Opt )
+{
+    Valuation& out = Result( Opt );
+    Underlying* u = Opt->GetUnderlying();
+    Currency* ccy = Opt->GetPremiumCurrency();
+    const date maturity = Opt->GetMaturityDate();
+    const double k = Opt->GetStrike();
+
+    const double t = YearFraction( _today, maturity );
+    const double df = ccy->GetDiscountRate()->GetDiscountFactor( maturity );
+    const double f = u->GetForward( maturity, ccy );
+    const double v = u->GetImplicitVol( k, maturity );
+
+    out.premium = BS_Digital_Price( f, k, t, v, df, Opt->GetType() == OptionType::Call,
+                                    Opt->IsCashOrNothing(), Opt->GetCashAmount() );
+    out.delta = out.gamma = 0;
 }
 
 //! Reiner-Rubinstein closed-form barrier price for a single spot value: decode the

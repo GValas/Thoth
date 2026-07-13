@@ -89,8 +89,9 @@ maturity), **Variance** (variance swap: volatility strike + notional) and
 the **memory** variant — autocall / protection / coupon barriers as percent of spot, and
 a generated observation schedule from a first date + monthly frequency + count; pde / mcl
 only, no ANA closed form), **Asian** (arithmetic average-price call/put, absolute/relative
-strike, averaging period) and **Ratchet** (cliquet: per-period return clip [local floor,
-cap] locked in, global floor/cap — both path-dependent, mcl only) — each showing
+strike, averaging period), **Ratchet** (cliquet: per-period return clip [local floor,
+cap] locked in, global floor/cap — both path-dependent, mcl only) and **Digital** (European
+binary: cash-or-nothing / asset-or-nothing call/put, ana/pde/mcl) — each showing
 premium + Greeks, each with a **Greeks** toggle that requests delta/gamma/vega/rho/theta
 from the engine's bump pass — meaningful even on the path-dependent notes (e.g. vega/rho/
 theta dominate on variance swaps and ratchets, where delta/gamma are ~0). Each panel can
@@ -114,7 +115,7 @@ Each row has a **tick box** (plus a header select-all) driving the **Re-price** 
 (the ticked rows, or the whole book when none are ticked), and its own **Termsheet** button
 that downloads that single product's termsheet as a Markdown file. **Double-clicking a row opens
 it in its pricing panel** — the Panels tab jumps to the matching sub-panel (Vanilla / Barrier /
-Variance / Autocallable / Asian / Ratchet) with the whole form prefilled from the booked
+Variance / Autocallable / Asian / Ratchet / Digital) with the whole form prefilled from the booked
 contract, ready to tweak and re-price. Every column **sorts** (click the header — asc / desc /
 off) and carries a **per-column text filter** in its header, so the book can be ordered by any
 field and narrowed live. Pricing is backed by a synchronous

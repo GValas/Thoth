@@ -8,9 +8,10 @@ import { VariancePanelComponent } from './variance-panel.component';
 import { AutocallablePanelComponent } from './autocallable-panel.component';
 import { AsianPanelComponent } from './asian-panel.component';
 import { RatchetPanelComponent } from './ratchet-panel.component';
+import { DigitalPanelComponent } from './digital-panel.component';
 
 //! Pricing panels: a tab each for the vanilla, barrier, variance-swap, autocallable,
-//! Asian and ratchet single-product panels. Each panel quotes one hand-entered
+//! Asian, ratchet and digital single-product panels. Each panel quotes one hand-entered
 //! instrument (live off the feed) and can push it to the global monitoring blotter —
 //! keeping the Vanilla Grid for strike x maturity sweeps.
 @Component({
@@ -24,6 +25,7 @@ import { RatchetPanelComponent } from './ratchet-panel.component';
     AutocallablePanelComponent,
     AsianPanelComponent,
     RatchetPanelComponent,
+    DigitalPanelComponent,
   ],
   template: `
     <div class="panels-header">
@@ -48,6 +50,9 @@ import { RatchetPanelComponent } from './ratchet-panel.component';
       <mat-tab label="Ratchet">
         <div class="tab-body"><app-ratchet-panel></app-ratchet-panel></div>
       </mat-tab>
+      <mat-tab label="Digital">
+        <div class="tab-body"><app-digital-panel></app-digital-panel></div>
+      </mat-tab>
     </mat-tab-group>
   `,
   styles: [
@@ -71,6 +76,7 @@ export class PanelsComponent {
     autocallable: 3,
     asian: 4,
     ratchet: 5,
+    digital: 6,
   };
 
   //! start on the sub-tab of a pending prefill (blotter double-click), else the first tab.

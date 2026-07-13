@@ -39,6 +39,8 @@ root: matrix
 #   variance swap mono                      ana   mcl   pde (ANA replication / MCL realized / PDE accumulated-variance)
 #   asian mono eu call (average-price)             mcl       (arithmetic average; MCL-only, ANA/PDE reject)
 #   ratchet mono (cliquet)                         mcl       (clipped period returns, global floor; MCL-only)
+#   digital mono cash-or-nothing call       ana   mcl   pde (pays 1 iff S>K; struck OTM so the grid stays off the jump)
+#   digital mono asset-or-nothing call      ana   mcl   pde (pays S iff S>K)
 #
 # 2026 features (each on its own market block — a term correlation / OIS curve /
 # Hull-White rate / past fixings — appended after the shared-market cells):
@@ -176,6 +178,13 @@ matrix: !sequence
     #! path-dependent, Monte-Carlo only (ANA/PDE reject)
     - asian_mono_eu_call_mcl
     - ratchet_mono_mcl
+    #! European digital / binary (cash-or-nothing + asset-or-nothing)
+    - digital_mono_cash_call_ana
+    - digital_mono_cash_call_pde
+    - digital_mono_cash_call_mcl
+    - digital_mono_asset_call_ana
+    - digital_mono_asset_call_pde
+    - digital_mono_asset_call_mcl
     #! cross-currency (both non-pivot): triangulated FX quanto + composite
     - vanilla_mono_eu_call_cross_quanto_ana
     - vanilla_mono_eu_call_cross_quanto_pde
@@ -1561,6 +1570,79 @@ c_ratchet: !ratchet
   local_floor: -5
   local_cap: 5
   global_floor: 0
+
+# --- Digital / binary (European): pays a fixed cash amount (cash-or-nothing) or the spot
+#     (asset-or-nothing) iff in the money. Path-independent -> ana (closed form) / pde / mcl,
+#     and the three agree. Struck OTM (K=120) so the PDE grid stays away from the payoff jump
+#     (a digital struck at the spot is the classic ATM-discontinuity worst case for a grid).
+digital_mono_cash_call_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_digital_cash
+  currency: eur
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_cash_call_ana_result
+digital_mono_cash_call_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_digital_cash
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_cash_call_pde_result
+digital_mono_cash_call_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_digital_cash
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_cash_call_mcl_result
+book_digital_cash: !book
+  contracts: [c_digital_cash]
+c_digital_cash: !digital
+  underlying: eq
+  premium_currency: eur
+  strike: 120
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  payout: cash_or_nothing
+  cash_amount: 1
+
+digital_mono_asset_call_ana: !ana_pricer
+  today: 2000-01-01
+  book: book_digital_asset
+  currency: eur
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_asset_call_ana_result
+digital_mono_asset_call_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_digital_asset
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_asset_call_pde_result
+digital_mono_asset_call_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_digital_asset
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl
+  indicators: [premium]
+  result: digital_mono_asset_call_mcl_result
+book_digital_asset: !book
+  contracts: [c_digital_asset]
+c_digital_asset: !digital
+  underlying: eq
+  premium_currency: eur
+  strike: 120
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  type: call
+  payout: asset_or_nothing
 
 # --- Cross-currency quanto & composite (2026): an EUR asset priced/settled in JPY, where the
 #     market keeps only the usd-PIVOT FX basis (usdeur_x, usdjpy_x) — the eur/jpy cross is never

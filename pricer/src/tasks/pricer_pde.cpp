@@ -9,6 +9,7 @@
 #include "autocallable.hpp"
 #include "variance_swap.hpp"
 #include "vanilla.hpp"
+#include "digital.hpp"
 
 //! Heston / Bates 2-D (S, v) ADI grid parameters (see SolveHestonGrid). The grid
 //! resolution follows the book's vanilla_precision (low | medium | high): a 2-D ADI
@@ -79,8 +80,8 @@ void PricerPDE::PreCheck()
         //! the PDE grid handles a vanilla, a barrier or a variance swap on a
         //! griddable underlying; dispatch on the type (RTTI) rather than the kind
         //! string, mirroring PriceContract / PricerANA::PreCheck.
-        const bool supported = dynamic_cast<Vanilla*>( c ) || dynamic_cast<Barrier*>( c ) ||
-                               dynamic_cast<VarianceSwap*>( c ) ||
+        const bool supported = dynamic_cast<Vanilla*>( c ) || dynamic_cast<Digital*>( c ) ||
+                               dynamic_cast<Barrier*>( c ) || dynamic_cast<VarianceSwap*>( c ) ||
                                dynamic_cast<Autocallable*>( c );
 
         if ( !c->GetUnderlying()->IsGriddable() || !supported )
@@ -128,6 +129,12 @@ void PricerPDE::PriceContract( Contract* Ctr )
     else if ( auto* van = dynamic_cast<Vanilla*>( Ctr ) )
     {
         PriceVanilla( van );
+    }
+    else if ( auto* dig = dynamic_cast<Digital*>( Ctr ) )
+    {
+        //! a digital is a European terminal-payoff contract — the same full-domain grid
+        //! solve as a vanilla, its (binary) payoff taken from Contract::Intrinsic.
+        PriceVanilla( dig );
     }
     else
     {

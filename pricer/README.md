@@ -226,6 +226,15 @@ underlying's surface exposes is silently skipped.
   the note's capital protection; `global_cap` is optional. Floors/caps are in
   percent. Path-dependent → **Monte-Carlo only** (a locally-flat note pays the
   deterministic global floor; ANA/PDE reject — `tests/test_asian_ratchet.cpp`).
+- `digital` — a European **binary / digital** option: at maturity pays a fixed
+  cash amount (`payout: cash_or_nothing`, `cash_amount` = Q) or the spot
+  (`payout: asset_or_nothing`) **iff in the money** (S > K call / S < K put).
+  Path-independent → priced by **ANA** (closed form `Q·df·N(±d₂)` /
+  `df·F·N(±d₁)`), **PDE** and **MCL**, and the three agree. Pinned by exact
+  identities (cash call + put = df; vanilla = asset-or-nothing − K·cash-or-nothing;
+  `tests/test_digital.cpp`). *Note:* a digital struck **at the money** is the
+  classic discontinuity worst case for the PDE grid (~few % off at S = K); ANA is
+  exact and MCL validates it, and the grid is accurate away from the strike.
 
 **Underlyings**
 - `equity`, `composite` (compo / quanto), `basket`, plus `currency` /
