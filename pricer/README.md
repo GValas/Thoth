@@ -331,7 +331,9 @@ path like the Dupire local-vol node) and **PDE** (the 2-D `(S,v)` ADI with
 `L²v`/`Lv` in the S-direction and cross coefficients); **ANA rejects it** (no
 closed form — silently pricing the bare Heston CF would ignore the leverage).
 Bates jumps are not supported under LSV. See `samples/lsv.yaml` for a
-calibration-quality demo (SABR reference vs LSV MCL/PDE on the same call).
+calibration-quality demo (SABR reference vs LSV MCL/PDE on the same call); the
+`samples/matrix.yaml` sequence also carries an LSV MCL/PDE cell alongside the
+Heston / Bates / SABR ones.
 
 **Analytics objects**
 - `pricer`.

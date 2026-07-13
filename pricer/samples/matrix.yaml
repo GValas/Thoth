@@ -29,6 +29,7 @@ root: matrix
 #   vanilla mono eu call compo (EUR->USD)   ana   mcl   pde
 #   vanilla mono eu call compo sabr         ana   mcl   (local vol; ANA implied vs MCL Dupire)
 #   vanilla mono eu call heston (stoch vol) ana   mcl   pde
+#   vanilla mono eu call lsv (loc-stoch vol)      mcl   pde (calibrated leverage on SABR; no ANA/Bates)
 #   vanilla mono eu call quanto             ana   mcl   pde
 #   vanilla mono eu call sabr (local vol)   ana   mcl   (ANA strike implied vs MCL Dupire; agree)
 #   vanilla mono us put compo (american)    mcl   pde
@@ -129,6 +130,10 @@ matrix: !sequence
     - vanilla_mono_eu_call_compo_sabr_ana
     - vanilla_mono_eu_call_compo_sabr_mcl
     - vanilla_multi_eu_call_basket_sabr_mcl
+    #! local-stochastic vol (LSV) — Heston base + a leverage calibrated to the SABR
+    #! target surface; MCL and PDE agree (no ANA closed form, no Bates jumps)
+    - vanilla_mono_eu_call_lsv_mcl
+    - vanilla_mono_eu_call_lsv_pde
     #! knock-in barrier (up&in, continuous) — vanilla = knock_in + knock_out parity
     - barrier_mono_continuous_in_call_ana
     - barrier_mono_continuous_in_call_mcl
@@ -1752,3 +1757,56 @@ c_cross_compo: !vanilla
   maturity: 2000-12-31
   type: call
   exercise: european
+
+# --- local-stochastic volatility (LSV): a Heston variance factor whose spot
+#     diffusion carries a leverage L(S,t) calibrated so the model reprices the
+#     target SABR smile (`sabr_vol`, reused from the SABR cells). MCL (QE variance
+#     + leveraged Andersen spot) and PDE (2-D (S,v) ADI with the leverage in the
+#     S-coefficients) agree; there is no closed form (ANA rejects) and Bates jumps
+#     are unsupported. Its own market block: the spot/variance correlation (-0.6)
+#     needs an `eq_lsv_var` row the shared flat `correl` matrix does not carry.
+vanilla_mono_eu_call_lsv_mcl: !mcl_pricer
+  today: 2000-01-01
+  book: book_lsv
+  currency: eur
+  mcl_configuration: shared_mcl
+  correlation: correl_lsv
+  indicators: [premium, delta, gamma, vega]
+  result: vanilla_mono_eu_call_lsv_mcl_result
+vanilla_mono_eu_call_lsv_pde: !pde_pricer
+  today: 2000-01-01
+  book: book_lsv
+  currency: eur
+  pde_configuration: shared_pde
+  correlation: correl_lsv
+  indicators: [premium, delta, gamma]
+  result: vanilla_mono_eu_call_lsv_pde_result
+book_lsv: !book
+  contracts: [c_lsv]
+c_lsv: !vanilla
+  underlying: eq_lsv
+  premium_currency: eur
+  strike: 100
+  is_absolute_strike: true
+  maturity: 2000-12-31
+  nominal: 1
+  type: call
+  exercise: european
+eq_lsv: !equity
+  spot: 100
+  volatility: lsv_vol
+  currency: eur
+# Heston base deliberately off the target level (init 18 vs long 26); the
+# calibrated leverage absorbs the gap so the LSV reprices `sabr_vol`.
+lsv_vol: !lsv_volatility
+  spot: 100
+  init_vol: 18
+  long_vol: 26
+  kappa: 2
+  vol_of_vol: 0.5
+  surface: sabr_vol
+  calendar: calendar
+correl_lsv: !correlation_matrix
+  underlyings: [eq_lsv, eq_lsv_var]
+  matrix: [1, -0.6,
+           -0.6, 1]
