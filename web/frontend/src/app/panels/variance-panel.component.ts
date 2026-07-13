@@ -105,7 +105,7 @@ import { PanelResultComponent } from './panel-result.component';
   styleUrl: './panel.shared.scss',
 })
 export class VariancePanelComponent extends PricingPanelBase implements OnInit {
-  readonly kind: InstrumentKind = 'variance_swap';
+  readonly kind: InstrumentKind = 'variance';
 
   volatilityStrike = 20;
   notional = 10000;

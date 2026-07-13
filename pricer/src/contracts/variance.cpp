@@ -1,5 +1,5 @@
 #include "thoth.hpp"
-#include "variance_swap.hpp"
+#include "variance.hpp"
 #include "object_reader.hpp"
 #include "simple_fixing_data.hpp"
 
@@ -8,14 +8,14 @@
 //! node that compares realized to strike variance.
 
 //! constructor
-VarianceSwap::VarianceSwap( const string& ObjectName ) : Contract( ObjectName, KIND_VARIANCE_SWAP )
+Variance::Variance( const string& ObjectName ) : Contract( ObjectName, KIND_VARIANCE )
 {
 }
 
-VarianceSwap::~VarianceSwap() = default;
+Variance::~Variance() = default;
 
 //! read own fields, then the common contract attributes
-void VarianceSwap::Configure( ObjectReader& reader )
+void Variance::Configure( ObjectReader& reader )
 {
     Contract::Configure( reader ); //!< common fields first (underlying, premium currency)
     _maturity_date = reader.Get<date>( "maturity" );
@@ -27,7 +27,7 @@ void VarianceSwap::Configure( ObjectReader& reader )
     _observation_period_days = reader.Get<int>( "observation_period_days", 0 );
     if ( _observation_period_days < 0 )
     {
-        ERR( "variance_swap '" + GetName() + "': observation_period_days must be >= 0" );
+        ERR( "variance '" + GetName() + "': observation_period_days must be >= 0" );
     }
     //! seasoned (in-life) swap: observation start in the past + realised fixings
     //! (presence probed as a string: dates are scalar fields in the YAML)
@@ -37,7 +37,7 @@ void VarianceSwap::Configure( ObjectReader& reader )
         _start_date = reader.Get<date>( "start" );
         if ( _start_date >= _maturity_date )
         {
-            ERR( "variance_swap '" + GetName() + "': start must precede maturity" );
+            ERR( "variance '" + GetName() + "': start must precede maturity" );
         }
     }
     if ( reader.Has<string>( "fixings" ) )
@@ -45,7 +45,7 @@ void VarianceSwap::Configure( ObjectReader& reader )
         _fixings = reader.Ref<SimpleFixingData>( "fixings" );
         if ( !_has_start )
         {
-            ERR( "variance_swap '" + GetName() + "': fixings need a start date" );
+            ERR( "variance '" + GetName() + "': fixings need a start date" );
         }
     }
 }
@@ -54,7 +54,7 @@ void VarianceSwap::Configure( ObjectReader& reader )
 //! strictly after today would need a forward-starting variance leg none of the
 //! engines produces yet. Also anchor the earliest valuation date (kept as a
 //! minimum across the theta roll-and-restore), where the realised path is frozen.
-void VarianceSwap::SetToday( const date& Today )
+void Variance::SetToday( const date& Today )
 {
     Contract::SetToday( Today );
     if ( !_anchor_today_set || Today < _anchor_today )
@@ -64,14 +64,14 @@ void VarianceSwap::SetToday( const date& Today )
     }
     if ( _has_start && _start_date > Today )
     {
-        ERR( "variance_swap '" + GetName() +
+        ERR( "variance '" + GetName() +
              "': forward-starting swaps (start after today) are not supported" );
     }
 }
 
 //! annualizer of the whole observation window (start -> maturity for a seasoned
 //! swap, today -> maturity otherwise)
-double VarianceSwap::GetTotalYearFraction() const
+double Variance::GetTotalYearFraction() const
 {
     return YearFraction( IsSeasoned() ? _start_date : _today, _maturity_date );
 }
@@ -81,16 +81,16 @@ double VarianceSwap::GetTotalYearFraction() const
 //! up to today, start included); continuous observation takes every provided
 //! fixing in [start, today) and demands one at start. Fixings dated today or
 //! later are ignored: today's level is the (possibly bumped) live spot.
-vector<std::pair<date, double>> VarianceSwap::PastObservations()
+vector<std::pair<date, double>> Variance::PastObservations()
 {
     if ( !_fixings )
     {
-        ERR( "variance_swap '" + GetName() + "': a seasoned swap (start before today) "
-                                             "needs a fixings reference" );
+        ERR( "variance '" + GetName() + "': a seasoned swap (start before today) "
+                                        "needs a fixings reference" );
     }
     if ( _fixings->GetUnderlying() != GetUnderlying()->GetName() )
     {
-        ERR( "variance_swap '" + GetName() + "': fixings '" + _fixings->GetName() +
+        ERR( "variance '" + GetName() + "': fixings '" + _fixings->GetName() +
              "' belong to underlying '" + _fixings->GetUnderlying() + "', not '" +
              GetUnderlying()->GetName() + "'" );
     }
@@ -122,7 +122,7 @@ vector<std::pair<date, double>> VarianceSwap::PastObservations()
             auto it = by_date.find( d );
             if ( it == by_date.end() )
             {
-                ERR( "variance_swap '" + GetName() + "': missing fixing on " +
+                ERR( "variance '" + GetName() + "': missing fixing on " +
                      boost::gregorian::to_iso_extended_string( d ) );
             }
             past.emplace_back( d, it->second );
@@ -139,7 +139,7 @@ vector<std::pair<date, double>> VarianceSwap::PastObservations()
         }
         if ( past.empty() || past.front().first != _start_date )
         {
-            ERR( "variance_swap '" + GetName() + "': fixings must include the start date" );
+            ERR( "variance '" + GetName() + "': fixings must include the start date" );
         }
     }
     return past;
@@ -148,7 +148,7 @@ vector<std::pair<date, double>> VarianceSwap::PastObservations()
 //! the realised (past) leg of a seasoned swap: squared log-returns over the past
 //! observations, closed by the bridge log^2( spot / last_fixing ) — the realised
 //! part of the interval running through today.
-double VarianceSwap::PastSumSquaredReturns()
+double Variance::PastSumSquaredReturns()
 {
     if ( !IsSeasoned() )
     {
@@ -168,7 +168,7 @@ double VarianceSwap::PastSumSquaredReturns()
 
 //! the bridge log-return log( spot / last_past_fixing ): the only spot-sensitive
 //! term of the realised leg (its analytic delta/gamma feed the ANA/PDE results)
-double VarianceSwap::LastFixingLogBridge()
+double Variance::LastFixingLogBridge()
 {
     if ( !IsSeasoned() )
     {
@@ -178,33 +178,33 @@ double VarianceSwap::LastFixingLogBridge()
 }
 
 //! getter
-date VarianceSwap::GetMaturityDate() const
+date Variance::GetMaturityDate() const
 {
     return _maturity_date;
 }
 
 //! the variance PDE has a zero terminal condition and its own (remaining-variance)
 //! boundaries — there is no terminal spot payoff here, so this is just 0.
-double VarianceSwap::Intrinsic( const double /*Spot*/ )
+double Variance::Intrinsic( const double /*Spot*/ )
 {
     return 0.0;
 }
 
 //! variance swaps settle only at maturity: no early exercise
-bool VarianceSwap::IsAmerican()
+bool Variance::IsAmerican()
 {
     return false;
 }
 
 //! Monte-Carlo flow: realized variance of the simulated path vs the strike.
-//! Build (or fetch) a VarianceSwapFlowNode wired to the spot node, the strike
+//! Build (or fetch) a VarianceFlowNode wired to the spot node, the strike
 //! variance (vol^2) and the notional, settling at maturity.
-MonteCarloNode* VarianceSwap::GetFlowNode( NodeCollector& NC,
-                                           const date& /*AsOfDate*/ )
+MonteCarloNode* Variance::GetFlowNode( NodeCollector& NC,
+                                       const date& /*AsOfDate*/ )
 {
-    return NC.GetOrCreate<VarianceSwapFlowNode>(
+    return NC.GetOrCreate<VarianceFlowNode>(
         _name + node_name::FLOW,
-        [&]( VarianceSwapFlowNode* V )
+        [&]( VarianceFlowNode* V )
         {
             V->SetSpotNode( GetUnderlyingNode( NC ) );
             V->SetStrikeVariance( _volatility_strike * _volatility_strike );
@@ -237,7 +237,7 @@ MonteCarloNode* VarianceSwap::GetFlowNode( NodeCollector& NC,
 //! schedule. A seasoned swap anchors on its start date (so the remaining
 //! schedule stays aligned with the past one) and returns only the FUTURE dates:
 //! past observations come from the fixings, not the diffusion.
-set<date> VarianceSwap::GetObservationDates()
+set<date> Variance::GetObservationDates()
 {
     set<date> s;
     if ( _observation_period_days > 0 )
@@ -266,7 +266,7 @@ set<date> VarianceSwap::GetObservationDates()
 //! on a sloped surface), so ANA/PDE stay consistent with the MCL path sampling
 //! that produces this term naturally. Flat surface: v_fwd = AtmVol^2*dt, the old
 //! behaviour, exactly.
-double VarianceSwap::ObservationDriftVariance( const date& Today )
+double Variance::ObservationDriftVariance( const date& Today )
 {
     if ( !IsDiscretelyObserved() )
     {
@@ -303,7 +303,7 @@ double VarianceSwap::ObservationDriftVariance( const date& Today )
 //! discretely-observed swap — every fixing date of the observation schedule (so the
 //! MCL grid diffuses the spot exactly there). A continuously-observed swap samples
 //! every diffusion step and needs only the maturity here.
-set<date> VarianceSwap::GetFixingDates()
+set<date> Variance::GetFixingDates()
 {
     set<date> s;
     s.insert( _maturity_date );
@@ -316,7 +316,7 @@ set<date> VarianceSwap::GetFixingDates()
 }
 
 //! same single date as the fixing
-set<date> VarianceSwap::GetFlowDates()
+set<date> Variance::GetFlowDates()
 {
     return GetFixingDates();
 }

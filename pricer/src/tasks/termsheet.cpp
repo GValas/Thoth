@@ -11,7 +11,7 @@
 #include "misc.hpp"
 #include "object_reader.hpp"
 #include "vanilla.hpp"
-#include "variance_swap.hpp"
+#include "variance.hpp"
 
 //! termsheet.cpp — render one contract's YAML description as a Markdown
 //! termsheet (see the header). Pure documentation: no pricing, no Greeks —
@@ -197,7 +197,7 @@ string Termsheet::PayoffSection() const
         return o.str();
     }
 
-    if ( auto* vs = dynamic_cast<VarianceSwap*>( _contract ) )
+    if ( auto* vs = dynamic_cast<Variance*>( _contract ) )
     {
         o << "At maturity the swap pays **notional x (realized variance - strike "
           << "variance)**, with a volatility strike of **"
@@ -346,7 +346,7 @@ string Termsheet::ScheduleSection() const
         return o.str();
     }
 
-    if ( auto* vs = dynamic_cast<VarianceSwap*>( _contract ) )
+    if ( auto* vs = dynamic_cast<Variance*>( _contract ) )
     {
         if ( !vs->IsDiscretelyObserved() )
         {

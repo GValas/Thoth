@@ -49,7 +49,7 @@ std::string SeasonedCfg( const std::string& method, int draws = 1,
     }
     o << "]}\n"
       << "book: !book {contracts: [vs]}\n"
-      << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
+      << "vs: !variance {underlying: eq, premium_currency: eur,"
       << " maturity: 2000-12-31, volatility_strike: 25, notional: 10000,"
       << " observation_period_days: 30";
     if ( seasoned )

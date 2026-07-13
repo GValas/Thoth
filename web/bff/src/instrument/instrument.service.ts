@@ -1,5 +1,5 @@
 //! Single-instrument pricing pipeline: build a one-contract book from a hand-entered
-//! product (vanilla / barrier / variance_swap) + the workspace's market data, price it
+//! product (vanilla / barrier / variance) + the workspace's market data, price it
 //! SYNCHRONOUSLY on a leased replica, and pivot the result into {premium, greeks}. This is
 //! the single-product counterpart of GridService — used by the GUI's pricing panels and the
 //! monitoring blotter. With `live`, the latest live spots AND the live correlation matrix
@@ -35,7 +35,7 @@ import { MarketFeedService } from '../market-feed/market-feed.service';
 export interface InstrumentPriceDto {
   workspaceId: string;
   engine: Engine;
-  kind: string; //!< engine instrument kind, e.g. "vanilla" | "barrier" | "variance_swap"
+  kind: string; //!< engine instrument kind, e.g. "vanilla" | "barrier" | "variance"
   instrument: Record<string, unknown>; //!< the instrument's own fields (no kind tag)
   indicators: string[];
   currency?: string;

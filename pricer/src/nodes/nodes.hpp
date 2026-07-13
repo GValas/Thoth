@@ -34,5 +34,5 @@
 #include "spot_diffusion_node.hpp"
 #include "term_correl_node.hpp"
 #include "vanilla_flow_node.hpp"
-#include "variance_swap_flow_node.hpp"
+#include "variance_flow_node.hpp"
 #include "yield_curve_node.hpp"

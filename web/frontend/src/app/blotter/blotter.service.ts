@@ -509,14 +509,14 @@ function randomContract(
   const kind = pick([
     'vanilla',
     'barrier',
-    'variance_swap',
+    'variance',
     'asian',
     'ratchet',
     'digital',
   ] as const);
   const maturity = maturityFrom(today, pick([6, 12, 18, 24, 36]));
 
-  if (kind === 'variance_swap') {
+  if (kind === 'variance') {
     const volStrike = 15 + Math.floor(Math.random() * 25); // 15..39 %
     return {
       kind,

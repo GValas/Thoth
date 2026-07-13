@@ -81,7 +81,7 @@ past_fixings: !simple_fixing_data
 
 book: !book
   contracts: [vs]
-vs: !variance_swap
+vs: !variance
   underlying: eq
   premium_currency: eur
   maturity: 2000-12-31

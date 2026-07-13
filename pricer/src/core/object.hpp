@@ -16,7 +16,7 @@ class ObjectReader; //!< field reader passed to Configure (see object_reader.hpp
 //! factory. One constant per concrete type keeps the spelling in a single place,
 //! shared between the YAML tag, the registry table and any code that tests kind.
 inline constexpr char KIND_BARRIER[] = "barrier";
-inline constexpr char KIND_VARIANCE_SWAP[] = "variance_swap";
+inline constexpr char KIND_VARIANCE[] = "variance";
 inline constexpr char KIND_BOOK[] = "book";
 //! the three pricer engines are each their own kind: the YAML tag (!mcl_pricer /
 //! !pde_pricer / !ana_pricer) picks the concrete engine directly, the same way the

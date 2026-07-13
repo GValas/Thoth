@@ -105,7 +105,7 @@ past_fixings: !simple_fixing_data
   underlying: eq
   dates: [1999-07-05, 1999-08-04, 1999-09-03, 1999-10-03, 1999-11-02, 1999-12-02]
   values: [100, 92, 103, 96, 108, 99]
-vs: !variance_swap
+vs: !variance
   underlying: eq
   premium_currency: eur
   maturity: 2000-12-31

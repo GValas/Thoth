@@ -283,7 +283,7 @@ function buildServer(): McpServer {
 );
 
   server.registerTool(
-  'price_variance_swap',
+  'price_variance',
   {
     title: 'Price a variance swap',
     description:
@@ -308,7 +308,7 @@ function buildServer(): McpServer {
   async (a) => {
     const { m, e, greeks } = splitArgs(a);
     return guarded(() =>
-      quote(m, e, 'variance_swap', {
+      quote(m, e, 'variance', {
         maturity: a.maturity,
         volatility_strike: a.volatility_strike_pct,
         notional: a.notional,

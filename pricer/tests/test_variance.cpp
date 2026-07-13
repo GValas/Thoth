@@ -33,7 +33,7 @@ std::string VarSwapCfg( double vol_pct, double rate_pct, double strike_vol_pct,
       << "eq: !equity {spot: 100, volatility: vol, currency: eur}\n"
       << "vol: !bs_volatility {volatility: " << vol_pct << ", calendar: cal}\n"
       << "book: !book {contracts: [vs]}\n"
-      << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
+      << "vs: !variance {underlying: eq, premium_currency: eur,"
       << " maturity: 2000-12-31, volatility_strike: " << strike_vol_pct
       << ", notional: " << notional;
     if ( obs_days > 0 )
@@ -91,7 +91,7 @@ TEST_CASE( "variance swap is ~zero when the strike equals the vol" )
 // E[(log S_{t2}/S_{t1})^2] = sigma^2*dt + mean^2 with mean = (r - sigma^2/2)*dt
 // under flat BS, so the fair variance gains the deterministic Sum(mean_i^2)/T on
 // top of the continuous sigma^2. The MCL path sampling produces the term
-// naturally; ANA and PDE add it via VarianceSwap::ObservationDriftVariance.
+// naturally; ANA and PDE add it via Variance::ObservationDriftVariance.
 TEST_CASE( "discretely-observed variance swap adds the drift^2 term (3 engines)" )
 {
     //! high carry + low vol makes the drift^2 term material: (r - sigma^2/2) =
@@ -180,7 +180,7 @@ TEST_CASE( "discrete variance swap uses per-interval forward variance on a term 
           << "vol: !sabr_volatility {maturities: [0.25, 1.0], alpha: [0.15, 0.35],"
           << " beta: [1.0, 1.0], rho: [0, 0], nu: [0.0001, 0.0001], calendar: cal}\n"
           << "book: !book {contracts: [vs]}\n"
-          << "vs: !variance_swap {underlying: eq, premium_currency: eur,"
+          << "vs: !variance {underlying: eq, premium_currency: eur,"
           << " maturity: 2000-12-31, volatility_strike: 0, notional: " << notl;
         if ( obs_days > 0 )
         {

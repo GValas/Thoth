@@ -4,7 +4,7 @@
 
 class Barrier;
 class Single;
-class VarianceSwap;
+class Variance;
 
 /*
 || V(X,t) : V_t = A(X).V_X + B(X).V_XX + C(X).V
@@ -209,7 +209,7 @@ class PricerPDE : public Pricer
     //! local-variance source, no discount), then PV = notional * DF * (fair - strike).
     //! _variance_mode drops the reaction term (C = 0) while reusing the grid solve.
     bool _variance_mode = false;
-    void SolveVarianceSwap( VarianceSwap* Ctr );
+    void SolveVariance( Variance* Ctr );
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 

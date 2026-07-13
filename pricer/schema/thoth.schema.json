@@ -62,7 +62,7 @@
         { "$ref": "#/$defs/historical_correlation_computation" },
         { "$ref": "#/$defs/vanilla" },
         { "$ref": "#/$defs/barrier" },
-        { "$ref": "#/$defs/variance_swap" },
+        { "$ref": "#/$defs/variance" },
         { "$ref": "#/$defs/autocallable" },
         { "$ref": "#/$defs/asian" },
         { "$ref": "#/$defs/ratchet" },
@@ -301,9 +301,9 @@
       }
     },
 
-    "variance_swap": {
+    "variance": {
       "type": "object",
-      "title": "!variance_swap",
+      "title": "!variance",
       "additionalProperties": false,
       "required": ["underlying", "premium_currency", "maturity", "volatility_strike"],
       "properties": {
@@ -522,7 +522,7 @@
       "required": ["today", "contract", "result"],
       "properties": {
         "today": { "$ref": "#/$defs/date", "description": "As-of date the relative levels resolve against." },
-        "contract": { "$ref": "#/$defs/ref", "description": "The contract to document (vanilla / barrier / variance_swap / autocallable)." },
+        "contract": { "$ref": "#/$defs/ref", "description": "The contract to document (vanilla / barrier / variance / autocallable)." },
         "title": { "type": "string", "description": "Optional document title (default: '<kind> on <underlying>')." },
         "issuer": { "type": "string", "description": "Optional issuer line in the header." },
         "result": { "type": "string", "description": "Name of the result block receiving the `termsheet` field." }

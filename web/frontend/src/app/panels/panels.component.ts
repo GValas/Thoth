@@ -72,7 +72,7 @@ export class PanelsComponent {
   private static readonly TAB_INDEX: Record<string, number> = {
     vanilla: 0,
     barrier: 1,
-    variance_swap: 2,
+    variance: 2,
     autocallable: 3,
     asian: 4,
     ratchet: 5,

@@ -60,9 +60,9 @@ parity). Discrete monitoring is **not** closed-form: it is priced numerically
 (MCL monitors exactly at the scheduled dates; the PDE zeroes the knocked region
 at each monitoring date).
 
-### `variance_swap` — realized-variance swap
+### `variance` — realized-variance swap
 
-`src/contracts/variance_swap.{hpp,cpp}`. Pays
+`src/contracts/variance.{hpp,cpp}`. Pays
 `notional · (realized_variance − strike_variance)` at maturity.
 
 | field | values | notes |
@@ -97,7 +97,7 @@ up_out: !barrier
   monitoring_period_days: 30
   barrier_up_level: 130
 
-var_swap: !variance_swap
+var_swap: !variance
   underlying: eq
   premium_currency: eur
   maturity: 2000-12-31
@@ -171,7 +171,7 @@ engine** (`GPU_GbmParams` returns false). Cells: ✅ supported / — not.
 | vanilla (Heston / Bates vol) | ✅ (char. fn.) | ✅ | ✅ | — (→ CPU) |
 | barrier, continuous monitoring | ✅ (Reiner–Rubinstein) | ✅ | ✅ | — (→ CPU) |
 | barrier, discrete monitoring | — | ✅ | ✅ | — (→ CPU) |
-| variance_swap | ✅ (replication) | — | ✅ | — (→ CPU) |
+| variance | ✅ (replication) | — | ✅ | — (→ CPU) |
 
 Underlying restrictions (independent of the product):
 

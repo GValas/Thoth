@@ -148,7 +148,7 @@ classDiagram
     GpuPriceable <|.. Contract
     Contract <|-- Vanilla
     Contract <|-- Barrier
-    Contract <|-- VarianceSwap
+    Contract <|-- Variance
 
     Object <|-- Book
     Book --> "*" Contract : contracts
@@ -270,5 +270,5 @@ classDiagram
     MonteCarloNode <|-- BookNode
     MonteCarloNode <|-- VanillaFlowNode
     MonteCarloNode <|-- BarrierFlowNode
-    MonteCarloNode <|-- VarianceSwapFlowNode
+    MonteCarloNode <|-- VarianceFlowNode
 ```

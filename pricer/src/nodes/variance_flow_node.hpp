@@ -11,7 +11,7 @@
 //! (which reads only S_T), this reads the *whole* spot path because realized
 //! variance is the path's quadratic variation. DAG input: the spot node, sampled at
 //! every date 0..maturity, but only when evaluated at the flow date.
-class VarianceSwapFlowNode : public MonteCarloNode
+class VarianceFlowNode : public MonteCarloNode
 {
 
   private:
@@ -47,6 +47,6 @@ class VarianceSwapFlowNode : public MonteCarloNode
     void SetPastVariance( double PastSum2 );               //!< realised past sum of squared returns
     void SetTotalYearFraction( double TotalYearFraction ); //!< start -> maturity annualizer
 
-    VarianceSwapFlowNode( const string& Name );
-    ~VarianceSwapFlowNode() override;
+    VarianceFlowNode( const string& Name );
+    ~VarianceFlowNode() override;
 };

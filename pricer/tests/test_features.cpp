@@ -64,7 +64,7 @@ TEST_CASE( "calendar day-weight: MCL matches ANA under a non-unit weight" )
 // replication must agree, and the fair value is positive for a strike below vol.
 TEST_CASE( "variance swap: MCL and ANA agree" )
 {
-    const std::string c = "o: !variance_swap {underlying: eq, premium_currency: eur,"
+    const std::string c = "o: !variance {underlying: eq, premium_currency: eur,"
                           " maturity: 2000-12-31, volatility_strike: 20, notional: 10000}\n";
     double ana = Premium( Price( OneContract( "ana", c ) ) );
     auto mr = Price( OneContract( "mcl", c ) );

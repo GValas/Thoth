@@ -18,7 +18,7 @@ class SimpleFixingData;
 //! also exactly what the MC path (restarting at today's spot) realises, so the
 //! three engines stay consistent. Without `start`, the historic spot-started
 //! behaviour is unchanged.
-class VarianceSwap : public Contract
+class Variance : public Contract
 {
 
   private:
@@ -98,6 +98,6 @@ class VarianceSwap : public Contract
     set<date> GetFlowDates() override;
 
     //! constructor / destructor
-    VarianceSwap( const string& ObjectName );
-    ~VarianceSwap() override;
+    Variance( const string& ObjectName );
+    ~Variance() override;
 };

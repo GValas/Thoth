@@ -23,7 +23,7 @@
 #include "book.hpp"
 #include "vanilla.hpp"
 #include "barrier.hpp"
-#include "variance_swap.hpp"
+#include "variance.hpp"
 #include "autocallable.hpp"
 #include "asian.hpp"
 #include "ratchet.hpp"
@@ -94,7 +94,7 @@ Object* ObjectManager::Build( const string& ObjectName )
         // ---- instruments ----
         { KIND_VANILLA, &Create<Vanilla> },
         { KIND_BARRIER, &Create<Barrier> },
-        { KIND_VARIANCE_SWAP, &Create<VarianceSwap> },
+        { KIND_VARIANCE, &Create<Variance> },
         { KIND_AUTOCALLABLE, &Create<Autocallable> },
         { KIND_ASIAN, &Create<Asian> },
         { KIND_RATCHET, &Create<Ratchet> },

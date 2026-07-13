@@ -14,7 +14,7 @@
 class Vanilla;
 class Digital;
 class Barrier;
-class VarianceSwap;
+class Variance;
 
 class PricerANA : public Pricer
 {
@@ -31,7 +31,7 @@ class PricerANA : public Pricer
     void PriceVanilla( Vanilla* Opt );
     void PriceDigital( Digital* Opt ); //!< European binary (closed form BS_Digital_Price)
     void PriceBarrier( Barrier* Bar );
-    void PriceVarianceSwap( VarianceSwap* Swap );
+    void PriceVariance( Variance* Swap );
 
     //! Reiner-Rubinstein closed-form barrier price for a single spot value (used for
     //! the premium and the finite-difference spot Greeks). r is the risk-free rate,

@@ -204,7 +204,7 @@ it stays in lock-step with the config format.
 
 Tools: `price_vanilla` (european/american, flat vol **or a SABR smile**, optional
 Greeks), `price_barrier` (the four knock types, continuous or discrete monitoring),
-`price_variance_swap` (incl. discrete fixing schedules), **`price_yaml_book`** (raw
+`price_variance` (incl. discrete fixing schedules), **`price_yaml_book`** (raw
 YAML pass-through — the full engine: Heston/Bates, quanto/composite/basket,
 `!sequence` matrices, `vega_<param>` Greeks), `get_config_schema` (author configs
 from the live schema) and `engine_health` (reachability + latency; the internal

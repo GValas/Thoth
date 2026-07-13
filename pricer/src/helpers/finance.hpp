@@ -136,7 +136,7 @@ double Barrier_Price( const double Spot,
 //!   K_fair = (2 / (T * df)) * integral OTM(K) / K^2 dK   (puts below F, calls above)
 //! integrated by the trapezoidal rule over the caller-supplied strike grid and its
 //! matching per-strike implied vols (ascending strikes > 0; the grid may be
-//! non-uniform). The caller (variance_swap.cpp) builds the grid from the surface.
+//! non-uniform). The caller (variance.cpp) builds the grid from the surface.
 double VarSwap_FairVariance( const double Forward,
                              const double TimeToMaturity,
                              const double DiscountFactor,

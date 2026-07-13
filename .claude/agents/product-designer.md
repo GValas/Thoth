@@ -16,7 +16,7 @@ Before touching code, pin down the payoff and answer two questions that drive ev
 
 1. **Is it path-dependent?** If the payoff reads the underlying at more than the maturity spot (an average, a running max/min, a sequence of period returns, a barrier-touch history), it is **Monte-Carlo only** (`mcl`). ANA and PDE must reject it. If instead it has a closed form (a digital, a forward-start vanilla), it also gets an **ANA** path and, where a grid applies, PDE.
 2. **What is the closest existing product?** Mirror it. Study the nearest sibling and copy its structure rather than starting blank:
-   - average / running-statistic on one underlying → **`variance_swap`** (`asian.*`, `asian_flow_node.*`)
+   - average / running-statistic on one underlying → **`variance`** (`asian.*`, `asian_flow_node.*`)
    - a schedule of clipped, locked-in period returns / a coupon → **`ratchet`** (`ratchet.*`, `ratchet_flow_node.*`)
    - an observation schedule with early-exit / memory coupons → **`autocallable`**
    - a plain terminal payoff with a closed form → **`vanilla`** / **`barrier`**

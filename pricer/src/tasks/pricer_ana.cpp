@@ -10,7 +10,7 @@
 #include "single.hpp"     //!< Volatility / StochasticVolParams (MonoVol helper)
 #include "vanilla.hpp"
 #include "digital.hpp"
-#include "variance_swap.hpp"
+#include "variance.hpp"
 
 //! a closed-form pricer is just a Pricer; no engine state to initialise
 PricerANA::PricerANA( const string& ObjectName,
@@ -63,7 +63,7 @@ void PricerANA::PreCheck()
         auto* van = dynamic_cast<Vanilla*>( c );
         auto* dig = dynamic_cast<Digital*>( c );
         auto* bar = dynamic_cast<Barrier*>( c );
-        auto* vsw = dynamic_cast<VarianceSwap*>( c );
+        auto* vsw = dynamic_cast<Variance*>( c );
 
         const bool supported = ( van && !van->IsAmerican() ) || ( dig != nullptr ) ||
                                ( bar && !bar->IsDiscrete() ) ||
@@ -127,9 +127,9 @@ void PricerANA::PriceContract( Contract* Ctr )
     {
         PriceBarrier( b );
     }
-    else if ( VarianceSwap* s = dynamic_cast<VarianceSwap*>( Ctr ) )
+    else if ( Variance* s = dynamic_cast<Variance*>( Ctr ) )
     {
-        PriceVarianceSwap( s );
+        PriceVariance( s );
     }
     else
     {
@@ -289,7 +289,7 @@ void PricerANA::PriceBarrier( Barrier* Bar )
 //!   K_fair = (2/T) e^{rT} [ integral_0^F P(K)/K^2 dK + integral_F^inf C(K)/K^2 dK ]
 //! and PV = notional * DF * (K_fair - K_var). Model-free in the vols: it integrates
 //! the implied surface, so a smile (SABR) feeds in; for a flat vol it reproduces sigma^2.
-void PricerANA::PriceVarianceSwap( VarianceSwap* Swap )
+void PricerANA::PriceVariance( Variance* Swap )
 {
     Valuation& out = Result( Swap );
     Underlying* u = Swap->GetUnderlying();

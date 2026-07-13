@@ -147,7 +147,7 @@ underlying's surface exposes is silently skipped.
 - `barrier` — knock-out / digital payoffs, **continuous or
   discrete monitoring** (`monitoring_period_days`); PDE, MCL and (continuous-only)
   closed-form.
-- `variance_swap` — pays `notional * (realized_variance - strike_variance)`;
+- `variance` — pays `notional * (realized_variance - strike_variance)`;
   priced by **Monte-Carlo** (realized variance of the simulated path),
   **analytically** by static replication (the 1/K²-weighted option strip, so a
   smile feeds in), or by **PDE** (the fair variance as a backward
@@ -161,7 +161,7 @@ underlying's surface exposes is silently skipped.
   variance** (exact under flat BS — where it reduces to `σ²Δt` — and a
   per-interval ATM approximation under a smile, so a sloped term structure
   prices each interval's convexity at its own vol; pinned against the engine's
-  own surface on a steep 15%→35% term structure in `tests/test_variance_swap.cpp`)
+  own surface on a steep 15%→35% term structure in `tests/test_variance.cpp`)
   — the three engines agree on a monthly-fixing swap where the add-on is ~7% of
   the fair variance.
   `0`/absent keeps the continuous convention (every diffusion step).
@@ -792,7 +792,7 @@ scripts/         shell wrappers (run from the project root, e.g. ./scripts/forma
   true value). American basket / path-dependent payoffs are not yet covered. An
   American MC run logs under the `AMC` label (vs `MCL` for a plain European run).
 - The `nominal` contract field is not wired for vanillas and barriers (their
-  premiums are per unit); the `variance_swap` (`notional`) and the
+  premiums are per unit); the `variance` (`notional`) and the
   `autocallable` (`nominal`, default 100) DO scale their payoffs by it.
 - The HTTP server serialises pricing requests (single global engine state).
 - Yield/repo/dividend curves interpolate across their pillars in **every** engine:

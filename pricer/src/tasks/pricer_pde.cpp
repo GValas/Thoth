@@ -7,7 +7,7 @@
 #include "object_reader.hpp"
 #include "progress_bar.hpp"
 #include "autocallable.hpp"
-#include "variance_swap.hpp"
+#include "variance.hpp"
 #include "vanilla.hpp"
 #include "digital.hpp"
 
@@ -81,7 +81,7 @@ void PricerPDE::PreCheck()
         //! griddable underlying; dispatch on the type (RTTI) rather than the kind
         //! string, mirroring PriceContract / PricerANA::PreCheck.
         const bool supported = dynamic_cast<Vanilla*>( c ) || dynamic_cast<Digital*>( c ) ||
-                               dynamic_cast<Barrier*>( c ) || dynamic_cast<VarianceSwap*>( c ) ||
+                               dynamic_cast<Barrier*>( c ) || dynamic_cast<Variance*>( c ) ||
                                dynamic_cast<Autocallable*>( c );
 
         if ( !c->GetUnderlying()->IsGriddable() || !supported )
@@ -112,9 +112,9 @@ void PricerPDE::PriceBook()
 void PricerPDE::PriceContract( Contract* Ctr )
 {
 
-    if ( auto* vs = dynamic_cast<VarianceSwap*>( Ctr ) )
+    if ( auto* vs = dynamic_cast<Variance*>( Ctr ) )
     {
-        SolveVarianceSwap( vs ); //!< expected-accumulated-variance grid (sets premium)
+        SolveVariance( vs ); //!< expected-accumulated-variance grid (sets premium)
     }
     else if ( auto* ac = dynamic_cast<Autocallable*>( Ctr ) )
     {
@@ -792,7 +792,7 @@ PricerPDE::GridResult PricerPDE::SolveGrid( Contract* Ctr )
 //! it still reproduces sigma^2 exactly). The far-wing Dirichlet boundaries use the
 //! flat ATM variance (negligible probability weight there).
 //! Reuses the transformed grid + Crank-Nicolson solve, with C() = 0 (_variance_mode).
-void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
+void PricerPDE::SolveVariance( Variance* Ctr )
 {
     InitGrid( Ctr, false ); //!< transformed grid, v (ATM vol), r, T_max, ...
     _variance_mode = true;  //!< drop the reaction term: C() = 0
@@ -869,7 +869,7 @@ void PricerPDE::SolveVarianceSwap( VarianceSwap* Ctr )
 
     //! discrete observation: the grid solves the continuous expected accumulated
     //! variance; a discrete fixing schedule adds the same deterministic drift^2
-    //! term the ANA strip adds (see VarianceSwap::ObservationDriftVariance)
+    //! term the ANA strip adds (see Variance::ObservationDriftVariance)
     fair_var += Ctr->ObservationDriftVariance( _today );
 
     const double k_var = Ctr->GetVolatilityStrike() * Ctr->GetVolatilityStrike();

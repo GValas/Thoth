@@ -69,7 +69,7 @@ TEST_CASE( "termsheet: seasoned variance swap mentions the in-life window" )
         "fix: !simple_fixing_data {underlying: eq,"
         " dates: [1999-07-05, 1999-08-04, 1999-09-03, 1999-10-03, 1999-11-02, 1999-12-02],"
         " values: [100, 92, 103, 96, 108, 99]}\n"
-        "o: !variance_swap {underlying: eq, premium_currency: eur, maturity: 2000-12-31,"
+        "o: !variance {underlying: eq, premium_currency: eur, maturity: 2000-12-31,"
         " volatility_strike: 25, notional: 10000, observation_period_days: 30,"
         " start: 1999-07-05, fixings: fix}\n",
         "o" ) );

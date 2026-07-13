@@ -6,7 +6,7 @@ const KINDS = [
   'ana_pricer', 'pde_pricer', 'mcl_pricer', 'mcl_configuration', 'pde_configuration',
   'currency', 'yield_curve', 'repo_curve', 'continuous_dividends_curve',
   'simple_weighted_calendar', 'correlation_matrix', 'equity', 'bs_volatility',
-  'sabr_volatility', 'book', 'vanilla', 'barrier', 'variance_swap',
+  'sabr_volatility', 'book', 'vanilla', 'barrier', 'variance',
 ];
 
 const MARKET = { today: '2026-01-01', spot: 100, vol_pct: 30, rate_pct: 5 };

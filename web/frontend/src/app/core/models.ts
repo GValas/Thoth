@@ -139,7 +139,7 @@ export interface GridProgress {
 export type InstrumentKind =
   | 'vanilla'
   | 'barrier'
-  | 'variance_swap'
+  | 'variance'
   | 'autocallable'
   | 'asian'
   | 'ratchet'

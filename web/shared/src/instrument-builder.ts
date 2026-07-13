@@ -1,5 +1,5 @@
 //! Build a ONE-contract book for a single hand-entered instrument (vanilla / barrier /
-//! variance_swap, …) and pivot its result block into a flat {premium, greeks} record.
+//! variance, …) and pivot its result block into a flat {premium, greeks} record.
 //!
 //! This is the single-product counterpart of grid-builder: instead of a strike x maturity
 //! sweep it prices exactly one instrument so the GUI's pricing panels (and the monitoring
@@ -34,11 +34,11 @@ const DEFAULT_MCL_CONFIG: Record<string, unknown> = {
 export const CONTRACT_NAME = 'contract';
 const BOOK_NAME = 'instrument_book';
 
-//! A single hand-entered instrument: the engine kind tag (vanilla / barrier / variance_swap)
+//! A single hand-entered instrument: the engine kind tag (vanilla / barrier / variance)
 //! plus the kind's own fields (underlying, strike, maturity, barrier_type, …). Fields are
 //! passed through verbatim, so a panel can send any variation the engine accepts.
 export interface InstrumentSpec {
-  kind: string; //!< engine instrument kind, e.g. "vanilla" | "barrier" | "variance_swap"
+  kind: string; //!< engine instrument kind, e.g. "vanilla" | "barrier" | "variance"
   fields: Record<string, unknown>; //!< the instrument's own fields (no kind tag)
 }
 
@@ -172,7 +172,7 @@ export interface InstrumentResult {
 }
 
 //! Pivot a result block (keys like `contract_premium`, `contract_delta`) into a flat record.
-//! Missing/non-finite fields are simply omitted (variance_swap, for instance, may write no
+//! Missing/non-finite fields are simply omitted (variance, for instance, may write no
 //! Greeks); premium falls back to NaN so the caller can show "—".
 export function parseInstrumentResult(
   resultBlock: Record<string, unknown>,

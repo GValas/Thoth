@@ -120,9 +120,9 @@ matrix: !sequence
     - vanilla_multi_eu_call_basket_pde
     - vanilla_multi_eu_call_best_of_mcl
     - vanilla_multi_eu_call_worst_of_mcl
-    - variance_swap_mono_ana
-    - variance_swap_mono_mcl
-    - variance_swap_mono_pde
+    - variance_mono_ana
+    - variance_mono_mcl
+    - variance_mono_pde
     #! local-vol (SABR) — ANA at the strike implied vol vs MCL on the Dupire surface
     - vanilla_mono_eu_call_sabr_ana
     - vanilla_mono_eu_call_sabr_mcl
@@ -167,9 +167,9 @@ matrix: !sequence
     - vanilla_mono_eu_call_ois_pde
     - vanilla_mono_eu_call_hw_ana
     - vanilla_mono_eu_call_hw_mcl
-    - variance_swap_seasoned_ana
-    - variance_swap_seasoned_mcl
-    - variance_swap_seasoned_pde
+    - variance_seasoned_ana
+    - variance_seasoned_mcl
+    - variance_seasoned_pde
     - autocallable_athena_mcl
     - autocallable_athena_pde
     - autocallable_phoenix_mcl
@@ -520,29 +520,29 @@ vanilla_mono_eu_call_bates_pde: !pde_pricer
   result: vanilla_mono_eu_call_bates_pde_result
 
 # variance swap
-variance_swap_mono_mcl: !mcl_pricer
+variance_mono_mcl: !mcl_pricer
   today: 2000-01-01
   book: book_vswap
   currency: eur
   mcl_configuration: shared_mcl
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
-  result: variance_swap_mono_mcl_result
-variance_swap_mono_ana: !ana_pricer
+  result: variance_mono_mcl_result
+variance_mono_ana: !ana_pricer
   today: 2000-01-01
   book: book_vswap
   currency: eur
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
-  result: variance_swap_mono_ana_result
-variance_swap_mono_pde: !pde_pricer
+  result: variance_mono_ana_result
+variance_mono_pde: !pde_pricer
   today: 2000-01-01
   book: book_vswap
   currency: eur
   pde_configuration: shared_pde
   correlation: correl
   indicators: [premium, delta, gamma, vega, rho, theta]
-  result: variance_swap_mono_pde_result
+  result: variance_mono_pde_result
 
 # SABR local-vol ATM call: ANA prices Black-Scholes at the strike's SABR implied
 # vol; MCL diffuses the Dupire local vol built from the surface. They agree
@@ -939,7 +939,7 @@ c_barr_disc: !barrier
   monitoring_period_days: 30
   barrier_up_level: 130
 
-c_vswap: !variance_swap
+c_vswap: !variance
   underlying: eq
   premium_currency: eur
   maturity: 2000-12-31
@@ -1399,32 +1399,32 @@ correl_hw: !correlation_matrix
 # --- seasoned (in-life) variance swap: the observation window opened 6 months
 #     before valuation; the realised leg is read from the booked fixings and
 #     time-weighted with the future fair leg. All three engines agree.
-variance_swap_seasoned_ana: !ana_pricer
+variance_seasoned_ana: !ana_pricer
   today: 2000-01-01
   book: book_vswap_seasoned
   currency: eur
   correlation: correl
   indicators: [premium, delta]
-  result: variance_swap_seasoned_ana_result
-variance_swap_seasoned_mcl: !mcl_pricer
+  result: variance_seasoned_ana_result
+variance_seasoned_mcl: !mcl_pricer
   today: 2000-01-01
   book: book_vswap_seasoned
   currency: eur
   mcl_configuration: shared_mcl
   correlation: correl
   indicators: [premium]
-  result: variance_swap_seasoned_mcl_result
-variance_swap_seasoned_pde: !pde_pricer
+  result: variance_seasoned_mcl_result
+variance_seasoned_pde: !pde_pricer
   today: 2000-01-01
   book: book_vswap_seasoned
   currency: eur
   pde_configuration: shared_pde
   correlation: correl
   indicators: [premium, delta]
-  result: variance_swap_seasoned_pde_result
+  result: variance_seasoned_pde_result
 book_vswap_seasoned: !book
   contracts: [c_vswap_seasoned]
-c_vswap_seasoned: !variance_swap
+c_vswap_seasoned: !variance
   underlying: eq
   premium_currency: eur
   maturity: 2000-12-31
