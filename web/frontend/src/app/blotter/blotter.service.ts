@@ -8,6 +8,21 @@ import {
   InstrumentTermsheetRequest,
 } from '../core/models';
 
+//! The sales workflow state of a blotter line. A quote moves new -> quoting -> quoted as the
+//! engine prices it; from a resting `quoted` (or `error`) the salesperson resolves it to a
+//! terminal `traded` (dealt on behalf of the client) or `missed` (client dealt elsewhere).
+//! Terminal rows are frozen — never re-priced — so the executed quote is preserved.
+//!   new     : just created (in a panel), not yet priced
+//!   quoting : being priced by the engine (a request is in flight)
+//!   quoted  : has a fresh price, awaiting the sales decision
+//!   error   : the last pricing attempt failed
+//!   traded  : sales dealt it on behalf of the client (terminal)
+//!   missed  : the client dealt elsewhere (terminal)
+export type BlotterStatus = 'new' | 'quoting' | 'quoted' | 'error' | 'traded' | 'missed';
+
+//! the two frozen, sales-set end states — excluded from every (re-)pricing path.
+const TERMINAL_STATES: readonly BlotterStatus[] = ['traded', 'missed'];
+
 //! One monitored line in the global blotter: the exact pricing request that produced it
 //! (so it can be re-priced — live or on demand) plus its last quote and the move direction
 //! of its premium (for the green/red live tint, same idea as the option chain).
@@ -21,12 +36,17 @@ export interface BlotterRow {
   dir: number; //!< sign of the last premium move: +1 up / -1 down / 0 flat
   greeks: Partial<Record<'delta' | 'gamma' | 'vega' | 'rho' | 'theta', number>>;
   currency: string;
-  status: 'queued' | 'priced' | 'error';
-  pricedAt: Date | null; //!< wall-clock time of the last successful pricing (transient, not persisted)
+  status: BlotterStatus;
+  pricedAt: Date | null; //!< wall-clock time of the last successful pricing
   error?: string;
 }
 
 const GREEK_KEYS = ['delta', 'gamma', 'vega', 'rho', 'theta'] as const;
+
+//! is this row in a frozen, sales-set terminal state (never re-priced)?
+export function isTerminal(status: BlotterStatus): boolean {
+  return TERMINAL_STATES.includes(status);
+}
 
 //! Root-scoped global monitoring blotter. Rows pushed from the pricing panels live here so
 //! they survive tab navigation; Live mode re-prices every row off the live feed on a throttle
@@ -137,9 +157,10 @@ export class BlotterService {
     }
   }
 
-  //! Add a product to the blotter (deep-copying the request so later panel edits don't
-  //! mutate the monitored row) and price it once immediately so it shows a quote.
-  add(input: { label: string; kind: InstrumentKind; request: InstrumentPriceRequest }): void {
+  //! Create a blotter line (status `new`, deep-copying the request so later panel edits don't
+  //! mutate the monitored row) WITHOUT pricing it, and return its id. The pricing is the
+  //! caller's choice — `add` prices immediately; a panel upsert supplies its own fresh quote.
+  private createRow(input: { label: string; kind: InstrumentKind; request: InstrumentPriceRequest }): string {
     const row: BlotterRow = {
       id: `${Date.now()}-${this.seq++}`,
       label: input.label,
@@ -150,12 +171,113 @@ export class BlotterService {
       dir: 0,
       greeks: {},
       currency: input.request.currency ?? '',
-      status: 'queued',
+      status: 'new',
       pricedAt: null,
     };
     this.rows.update((rs) => [...rs, row]);
     this.persist();
-    void this.priceRow(row.id, this.liveMode());
+    return row.id;
+  }
+
+  //! Add a product to the blotter and price it once immediately so it shows a quote. Returns
+  //! the new row id so a caller (a pricing panel) can keep updating the same line.
+  add(input: { label: string; kind: InstrumentKind; request: InstrumentPriceRequest }): string {
+    const id = this.createRow(input);
+    void this.priceRow(id, this.liveMode());
+    return id;
+  }
+
+  //! Upsert a pricing panel's working quote as a SINGLE blotter line, so that every option
+  //! being priced in a panel is systematically mirrored here (the sales workflow starts in
+  //! the blotter, not on an explicit "send"). The panel keeps the returned id and passes it
+  //! back on each re-price so it updates the same row instead of spawning a new one. The panel
+  //! supplies the phase and, once priced, the computed quote — the blotter does NOT re-price
+  //! here (the panel already called the engine). A fresh row is created when there is no live
+  //! link yet or the previously linked row was resolved (traded/missed) — a new quote then
+  //! opens a new line rather than reviving a closed deal.
+  upsertFromPanel(input: {
+    rowId: string | null;
+    label: string;
+    kind: InstrumentKind;
+    request: InstrumentPriceRequest;
+    status: Extract<BlotterStatus, 'quoting' | 'quoted' | 'error'>;
+    premium?: number | null;
+    greeks?: BlotterRow['greeks'];
+    currency?: string;
+    error?: string;
+  }): string {
+    const existing = input.rowId ? this.rows().find((r) => r.id === input.rowId) : undefined;
+    if (!existing || isTerminal(existing.status)) {
+      // no live link (or the old one is closed): open a new line (no re-price — the panel
+      // already priced), then fold in the panel's own fresh result + phase.
+      const id = this.createRow({ label: input.label, kind: input.kind, request: input.request });
+      this.applyPanelQuote(id, input);
+      return id;
+    }
+    this.applyPanelQuote(existing.id, input);
+    return existing.id;
+  }
+
+  //! fold a panel-supplied quote (phase + premium/greeks) into an existing row.
+  private applyPanelQuote(
+    id: string,
+    input: {
+      label: string;
+      request: InstrumentPriceRequest;
+      status: Extract<BlotterStatus, 'quoting' | 'quoted' | 'error'>;
+      premium?: number | null;
+      greeks?: BlotterRow['greeks'];
+      currency?: string;
+      error?: string;
+    },
+  ): void {
+    this.rows.update((rs) =>
+      rs.map((r) => {
+        if (r.id !== id) return r;
+        const request = { ...input.request, instrument: { ...input.request.instrument }, live: false };
+        if (input.status === 'quoting') {
+          return { ...r, label: input.label, request, status: 'quoting', error: undefined };
+        }
+        if (input.status === 'error') {
+          return { ...r, label: input.label, request, status: 'error', error: input.error };
+        }
+        const prev = r.premium;
+        const premium = input.premium ?? null;
+        const dir = prev != null && premium != null && Number.isFinite(premium) ? Math.sign(premium - prev) : 0;
+        return {
+          ...r,
+          label: input.label,
+          request,
+          prevPremium: prev,
+          premium,
+          dir,
+          greeks: input.greeks ?? {},
+          currency: input.currency ?? r.currency,
+          status: 'quoted',
+          pricedAt: new Date(),
+          error: undefined,
+        };
+      }),
+    );
+    this.persist();
+  }
+
+  //! Sales resolves a row to a terminal state: `traded` (dealt on behalf of the client) or
+  //! `missed` (client dealt elsewhere). Freezes the last quote — the row is never re-priced
+  //! again. `reopen` undoes a mis-click, returning the row to `quoted` and re-pricing it.
+  markTraded(id: string): void {
+    this.setStatus(id, 'traded');
+  }
+  markMissed(id: string): void {
+    this.setStatus(id, 'missed');
+  }
+  reopen(id: string): void {
+    this.setStatus(id, 'quoted');
+    void this.priceRow(id, false);
+  }
+  private setStatus(id: string, status: BlotterStatus): void {
+    this.rows.update((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
+    this.persist();
   }
 
   remove(id: string): void {
@@ -194,15 +316,18 @@ export class BlotterService {
     }
   }
 
-  //! one-off re-price of every row, off the live feed (used to re-quote restored rows).
+  //! one-off re-price of every (non-terminal) row, off the live feed (used to re-quote
+  //! restored rows). Terminal rows keep their frozen executed quote.
   async repriceAll(live = false): Promise<void> {
-    await Promise.all(this.rows().map((r) => this.priceRow(r.id, live)));
+    await Promise.all(this.rows().filter((r) => !isTerminal(r.status)).map((r) => this.priceRow(r.id, live)));
   }
 
   //! re-price the TARGETED rows once (the ticked ones, or the whole book if none
-  //! ticked) — the toolbar "Re-price" button.
+  //! ticked) — the toolbar "Re-price" button. Skips frozen terminal rows.
   async repriceSelected(live = false): Promise<void> {
-    await Promise.all(this.targets().map((r) => this.priceRow(r.id, live)));
+    await Promise.all(
+      this.targets().filter((r) => !isTerminal(r.status)).map((r) => this.priceRow(r.id, live)),
+    );
   }
 
   //! render ONE row's termsheet (the engine's !termsheet task) and download it as a
@@ -232,7 +357,7 @@ export class BlotterService {
 
   private async liveTick(): Promise<void> {
     if (!this.liveMode()) return;
-    await Promise.all(this.rows().map((r) => this.priceRow(r.id, true)));
+    await Promise.all(this.rows().filter((r) => !isTerminal(r.status)).map((r) => this.priceRow(r.id, true)));
     if (this.liveMode()) {
       const ms = Math.max(1, this.liveThrottleSec) * 1000;
       this.liveTimer = setTimeout(() => void this.liveTick(), ms);
@@ -241,14 +366,17 @@ export class BlotterService {
 
   //! Price one row by id and fold the quote back in (tracking the premium move direction for
   //! the live tint). The row may have been removed mid-flight, so re-resolve it by id.
+  //! Terminal rows (traded / missed) are frozen and skipped. Flips the row to `quoting` while
+  //! the request is in flight, then to `quoted` (or `error`).
   private async priceRow(id: string, live: boolean): Promise<void> {
     const row = this.rows().find((r) => r.id === id);
-    if (!row) return;
+    if (!row || isTerminal(row.status)) return;
+    this.rows.update((rs) => rs.map((r) => (r.id === id ? { ...r, status: 'quoting' } : r)));
     try {
       const res = await firstValueFrom(this.api.priceInstrument({ ...row.request, live }));
       this.rows.update((rs) =>
         rs.map((r) => {
-          if (r.id !== id) return r;
+          if (r.id !== id || isTerminal(r.status)) return r;
           const prev = r.premium;
           const premium = res.result.premium;
           const dir = prev != null && Number.isFinite(premium) ? Math.sign(premium - prev) : 0;
@@ -259,7 +387,7 @@ export class BlotterService {
             dir,
             greeks: res.result.greeks ?? {},
             currency: res.currency,
-            status: 'priced',
+            status: 'quoted',
             pricedAt: new Date(),
             error: undefined,
           };
@@ -269,14 +397,20 @@ export class BlotterService {
       const err = e as { error?: { message?: string } };
       this.rows.update((rs) =>
         rs.map((r) =>
-          r.id === id ? { ...r, status: 'error', error: err.error?.message ?? 'Pricing failed' } : r,
+          r.id === id && !isTerminal(r.status)
+            ? { ...r, status: 'error', error: err.error?.message ?? 'Pricing failed' }
+            : r,
         ),
       );
     }
   }
 
-  //! Persist the monitored set (request + label, not the transient quote) so a reload
-  //! restores the book; quotes are re-fetched live. Best-effort — swallow storage errors.
+  //! Persist the monitored set so a reload restores the book. The request + label rebuild the
+  //! line; the workflow `status` and last quote (premium/greeks/currency) are persisted too so
+  //! sales-set terminal rows (traded / missed) survive a reload with their executed quote
+  //! frozen. Non-terminal rows are re-quoted live on restore. Best-effort — swallow storage
+  //! errors. A stray transient `quoting` is normalised to `new` (no request is in flight after
+  //! a reload).
   private persist(): void {
     try {
       const slim = this.rows().map((r) => ({
@@ -284,6 +418,11 @@ export class BlotterService {
         label: r.label,
         kind: r.kind,
         request: r.request,
+        status: r.status === 'quoting' ? 'new' : r.status,
+        premium: r.premium,
+        greeks: r.greeks,
+        currency: r.currency,
+        pricedAt: r.pricedAt ? r.pricedAt.getTime() : null,
       }));
       localStorage.setItem(this.STORE_KEY, JSON.stringify(slim));
     } catch {
@@ -292,7 +431,9 @@ export class BlotterService {
   }
 
   private restore(): void {
-    let saved: Array<Pick<BlotterRow, 'id' | 'label' | 'kind' | 'request'>> = [];
+    type Saved = Pick<BlotterRow, 'id' | 'label' | 'kind' | 'request'> &
+      Partial<Pick<BlotterRow, 'status' | 'premium' | 'greeks' | 'currency'>> & { pricedAt?: number | null };
+    let saved: Saved[] = [];
     try {
       const raw = localStorage.getItem(this.STORE_KEY);
       if (raw) saved = JSON.parse(raw);
@@ -302,17 +443,21 @@ export class BlotterService {
     if (!saved.length) return;
     this.rows.set(
       saved.map((s) => ({
-        ...s,
-        premium: null,
+        id: s.id,
+        label: s.label,
+        kind: s.kind,
+        request: s.request,
+        premium: s.premium ?? null,
         prevPremium: null,
         dir: 0,
-        greeks: {},
-        currency: s.request.currency ?? '',
-        status: 'queued' as const,
-        pricedAt: null,
+        greeks: s.greeks ?? {},
+        currency: s.currency ?? s.request.currency ?? '',
+        status: s.status ?? 'new',
+        pricedAt: s.pricedAt ? new Date(s.pricedAt) : null,
       })),
     );
-    // re-quote the restored rows once so they aren't blank.
+    // re-quote the restored (non-terminal) rows once so they aren't blank; terminal rows keep
+    // their frozen executed quote.
     void this.repriceAll(false);
   }
 }

@@ -27,6 +27,14 @@
       >
         <mat-icon>refresh</mat-icon> Re-price {{ targetLabel() }}
       </button>
+      <button
+        mat-stroked-button
+        [color]="showGreeks() ? 'primary' : undefined"
+        (click)="toggleGreeks()"
+        [matTooltip]="showGreeks() ? 'Hide the Greek columns' : 'Show the Greek columns'"
+      >
+        <mat-icon>{{ showGreeks() ? 'visibility' : 'visibility_off' }}</mat-icon> Greeks
+      </button>
       <span class="thoth-spacer"></span>
       @if (b.liveMode()) {
         <span class="meta thoth-muted"><span class="dot-live"></span> Live — every {{ b.liveThrottleSec }}s off the live spots</span>
@@ -58,7 +66,7 @@
     </ng-container>
 
     <ng-container matColumnDef="kind">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Product" col="kind" [sortDir]="sortDirFor('kind')" [filter]="filterFor('kind')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('kind', $event)"
@@ -68,7 +76,7 @@
     </ng-container>
 
     <ng-container matColumnDef="label">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Description" col="label" [sortDir]="sortDirFor('label')" [filter]="filterFor('label')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('label', $event)"
@@ -78,7 +86,7 @@
     </ng-container>
 
     <ng-container matColumnDef="underlying">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Underlying" col="underlying" [sortDir]="sortDirFor('underlying')" [filter]="filterFor('underlying')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('underlying', $event)"
@@ -88,7 +96,7 @@
     </ng-container>
 
     <ng-container matColumnDef="spot">
-      <th mat-header-cell *matHeaderCellDef class="num">
+      <th mat-header-cell *matHeaderCellDef class="num" cdkDrag>
         <app-blotter-col-header
           label="Spot" col="spot" [sortDir]="sortDirFor('spot')" [filter]="filterFor('spot')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('spot', $event)"
@@ -100,7 +108,7 @@
     </ng-container>
 
     <ng-container matColumnDef="engine">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Engine" col="engine" [sortDir]="sortDirFor('engine')" [filter]="filterFor('engine')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('engine', $event)"
@@ -110,7 +118,7 @@
     </ng-container>
 
     <ng-container matColumnDef="premium">
-      <th mat-header-cell *matHeaderCellDef class="num">
+      <th mat-header-cell *matHeaderCellDef class="num" cdkDrag>
         <app-blotter-col-header
           label="Premium" col="premium" [sortDir]="sortDirFor('premium')" [filter]="filterFor('premium')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('premium', $event)"
@@ -122,7 +130,7 @@
     </ng-container>
 
     <ng-container matColumnDef="ccy">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Ccy" col="ccy" [sortDir]="sortDirFor('ccy')" [filter]="filterFor('ccy')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('ccy', $event)"
@@ -133,7 +141,7 @@
 
     @for (g of b.greekColumns(); track g) {
       <ng-container [matColumnDef]="g">
-        <th mat-header-cell *matHeaderCellDef class="num">
+        <th mat-header-cell *matHeaderCellDef class="num" cdkDrag>
           <app-blotter-col-header
             [label]="g" [col]="g" [sortDir]="sortDirFor(g)" [filter]="filterFor(g)"
             (sort)="toggleSort($event)" (filterChange)="setFilter(g, $event)"
@@ -144,7 +152,7 @@
     }
 
     <ng-container matColumnDef="priced">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Priced" col="priced" [sortDir]="sortDirFor('priced')" [filter]="filterFor('priced')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('priced', $event)"
@@ -154,26 +162,52 @@
     </ng-container>
 
     <ng-container matColumnDef="status">
-      <th mat-header-cell *matHeaderCellDef>
+      <th mat-header-cell *matHeaderCellDef cdkDrag>
         <app-blotter-col-header
           label="Status" col="status" [sortDir]="sortDirFor('status')" [filter]="filterFor('status')"
           (sort)="toggleSort($event)" (filterChange)="setFilter('status', $event)"
         ></app-blotter-col-header>
       </th>
       <td mat-cell *matCellDef="let r">
-        @if (r.status === 'error') {
-          <span class="thoth-error" [matTooltip]="r.error || ''"><mat-icon class="status-ic">error</mat-icon></span>
-        } @else if (r.status === 'queued') {
-          <span class="thoth-muted">…</span>
-        } @else {
-          <mat-icon class="status-ic ok">check_circle</mat-icon>
-        }
+        <span
+          [class]="'status-badge st-' + r.status"
+          [matTooltip]="r.status === 'error' ? (r.error || 'Pricing failed') : statusTooltip(r.status)"
+        >
+          <mat-icon class="status-ic">{{ statusIcon(r.status) }}</mat-icon>
+          {{ statusLabel(r.status) }}
+        </span>
       </td>
     </ng-container>
 
     <ng-container matColumnDef="actions">
-      <th mat-header-cell *matHeaderCellDef></th>
+      <th mat-header-cell *matHeaderCellDef class="actions-head">Actions</th>
       <td mat-cell *matCellDef="let r" class="row-actions">
+        @if (r.status === 'traded' || r.status === 'missed') {
+          <button
+            mat-icon-button
+            (click)="b.reopen(r.id)"
+            matTooltip="Reopen — undo the trade/miss mark and re-quote"
+          >
+            <mat-icon>undo</mat-icon>
+          </button>
+        } @else {
+          <button
+            mat-icon-button
+            class="act-traded"
+            (click)="b.markTraded(r.id)"
+            matTooltip="Mark traded — dealt on behalf of the client"
+          >
+            <mat-icon>check_circle</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            class="act-missed"
+            (click)="b.markMissed(r.id)"
+            matTooltip="Mark missed — client dealt elsewhere"
+          >
+            <mat-icon>cancel</mat-icon>
+          </button>
+        }
         <button
           mat-icon-button
           [disabled]="termsheetBusyId() === r.id"
@@ -188,7 +222,13 @@
       </td>
     </ng-container>
 
-    <tr mat-header-row *matHeaderRowDef="columns()"></tr>
+    <tr
+      mat-header-row
+      *matHeaderRowDef="columns()"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="dropColumn($event)"
+    ></tr>
     <tr
       mat-row
       *matRowDef="let row; columns: columns()"

@@ -62,6 +62,13 @@ export abstract class PricingPanelBase {
   liveThrottleSec = 5;
   private liveTimer?: ReturnType<typeof setTimeout>;
 
+  //! id of THIS panel's working quote in the global blotter. Every option priced in the panel
+  //! is systematically mirrored to the blotter as a single evolving line (the sales workflow
+  //! starts there); this holds the link so re-prices update that same row rather than spawning
+  //! new ones. Reset to null once the salesperson resolves the row (traded / missed) — the next
+  //! price then opens a fresh line. Lost when the panel is destroyed (a limitation for later).
+  private blotterRowId: string | null = null;
+
   init(): void {
     this.ctx.init();
     if (!this.currency) this.currency = this.ctx.defaultCurrency();
@@ -81,6 +88,9 @@ export abstract class PricingPanelBase {
   protected applyPrefill(): void {
     const p = this.prefillSvc.consume(this.kind);
     if (!p) return;
+    // re-link to the originating blotter row (double-click a row -> edit here): re-pricing
+    // then updates that same line instead of opening a duplicate.
+    this.blotterRowId = p.blotterRowId ?? null;
     this.engine = p.engine;
     const i = p.instrument;
     if (typeof i['underlying'] === 'string') this.underlying = i['underlying'];
@@ -150,14 +160,39 @@ export abstract class PricingPanelBase {
   private async run(req: InstrumentPriceRequest): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
+    this.pushToBlotter(req, 'quoting'); //!< mirror it to the blotter the moment it starts pricing
     try {
       const res = await firstValueFrom(this.api.priceInstrument(req));
       this.applyResult(res);
+      this.pushToBlotter(req, 'quoted', res);
     } catch (e) {
       this.fail(e);
+      this.pushToBlotter(req, 'error');
     } finally {
       this.busy.set(false);
     }
+  }
+
+  //! Mirror the panel's current quote to the global blotter as a single evolving line, keeping
+  //! the returned link so subsequent (re-)prices update the SAME row. `quoting` announces a
+  //! request is in flight; `quoted`/`error` fold in the outcome. This is what makes every
+  //! option priced in a panel systematically appear in the blotter's sales workflow.
+  private pushToBlotter(
+    req: InstrumentPriceRequest,
+    status: 'quoting' | 'quoted' | 'error',
+    res?: { result: { premium: number; greeks: Partial<Record<string, number>> }; currency: string },
+  ): void {
+    this.blotterRowId = this.blotter.upsertFromPanel({
+      rowId: this.blotterRowId,
+      label: this.rowLabel(),
+      kind: this.kind,
+      request: req,
+      status,
+      premium: res?.result.premium ?? null,
+      greeks: res?.result.greeks ?? {},
+      currency: res?.currency,
+      error: status === 'error' ? (this.error() ?? undefined) : undefined,
+    });
   }
 
   private applyResult(res: {
@@ -201,9 +236,11 @@ export abstract class PricingPanelBase {
         const res = await firstValueFrom(this.api.priceInstrument(req));
         this.applyResult(res);
         this.error.set(null);
+        this.pushToBlotter(req, 'quoted', res); //!< keep the mirrored blotter line live too
       } catch (e) {
         const err = e as { error?: { message?: string } };
         this.error.set(err.error?.message ?? 'Live pricing failed');
+        this.pushToBlotter(req, 'error');
       }
     }
     if (this.liveMode()) {
@@ -256,11 +293,27 @@ export abstract class PricingPanelBase {
     return name.toLowerCase().endsWith('.md') ? name : `${name}.md`;
   }
 
-  //! push the current product to the global monitoring blotter.
+  //! Explicitly push the current product to the global monitoring blotter. Now largely
+  //! redundant — pricing already mirrors the option to the blotter automatically — so this
+  //! updates the SAME linked line (never duplicates it). If nothing has been priced yet it
+  //! just prices, which mirrors the row on its own.
   addToBlotter(): void {
+    if (this.premium() == null) {
+      this.price();
+      return;
+    }
     const req = this.buildRequest(false);
     if (!req) return;
-    this.blotter.add({ label: this.rowLabel(), kind: this.kind, request: req });
+    this.blotterRowId = this.blotter.upsertFromPanel({
+      rowId: this.blotterRowId,
+      label: this.rowLabel(),
+      kind: this.kind,
+      request: req,
+      status: 'quoted',
+      premium: this.premium(),
+      greeks: this.greeks(),
+      currency: this.resultCurrency() || this.currency,
+    });
   }
 
   private fail(e: unknown): void {

@@ -95,7 +95,11 @@ binary: cash-or-nothing / asset-or-nothing call/put, ana/pde/mcl) — each showi
 premium + Greeks, each with a **Greeks** toggle that requests delta/gamma/vega/rho/theta
 from the engine's bump pass — meaningful even on the path-dependent notes (e.g. vega/rho/
 theta dominate on variance swaps and ratchets, where delta/gamma are ~0). Each panel can
-**re-price live** off the spot feed on a throttle, and has a **Send to blotter** button and a
+**re-price live** off the spot feed on a throttle. **Every option priced in a panel is
+systematically mirrored to the blotter** as a single evolving line (the sales workflow starts
+there, not on an explicit send): the row appears the moment pricing starts and updates in place
+on each re-price. A **Send to blotter** button remains (now idempotent — it updates the same
+mirrored line rather than duplicating it), alongside a
 **Termsheet** button that renders the product's booked description as a Markdown
 document (the engine's `!termsheet` documentation task, via `POST
 /api/instrument/termsheet`) and downloads it as a `.md` file — same form state as
@@ -118,7 +122,15 @@ it in its pricing panel** — the Panels tab jumps to the matching sub-panel (Va
 Variance / Autocallable / Asian / Ratchet / Digital) with the whole form prefilled from the booked
 contract, ready to tweak and re-price. Every column **sorts** (click the header — asc / desc /
 off) and carries a **per-column text filter** in its header, so the book can be ordered by any
-field and narrowed live. Pricing is backed by a synchronous
+field and narrowed live; the data columns can be **reordered by dragging their headers** (a drag
+handle on each), premia/Greeks are shown to **2 decimals**, and the **Greek columns are foldable**
+(hidden by default via a toolbar **Greeks** toggle for a lighter monitoring view). Each row carries
+a **sales-workflow status** badge — `new` (created, not yet priced) → `quoting` (being priced by
+the engine) → `quoted` (priced, awaiting the sales decision) → the salesperson resolves it from the
+**action column** to a frozen terminal state, `traded` (dealt on behalf of the client) or `missed`
+(client dealt elsewhere); terminal rows are never re-priced (their executed quote is frozen and
+survives a reload), and an **undo** action reopens a mis-marked row. Only the **sales** role is
+modelled for now (trader / client roles come later). Pricing is backed by a synchronous
 `POST /api/instrument/price` endpoint (`live: true` overlays the live spots **and the live
 correlation matrix** — each streamed pair takes its live value, the rest keep their stored
 one, and the blend is Cholesky-gated back to the stored matrix if mixing would break

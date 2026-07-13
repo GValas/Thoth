@@ -7,6 +7,7 @@ export interface PanelPrefill {
   kind: InstrumentKind;
   engine: Engine;
   instrument: Record<string, unknown>;
+  blotterRowId?: string; //!< the originating blotter row, so re-pricing updates it in place
 }
 
 //! Hand-off channel for the "double-click a blotter row -> open it in the matching pricing
@@ -18,8 +19,9 @@ export class PanelPrefillService {
   private readonly _pending = signal<PanelPrefill | null>(null);
 
   //! stash a contract to open in its panel (deep-copied so later blotter edits don't leak in).
-  request(kind: InstrumentKind, engine: Engine, instrument: Record<string, unknown>): void {
-    this._pending.set({ kind, engine, instrument: { ...instrument } });
+  //! `blotterRowId` links it back to its blotter line so the panel re-prices that row in place.
+  request(kind: InstrumentKind, engine: Engine, instrument: Record<string, unknown>, blotterRowId?: string): void {
+    this._pending.set({ kind, engine, instrument: { ...instrument }, blotterRowId });
   }
 
   //! read the pending prefill without clearing it (the Panels tab uses this to pick the sub-tab).

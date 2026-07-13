@@ -9,11 +9,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Router } from '@angular/router';
 import { PanelContextService } from '../panels/panel-context.service';
 import { PanelPrefillService } from '../panels/panel-prefill.service';
 import { LiveSpotsService } from '../market-data/live-spots.service';
-import { BlotterService, BlotterRow } from './blotter.service';
+import { BlotterService, BlotterRow, BlotterStatus } from './blotter.service';
 import { BlotterColHeaderComponent, SortDir } from './blotter-col-header.component';
 
 //! Global monitoring blotter: every product sent from a pricing panel becomes a live row.
@@ -32,6 +33,7 @@ import { BlotterColHeaderComponent, SortDir } from './blotter-col-header.compone
     MatInputModule,
     MatTooltipModule,
     MatCheckboxModule,
+    DragDropModule,
     BlotterColHeaderComponent,
   ],
   templateUrl: './blotter.component.html',
@@ -106,6 +108,7 @@ export class BlotterComponent implements OnInit {
     if (col === 'spot') return this.fmt(this.spotOf(row));
     if (col === 'premium') return this.fmt(row.premium);
     if (col === 'priced') return this.fmtTime(row.pricedAt);
+    if (col === 'status') return this.statusLabel(row.status);
     const v = this.sortValue(row, col);
     if (v == null) return '';
     return typeof v === 'number' ? this.fmt(v) : String(v);
@@ -141,21 +144,54 @@ export class BlotterComponent implements OnInit {
     return out;
   });
 
-  //! the tick column first, fixed columns + whichever Greeks appear, then actions.
-  readonly columns = computed<string[]>(() => [
-    'select',
-    'kind',
-    'label',
-    'underlying',
-    'spot',
-    'engine',
-    'premium',
-    'ccy',
-    ...this.b.greekColumns(),
-    'priced',
-    'status',
-    'actions',
+  //! Greek columns are hidden by default (a lighter monitoring view); the toolbar toggles them.
+  readonly showGreeks = signal(false);
+  private static readonly GREEKS = ['delta', 'gamma', 'vega', 'rho', 'theta'];
+
+  //! user-reorderable order of the DATA columns (drag a header). `select` stays first and
+  //! `actions` last; Greeks keep their slot here even while hidden, so toggling them back on
+  //! restores their place.
+  readonly colOrder = signal<string[]>([
+    'kind', 'label', 'underlying', 'spot', 'engine', 'premium', 'ccy',
+    'delta', 'gamma', 'vega', 'rho', 'theta', 'priced', 'status',
   ]);
+
+  //! the displayed columns: select + the ordered data columns (Greeks only when shown and
+  //! actually present in the book) + actions.
+  readonly columns = computed<string[]>(() => {
+    const present = new Set(this.b.greekColumns());
+    const show = this.showGreeks();
+    const mid = this.colOrder().filter((c) =>
+      BlotterComponent.GREEKS.includes(c) ? show && present.has(c) : true,
+    );
+    return ['select', ...mid, 'actions'];
+  });
+
+  //! whether a column is a (draggable, sortable, filterable) data column vs a fixed one.
+  isDataColumn(col: string): boolean {
+    return col !== 'select' && col !== 'actions';
+  }
+
+  //! show / hide the Greek columns.
+  toggleGreeks(): void {
+    this.showGreeks.update((v) => !v);
+  }
+
+  //! reorder a data column by dragging its header. Move by NAME so the visible/hidden Greek
+  //! split never mismatches the drop indices; the fixed select/actions never move.
+  dropColumn(e: CdkDragDrop<unknown>): void {
+    const displayed = this.columns();
+    const from = displayed[e.previousIndex];
+    const to = displayed[e.currentIndex];
+    if (!from || !to || !this.isDataColumn(from) || !this.isDataColumn(to)) return;
+    const order = [...this.colOrder()];
+    const fi = order.indexOf(from);
+    const ti = order.indexOf(to);
+    if (fi >= 0 && ti >= 0) {
+      moveItemInArray(order, fi, ti);
+      this.colOrder.set(order);
+    }
+  }
 
   constructor() {
     // first-launch demo book: once the workspace's underlyings have loaded, if the
@@ -189,7 +225,7 @@ export class BlotterComponent implements OnInit {
 
   //! double-click a row -> open its contract in the matching pricing panel, prefilled.
   openInPanel(row: BlotterRow): void {
-    this.prefill.request(row.kind, row.request.engine, row.request.instrument);
+    this.prefill.request(row.kind, row.request.engine, row.request.instrument, row.id);
     void this.router.navigate(['/panels']);
   }
 
@@ -216,7 +252,7 @@ export class BlotterComponent implements OnInit {
 
   fmt(v: number | null | undefined): string {
     if (v == null || !Number.isFinite(v)) return '—';
-    return v.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   //! wall-clock time (HH:MM:SS) of a row's last successful pricing, or a dash.
@@ -228,6 +264,25 @@ export class BlotterComponent implements OnInit {
       second: '2-digit',
       hour12: false,
     });
+  }
+
+  //! --- sales workflow status column: label / icon / tooltip per state ---------
+  private static readonly STATUS_META: Record<BlotterStatus, { label: string; icon: string; tip: string }> = {
+    new: { label: 'New', icon: 'fiber_new', tip: 'Just created — not yet priced' },
+    quoting: { label: 'Quoting', icon: 'hourglass_top', tip: 'Being priced by the engine' },
+    quoted: { label: 'Quoted', icon: 'request_quote', tip: 'Priced — awaiting the sales decision' },
+    error: { label: 'Error', icon: 'error', tip: 'Pricing failed' },
+    traded: { label: 'Traded', icon: 'check_circle', tip: 'Dealt on behalf of the client' },
+    missed: { label: 'Missed', icon: 'cancel', tip: 'Client dealt elsewhere' },
+  };
+  statusLabel(s: BlotterStatus): string {
+    return BlotterComponent.STATUS_META[s]?.label ?? s;
+  }
+  statusIcon(s: BlotterStatus): string {
+    return BlotterComponent.STATUS_META[s]?.icon ?? 'help';
+  }
+  statusTooltip(s: BlotterStatus): string {
+    return BlotterComponent.STATUS_META[s]?.tip ?? '';
   }
 
   //! a word describing what an action targets (for the button label / snackbar):

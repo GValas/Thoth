@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 export type SortDir = 'asc' | 'desc' | null;
 
@@ -10,9 +11,10 @@ export type SortDir = 'asc' | 'desc' | null;
 @Component({
   selector: 'app-blotter-col-header',
   standalone: true,
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, DragDropModule],
   template: `
     <button type="button" class="bch-title" (click)="sort.emit(col)" [attr.aria-label]="'Sort by ' + label">
+      <mat-icon cdkDragHandle class="bch-drag" (click)="$event.stopPropagation()" aria-label="Drag to reorder">drag_indicator</mat-icon>
       <span>{{ label }}</span>
       <mat-icon class="bch-arrow" [class.on]="sortDir">{{
         sortDir === 'asc' ? 'arrow_upward' : sortDir === 'desc' ? 'arrow_downward' : 'unfold_more'
@@ -52,6 +54,16 @@ export type SortDir = 'asc' | 'desc' | null;
         color: inherit;
         text-align: left;
         white-space: nowrap;
+      }
+      .bch-drag {
+        font-size: 15px;
+        width: 15px;
+        height: 15px;
+        cursor: grab;
+        opacity: 0.3;
+      }
+      .bch-drag:active {
+        cursor: grabbing;
       }
       .bch-arrow {
         font-size: 15px;
