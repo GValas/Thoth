@@ -6,7 +6,10 @@ Guidance for Claude (and any agent) working in this repository.
 
 This is a monorepo. The C++ pricing engine lives under **`pricer/`** (its own
 `README.md`, `CMakeLists.txt`, `src/ tests/ samples/ schema/ docs/ scripts/`); the
-web dashboard lives under **`web/`** (NestJS BFF + Angular SPA, added incrementally).
+web dashboard lives under **`web/`** (NestJS BFF + Angular SPA, added incrementally),
+which also hosts **`web/mcp/`**, the MCP server exposing the engine to LLM agents
+(stdio + Streamable HTTP; see the root `README.md` for transports, auth and the
+claude.ai connector setup).
 The root holds the monorepo `README.md`, this file, `docker-compose.yml`, and the
 shared `.github/ .devcontainer/ .vscode/`.
 

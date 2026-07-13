@@ -251,6 +251,33 @@ claude mcp add --transport http thoth-pricing http://localhost:7777/mcp \
   --header "Authorization: Bearer $MCP_API_KEY"
 ```
 
+**claude.ai (web) custom connector:** claude.ai speaks Streamable HTTP but its
+custom connectors only support **OAuth or unauthenticated** servers — there is no
+field for a static bearer key, so it cannot call the `MCP_API_KEY`-protected
+endpoint directly. To connect claude.ai to a publicly exposed deployment, keep
+`MCP_API_KEY` set and add a **secret-path route on the public reverse proxy** that
+injects the header server-side (the secret URL is the credential; rotate it by
+changing the path segment). With nginx / Nginx Proxy Manager (Advanced tab):
+
+```nginx
+location = /mcp-<long-random-token> {
+    proxy_set_header Authorization "Bearer <MCP_API_KEY>";
+    proxy_pass http://<host>:7777/mcp;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection '';
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+}
+```
+
+Then register `https://<public-host>/mcp-<long-random-token>` in claude.ai under
+*Settings → Connectors → Add custom connector* (leave the OAuth fields empty).
+Note the endpoint is exact-matched: use `/mcp` **without** a trailing slash
+(`/mcp/` falls through to the SPA and answers 405).
+
 ## Repository map
 
 ```
